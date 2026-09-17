@@ -15,6 +15,7 @@ export * from './domain/entitlement-policy.ts';
 export * from './domain/asset.ts';
 export * from './domain/render.ts';
 export * from './domain/cost.ts';
+export * from './domain/operations.ts';
 export * from './domain/qa.ts';
 export * from './domain/project.ts';
 export * from './domain/job.ts';

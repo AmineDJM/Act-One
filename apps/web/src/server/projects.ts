@@ -47,7 +47,7 @@ export async function createProject(session: Session, input: CreateProjectInput)
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
-  const used = await store.projects.countCreatedSince(organization.id, monthStart.toISOString());
+  const used = await store.projects.countTowardQuotaSince(organization.id, monthStart.toISOString());
 
   // The decision itself is a pure function in @act-one/core, so the worker and
   // the app cannot drift into answering the same question differently.

@@ -9,6 +9,10 @@ import type {
   CreativeTreatment,
   CredentialAuditEvent,
   GenerationCost,
+  LogLevel,
+  LogQuery,
+  OperationalEvent,
+  OperationalEventInput,
   Job,
   JobKind,
   JobState,
@@ -61,6 +65,7 @@ export interface Store {
   readonly qaReports: QaReportRepo;
   readonly jobs: JobRepo;
   readonly costs: CostRepo;
+  readonly log: OperationalLogRepo;
   readonly comments: CommentRepo;
   readonly approvals: ApprovalRepo;
   readonly revisions: RevisionRepo;
@@ -124,7 +129,17 @@ export interface ProjectRepo {
   get(organizationId: string, id: string): Promise<Project | null>;
   update(organizationId: string, id: string, patch: Partial<Project>): Promise<Project>;
   list(organizationId: string, options?: { includeArchived?: boolean }): Promise<Project[]>;
-  countCreatedSince(organizationId: string, since: string): Promise<number>;
+  /**
+   * Projects that count against the plan's monthly allowance.
+   *
+   * Not simply "projects created": a project that failed before research ever
+   * produced an understanding cost the customer nothing and delivered nothing,
+   * and charging it against their allowance means a founder whose first two
+   * attempts broke on *our* side is told to upgrade. The moment an
+   * understanding exists we have delivered something, and it counts — however
+   * the project ends after that.
+   */
+  countTowardQuotaSince(organizationId: string, since: string): Promise<number>;
   setStage(organizationId: string, id: string, stage: ProjectStage): Promise<Project>;
   addCost(organizationId: string, id: string, costUsd: number, credits: number): Promise<void>;
   listByStage(stage: ProjectStage, limit?: number): Promise<Project[]>;
@@ -228,6 +243,26 @@ export interface CostRepo {
     byProvider: { provider: string; costUsd: number; calls: number; failures: number }[];
     byOperation: { operation: string; costUsd: number; calls: number }[];
   }>;
+}
+
+/**
+ * The operator's record of what the platform did.
+ *
+ * No organizationId parameter anywhere: these events span tenants by design and
+ * are reachable only with platform access. A tenant-scoped caller has no
+ * business here at all, so the contract does not offer them a way in.
+ */
+export interface OperationalLogRepo {
+  record(event: OperationalEventInput): Promise<OperationalEvent>;
+  /** Fire-and-forget: logging must never be the reason an operation fails. */
+  recordSafely(event: OperationalEventInput): void;
+  list(query?: LogQuery): Promise<OperationalEvent[]>;
+  /** Counts per level over a window, for the dashboard's health strip. */
+  levelCounts(since: string): Promise<Record<LogLevel, number>>;
+  /** The events happening most often, so an operator sees the pattern first. */
+  topEvents(since: string, limit?: number): Promise<{ event: string; level: LogLevel; count: number }[]>;
+  /** Trims events older than the retention window. Returns rows removed. */
+  prune(olderThan: string): Promise<number>;
 }
 
 export interface CommentRepo {

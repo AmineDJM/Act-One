@@ -83,14 +83,47 @@ async function runOne(
   job: Parameters<typeof runJob>[1],
 ): Promise<void> {
   const started = Date.now();
+  const where = {
+    organizationId: job.organizationId,
+    projectId: job.projectId ?? null,
+    jobId,
+    actorUserId: null,
+  };
+
   try {
     const outcome = await runJob(state.deps, job, state.controller.signal);
-    const seconds = ((Date.now() - started) / 1000).toFixed(1);
-    log(`${jobId} ${outcome.status} in ${seconds}s${'error' in outcome ? `: ${outcome.error}` : ''}`);
+    const durationMs = Date.now() - started;
+    const error = 'error' in outcome ? outcome.error : undefined;
+    log(`${jobId} ${outcome.status} in ${(durationMs / 1000).toFixed(1)}s${error ? `: ${error}` : ''}`);
+
+    /*
+     * Stdout is where this used to end, on a machine nobody operating the
+     * platform can reach. The customer is told "Something went wrong on our
+     * side" — correct, and useless on its own. The operator reads this.
+     */
+    state.deps.store.log.recordSafely({
+      ...where,
+      level: outcome.status === 'failed' ? 'error' : 'info',
+      source: 'worker',
+      event: `job.${outcome.status}`,
+      message: error ?? `${job.kind} ${outcome.status}`,
+      durationMs,
+      detail: { kind: job.kind, attempt: job.attempts, worker: state.config.workerId },
+    });
   } catch (error) {
     // runJob already records failure; this is the last line of defence against
     // an unhandled rejection taking the process down with it.
-    log(`${jobId} threw outside the runner: ${(error as Error).message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    log(`${jobId} threw outside the runner: ${message}`);
+    state.deps.store.log.recordSafely({
+      ...where,
+      level: 'error',
+      source: 'worker',
+      event: 'job.crashed',
+      message,
+      durationMs: Date.now() - started,
+      detail: { kind: job.kind, attempt: job.attempts, worker: state.config.workerId },
+    });
   }
 }
 

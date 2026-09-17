@@ -1,5 +1,18 @@
-import { AppError, notFound, retryDelayMs } from '@act-one/core';
+import {
+  AppError,
+  levelSeverity,
+  matchesLogQuery,
+  newId,
+  notFound,
+  redactDetail,
+  redactMessage,
+  retryDelayMs,
+} from '@act-one/core';
 import type {
+  LogLevel,
+  LogQuery,
+  OperationalEvent,
+  OperationalEventInput,
   Approval,
   ApprovalGate,
   Asset,
@@ -60,6 +73,7 @@ export class MemoryStore implements Store {
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
     jobs: new Map<string, Job>(),
     costs: new Map<string, GenerationCost>(),
+    log: new Map<string, OperationalEvent>(),
     comments: new Map<string, Comment>(),
     approvals: new Map<string, Approval>(),
     revisions: new Map<string, RevisionRequest & { organizationId: string }>(),
@@ -296,8 +310,14 @@ export class MemoryStore implements Store {
       this.scoped(this.tables.projects, organizationId)
         .filter((p) => options.includeArchived || p.archivedAt === null)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    countCreatedSince: async (organizationId: string, since: string) =>
-      this.scoped(this.tables.projects, organizationId).filter((p) => p.createdAt >= since).length,
+    countTowardQuotaSince: async (organizationId: string, since: string) => {
+      const understood = new Set(
+        [...this.tables.understandings.values()].map((u) => u.projectId),
+      );
+      return this.scoped(this.tables.projects, organizationId).filter(
+        (p) => p.createdAt >= since && !(p.stage === 'failed' && !understood.has(p.id)),
+      ).length;
+    },
     setStage: async (organizationId: string, id: string, stage: ProjectStage) =>
       this.patch(
         this.tables.projects,
@@ -659,6 +679,67 @@ export class MemoryStore implements Store {
       };
     },
   };
+
+  readonly log = {
+    record: async (input: OperationalEventInput) => this.writeEvent(input),
+    recordSafely: (input: OperationalEventInput) => {
+      // Logging a failure must never become a second failure.
+      try {
+        this.writeEvent(input);
+      } catch {
+        /* ignore */
+      }
+    },
+    list: async (query: LogQuery = {}) => {
+      const rows = [...this.tables.log.values()]
+        .filter((e) => matchesLogQuery(e, query))
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+      return rows.slice(0, query.limit ?? 200);
+    },
+    levelCounts: async (since: string) => {
+      const counts: Record<LogLevel, number> = { debug: 0, info: 0, warn: 0, error: 0 };
+      for (const event of this.tables.log.values()) {
+        if (event.at >= since) counts[event.level] += 1;
+      }
+      return counts;
+    },
+    topEvents: async (since: string, limit = 8) => {
+      const seen = new Map<string, { event: string; level: LogLevel; count: number }>();
+      for (const event of this.tables.log.values()) {
+        if (event.at < since) continue;
+        const existing = seen.get(event.event);
+        if (existing) {
+          existing.count += 1;
+          if (levelSeverity(event.level) > levelSeverity(existing.level)) existing.level = event.level;
+        } else {
+          seen.set(event.event, { event: event.event, level: event.level, count: 1 });
+        }
+      }
+      return [...seen.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+    },
+    prune: async (olderThan: string) => {
+      let removed = 0;
+      for (const [id, event] of this.tables.log) {
+        if (event.at < olderThan) {
+          this.tables.log.delete(id);
+          removed += 1;
+        }
+      }
+      return removed;
+    },
+  };
+
+  private writeEvent(input: OperationalEventInput): OperationalEvent {
+    const event: OperationalEvent = {
+      ...input,
+      id: input.id ?? newId('evt'),
+      at: input.at ?? new Date().toISOString(),
+      message: redactMessage(input.message ?? ''),
+      detail: redactDetail(input.detail ?? {}),
+    };
+    this.tables.log.set(event.id, event);
+    return event;
+  }
 
   readonly comments = {
     create: async (comment: Comment) => {

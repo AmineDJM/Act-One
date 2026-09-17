@@ -1,5 +1,9 @@
-import { AppError, notFound, resequence } from '@act-one/core';
+import { AppError, newId, notFound, redactDetail, redactMessage, resequence } from '@act-one/core';
 import type {
+  LogLevel,
+  LogQuery,
+  OperationalEvent,
+  OperationalEventInput,
   Approval,
   ApprovalGate,
   Asset,
@@ -530,10 +534,18 @@ export class PgStore implements Store {
         return r.rows.map(toProject);
       }),
 
-    countCreatedSince: async (organizationId: string, since: string) =>
+    countTowardQuotaSince: async (organizationId: string, since: string) =>
       this.tenant(organizationId, async (c) => {
         const r = await c.query<{ count: number }>(
-          'SELECT COUNT(*)::int AS count FROM projects WHERE organization_id = $1 AND created_at >= $2',
+          `SELECT COUNT(*)::int AS count FROM projects p
+           WHERE p.organization_id = $1
+             AND p.created_at >= $2
+             AND NOT (
+               p.stage = 'failed'
+               AND NOT EXISTS (
+                 SELECT 1 FROM product_understandings u WHERE u.project_id = p.id
+               )
+             )`,
           [organizationId, since],
         );
         return num(r.rows[0]?.count);
@@ -1300,6 +1312,107 @@ export class PgStore implements Store {
       }),
   };
 
+  // --- operations ---------------------------------------------------------
+
+  readonly log = {
+    record: async (input: OperationalEventInput) => this.writeEvent(input),
+
+    recordSafely: (input: OperationalEventInput) => {
+      /*
+       * Deliberately not awaited, and deliberately swallowing. This is called
+       * from failure paths — if the database is the thing that is unwell,
+       * logging that fact must not replace the original error with a second
+       * one, or turn a handled failure into an unhandled rejection.
+       */
+      void this.writeEvent(input).catch(() => undefined);
+    },
+
+    list: async (query: LogQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const where: string[] = [];
+        const params: unknown[] = [];
+        /** Appends a parameter and returns its placeholder. */
+        const bind = (value: unknown) => `$${params.push(value)}`;
+
+        if (query.level) where.push(`level = ${bind(query.level)}`);
+        if (query.minLevel) {
+          where.push(`severity_of(level) >= severity_of(${bind(query.minLevel)})`);
+        }
+        if (query.source) where.push(`source = ${bind(query.source)}`);
+        if (query.organizationId) where.push(`organization_id = ${bind(query.organizationId)}`);
+        if (query.projectId) where.push(`project_id = ${bind(query.projectId)}`);
+        if (query.event) where.push(`event = ${bind(query.event)}`);
+        if (query.since) where.push(`at >= ${bind(query.since)}`);
+        if (query.search) {
+          const needle = bind(`%${query.search}%`);
+          where.push(`(message ILIKE ${needle} OR event ILIKE ${needle})`);
+        }
+
+        const limit = bind(Math.min(Math.max(query.limit ?? 200, 1), 1000));
+        const r = await c.query(
+          `SELECT * FROM operational_events
+           ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+           ORDER BY at DESC LIMIT ${limit}`,
+          params,
+        );
+        return r.rows.map(toEvent);
+      }),
+
+    levelCounts: async (since: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ level: LogLevel; count: number }>(
+          'SELECT level, COUNT(*)::int AS count FROM operational_events WHERE at >= $1 GROUP BY level',
+          [since],
+        );
+        const counts: Record<LogLevel, number> = { debug: 0, info: 0, warn: 0, error: 0 };
+        for (const row of r.rows) counts[row.level] = num(row.count);
+        return counts;
+      }),
+
+    topEvents: async (since: string, limit = 8) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ event: string; level: LogLevel; count: number }>(
+          `SELECT event,
+                  (ARRAY_AGG(level ORDER BY severity_of(level) DESC))[1] AS level,
+                  COUNT(*)::int AS count
+           FROM operational_events WHERE at >= $1
+           GROUP BY event ORDER BY count DESC LIMIT $2`,
+          [since, limit],
+        );
+        return r.rows.map((row) => ({ event: row.event, level: row.level, count: num(row.count) }));
+      }),
+
+    prune: async (olderThan: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('DELETE FROM operational_events WHERE at < $1', [olderThan]);
+        return r.rowCount ?? 0;
+      }),
+  };
+
+  private async writeEvent(input: OperationalEventInput): Promise<OperationalEvent> {
+    const event: OperationalEvent = {
+      ...input,
+      id: input.id ?? newId('evt'),
+      at: input.at ?? new Date().toISOString(),
+      message: redactMessage(input.message ?? ''),
+      detail: redactDetail(input.detail ?? {}),
+    };
+    await this.asPlatform(async (c) => {
+      await c.query(
+        `INSERT INTO operational_events
+           (id, at, level, source, event, message, organization_id, project_id, job_id,
+            actor_user_id, duration_ms, detail)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [
+          event.id, event.at, event.level, event.source, event.event, event.message,
+          event.organizationId, event.projectId, event.jobId, event.actorUserId,
+          event.durationMs, event.detail,
+        ],
+      );
+    });
+    return event;
+  }
+
   // --- collaboration ------------------------------------------------------
 
   readonly comments = {
@@ -1813,6 +1926,23 @@ function toCost(row: Row): GenerationCost {
     isRetry: Boolean(row['is_retry']),
     metadata: (row['metadata'] as Record<string, unknown>) ?? {},
     createdAt: iso(row['created_at']),
+  };
+}
+
+function toEvent(row: Row): OperationalEvent {
+  return {
+    id: row['id'] as string,
+    at: iso(row['at']),
+    level: row['level'] as OperationalEvent['level'],
+    source: row['source'] as OperationalEvent['source'],
+    event: row['event'] as string,
+    message: (row['message'] as string) ?? '',
+    organizationId: (row['organization_id'] as string) ?? null,
+    projectId: (row['project_id'] as string) ?? null,
+    jobId: (row['job_id'] as string) ?? null,
+    actorUserId: (row['actor_user_id'] as string) ?? null,
+    durationMs: row['duration_ms'] === null || row['duration_ms'] === undefined ? null : num(row['duration_ms']),
+    detail: (row['detail'] as Record<string, unknown>) ?? {},
   };
 }
 
