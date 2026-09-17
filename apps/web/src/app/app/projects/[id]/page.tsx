@@ -42,7 +42,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     poster,
     copyKit,
   } = view;
-  const cta = primaryCtaFor(project.stage);
+
+  /*
+   * A running job wins over the stage.
+   *
+   * Cutting a campaign leaves the project at film_ready, so the CTA stayed
+   * pressable while the cuts were rendering and a second click queued a second
+   * campaign. Anything in flight is a reason to watch, whatever the stage says.
+   */
+  const cta = activeJob ? 'watch_progress' : primaryCtaFor(project.stage);
   const permission = await renderPermission(session, project);
 
   return (

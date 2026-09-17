@@ -39,11 +39,10 @@ export async function runCampaign(
 
     // Each cut is its own storyboard, persisted so the variant can be
     // re-rendered later without re-deriving the edit.
-    const cut = resequence(variantStoryboard(storyboard, plan));
+    const cut = resequence(variantStoryboard(storyboard, plan, newId('sbd')));
     const cutBoard = await store.storyboards.create(
       {
         ...cut,
-        id: newId('sbd'),
         version: (await store.storyboards.nextVersion(organizationId, project.id)),
         status: 'approved',
         createdAt: new Date().toISOString(),

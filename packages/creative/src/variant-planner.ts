@@ -186,18 +186,35 @@ function minimumLegible(scene: Scene): number {
 }
 
 /** Materialises a plan as a storyboard the render pipeline can execute. */
-export function variantStoryboard(master: Storyboard, plan: VariantPlan): Storyboard {
+/**
+ * The storyboard for one cut.
+ *
+ * Takes the id it will be stored under, because a cut is a new storyboard and
+ * its scenes are new rows. Spreading the master's scenes kept their ids and
+ * their storyboardId, so persisting a cut tried to insert scenes that already
+ * existed and every campaign died on a primary key violation.
+ *
+ * The variant itself still records the master's scene ids, which is the useful
+ * provenance: it says which moments of the film this cut is made of.
+ */
+export function variantStoryboard(
+  master: Storyboard,
+  plan: VariantPlan,
+  storyboardId: string,
+): Storyboard {
   const byId = new Map(master.scenes.map((s) => [s.id, s]));
   const scenes = plan.sceneIds
     .map((id) => byId.get(id))
     .filter((scene): scene is Scene => Boolean(scene))
     .map((scene) => ({
       ...scene,
+      id: newId('scn'),
+      storyboardId,
       duration: plan.durations[scene.id] ?? scene.duration,
       status: 'draft' as const,
     }));
 
-  return resequence({ ...master, scenes, updatedAt: new Date().toISOString() });
+  return resequence({ ...master, id: storyboardId, scenes, updatedAt: new Date().toISOString() });
 }
 
 export function toVariant(params: {

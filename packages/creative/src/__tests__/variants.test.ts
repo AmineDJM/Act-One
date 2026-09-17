@@ -98,15 +98,39 @@ describe('planCampaign', () => {
 
 describe('variantStoryboard', () => {
   it('materialises a plan as a renderable, resequenced storyboard', () => {
-    const plan = planVariant(master(), 'vertical_30');
-    const board = variantStoryboard(master(), plan);
+    const source = master();
+    const plan = planVariant(source, 'vertical_30');
+    const board = variantStoryboard(source, plan, 'sbd_cut');
 
-    expect(board.scenes.map((s) => s.id)).toEqual(plan.sceneIds);
+    expect(board.scenes).toHaveLength(plan.sceneIds.length);
     expect(board.scenes.map((s) => s.index)).toEqual(plan.sceneIds.map((_, i) => i));
     expect(storyboardDuration(board)).toBeCloseTo(
       Object.values(plan.durations).reduce((s, d) => s + d, 0),
       1,
     );
     expect(board.scenes[0]!.startTime).toBe(0);
+  });
+
+  it('gives the cut its own storyboard and its own scene rows', () => {
+    // Keeping the master's ids meant persisting a cut tried to insert scenes
+    // that already existed, and every campaign died on a key violation.
+    const source = master();
+    const plan = planVariant(source, 'vertical_30');
+    const board = variantStoryboard(source, plan, 'sbd_cut');
+
+    expect(board.id).toBe('sbd_cut');
+    expect(board.scenes.every((scene) => scene.storyboardId === 'sbd_cut')).toBe(true);
+
+    const masterIds = new Set(source.scenes.map((scene) => scene.id));
+    expect(board.scenes.some((scene) => masterIds.has(scene.id))).toBe(false);
+  });
+
+  it('gives two cuts of the same film different scene rows', () => {
+    const source = master();
+    const a = variantStoryboard(source, planVariant(source, 'vertical_30'), 'sbd_a');
+    const b = variantStoryboard(source, planVariant(source, 'vertical_30'), 'sbd_b');
+
+    const idsA = new Set(a.scenes.map((scene) => scene.id));
+    expect(b.scenes.some((scene) => idsA.has(scene.id))).toBe(false);
   });
 });
