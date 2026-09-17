@@ -1,0 +1,182 @@
+import { newId, type BrandSystem, type Concept, type ProductUnderstanding, type ProjectBrief, type Scene, type Storyboard } from '@act-one/core';
+
+export function brandFixture(over: Partial<BrandSystem> = {}): BrandSystem {
+  const now = '2026-01-01T00:00:00.000Z';
+  return {
+    id: 'brd_1',
+    organizationId: 'org_1',
+    name: 'Northwind',
+    logo: null,
+    logoVariants: [],
+    primaryColor: '#2f6fed',
+    secondaryColor: '#8fb2f7',
+    accentColors: [],
+    primaryCandidates: ['#2f6fed'],
+    neutrals: ['#0a0a0c', '#1c1c22', '#3d3d45', '#6b6b76', '#9a9aa4', '#c9c9d1', '#e7e7ec', '#f4f4f7', '#ffffff'],
+    canvasDark: '#08080c',
+    canvasLight: '#ffffff',
+    typography: [],
+    visualStyle: 'minimal',
+    imageTreatment: 'none',
+    layoutDensity: 'balanced',
+    cornerStyle: 'subtle',
+    cornerRadiusPx: 8,
+    motionStyle: 'precise',
+    tone: 'Plain-spoken.',
+    allowsGlow: false,
+    allowsGradient: false,
+    confirmedByUser: true,
+    sources: [],
+    createdAt: now,
+    updatedAt: now,
+    ...over,
+  };
+}
+
+export function understandingFixture(over: Partial<ProductUnderstanding> = {}): ProductUnderstanding {
+  return {
+    id: 'pun_1',
+    projectId: 'prj_1',
+    name: 'Northwind',
+    oneLiner: 'Reconciles invoices without a spreadsheet.',
+    category: 'Finance automation',
+    targetAudience: ['Controllers', 'Finance teams at mid-market companies'],
+    painPoints: [{ text: 'Month-end close takes a week of manual matching', evidenceIds: ['evt_1'] }],
+    keyBenefits: [{ text: 'Closes the books without manual matching', evidenceIds: ['evt_1'] }],
+    differentiators: [{ text: 'Reads the source documents rather than the ledger', evidenceIds: ['evt_2'] }],
+    coreFeatures: [{ text: 'Automated reconciliation', evidenceIds: ['evt_2'] }],
+    proofPoints: [{ text: 'Trusted by 400 finance teams', evidenceIds: ['evt_3'] }],
+    productMoments: [
+      {
+        id: 'mom_1',
+        title: 'Reconciliation runs',
+        description: 'Forty unmatched rows resolve to zero',
+        startState: '40 unmatched rows',
+        endState: '0 unmatched rows',
+        screenshots: ['ast_1', 'ast_2'],
+        recording: null,
+        sourceUrl: 'https://app.northwind.com/reconcile',
+        wowScore: 0.85,
+        relevanceScore: 0.9,
+        interactionSteps: ['Click Run'],
+        requiresAuth: true,
+        elementBounds: null,
+      },
+      {
+        id: 'mom_2',
+        title: 'Exception review',
+        description: 'Reviewing the few rows that need a human',
+        startState: '3 exceptions',
+        endState: 'cleared',
+        screenshots: ['ast_3'],
+        recording: null,
+        sourceUrl: 'https://app.northwind.com/exceptions',
+        wowScore: 0.5,
+        relevanceScore: 0.6,
+        interactionSteps: [],
+        requiresAuth: true,
+        elementBounds: null,
+      },
+    ],
+    strongestVisualMoments: ['mom_1', 'mom_2'],
+    tone: 'Direct, unfussy.',
+    brandTraits: ['precise'],
+    competitorCategory: 'Close management',
+    productMaturity: 'growth',
+    launchContext: 'product_launch',
+    evidence: [],
+    sources: [],
+    gaps: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  };
+}
+
+export function briefFixture(over: Partial<ProjectBrief> = {}): ProjectBrief {
+  return {
+    targetAudience: null,
+    goal: null,
+    keyMessage: null,
+    durationSeconds: 60,
+    channels: [],
+    creativeMode: 'studio',
+    voiceStrategy: null,
+    formats: [],
+    excludedClaims: [],
+    realMediaOnly: false,
+    ...over,
+  };
+}
+
+export function conceptFixture(over: Partial<Concept> = {}): Concept {
+  return {
+    id: newId('cpt'),
+    projectId: 'prj_1',
+    name: 'One run',
+    keyIdea: 'A week of manual matching collapses into a single run',
+    hook: 'Forty rows. One click.',
+    targetEmotion: 'relief',
+    productAngle: 'Problem first',
+    narrativeStructure: 'problem_shift_proof',
+    visualDirection: 'Dark, restrained',
+    motionDirection: 'Slow pushes',
+    soundDirection: 'Sub-heavy',
+    productUiUsage: 'Real reconciliation screen',
+    generativeUsage: 'None',
+    creativeSystem: 'cinematic_black',
+    estimatedDurationSeconds: 60,
+    recommendedChannels: ['homepage_hero'],
+    keyScenes: ['Rows pile up', 'One run', 'Zero left'],
+    momentIds: ['mom_1'],
+    animaticAssetId: null,
+    selected: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  };
+}
+
+export function sceneFixture(
+  over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualType'>,
+): Scene {
+  return {
+    storyboardId: 'sbd_1',
+    index: 0,
+    startTime: 0,
+    purpose: 'test scene',
+    narration: '',
+    onScreenText: [],
+    assetRefs: [],
+    momentIds: [],
+    motionRecipe: { name: 'hold', easing: 'out_quint', delay: 0, stagger: 0.06, intensity: 0.6, params: {} },
+    cameraRecipe: {
+      move: 'static', fromScale: 1, toScale: 1, fromX: 0, toX: 0, fromY: 0, toY: 0,
+      motionBlur: 0.1, depthOfField: 0, easing: 'in_out_quart',
+    },
+    soundCues: [],
+    voiceOver: false,
+    generativeNeeds: [],
+    threeDSceneId: null,
+    status: 'draft',
+    claimEvidenceIds: [],
+    notes: '',
+    estimatedCostUsd: 0,
+    ...over,
+  };
+}
+
+export function storyboardFixture(scenes: Scene[], over: Partial<Storyboard> = {}): Storyboard {
+  return {
+    id: 'sbd_1',
+    projectId: 'prj_1',
+    conceptId: 'cpt_1',
+    treatmentId: 'trt_1',
+    version: 1,
+    scenes,
+    voiceStrategy: 'none',
+    musicDirection: '',
+    status: 'draft',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  };
+}

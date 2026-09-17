@@ -90,13 +90,29 @@ export type Concept = z.infer<typeof Concept>;
  * divergence structurally so the strategy engine can reject and regenerate.
  */
 export function conceptDivergence(a: Concept, b: Concept): number {
-  let score = 0;
-  if (a.narrativeStructure !== b.narrativeStructure) score += 0.3;
-  if (a.creativeSystem !== b.creativeSystem) score += 0.25;
-  if (a.targetEmotion.toLowerCase() !== b.targetEmotion.toLowerCase()) score += 0.15;
-  score += 0.3 * (1 - lexicalOverlap(`${a.keyIdea} ${a.hook}`, `${b.keyIdea} ${b.hook}`));
-  return Math.min(1, score);
+  let structural = 0;
+  if (a.narrativeStructure !== b.narrativeStructure) structural += 0.3;
+  if (a.creativeSystem !== b.creativeSystem) structural += 0.25;
+  if (a.targetEmotion.toLowerCase() !== b.targetEmotion.toLowerCase()) structural += 0.15;
+
+  const ideaOverlap = lexicalOverlap(`${a.keyIdea} ${a.hook}`, `${b.keyIdea} ${b.hook}`);
+  const score = Math.min(1, structural + 0.3 * (1 - ideaOverlap));
+
+  // The idea can veto the structure.
+  //
+  // Structural difference alone used to be enough to pass, which meant three
+  // restatements of one idea counted as three directions because each had a
+  // different narrative shape. But the idea is what the customer reads on the
+  // card — three cards all saying "a week collapses into one run" are one
+  // concept in three outfits, however differently they are shot.
+  if (ideaOverlap > IDEA_RESTATEMENT_THRESHOLD) {
+    return Math.min(score, 0.4 * (1 - ideaOverlap));
+  }
+  return score;
 }
+
+/** Above this, two ideas are the same idea reworded. */
+export const IDEA_RESTATEMENT_THRESHOLD = 0.6;
 
 export function lexicalOverlap(a: string, b: string): number {
   const norm = (s: string) =>

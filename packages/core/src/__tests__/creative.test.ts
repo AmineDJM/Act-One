@@ -105,3 +105,47 @@ describe('primary CTA', () => {
     expect(primaryCtaFor('film_ready')).toBe('review_film');
   });
 });
+
+describe('idea-level veto', () => {
+  it('refuses to call three restatements of one idea diverse, however differently shot', () => {
+    const shared = 'Collapse a week of manual reconciliation into one automated run';
+    const a = concept({
+      id: '1',
+      name: 'One run',
+      keyIdea: shared,
+      narrativeStructure: 'problem_shift_proof',
+      creativeSystem: 'cinematic_black',
+      targetEmotion: 'relief',
+    });
+    const b = concept({
+      id: '2',
+      name: 'Single run',
+      keyIdea: 'Collapse a week of manual reconciliation into a single automated run',
+      // Every structural signal differs — and it still must not count as diverse.
+      narrativeStructure: 'manifesto',
+      creativeSystem: 'editorial_tech',
+      targetEmotion: 'ambition',
+    });
+
+    expect(conceptDivergence(a, b)).toBeLessThan(0.45);
+    expect(conceptSetIsDiverse([a, b])).toBe(false);
+  });
+
+  it('still rewards genuinely different ideas that share a structure', () => {
+    const a = concept({
+      id: '1',
+      name: 'One run',
+      keyIdea: 'A week of manual matching disappears into a single automated run',
+      targetEmotion: 'relief',
+      creativeSystem: 'cinematic_black',
+    });
+    const b = concept({
+      id: '2',
+      name: 'Nobody waits',
+      keyIdea: 'Finance stops being the department everyone else waits for',
+      targetEmotion: 'ambition',
+      creativeSystem: 'editorial_tech',
+    });
+    expect(conceptDivergence(a, b)).toBeGreaterThan(0.45);
+  });
+});

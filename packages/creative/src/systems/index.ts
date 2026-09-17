@@ -48,16 +48,21 @@ export function scoreSystemFit(
   let score = 0.5;
 
   const hasRealFootage = understanding.productMoments.some((m) => m.screenshots.length > 0);
-  const needsFootage = system.archetypes.filter((a) => a.requiresProductAsset).length;
-  const footageHeavy = needsFootage / system.archetypes.length > 0.5;
+  // Proportional, not a threshold. A system where half the archetypes need real
+  // capture is half as compromised without it as one where all of them do —
+  // a binary cutoff let exactly-half systems (Kinetic Product) escape entirely.
+  const footageDependence =
+    system.archetypes.filter((a) => a.requiresProductAsset).length / system.archetypes.length;
 
-  if (footageHeavy && !hasRealFootage) {
-    // A UI-led system with no real UI has to fake it, and we never fake it.
-    score -= 0.35;
-    reasons.push('No real product capture to carry a UI-led system');
-  } else if (footageHeavy && hasRealFootage) {
-    score += 0.18;
-    reasons.push('Real product capture available');
+  if (footageDependence > 0.2) {
+    if (hasRealFootage) {
+      score += 0.36 * footageDependence;
+      reasons.push('Real product capture available');
+    } else {
+      // A UI-led system with no real UI has to fake it, and we never fake it.
+      score -= 0.7 * footageDependence;
+      reasons.push('No real product capture to carry a UI-led system');
+    }
   }
 
   const styleAffinity: Record<string, CreativeSystemId[]> = {
