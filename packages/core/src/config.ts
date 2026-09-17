@@ -2,12 +2,18 @@ import { z } from 'zod';
 
 /**
  * Working product name. Branding is not final; nothing should hardcode it.
+ *
+ * Read through a guard because this module is also bundled for the browser by
+ * Remotion, where `process` does not exist.
  */
-export const PRODUCT_NAME = process.env.ACT_ONE_PRODUCT_NAME?.trim() || 'Act One';
-export const PRODUCT_TAGLINE =
-  process.env.ACT_ONE_TAGLINE?.trim() || 'Your product. Directed.';
+function env(name: string): string | undefined {
+  return typeof process !== 'undefined' ? process.env?.[name]?.trim() : undefined;
+}
+
+export const PRODUCT_NAME = env('ACT_ONE_PRODUCT_NAME') || 'Act One';
+export const PRODUCT_TAGLINE = env('ACT_ONE_TAGLINE') || 'Your product. Directed.';
 export const PRODUCT_SUBLINE =
-  process.env.ACT_ONE_SUBLINE?.trim() ||
+  env('ACT_ONE_SUBLINE') ||
   'Give us your product. We write, direct and produce the launch film.';
 
 /** Creative guard-rails that the engines enforce, tunable by Super Admin. */

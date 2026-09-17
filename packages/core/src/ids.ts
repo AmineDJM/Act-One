@@ -1,4 +1,18 @@
-import { randomUUID, randomBytes } from 'node:crypto';
+/**
+ * Id generation, deliberately isomorphic.
+ *
+ * These run in the Node worker, in Next.js server code, AND inside the Remotion
+ * bundle, which webpack targets at the browser. Importing node:crypto here
+ * broke the render bundle outright — so this uses Web Crypto, which is present
+ * in Node 18+, in browsers, and in workers alike.
+ */
+const webCrypto: Crypto = globalThis.crypto;
+
+function randomHex(bytes: number): string {
+  const buffer = new Uint8Array(bytes);
+  webCrypto.getRandomValues(buffer);
+  return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export type IdPrefix =
   | 'org'
@@ -27,12 +41,12 @@ export type IdPrefix =
  */
 export function newId(prefix: IdPrefix): string {
   const time = Date.now().toString(36).padStart(9, '0');
-  const rand = randomBytes(8).toString('hex');
+  const rand = randomHex(8);
   return `${prefix}_${time}${rand}`;
 }
 
 export function uuid(): string {
-  return randomUUID();
+  return webCrypto.randomUUID();
 }
 
 export function isId(value: unknown, prefix?: IdPrefix): value is string {
