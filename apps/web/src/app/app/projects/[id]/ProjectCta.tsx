@@ -3,7 +3,12 @@
 import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PrimaryCta } from '@act-one/core';
-import { startRenderAction, createCampaignAction, type FormState } from '../../actions.ts';
+import {
+  createCampaignAction,
+  retryProjectAction,
+  startRenderAction,
+  type FormState,
+} from '../../actions.ts';
 import styles from '../../app.module.css';
 
 /**
@@ -33,6 +38,9 @@ export function ProjectCta(props: {
     createCampaignAction,
     { error: null },
   );
+  const [retryState, retry, retrying] = useActionState<FormState, FormData>(retryProjectAction, {
+    error: null,
+  });
 
   useEffect(() => {
     if (!working) return;
@@ -43,10 +51,22 @@ export function ProjectCta(props: {
     return () => clearInterval(timer);
   }, [working, router]);
 
+  /*
+   * Every CTA that is not a progress state must resolve to something the
+   * customer can press. A CTA with no action renders no button at all, which is
+   * how "render the film" and "try again" both became dead ends on the two
+   * pages where somebody most needs a way forward.
+   */
   const action =
-    props.cta === 'render_film' ? render : props.cta === 'create_variants' ? campaign : null;
-  const pending = rendering || cutting;
-  const result = renderState.error ?? campaignState.error;
+    props.cta === 'render_film'
+      ? render
+      : props.cta === 'create_variants'
+        ? campaign
+        : props.cta === 'retry'
+          ? retry
+          : null;
+  const pending = rendering || cutting || retrying;
+  const result = renderState.error ?? campaignState.error ?? retryState.error;
 
   return (
     <section className={styles.cta}>

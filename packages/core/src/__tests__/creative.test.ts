@@ -6,6 +6,7 @@ import {
   conceptSetIsDiverse,
   leastDivergentPair,
   lexicalOverlap,
+  ctaNeedsAction,
   primaryCtaFor,
   CTA_LABELS,
   ProjectStage,
@@ -105,6 +106,21 @@ describe('primary CTA', () => {
     expect(primaryCtaFor('concepting')).toBe('watch_progress');
     expect(primaryCtaFor('concepts_ready')).toBe('choose_concept');
     expect(primaryCtaFor('film_ready')).toBe('review_film');
+  });
+
+  it('offers a way forward from an approved storyboard and from a failure', () => {
+    // Both of these produced a CTA the UI had no action for, so the page
+    // rendered no button: a finished storyboard could not be rendered, and a
+    // failed project could only be restarted by creating a whole new one.
+    expect(primaryCtaFor('storyboard_ready')).toBe('render_film');
+    expect(primaryCtaFor('failed')).toBe('retry');
+  });
+
+  it('only ever asks the customer to wait while work is actually running', () => {
+    const waiting = ProjectStage.options.filter((stage) => !ctaNeedsAction(primaryCtaFor(stage)));
+    expect(waiting.sort()).toEqual(
+      ['capturing_product', 'concepting', 'generating_assets', 'qa', 'rendering', 'researching', 'storyboarding'].sort(),
+    );
   });
 });
 

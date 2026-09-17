@@ -2,7 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { AppError, normalizeUrl, newId, can } from '@act-one/core';
+import {
+  AppError,
+  can,
+  newId,
+  normalizeUrl,
+  type JobKind,
+  type Project,
+  type ProjectStage,
+} from '@act-one/core';
 import { requireSession } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { createProject, enqueue, getProjectOr404 } from '@/server/projects.ts';
@@ -217,4 +225,46 @@ export async function createCampaignAction(
   } catch (error) {
     return { error: reportError('createCampaignAction', error).publicMessage };
   }
+}
+
+/**
+ * Picks a failed project back up.
+ *
+ * A project that failed was reachable only by starting again from the URL,
+ * which throws away the research, the brand and the concepts that did succeed —
+ * and, on the free plan, spends another project from the monthly allowance to
+ * recover from our own error. This re-queues the stage that actually failed and
+ * keeps everything before it.
+ */
+export async function retryProjectAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const project = await getProjectOr404(session, String(formData.get('projectId') ?? ''));
+
+    if (!can(session.actor, 'project:create')) {
+      throw new AppError('forbidden', 'Your role cannot restart work on a project.');
+    }
+
+    // Resume from the furthest point that completed, so a render that died does
+    // not re-run the research that did not.
+    const { kind, stage } = resumePointFor(project);
+    await getStore().projects.setStage(session.organizationId, project.id, stage);
+    await enqueue(project, kind, {}, 1);
+
+    revalidatePath(`/app/projects/${project.id}`);
+    return { error: null, message: 'Picking up where it stopped.' };
+  } catch (error) {
+    return { error: reportError('retryProjectAction', error).publicMessage };
+  }
+}
+
+/** The stage to re-enter, given what the project already has. */
+function resumePointFor(project: Project): { kind: JobKind; stage: ProjectStage } {
+  if (project.activeStoryboardId) return { kind: 'render_film', stage: 'rendering' };
+  if (project.selectedConceptId) return { kind: 'build_storyboard', stage: 'storyboarding' };
+  if (project.productUnderstandingId) return { kind: 'generate_concepts', stage: 'concepting' };
+  return { kind: 'research_product', stage: 'researching' };
 }

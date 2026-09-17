@@ -30,7 +30,6 @@ export const PrimaryCta = z.enum([
   'understand_product',
   'view_understanding',
   'choose_concept',
-  'review_storyboard',
   'render_film',
   'watch_progress',
   'review_film',
@@ -54,7 +53,14 @@ export function primaryCtaFor(stage: ProjectStage): PrimaryCta {
     case 'storyboarding':
       return 'watch_progress';
     case 'storyboard_ready':
-      return 'review_storyboard';
+      /*
+       * The storyboard is already on the page; a button labelled "review the
+       * storyboard" would do nothing. The action here is to render — and this
+       * returned a CTA the UI had no action for, so at the one moment the
+       * customer is ready to make their film, the page rendered no button at
+       * all.
+       */
+      return 'render_film';
     case 'capturing_product':
     case 'generating_assets':
     case 'rendering':
@@ -69,11 +75,24 @@ export function primaryCtaFor(stage: ProjectStage): PrimaryCta {
   }
 }
 
+/**
+ * The CTAs that are a state of waiting rather than something to press.
+ *
+ * Every other CTA must resolve to an action in the UI. One that does not
+ * renders no button at all, which is worse than a wrong button: the page simply
+ * stops offering a way forward and the customer has nowhere to go.
+ */
+export const PASSIVE_CTAS: readonly PrimaryCta[] = ['watch_progress'];
+
+/** True when this CTA needs the UI to give the customer something to press. */
+export function ctaNeedsAction(cta: PrimaryCta): boolean {
+  return !PASSIVE_CTAS.includes(cta);
+}
+
 export const CTA_LABELS: Record<PrimaryCta, string> = {
   understand_product: 'Understand my product',
   view_understanding: 'See what we found',
   choose_concept: 'Choose a concept',
-  review_storyboard: 'Review the storyboard',
   render_film: 'Render the film',
   watch_progress: 'Working…',
   review_film: 'Watch your film',
