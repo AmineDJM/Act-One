@@ -1,4 +1,5 @@
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
+import { installProxyFromEnvironment } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
 import { resolveFfmpeg } from '@act-one/sound';
 import { buildRegistry, loadConfig, type WorkerConfig } from './config.ts';
@@ -24,6 +25,16 @@ type WorkerState = {
 };
 
 async function main(): Promise<void> {
+  /*
+   * Before any provider exists. Node's fetch ignores HTTPS_PROXY, so a deploy
+   * whose egress is behind a proxy would otherwise see every provider call
+   * fail — as a timeout, or as a 401 that looks exactly like a bad API key.
+   */
+  const proxy = await installProxyFromEnvironment();
+  if (proxy.proxy) {
+    log(proxy.installed ? `egress proxy: ${proxy.proxy}` : `egress proxy configured but unavailable: ${proxy.proxy}`);
+  }
+
   const config = loadConfig();
 
   const state: WorkerState = {

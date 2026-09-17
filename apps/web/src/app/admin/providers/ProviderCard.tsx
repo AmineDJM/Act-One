@@ -1,7 +1,12 @@
 'use client';
 
 import { useActionState } from 'react';
-import { saveProviderAction, testProviderAction, type ActionResult } from '../actions.ts';
+import {
+  adoptFromEnvironmentAction,
+  saveProviderAction,
+  testProviderAction,
+  type ActionResult,
+} from '../actions.ts';
 import styles from '../admin.module.css';
 
 /**
@@ -37,8 +42,12 @@ export function ProviderCard(props: ProviderCardProps) {
     testProviderAction,
     null,
   );
+  const [adoptResult, adopt, adopting] = useActionState<ActionResult | null, FormData>(
+    adoptFromEnvironmentAction,
+    null,
+  );
 
-  const result = saveResult ?? testResult;
+  const result = adoptResult ?? saveResult ?? testResult;
   const statusLabel = props.state.configured
     ? props.state.source === 'console'
       ? 'Configured'
@@ -101,7 +110,22 @@ export function ProviderCard(props: ProviderCardProps) {
         </div>
 
         <div className={styles.providerActions}>
-          <button className="btn" type="submit" disabled={saving}>
+          {props.state.source === 'environment' ? (
+            /*
+             * The key already works — it is in the environment — but it lives
+             * outside the console, so it cannot be rotated without a redeploy
+             * and this page can only report it rather than own it. One click
+             * moves it into the vault.
+             */
+            <button className="btn" type="submit" formAction={adopt} disabled={adopting}>
+              {adopting ? 'Adopting…' : 'Adopt from environment'}
+            </button>
+          ) : null}
+          <button
+            className={props.state.source === 'environment' ? 'btn btn--secondary' : 'btn'}
+            type="submit"
+            disabled={saving}
+          >
             {saving ? 'Saving…' : 'Save & verify'}
           </button>
           <button className="btn btn--secondary" type="submit" formAction={test} disabled={testing}>

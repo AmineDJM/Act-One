@@ -13,6 +13,7 @@ import {
   ProviderConfig,
   ProviderRegistry,
   generateVaultKey,
+  installProxyFromEnvironment,
   secretContext,
   type ProviderHealth,
   type SecretVault,
@@ -38,7 +39,7 @@ export const PROVIDER_SLOTS = [
     label: 'OpenAI',
     purpose: 'Reads the product, writes the concepts, checks the finished film.',
     required: true,
-    fields: [{ key: 'apiKey', label: 'API key', placeholder: 'sk-…', secret: true }],
+    fields: [{ key: 'apiKey', label: 'API key', placeholder: 'sk-…', secret: true, envVar: 'OPENAI_API_KEY' }],
     envFallback: 'OPENAI_API_KEY',
     docsUrl: 'https://platform.openai.com/api-keys',
   },
@@ -48,8 +49,8 @@ export const PROVIDER_SLOTS = [
     purpose: 'Isolated browsers for reading sites and exploring customer products.',
     required: false,
     fields: [
-      { key: 'apiKey', label: 'API key', placeholder: 'bb_…', secret: true },
-      { key: 'projectId', label: 'Project ID', placeholder: 'uuid', secret: false },
+      { key: 'apiKey', label: 'API key', placeholder: 'bb_…', secret: true, envVar: 'BROWSERBASE_API_KEY' },
+      { key: 'projectId', label: 'Project ID', placeholder: 'uuid', secret: false, envVar: 'BROWSERBASE_PROJECT_ID' },
     ],
     envFallback: 'BROWSERBASE_API_KEY',
     docsUrl: 'https://www.browserbase.com/settings',
@@ -60,8 +61,8 @@ export const PROVIDER_SLOTS = [
     purpose: 'Generated cinematic shots, used sparingly for mood and metaphor.',
     required: false,
     fields: [
-      { key: 'apiKey', label: 'API key', placeholder: 'hf_…', secret: true },
-      { key: 'apiSecret', label: 'API secret', placeholder: 'optional', secret: true },
+      { key: 'apiKey', label: 'API key', placeholder: 'hf_…', secret: true, envVar: 'HIGGSFIELD_API_KEY' },
+      { key: 'apiSecret', label: 'API secret', placeholder: 'optional', secret: true, envVar: 'HIGGSFIELD_API_SECRET' },
     ],
     envFallback: 'HIGGSFIELD_API_KEY',
     docsUrl: 'https://higgsfield.ai',
@@ -72,8 +73,8 @@ export const PROVIDER_SLOTS = [
     purpose: 'Subscriptions, credits and the customer billing portal.',
     required: false,
     fields: [
-      { key: 'secretKey', label: 'Secret key', placeholder: 'sk_live_…', secret: true },
-      { key: 'webhookSecret', label: 'Webhook signing secret', placeholder: 'whsec_…', secret: true },
+      { key: 'secretKey', label: 'Secret key', placeholder: 'sk_live_…', secret: true, envVar: 'STRIPE_SECRET_KEY' },
+      { key: 'webhookSecret', label: 'Webhook signing secret', placeholder: 'whsec_…', secret: true, envVar: 'STRIPE_WEBHOOK_SECRET' },
     ],
     envFallback: 'STRIPE_SECRET_KEY',
     docsUrl: 'https://dashboard.stripe.com/apikeys',
@@ -85,9 +86,9 @@ export const PROVIDER_SLOTS = [
       'Optional. Assets are written to local disk by default, which is enough for a single box — point this at a bucket when the disk is ephemeral or more than one machine renders.',
     required: false,
     fields: [
-      { key: 'url', label: 'Project URL', placeholder: 'https://xyz.supabase.co', secret: false },
-      { key: 'serviceKey', label: 'Service role key', placeholder: 'eyJ…', secret: true },
-      { key: 'bucket', label: 'Bucket', placeholder: 'act-one', secret: false },
+      { key: 'url', label: 'Project URL', placeholder: 'https://xyz.supabase.co', secret: false, envVar: 'SUPABASE_URL' },
+      { key: 'serviceKey', label: 'Service role key', placeholder: 'eyJ…', secret: true, envVar: 'SUPABASE_SERVICE_ROLE_KEY' },
+      { key: 'bucket', label: 'Bucket', placeholder: 'act-one', secret: false, envVar: 'SUPABASE_STORAGE_BUCKET' },
     ],
     envFallback: 'SUPABASE_SERVICE_ROLE_KEY',
     docsUrl: 'https://supabase.com/dashboard/project/_/settings/api',
@@ -161,26 +162,23 @@ export async function readProviderCredentials(
 }
 
 function credentialsFromEnv(id: ProviderSlotId): Record<string, string> {
-  const pick = (name: string): string | undefined => process.env[name]?.trim() || undefined;
-  switch (id) {
-    case 'openai':
-      return clean({ apiKey: pick('OPENAI_API_KEY') });
-    case 'browserbase':
-      return clean({ apiKey: pick('BROWSERBASE_API_KEY'), projectId: pick('BROWSERBASE_PROJECT_ID') });
-    case 'higgsfield':
-      return clean({ apiKey: pick('HIGGSFIELD_API_KEY'), apiSecret: pick('HIGGSFIELD_API_SECRET') });
-    case 'stripe':
-      return clean({ secretKey: pick('STRIPE_SECRET_KEY'), webhookSecret: pick('STRIPE_WEBHOOK_SECRET') });
-    case 'supabase':
-      return clean({
-        url: pick('SUPABASE_URL'),
-        serviceKey: pick('SUPABASE_SERVICE_ROLE_KEY'),
-        bucket: pick('SUPABASE_STORAGE_BUCKET'),
-      });
-    default:
-      return {};
-  }
+  // Derived from the slot table rather than repeated here: two lists of the
+  // same environment variable names drift, and the one that drifts is always
+  // the one nobody is looking at.
+  const slot = PROVIDER_SLOTS.find((candidate) => candidate.id === id);
+  if (!slot) return {};
+  return clean(
+    Object.fromEntries(
+      slot.fields.map((field) => [field.key, process.env[field.envVar]?.trim() || undefined]),
+    ),
+  );
 }
+
+/** Every environment variable the console knows how to route, by slot. */
+export const ENV_VAR_ROUTES: { envVar: string; provider: ProviderSlotId; field: string }[] =
+  PROVIDER_SLOTS.flatMap((slot) =>
+    slot.fields.map((field) => ({ envVar: field.envVar, provider: slot.id, field: field.key })),
+  );
 
 /**
  * A hung database connection blocks until the pool's own timeout, which is far
@@ -244,6 +242,9 @@ export async function listProviderState(): Promise<ProviderCredentialState[]> {
 
 /** Live check against the vendor, so the console can show a real verdict. */
 export async function testProvider(id: ProviderSlotId): Promise<ProviderHealth> {
+  // Idempotent. A connection test that bypasses the egress proxy would report
+  // a healthy key as broken, or a broken one as healthy.
+  await installProxyFromEnvironment();
   const credentials = await readProviderCredentials(id);
   const { OpenAiLlmProvider, BrowserbaseProvider, HiggsfieldProvider, SupabaseStorageProvider } =
     await import('@act-one/providers');
@@ -360,6 +361,11 @@ export async function buildRegistry(scope: {
   projectId?: string | null;
   renderId?: string | null;
 }): Promise<ProviderRegistry> {
+  // Node's fetch ignores HTTPS_PROXY, so on a deploy behind an egress proxy
+  // every provider call fails in a way that looks like a bad key. Installing it
+  // here covers both the registry and the console's own connection tests.
+  await installProxyFromEnvironment();
+
   const config = await getPlatformConfig();
   const [openai, browserbase, higgsfield, supabase] = await Promise.all([
     readProviderCredentials('openai'),

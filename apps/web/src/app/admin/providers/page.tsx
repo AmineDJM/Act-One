@@ -1,6 +1,7 @@
 import { PROVIDER_SLOTS, getPlatformConfig, listProviderState } from '@/server/platform.ts';
 import { isUsingMemoryStore } from '@/server/store.ts';
 import { ProviderCard } from './ProviderCard.tsx';
+import { SetupPanel, type Readiness } from './SetupPanel.tsx';
 import { RoutingForm } from './RoutingForm.tsx';
 import styles from '../admin.module.css';
 
@@ -9,6 +10,60 @@ export const dynamic = 'force-dynamic';
 export default async function ProvidersPage() {
   const [states, config] = await Promise.all([listProviderState(), getPlatformConfig()]);
   const byId = new Map(states.map((state) => [state.id, state]));
+
+  /*
+   * What is actually stopping this platform from making a film, in the order
+   * an operator cares about. Only OpenAI is genuinely required: research falls
+   * back to a local Chromium, storage falls back to local disk, and a platform
+   * with no Stripe simply cannot charge anyone yet.
+   */
+  const state = (id: string) => byId.get(id as never);
+  const readiness: Readiness = {
+    blocking: [
+      {
+        label: 'OpenAI',
+        ready: Boolean(state('openai')?.configured),
+        note: 'Reads the product, writes the concepts, checks the film.',
+      },
+      {
+        label: 'A database',
+        ready: !isUsingMemoryStore(),
+        note: isUsingMemoryStore()
+          ? 'DATABASE_URL is not set, so nothing survives a restart.'
+          : 'Connected.',
+      },
+    ],
+    optional: [
+      {
+        label: 'Stripe',
+        ready: Boolean(state('stripe')?.configured),
+        note: state('stripe')?.configured
+          ? 'Subscriptions and credits are live.'
+          : 'Until this is set, nobody can be charged and every workspace stays on the free plan.',
+      },
+      {
+        label: 'Browserbase',
+        ready: Boolean(state('browserbase')?.configured),
+        note: state('browserbase')?.configured
+          ? 'Research runs on isolated cloud browsers.'
+          : 'Research runs on the local Chromium instead, which is fine on one machine.',
+      },
+      {
+        label: 'Higgsfield',
+        ready: Boolean(state('higgsfield')?.configured),
+        note: state('higgsfield')?.configured
+          ? 'Generated shots are available for mood and metaphor.'
+          : 'Films are rendered entirely by our own engine and real capture.',
+      },
+      {
+        label: 'Object storage',
+        ready: Boolean(state('supabase')?.configured),
+        note: state('supabase')?.configured
+          ? 'Assets are written to your bucket.'
+          : 'Assets are written to local disk — fine for one box, lost on an ephemeral one.',
+      },
+    ],
+  };
 
   return (
     <>
@@ -26,6 +81,8 @@ export default async function ProvidersPage() {
           memory and disappears on restart. Set DATABASE_URL and ACT_ONE_SECRET_KEYS to persist.
         </div>
       ) : null}
+
+      <SetupPanel readiness={readiness} />
 
       <div className={styles.providerList}>
         {PROVIDER_SLOTS.map((slot) => (

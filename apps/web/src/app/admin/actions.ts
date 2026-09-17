@@ -1,16 +1,27 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { Plan, CreativeBudget, type Entitlement } from '@act-one/core';
+import {
+  CreativeBudget,
+  Plan,
+  parseEnvBlock,
+  routeEnvEntries,
+  type Entitlement,
+} from '@act-one/core';
 import { ProviderConfig } from '@act-one/providers';
 import { requireSuperAdmin } from '@/server/auth.ts';
 import {
+  ENV_VAR_ROUTES,
+  PROVIDER_SLOTS,
   getPlatformConfig,
+  listProviderState,
+  readProviderCredentials,
   savePlatformConfig,
   saveProviderCredentials,
   testProvider,
   type ProviderSlotId,
 } from '@/server/platform.ts';
+import { getStore } from '@/server/store.ts';
 
 /**
  * Console mutations.
@@ -20,6 +31,60 @@ import {
  * this is the actual control.
  */
 export type ActionResult = { ok: boolean; message: string };
+
+export type ImportResult = {
+  ok: boolean;
+  message: string;
+  saved: { provider: string; fields: number; healthy: boolean; message?: string }[];
+  /** Keys in the pasted block that nothing wanted, so nobody assumes they landed. */
+  unmatched: string[];
+};
+
+export type ProviderHealthSummary = {
+  provider: string;
+  healthy: boolean;
+  latencyMs: number | null;
+  message: string | null;
+};
+
+/** Reads the environment values a slot would fall back to, without storing them. */
+function environmentCredentials(id: ProviderSlotId): Record<string, string> {
+  const slot = PROVIDER_SLOTS.find((candidate) => candidate.id === id);
+  if (!slot) return {};
+  const values: Record<string, string> = {};
+  for (const field of slot.fields) {
+    const value = process.env[field.envVar]?.trim();
+    if (value) values[field.key] = value;
+  }
+  return values;
+}
+
+/**
+ * Staff actions are logged.
+ *
+ * Who turned on which integration, and when, is the first question asked after
+ * anything unexpected — and the console is the one place where a single person
+ * can change how the whole platform behaves.
+ */
+async function recordAdminEvent(
+  actorUserId: string,
+  event: string,
+  message: string,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  getStore().log.recordSafely({
+    level: 'info',
+    source: 'admin',
+    event,
+    message,
+    organizationId: null,
+    projectId: null,
+    jobId: null,
+    actorUserId,
+    durationMs: null,
+    detail,
+  });
+}
 
 export async function saveProviderAction(
   _previous: ActionResult | null,
@@ -188,4 +253,132 @@ export async function saveBudgetAction(
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const text = typeof value === 'string' ? value.trim() : '';
   return text.length > 0 ? text : null;
+}
+
+/**
+ * Adopts credentials that are already in the environment.
+ *
+ * A deploy typically boots with keys in environment variables, which work but
+ * live outside the console: they cannot be rotated without a redeploy, and the
+ * console can only report "from environment" rather than own them. One click
+ * copies them into the vault, after which the console is the source of truth.
+ */
+export async function adoptFromEnvironmentAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireSuperAdmin();
+  const id = String(formData.get('provider') ?? '') as ProviderSlotId;
+
+  const values = environmentCredentials(id);
+  if (Object.keys(values).length === 0) {
+    return { ok: false, message: 'Nothing in the environment for this integration.' };
+  }
+
+  await saveProviderCredentials(id, values, user.id);
+  revalidatePath('/admin/providers');
+
+  const health = await testProvider(id);
+  await recordAdminEvent(user.id, 'integration.adopted', `Adopted ${id} from the environment.`, {
+    provider: id,
+    fields: Object.keys(values),
+    healthy: health.healthy,
+  });
+
+  return {
+    ok: health.healthy,
+    message: health.healthy
+      ? `Adopted ${Object.keys(values).length} value${Object.keys(values).length === 1 ? '' : 's'} and verified.`
+      : `Adopted, but the check failed: ${health.message ?? 'unknown error'}`,
+  };
+}
+
+/**
+ * Takes a pasted block of environment variables and files each value where it
+ * belongs.
+ *
+ * The values are already in the operator's .env or their host's dashboard.
+ * Making them pick it apart field by field is busywork, and busywork during
+ * setup is where half-configured platforms come from.
+ */
+export async function importEnvBlockAction(
+  _previous: ImportResult | null,
+  formData: FormData,
+): Promise<ImportResult> {
+  const user = await requireSuperAdmin();
+  const block = String(formData.get('env') ?? '');
+
+  const { matched, unmatched } = routeEnvEntries(parseEnvBlock(block), ENV_VAR_ROUTES);
+  if (matched.length === 0) {
+    return {
+      ok: false,
+      message:
+        unmatched.length > 0
+          ? `Recognised nothing to configure. Unused: ${unmatched.slice(0, 6).join(', ')}.`
+          : 'Nothing that looks like KEY=value.',
+      saved: [],
+      unmatched,
+    };
+  }
+
+  // Group by provider: each slot is one encrypted blob, so saving field by
+  // field would have the last write drop the others.
+  const byProvider = new Map<ProviderSlotId, Record<string, string>>();
+  for (const { route, value } of matched) {
+    const existing = byProvider.get(route.provider) ?? {};
+    existing[route.field] = value;
+    byProvider.set(route.provider, existing);
+  }
+
+  const saved: { provider: string; fields: number; healthy: boolean; message?: string }[] = [];
+  for (const [provider, values] of byProvider) {
+    // Merge over what is already stored, so pasting a block that only carries
+    // one of a provider's two fields does not erase the other.
+    const current = await readProviderCredentials(provider);
+    await saveProviderCredentials(provider, { ...current, ...values }, user.id);
+    const health = await testProvider(provider);
+    saved.push({
+      provider,
+      fields: Object.keys(values).length,
+      healthy: health.healthy,
+      ...(health.message ? { message: health.message } : {}),
+    });
+  }
+
+  revalidatePath('/admin/providers');
+  await recordAdminEvent(user.id, 'integration.imported', 'Imported credentials from a pasted block.', {
+    providers: saved.map((row) => row.provider),
+    unmatched,
+  });
+
+  const healthy = saved.filter((row) => row.healthy).length;
+  return {
+    ok: healthy === saved.length,
+    message:
+      healthy === saved.length
+        ? `Configured ${saved.length} integration${saved.length === 1 ? '' : 's'}, all verified.`
+        : `Configured ${saved.length}, ${saved.length - healthy} failed verification.`,
+    saved,
+    unmatched,
+  };
+}
+
+/** Runs a live check against every configured integration at once. */
+export async function testAllProvidersAction(): Promise<ProviderHealthSummary[]> {
+  await requireSuperAdmin();
+  const states = await listProviderState();
+
+  return Promise.all(
+    states
+      .filter((state) => state.configured)
+      .map(async (state) => {
+        const health = await testProvider(state.id);
+        return {
+          provider: state.id,
+          healthy: health.healthy,
+          latencyMs: health.latencyMs ?? null,
+          message: health.message ?? null,
+        };
+      }),
+  );
 }

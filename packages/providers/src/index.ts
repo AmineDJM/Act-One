@@ -1,5 +1,6 @@
 export * from './types.ts';
 export * from './http.ts';
+export * from './proxy.ts';
 export * from './secrets.ts';
 export * from './registry.ts';
 

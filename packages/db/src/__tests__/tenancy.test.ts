@@ -310,69 +310,52 @@ describe('concept selection', () => {
 
 describe('project quota accounting', () => {
   let store: MemoryStore;
+  let org: Organization;
+  let user: User;
 
   beforeEach(async () => {
     store = new MemoryStore();
-    await store.organizations.create({
-      id: 'org_q',
-      name: 'Quota',
-      slug: 'quota',
-      planId: 'free',
-      isSuspended: false,
-      creditBalance: 0,
-      creditsSpent: 0,
-      marginMultiplier: 3.2,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    });
+    org = makeOrg('Quota');
+    user = makeUser('founder@quota.com');
+    await store.organizations.create(org);
+    await store.users.create(user);
   });
 
-  async function project(id: string, stage: 'created' | 'failed' | 'film_ready') {
-    return store.projects.create({
-      id,
-      organizationId: 'org_q',
-      name: 'Test',
-      websiteUrl: 'https://example.com',
-      stage,
-      creativeMode: 'balanced',
-      realMediaOnly: false,
-      supplementalUrls: [],
-      durationSeconds: null,
-      createdByUserId: 'usr_1',
-      createdAt: '2026-02-01T00:00:00.000Z',
-      updatedAt: '2026-02-01T00:00:00.000Z',
-    } as Parameters<typeof store.projects.create>[0]);
-  }
+  const since = '2000-01-01T00:00:00.000Z';
 
-  const since = '2026-01-15T00:00:00.000Z';
+  async function project(stage: Project['stage']): Promise<Project> {
+    const created = await store.projects.create({ ...makeProject(org.id, user.id, 'Test'), stage });
+    return created;
+  }
 
   it('does not charge a project that failed before it delivered anything', async () => {
     // A founder whose first attempts broke on our side must not be told to
     // upgrade because of it.
-    await project('prj_dead_1', 'failed');
-    await project('prj_dead_2', 'failed');
-    expect(await store.projects.countTowardQuotaSince('org_q', since)).toBe(0);
+    await project('failed');
+    await project('failed');
+    expect(await store.projects.countTowardQuotaSince(org.id, since)).toBe(0);
   });
 
   it('charges a failed project once research produced an understanding', async () => {
-    await project('prj_partial', 'failed');
+    const failed = await project('failed');
     await store.understandings.create(
-      { id: 'und_1', projectId: 'prj_partial' } as Parameters<typeof store.understandings.create>[0],
-      'org_q',
+      { id: newId('pun'), projectId: failed.id } as Parameters<typeof store.understandings.create>[0],
+      org.id,
     );
 
-    expect(await store.projects.countTowardQuotaSince('org_q', since)).toBe(1);
+    expect(await store.projects.countTowardQuotaSince(org.id, since)).toBe(1);
   });
 
   it('charges every project that is not a bare failure', async () => {
-    await project('prj_live', 'created');
-    await project('prj_done', 'film_ready');
-    await project('prj_dead', 'failed');
-    expect(await store.projects.countTowardQuotaSince('org_q', since)).toBe(2);
+    await project('created');
+    await project('film_ready');
+    await project('failed');
+    expect(await store.projects.countTowardQuotaSince(org.id, since)).toBe(2);
   });
 
   it('ignores projects created before the window', async () => {
-    await project('prj_old', 'film_ready');
-    expect(await store.projects.countTowardQuotaSince('org_q', '2026-03-01T00:00:00.000Z')).toBe(0);
+    await project('film_ready');
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    expect(await store.projects.countTowardQuotaSince(org.id, future)).toBe(0);
   });
 });

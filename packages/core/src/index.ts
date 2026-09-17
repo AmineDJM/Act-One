@@ -3,6 +3,7 @@ export * from './errors.ts';
 export * from './ids.ts';
 export * from './config.ts';
 export * from './zod-helpers.ts';
+export * from './env-block.ts';
 
 export * from './domain/evidence.ts';
 export * from './domain/product.ts';
