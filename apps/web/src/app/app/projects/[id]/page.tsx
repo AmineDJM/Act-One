@@ -12,6 +12,7 @@ import { ProjectCta } from './ProjectCta.tsx';
 import { ConceptChoice } from './ConceptChoice.tsx';
 import { BrandConfirm } from './BrandConfirm.tsx';
 import { StoryboardPanel } from './StoryboardPanel.tsx';
+import { FilmDelivery } from './FilmDelivery.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     throw error;
   }
 
-  const { project, understanding, brand, concepts, storyboard, activeJob } = view;
+  const { project, understanding, brand, concepts, storyboard, activeJob, latestRender, variants, poster } =
+    view;
   const cta = primaryCtaFor(project.stage);
   const permission = await renderPermission(session, project);
 
@@ -59,6 +61,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         status={activeJob?.statusMessage ?? null}
         disabled={!permission.allowed && cta === 'render_film'}
       />
+
+      {/* The film comes first once it exists: it is what everything else was for. */}
+      {latestRender ? (
+        <div className={styles.panels}>
+          <FilmDelivery
+            render={latestRender}
+            variants={variants}
+            posterAssetId={poster?.id ?? null}
+            projectName={project.name}
+          />
+        </div>
+      ) : null}
 
       <div className={styles.panels}>
         {understanding ? (

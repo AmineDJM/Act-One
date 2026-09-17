@@ -153,7 +153,21 @@ export async function loadProjectView(session: Session, projectId: string) {
     ? await entitlementsFor(organization)
     : { plan: null, entitlements: new Set<never>() };
 
+  // The finished film, and the cuts made from it. Without these the project
+  // page can say a film is ready but has nothing to hand over.
+  const latestRender =
+    renders.find((render) => render.status === 'completed' && render.masterAssetId) ?? null;
+  const variants = latestRender
+    ? await store.variants.listForRender(session.organizationId, latestRender.id)
+    : [];
+  const posters = latestRender
+    ? await store.assets.listForProject(session.organizationId, project.id, 'poster_frame')
+    : [];
+
   return {
+    latestRender,
+    variants,
+    poster: posters[0] ?? null,
     project,
     understanding,
     brand,

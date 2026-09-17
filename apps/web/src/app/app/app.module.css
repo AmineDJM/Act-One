@@ -193,3 +193,31 @@
 }
 .planPrice span { font-size: 0.8rem; font-weight: 400; color: var(--text-muted); letter-spacing: 0; }
 .planFacts { list-style: none; display: grid; gap: 4px; font-size: 0.82rem; color: var(--text-secondary); }
+
+/* --- delivery ------------------------------------------------------------- */
+
+.player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  /* Explicit, because the height attribute a browser infers from the file would
+     otherwise fight the aspect ratio and letterbox the film in its own frame. */
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: #000;
+  display: block;
+}
+
+.variantList { list-style: none; display: grid; gap: var(--space-2); }
+.variantList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: 0.88rem;
+}
+.variantMeta { display: block; font-size: 0.78rem; color: var(--text-muted); margin-top: 1px; }
