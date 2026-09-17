@@ -27,6 +27,29 @@ export function probeDocument(): {
     bodySizePx: number;
   };
 } {
+  // Everything probeDocument needs must be defined INSIDE it: page.evaluate
+  // serialises this single function and evaluates it in the page, where module
+  // scope does not exist. A helper declared outside is silently undefined at
+  // runtime, which takes down the whole capture.
+  const inlineSvgMarkup = (svg: SVGElement): string => {
+    const clone = svg.cloneNode(true) as SVGElement;
+    if (!clone.getAttribute('xmlns')) {
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    }
+    // A logo that inherits currentColor renders black-on-black once it leaves
+    // the page, so resolve it to what the browser actually painted.
+    const painted = getComputedStyle(svg).color;
+    if (painted && painted.startsWith('rgb')) {
+      clone.setAttribute('color', painted);
+      if (!clone.getAttribute('fill')) clone.setAttribute('fill', painted);
+    }
+    if (!clone.getAttribute('viewBox')) {
+      const rect = svg.getBoundingClientRect();
+      clone.setAttribute('viewBox', `0 0 ${Math.round(rect.width)} ${Math.round(rect.height)}`);
+    }
+    return clone.outerHTML;
+  };
+
   const toHex = (value: string): string | null => {
     const match = value.match(/rgba?\(([^)]+)\)/);
     if (!match || !match[1]) return null;
@@ -161,9 +184,7 @@ export function probeDocument(): {
         : ('body' as const),
   }));
 
-  const logoCandidates = Array.from(
-    document.querySelectorAll<HTMLImageElement>('img, svg'),
-  )
+  const logoCandidates = Array.from(document.querySelectorAll<Element>('img, svg'))
     .filter((node) => {
       const rect = node.getBoundingClientRect();
       if (rect.top > 400 || rect.width < 16 || rect.width > 520) return false;
@@ -172,23 +193,36 @@ export function probeDocument(): {
         node.getAttribute('class') ?? '',
         node.getAttribute('id') ?? '',
         node.getAttribute('src') ?? '',
+        node.getAttribute('aria-label') ?? '',
         node.closest('a')?.getAttribute('href') ?? '',
       ]
         .join(' ')
         .toLowerCase();
-      return /logo|brand|wordmark|icon/.test(haystack) || node.closest('header') !== null;
+      return /logo|brand|wordmark/.test(haystack) || node.closest('header') !== null;
     })
-    .slice(0, 6)
+    .slice(0, 8)
     .map((node) => {
       const rect = node.getBoundingClientRect();
+      // Inline <svg> is how most well-built sites ship their logo, and it has
+      // no src at all. Serialising it to a data URL is the only way to get the
+      // real mark rather than falling back to a screenshot crop — and it is
+      // vector, which is what a 4K logo reveal needs.
+      // percent-encoded rather than base64: btoa throws on any non-Latin-1
+      // character, and logos carry ™, © and accented wordmarks routinely.
+      const src =
+        node.tagName.toLowerCase() === 'svg'
+          ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+              inlineSvgMarkup(node as SVGElement),
+            )}`
+          : node.getAttribute('src') ?? node.getAttribute('data-src') ?? '';
       return {
-        src: node.getAttribute('src') ?? node.getAttribute('data-src') ?? '',
-        alt: node.getAttribute('alt') ?? '',
+        src,
+        alt: node.getAttribute('alt') ?? node.getAttribute('aria-label') ?? '',
         width: Math.round(rect.width),
         height: Math.round(rect.height),
       };
     })
-    .filter((candidate) => candidate.src.length > 0);
+    .filter((candidate) => candidate.src.length > 0 && candidate.src.length < 200_000);
 
   const bodySizePx =
     Array.from(bodySizes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 16;

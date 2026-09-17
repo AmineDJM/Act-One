@@ -85,7 +85,22 @@ export class PlaywrightSession implements BrowserSession {
 
   async capture(options: CaptureOptions = {}): Promise<PageCapture> {
     await this.prepareForCapture(options);
-    const probed = await this.page.evaluate(probeDocument);
+
+    // The probe runs inside the customer's page, where a strict CSP, an exotic
+    // DOM or one thrown getter can take it down. Losing the style profile is
+    // survivable — losing the page text means the whole crawl produced nothing,
+    // so the text path degrades independently.
+    let probed: Awaited<ReturnType<typeof probeDocument>> | null = null;
+    try {
+      probed = await this.page.evaluate(probeDocument);
+    } catch (error) {
+      this.audit?.({
+        action: 'blocked',
+        detail: `Style probe failed on ${this.page.url()}: ${(error as Error).message.slice(0, 200)}`,
+      });
+    }
+
+    const fallback = probed ?? (await this.captureTextOnly());
     const html = await this.page.content();
     let screenshot: Uint8Array | null = null;
     try {
@@ -99,15 +114,35 @@ export class PlaywrightSession implements BrowserSession {
 
     return {
       url: this.page.url(),
-      title: probed.title,
-      text: probed.text,
+      title: fallback.title,
+      text: fallback.text,
       html: html.slice(0, 400_000),
       screenshot,
-      styleProfile: probed.styleProfile,
-      links: probed.links,
+      styleProfile: probed?.styleProfile ?? null,
+      links: fallback.links,
       statusCode: 200,
       capturedAt: new Date().toISOString(),
     };
+  }
+
+  /** Minimal, maximally-robust extraction for when the full probe fails. */
+  private async captureTextOnly(): Promise<{
+    title: string;
+    text: string;
+    links: { href: string; text: string }[];
+  }> {
+    try {
+      return await this.page.evaluate(() => ({
+        title: document.title ?? '',
+        text: (document.body?.innerText ?? '').slice(0, 60_000),
+        links: Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+          .slice(0, 400)
+          .map((a) => ({ href: a.href, text: (a.textContent ?? '').trim().slice(0, 140) }))
+          .filter((l) => l.href.startsWith('http')),
+      }));
+    } catch {
+      return { title: '', text: '', links: [] };
+    }
   }
 
   async screenshot(options: CaptureOptions = {}): Promise<Uint8Array> {

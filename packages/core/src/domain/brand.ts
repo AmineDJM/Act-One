@@ -83,6 +83,15 @@ export const BrandSystem = z.object({
   primaryColor: hexColor,
   secondaryColor: hexColor,
   accentColors: z.array(hexColor).default([]),
+  /**
+   * Other colours that could legitimately be the brand's primary, best first.
+   *
+   * Some brands genuinely have two: an established mark colour and a newer
+   * highlight, both used everywhere. No amount of measurement resolves that,
+   * and guessing confidently is worse than asking — so the confirmation screen
+   * offers these as one-click swaps instead of pretending we were sure.
+   */
+  primaryCandidates: z.array(hexColor).default([]),
   neutrals: z.array(hexColor).default([]),
   /** Film background. Dark films are the default for launch, but only if the brand allows it. */
   canvasDark: hexColor.default('#07070a'),
