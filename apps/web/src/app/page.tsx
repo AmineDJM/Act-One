@@ -5,6 +5,7 @@ import { CREATIVE_SYSTEMS } from '@act-one/creative';
 import { Nav } from '@/components/Nav.tsx';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
+import { HeroFilm } from '@/components/HeroFilm.tsx';
 import { site, absoluteUrl } from '@/lib/site.ts';
 import styles from '@/components/marketing.module.css';
 
@@ -69,10 +70,15 @@ const FAQ = [
 
 const FEATURED_SYSTEMS = ['cinematic_black', 'kinetic_product', 'editorial_tech'] as const;
 
-const SWATCHES: Record<string, { background: string; color: string }> = {
-  cinematic_black: { background: '#09090d', color: '#f4f5f8' },
-  kinetic_product: { background: '#5b7cfa', color: '#ffffff' },
-  editorial_tech: { background: '#f4f5f8', color: '#0b0b10' },
+/*
+ * Each system is shown as a frame from a film actually made in it, not as a
+ * colour swatch. A page arguing that these are distinct creative languages has
+ * to demonstrate the distinction; three rectangles demonstrate nothing.
+ */
+const SYSTEM_FRAMES: Record<string, { poster: string; company: string }> = {
+  cinematic_black: { poster: '/work/northwind.png', company: 'Northwind' },
+  kinetic_product: { poster: '/work/meridian.png', company: 'Meridian' },
+  editorial_tech: { poster: '/work/halyard.png', company: 'Halyard' },
 };
 
 export default function HomePage() {
@@ -84,14 +90,23 @@ export default function HomePage() {
       <main id="main">
         <section className={styles.hero}>
           <div className={`shell ${styles.heroInner}`}>
-            <p className="eyebrow">Launch films for software companies</p>
-            <h1 className={styles.heroTitle}>{site.tagline}</h1>
-            <p className={`lede ${styles.heroLede}`}>
-              Give us your product. We understand what it does, learn how your brand looks, develop
-              three creative directions, and produce the launch film — with the restraint of a studio
-              that has made a hundred of them.
-            </p>
-            <StartProject />
+            <div className={styles.heroCopy}>
+              <p className="eyebrow">Launch films for software companies</p>
+              <h1 className={styles.heroTitle}>{site.tagline}</h1>
+              <p className={`lede ${styles.heroLede}`}>
+                Give us your product. We understand what it does, learn how your brand looks, develop
+                three creative directions, and produce the launch film — with the restraint of a studio
+                that has made a hundred of them.
+              </p>
+              <StartProject />
+            </div>
+
+            {/*
+              * A company that sells film has to show film above the fold. This is
+              * a real render from the engine that would render yours, not a
+              * mockup of one.
+              */}
+            <HeroFilm />
           </div>
         </section>
 
@@ -177,13 +192,19 @@ export default function HomePage() {
           <div className={styles.systems}>
             {FEATURED_SYSTEMS.map((id) => {
               const system = CREATIVE_SYSTEMS[id];
-              const swatch = SWATCHES[id]!;
+              const frame = SYSTEM_FRAMES[id]!;
               return (
                 <article key={id} className={styles.system}>
-                  <div className={styles.systemSwatch} style={swatch}>
-                    {system.name}
-                  </div>
+                  <img
+                    className={styles.systemFrame}
+                    src={frame.poster}
+                    alt={`A frame from the ${frame.company} reference film, made in ${system.name}`}
+                    width={640}
+                    height={360}
+                    loading="lazy"
+                  />
                   <div className={styles.systemBody}>
+                    <h3 style={{ fontSize: '1rem' }}>{system.name}</h3>
                     <p>{system.essence}</p>
                     <p className="muted" style={{ fontSize: '0.82rem' }}>
                       Suits: {system.suitsWhen[0]}

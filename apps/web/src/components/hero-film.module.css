@@ -1,0 +1,36 @@
+.wrap { display: grid; gap: var(--space-3); min-width: 0; }
+
+.frame {
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.frame video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.caption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.caption a { color: var(--text-secondary); margin-left: auto; }
+.caption a:hover { color: var(--text); }
+.fiction { color: var(--text-muted); }
+
+.dots { display: inline-flex; gap: 6px; }
+.dots button {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+.dots button[data-active='true'] { background: var(--accent); transform: scale(1.25); }

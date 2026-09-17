@@ -22,7 +22,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\"",
     "verify": "npm run typecheck && npm run test",
-    "demo": "vite-node scripts/demo.ts"
+    "demo": "vite-node scripts/demo.ts",
+    "reference-films": "vite-node scripts/reference-films.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -1,0 +1,42 @@
+.card { display: grid; gap: var(--space-4); }
+
+.frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+.frame:hover,
+.frame:focus-visible { border-color: var(--line-strong); transform: translateY(-2px); }
+.frame video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.badge {
+  position: absolute;
+  bottom: var(--space-3);
+  left: var(--space-3);
+  padding: 4px 9px;
+  border-radius: 999px;
+  /* Sits over frames that may be near-white or near-black, so it carries its
+     own backdrop rather than trusting the film behind it. */
+  background: rgb(0 0 0 / 0.62);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  transition: opacity var(--duration) var(--ease);
+}
+.badge[data-playing='true'] { opacity: 0; }
+
+.card figcaption { display: grid; gap: var(--space-2); }
+.card h3 { font-size: 1.05rem; letter-spacing: -0.02em; }
+.idea { color: var(--text-secondary); font-size: 0.92rem; }
+.meta { font-size: 0.84rem; color: var(--text-muted); display: grid; gap: 2px; }
+.meta strong { color: var(--text-secondary); font-weight: 500; }

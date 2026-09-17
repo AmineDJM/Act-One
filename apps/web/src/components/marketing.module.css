@@ -75,9 +75,28 @@
   pointer-events: none;
   z-index: 0;
 }
-.heroInner { position: relative; z-index: 1; }
-.heroTitle { max-width: 16ch; margin-block: var(--space-5) var(--space-5); }
-.heroLede { margin-bottom: var(--space-7); }
+/*
+ * Copy and film side by side. The hero used to be copy alone in the left half
+ * of a 1440px page, and the empty right half read as unfinished rather than
+ * confident — on a page whose whole claim is film craft, that space should be
+ * holding a film.
+ */
+.heroInner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: clamp(var(--space-6), 5vw, var(--space-8));
+  align-items: center;
+}
+@media (max-width: 1000px) {
+  /* Copy first on a phone: somebody who has not read the claim yet has no
+     reason to care about the film. */
+  .heroInner { grid-template-columns: 1fr; gap: var(--space-7); }
+}
+.heroCopy { min-width: 0; }
+.heroTitle { max-width: 14ch; margin-block: var(--space-5) var(--space-5); }
+.heroLede { margin-bottom: var(--space-6); }
 
 .starter {
   max-width: 620px;
@@ -172,16 +191,6 @@
   transition: border-color var(--duration) var(--ease);
 }
 .system:hover { border-color: var(--line-strong); }
-.systemSwatch {
-  height: 132px;
-  display: flex;
-  align-items: center;
-  padding: var(--space-5);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  font-size: 1.5rem;
-  line-height: 1.05;
-}
 .systemBody { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
 .systemBody p { font-size: 0.9rem; color: var(--text-secondary); }
 
@@ -240,4 +249,28 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-5);
+}
+
+/* Reference films sit three across on desktop and one per row on a phone —
+   never two, which would leave an orphan and read as a layout accident. */
+.filmGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+@media (max-width: 1000px) { .filmGrid { grid-template-columns: 1fr; max-width: 560px; } }
+
+.systemFrame {
+  width: 100%;
+  /*
+   * `height: auto` is load-bearing. The element carries width/height attributes
+   * so the browser reserves the right box before the file arrives, and without
+   * this the height attribute wins over aspect-ratio — the frame rendered 365
+   * by 360 and object-fit cropped the headline out of its own poster.
+   */
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
 }
