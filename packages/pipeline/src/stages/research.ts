@@ -1,5 +1,5 @@
 import { AppError, newId, secretContextFor } from '../shared.ts';
-import { stageReached } from '@act-one/core';
+import { credentialIsUsable, stageReached } from '@act-one/core';
 import { ProductResearchAgent, ProductExplorer } from '@act-one/research';
 import type { SecretVault } from '@act-one/providers';
 import { policyForAuthenticatedProduct } from '@act-one/providers';
@@ -20,6 +20,10 @@ export async function runResearch(
 ): Promise<{ understandingId: string; brandId: string }> {
   const { store, registry, project, organizationId } = context;
   const call = { organizationId, projectId: project.id, signal: context.signal };
+
+  // Checked before a browser is opened, so an unusable address is a sentence
+  // rather than a timeout somewhere inside the agent.
+  assertResearchable(project.websiteUrl);
 
   await context.progress(0.02, 'Opening a browser');
 
@@ -148,7 +152,8 @@ async function exploreProduct(context: StageContext, vault?: SecretVault) {
   if (!project.productCredentialId || !vault) return empty;
 
   const credential = await store.credentials.getForProject(organizationId, project.id);
-  if (!credential || credential.revokedAt) return empty;
+  // One definition of usable, shared with the pages that offer to use it.
+  if (!credential || !credentialIsUsable(credential)) return empty;
 
   const sealed = await store.credentials.getCiphertext(organizationId, credential.id);
   if (!sealed) return empty;
@@ -231,6 +236,17 @@ async function exploreProduct(context: StageContext, vault?: SecretVault) {
   }
 }
 
-export function assertResearchable(websiteUrl: string): void {
+function assertResearchable(websiteUrl: string): void {
   if (!websiteUrl) throw new AppError('validation_failed', 'This project has no website to read.');
+  let parsed: URL;
+  try {
+    parsed = new URL(websiteUrl);
+  } catch {
+    throw new AppError('validation_failed', `${websiteUrl} is not an address we can open.`);
+  }
+  // A browser agent pointed at file:// or a private address is a way to read
+  // this machine rather than a customer's product.
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new AppError('validation_failed', 'A product lives at an http or https address.');
+  }
 }

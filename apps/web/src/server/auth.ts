@@ -5,12 +5,10 @@ import { redirect } from 'next/navigation';
 import {
   AppError,
   newId,
-  roleHasPermission,
   slugify,
   unauthorized,
   type ActorContext,
   type MemberRole,
-  type Permission,
   type User,
 } from '@act-one/core';
 import { getStore } from './store.ts';
@@ -247,14 +245,6 @@ export async function requireSession(): Promise<Session> {
 export async function requireSessionForPage(returnTo: string): Promise<Session> {
   const session = await getSession();
   if (!session) redirect(`/auth/sign-in?next=${encodeURIComponent(returnTo)}`);
-  return session;
-}
-
-export async function requirePermission(permission: Permission): Promise<Session> {
-  const session = await requireSession();
-  if (!roleHasPermission(session.role, permission)) {
-    throw new AppError('forbidden', `Your role (${session.role}) cannot do that.`);
-  }
   return session;
 }
 

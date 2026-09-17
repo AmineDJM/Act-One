@@ -433,12 +433,18 @@ export async function entitlementsFor(
   const { plans } = await getPlatformConfig();
   const subscription = await getStore().subscriptions.getForOrganization(organization.id);
 
-  const { planById, subscriptionIsLive } = await import('@act-one/core');
-  // A lapsed subscription falls back to free rather than keeping paid features:
-  // billing failures must degrade, not grant.
-  const effectivePlanId =
-    subscription && subscriptionIsLive(subscription.status) ? subscription.planId : organization.planId;
-  const plan = planById(plans, subscription && !subscriptionIsLive(subscription.status) ? 'free' : effectivePlanId);
+  // One definition, shared with the worker. Two copies of "what is this
+  // customer entitled to" is how a page offers 4K that the renderer does not
+  // make, or a lapsed subscription keeps a feature on one side and loses it on
+  // the other.
+  const { effectivePlan } = await import('@act-one/core');
+  const plan = effectivePlan({
+    plans,
+    organization,
+    subscription: subscription
+      ? { planId: subscription.planId, status: subscription.status }
+      : null,
+  });
 
   return { plan, entitlements: new Set(plan.entitlements) };
 }

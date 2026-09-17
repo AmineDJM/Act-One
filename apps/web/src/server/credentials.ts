@@ -4,6 +4,7 @@ import {
   DEFAULT_DENIED_PATHS,
   ProductCredentialKind,
   can,
+  credentialIsUsable,
   loginUrlBelongsToProduct,
   newId,
   type CredentialAuditEvent,
@@ -75,7 +76,7 @@ export async function authorizeProductAccess(
 
   // Anything already authorised for this project is replaced, not accumulated.
   const existing = await store.credentials.getForProject(session.organizationId, project.id);
-  if (existing && !existing.revokedAt) {
+  if (existing && credentialIsUsable(existing)) {
     await store.credentials.revoke(session.organizationId, existing.id);
     await writeAudit(existing, 'revoked', 'Replaced by a new authorisation.');
   }
@@ -120,7 +121,7 @@ export async function revokeProductAccess(session: Session, projectId: string): 
 
   const store = getStore();
   const credential = await store.credentials.getForProject(session.organizationId, projectId);
-  if (!credential || credential.revokedAt) return;
+  if (!credential || !credentialIsUsable(credential)) return;
 
   await store.credentials.revoke(session.organizationId, credential.id);
   await store.projects.update(session.organizationId, projectId, { productCredentialId: null });
@@ -134,7 +135,7 @@ export async function loadProductAccess(
 ): Promise<{ credential: ProductCredential | null; audit: CredentialAuditEvent[] }> {
   const store = getStore();
   const credential = await store.credentials.getForProject(session.organizationId, projectId);
-  if (!credential || credential.revokedAt) return { credential: null, audit: [] };
+  if (!credential || !credentialIsUsable(credential)) return { credential: null, audit: [] };
 
   const audit = await store.credentials.listAudit(session.organizationId, credential.id);
   return { credential, audit };

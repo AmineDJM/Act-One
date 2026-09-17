@@ -196,10 +196,13 @@ export async function startRenderAction(
       createdAt: new Date().toISOString(),
     });
 
-    await enqueue(project, 'render_film', {
-      storyboardId: project.activeStoryboardId,
-      watermarked: permission.watermarked,
-    }, 5);
+    /*
+     * The payload says what to render, not on what terms. Watermark and
+     * resolution are resolved by the worker from the plan at the moment the
+     * film is made, so a job that waits in the queue through an upgrade or a
+     * lapse gets the right answer rather than the one from when it was queued.
+     */
+    await enqueue(project, 'render_film', { storyboardId: project.activeStoryboardId }, 5);
     await store.projects.setStage(session.organizationId, project.id, 'rendering');
 
     revalidatePath(`/app/projects/${project.id}`);

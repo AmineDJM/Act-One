@@ -87,9 +87,24 @@ export function storageKeyFor(parts: {
   return segments.join('/');
 }
 
+/**
+ * May this asset stand for the customer's product on screen?
+ *
+ * Only material that came from the product itself: what our browser agent
+ * observed, or what the customer handed us. A generated image of an interface
+ * is the one thing this product must never present as somebody's software, and
+ * `rendered` is excluded too — our own engines make typography and 3D staging,
+ * neither of which is evidence of what the product looks like.
+ *
+ * A 3D hero shot stages a real capture rather than replacing it, so those
+ * scenes keep pointing at the capture and pass this the same way a flat one
+ * does.
+ */
 export function isRealProductAsset(asset: Pick<Asset, 'origin' | 'kind'>): boolean {
+  if (asset.origin !== 'captured' && asset.origin !== 'uploaded') return false;
   return (
-    asset.origin === 'captured' &&
-    (asset.kind === 'screenshot' || asset.kind === 'screen_recording')
+    asset.kind === 'screenshot' ||
+    asset.kind === 'screen_recording' ||
+    asset.kind === 'brand_image'
   );
 }

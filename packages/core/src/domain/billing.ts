@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Organization } from './org.ts';
 
 /**
  * Entitlements, not plan-name checks.
@@ -251,4 +252,35 @@ export type Subscription = z.infer<typeof Subscription>;
 /** A plan grants entitlements only while the subscription is in good standing. */
 export function subscriptionIsLive(status: SubscriptionStatus): boolean {
   return status === 'active' || status === 'trialing';
+}
+
+/**
+ * The plan an organisation is actually entitled to right now.
+ *
+ * One definition, because two would drift: the web layer answers this to decide
+ * what to offer, and the worker answers it to decide what to make. If the
+ * worker were more generous than the page, we would render something nobody
+ * bought; if it were meaner, somebody would pay for 4K and get 1080p.
+ *
+ * A lapsed subscription falls back to free rather than keeping paid features.
+ * Billing failures must degrade, not grant.
+ */
+export function effectivePlan(params: {
+  plans: Plan[];
+  organization: Pick<Organization, 'planId'>;
+  subscription: { planId: string; status: SubscriptionStatus } | null;
+}): Plan {
+  const { plans, organization, subscription } = params;
+  if (subscription && !subscriptionIsLive(subscription.status)) return planById(plans, 'free');
+  return planById(plans, subscription ? subscription.planId : organization.planId);
+}
+
+/**
+ * The resolution a plan is owed for its master.
+ *
+ * Pro sells 4K and the renderer used to hardcode 1080p, so the most expensive
+ * plan delivered exactly what the one below it did.
+ */
+export function masterQualityFor(plan: Plan): 'hd' | 'uhd' {
+  return hasEntitlement(plan, 'render.4k') ? 'uhd' : 'hd';
 }

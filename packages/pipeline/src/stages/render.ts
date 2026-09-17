@@ -4,7 +4,9 @@ import path from 'node:path';
 import {
   AppError,
   DEFAULT_FPS,
+  isRealProductAsset,
   newId,
+  REAL_PRODUCT_VISUAL_TYPES,
   storyboardDuration,
   type AspectRatio,
   type QaIssue,
@@ -18,6 +20,7 @@ import { renderFilm } from '@act-one/motion';
 import { buildMix, directSound, mixArgs, muxArgs, posterArgs, runFfmpeg, DEFAULT_LIBRARY } from '@act-one/sound';
 import { factCheck, planRepairs, applyRepairs, runDeterministicChecks, selectFramesToInspect, inspectFrame } from '@act-one/qa';
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
+import { masterTermsFor, planFor } from '../entitlements.ts';
 
 /**
  * The render stage.
@@ -30,8 +33,14 @@ import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 export type RenderOptions = {
   storyboardId: string;
   aspect?: AspectRatio;
+  /**
+   * Overrides the resolution the plan would give.
+   *
+   * Only the animatic sets this. Watermarking is not overridable at all: it is
+   * what a plan pays to remove, so it is decided here from the plan and nowhere
+   * else.
+   */
   quality?: RenderQuality;
-  watermarked?: boolean;
   maxRepairAttempts?: number;
   /** Skips vision QA. Used for previews and animatics, where it is not worth it. */
   skipVisionQa?: boolean;
@@ -53,8 +62,21 @@ export async function runRender(
 ): Promise<{ renderId: string; assetId: string; qaPassed: boolean; issues: QaIssue[] }> {
   const { store, registry, project, organizationId } = context;
   const aspect = options.aspect ?? '16:9';
-  const quality = options.quality ?? 'hd';
   const kind = options.kind ?? 'film';
+
+  /*
+   * The plan decides the master, and the worker asks the plan rather than
+   * believing the job payload. Pro sells 4K and this defaulted to 1080p, so the
+   * most expensive plan delivered what the one below it did; and a job that sat
+   * in the queue while a subscription lapsed used to keep the answer from when
+   * it was enqueued.
+   *
+   * Cuts inherit the film's terms. An animatic is neither: it is a preview at
+   * preview resolution whatever anybody is paying.
+   */
+  const terms = masterTermsFor(await planFor(store, organizationId));
+  const quality = options.quality ?? (kind === 'animatic' ? 'preview' : terms.quality);
+  const watermarked = kind === 'animatic' ? false : terms.watermarked;
 
   const storyboard = await store.storyboards.get(organizationId, options.storyboardId);
   if (!storyboard) throw new AppError('not_found', 'Storyboard not found.');
@@ -68,6 +90,8 @@ export async function runRender(
   const concept = await store.concepts.get(organizationId, storyboard.conceptId);
   if (!concept) throw new AppError('conflict', 'The concept behind this storyboard is missing.');
   const system = getSystem(concept.creativeSystem);
+
+  await assertProductIsReal(context, storyboard);
 
   const render = await store.renders.create({
     id: newId('rnd'),
@@ -84,7 +108,7 @@ export async function runRender(
     status: 'rendering_scenes',
     masterAssetId: null,
     posterAssetId: null,
-    watermarked: options.watermarked ?? false,
+    watermarked,
     durationSeconds: storyboardDuration(storyboard),
     costUsd: 0,
     qaReportId: null,
@@ -110,7 +134,7 @@ export async function runRender(
         system,
         aspect,
         quality,
-        watermarked: options.watermarked ?? false,
+        watermarked,
         workDir,
         attempt,
       });
@@ -162,7 +186,7 @@ export async function runRender(
       extension: 'mp4',
       contentType: 'video/mp4',
       durationSeconds: storyboardDuration(current),
-      metadata: { aspect, quality, watermarked: options.watermarked ?? false },
+      metadata: { aspect, quality, watermarked },
     });
 
     const posterPath = path.join(workDir, 'poster.jpg');
@@ -228,6 +252,44 @@ export async function runRender(
     // Always. A leaked frame sequence per job fills a render host's disk in a
     // morning, and the failure that follows looks nothing like the cause.
     await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Refuses to render a film that would show invented software as the product.
+ *
+ * This is the product's one absolute rule and it is checked here, at the
+ * boundary where frames are about to be made, rather than trusted to hold
+ * because of how the storyboard was planned. Planning is upstream of a
+ * revision, a repair pass and a campaign cut, any of which can rewrite a
+ * scene; a check that runs before every render survives all three.
+ *
+ * It refuses rather than degrades. A scene silently dropped to typography is a
+ * film the customer still receives, believing the product beat is theirs.
+ */
+async function assertProductIsReal(context: StageContext, storyboard: Storyboard): Promise<void> {
+  const productScenes = storyboard.scenes.filter((scene) =>
+    REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType),
+  );
+  const ids = [...new Set(productScenes.flatMap((scene) => scene.assetRefs))];
+  if (ids.length === 0) return;
+
+  const assets = await context.store.assets.getMany(context.organizationId, ids);
+  const byId = new Map(assets.map((asset) => [asset.id, asset]));
+
+  for (const scene of productScenes) {
+    for (const id of scene.assetRefs) {
+      const asset = byId.get(id);
+      // An id that resolves to nothing renders as no imagery at all, which is
+      // a worse-looking scene and not a false one. Only a real asset that is
+      // not the product is a reason to stop.
+      if (!asset || isRealProductAsset(asset)) continue;
+      throw new AppError(
+        'unsafe_operation',
+        `Scene ${scene.index + 1} shows the product but is backed by ${asset.origin} material. ` +
+          'Act One does not present generated imagery as a real interface.',
+      );
+    }
   }
 }
 

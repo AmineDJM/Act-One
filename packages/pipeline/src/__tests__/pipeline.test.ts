@@ -395,6 +395,44 @@ describe('pipeline', () => {
     expect(revisions[0]!.intent).toBe('retime_scene');
   });
 
+  it('refuses to render invented software as somebody\u2019s product', async () => {
+    await runJob(deps, await enqueued(store, org.id, project.id, 'research_product'));
+    await runJob(deps, await enqueued(store, org.id, project.id, 'generate_concepts'));
+    const concepts = await store.concepts.listForProject(org.id, project.id);
+    await store.projects.update(org.id, project.id, { selectedConceptId: concepts[0]!.id });
+    await runJob(deps, await enqueued(store, org.id, project.id, 'build_storyboard', { conceptId: concepts[0]!.id }));
+
+    const board = (await store.storyboards.listForProject(org.id, project.id))[0]!;
+
+    // A generated shot, of the kind the media provider returns.
+    const generated = await store.assets.create({
+      id: newId('ast'), organizationId: org.id, projectId: project.id, conceptId: null,
+      sceneId: board.scenes[0]!.id, kind: 'generated_video', origin: 'generated',
+      rights: 'generated_derivative', storageKey: 'fake/shot.mp4', contentType: 'video/mp4',
+      bytes: 10, width: 1920, height: 1080, durationSeconds: 3, checksum: null,
+      provider: 'higgsfield', model: 'test', sourceUrl: null, costUsd: 0, metadata: {},
+      createdAt: new Date().toISOString(),
+    });
+
+    // However it got there — a revision, a repair, a bug — a scene that says it
+    // shows the product is now backed by imagery a model invented.
+    await store.storyboards.updateScene(org.id, board.scenes[0]!.id, {
+      visualType: 'product_ui',
+      assetRefs: [generated.id],
+    });
+
+    const outcome = await runJob(
+      deps,
+      await enqueued(store, org.id, project.id, 'render_film', { storyboardId: board.id }),
+    );
+
+    expect(outcome.status).toBe('failed');
+    // And it stops before a single frame is rendered, rather than being caught
+    // by QA after the film has been paid for.
+    expect(outcome.status === 'failed' && outcome.error).toMatch(/generated material/i);
+    expect(outcome.status === 'failed' && outcome.retryable).toBe(false);
+  });
+
   it('records a failure against the project instead of spinning forever', async () => {
     // No research has run, so there is no concept to storyboard.
     const outcome = await runJob(deps, await enqueued(store, org.id, project.id, 'build_storyboard'));

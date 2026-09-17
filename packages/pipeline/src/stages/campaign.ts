@@ -55,8 +55,8 @@ export async function runCampaign(
       const result = await runRender(context, {
         storyboardId: cutBoard.id,
         aspect: plan.aspect,
-        quality: 'hd',
-        watermarked: master.watermarked,
+        // Resolution and watermark come from the plan, the same as the master's
+        // did — a cut of a clean 4K film is a clean 4K cut.
         // Vision QA already ran on the master, and these are the same frames
         // recomposed — paying for it again per cut is waste.
         skipVisionQa: true,
@@ -80,9 +80,3 @@ export async function runCampaign(
   return { variantIds: rendered };
 }
 
-export function campaignSummary(
-  storyboard: Parameters<typeof storyboardDuration>[0],
-  purposes: typeof DEFAULT_CAMPAIGN,
-): string {
-  return `${purposes.length} cuts from a ${storyboardDuration(storyboard).toFixed(0)}s master`;
-}

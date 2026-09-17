@@ -1,4 +1,11 @@
-import { AppError, MODE_BUDGETS, usdToCredits, type GenerativeNeed, type Scene } from '@act-one/core';
+import {
+  AppError,
+  MODE_BUDGETS,
+  REAL_PRODUCT_VISUAL_TYPES,
+  usdToCredits,
+  type GenerativeNeed,
+  type Scene,
+} from '@act-one/core';
 import { planThreeDScene, renderThreeDScene, isBlenderAvailable } from '@act-one/three-d';
 import { ingestAsset, resolveAssetUrls, type StageContext } from '../context.ts';
 
@@ -53,6 +60,22 @@ export async function runSceneAssets(
       if (outcome === 'generated') result.generated += 1;
       else if (outcome === 'skipped') result.skipped += 1;
       else result.failed += 1;
+      continue;
+    }
+
+    /*
+     * A scene that shows the product shows the product. Generative media is
+     * allowed to support, contextualise and metaphorise around it, and is never
+     * allowed to stand in for it — so a generated shot is not written into a
+     * product scene even if one somehow asks for it. The storyboard engine
+     * already routes these apart; this is the second lock, because the cost of
+     * it being wrong is showing a founder an interface that is not theirs.
+     */
+    if (REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType) && scene.generativeNeeds.length > 0) {
+      result.skipped += scene.generativeNeeds.length;
+      result.notes.push(
+        `Scene ${scene.index + 1}: shows the product, so it is not generated.`,
+      );
       continue;
     }
 

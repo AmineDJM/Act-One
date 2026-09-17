@@ -152,9 +152,10 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
       });
 
     case 'render_film':
+      // No watermark flag in the payload: the plan decides, in the worker,
+      // at the moment the film is made.
       return runRender(context, {
         storyboardId: String(payload['storyboardId'] ?? context.project.activeStoryboardId ?? ''),
-        watermarked: payload['watermarked'] === true,
       });
 
     case 'render_variant':

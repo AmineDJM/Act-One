@@ -1,4 +1,4 @@
-import { AppError, storyboardEstimatedCost, storyboardDuration } from '@act-one/core';
+import { AppError, storyboardEstimatedCost } from '@act-one/core';
 import { CreativeDirector, StoryboardEngine } from '@act-one/creative';
 import { runDeterministicChecks } from '@act-one/qa';
 import type { StageContext } from '../context.ts';
@@ -97,6 +97,3 @@ export async function runStoryboard(
   };
 }
 
-export function describeStoryboard(storyboard: Parameters<typeof storyboardDuration>[0]): string {
-  return `${storyboard.scenes.length} scenes · ${storyboardDuration(storyboard).toFixed(1)}s`;
-}

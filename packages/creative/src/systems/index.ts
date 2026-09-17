@@ -27,10 +27,6 @@ export function getSystem(id: CreativeSystemId): CreativeSystem {
   return CREATIVE_SYSTEMS[id] ?? cinematicBlack;
 }
 
-export function productionReadySystems(): CreativeSystem[] {
-  return Object.values(CREATIVE_SYSTEMS).filter((system) => system.productionReady);
-}
-
 /**
  * Scores how well a system fits a given brand and product.
  *
