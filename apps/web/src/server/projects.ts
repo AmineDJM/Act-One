@@ -182,7 +182,13 @@ export async function loadProjectView(session: Session, projectId: string) {
     understanding,
     brand,
     concepts,
-    storyboard: storyboards[0] ?? null,
+    /*
+     * The film's storyboard, not the newest one. Every campaign cut is stored
+     * as its own storyboard, so taking the most recent showed the customer a
+     * six-second bumper's five scenes as though it were their film.
+     */
+    storyboard:
+      storyboards.find((board) => board.id === project.activeStoryboardId) ?? storyboards[0] ?? null,
     renders,
     activeJob: jobs.find((job) => job.state !== 'completed' && job.state !== 'failed') ?? null,
     jobs,
