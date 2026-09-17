@@ -33,7 +33,8 @@ export type IdPrefix =
   | 'sec'
   | 'cmt'
   | 'inv'
-  | 'mom';
+  | 'mom'
+  | 'cpy';
 
 /**
  * Prefixed, sortable-ish ids. The timestamp prefix keeps ids roughly ordered by

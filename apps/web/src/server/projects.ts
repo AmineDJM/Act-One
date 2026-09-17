@@ -163,8 +163,10 @@ export async function loadProjectView(session: Session, projectId: string) {
   const posters = latestRender
     ? await store.assets.listForProject(session.organizationId, project.id, 'poster_frame')
     : [];
+  const copyKit = await store.copy.getLatestForProject(session.organizationId, project.id);
 
   return {
+    copyKit,
     latestRender,
     variants,
     poster: posters[0] ?? null,

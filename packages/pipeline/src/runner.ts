@@ -15,6 +15,7 @@ import { runConcepts } from './stages/concepts.ts';
 import { runStoryboard } from './stages/storyboard.ts';
 import { runRender } from './stages/render.ts';
 import { runCampaign } from './stages/campaign.ts';
+import { runCopy } from './stages/copy.ts';
 import { runRevision } from './stages/revision.ts';
 import { runSceneAssets } from './stages/assets.ts';
 
@@ -185,8 +186,10 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
           : {}),
       });
 
-    case 'render_animatic':
     case 'generate_copy':
+      return runCopy(context);
+
+    case 'render_animatic':
       // Declared in the job taxonomy and dispatched here so an enqueued job is
       // never silently dropped, but not yet implemented as its own stage.
       return { skipped: true, kind: job.kind };

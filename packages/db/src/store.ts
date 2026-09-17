@@ -8,6 +8,7 @@ import type {
   Concept,
   CreativeTreatment,
   CredentialAuditEvent,
+  CopyKit,
   GenerationCost,
   Invitation,
   LogLevel,
@@ -66,6 +67,7 @@ export interface Store {
   readonly variants: VariantRepo;
   readonly qaReports: QaReportRepo;
   readonly jobs: JobRepo;
+  readonly copy: CopyRepo;
   readonly costs: CostRepo;
   readonly log: OperationalLogRepo;
   readonly comments: CommentRepo;
@@ -310,6 +312,11 @@ export interface OperationalLogRepo {
   topEvents(since: string, limit?: number): Promise<{ event: string; level: LogLevel; count: number }[]>;
   /** Trims events older than the retention window. Returns rows removed. */
   prune(olderThan: string): Promise<number>;
+}
+
+export interface CopyRepo {
+  create(kit: CopyKit): Promise<CopyKit>;
+  getLatestForProject(organizationId: string, projectId: string): Promise<CopyKit | null>;
 }
 
 export interface CommentRepo {

@@ -13,6 +13,7 @@ import { ConceptChoice } from './ConceptChoice.tsx';
 import { BrandConfirm } from './BrandConfirm.tsx';
 import { StoryboardPanel } from './StoryboardPanel.tsx';
 import { FilmDelivery } from './FilmDelivery.tsx';
+import { CopyKitPanel } from './CopyKit.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -29,8 +30,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     throw error;
   }
 
-  const { project, understanding, brand, concepts, storyboard, activeJob, latestRender, variants, poster } =
-    view;
+  const {
+    project,
+    understanding,
+    brand,
+    concepts,
+    storyboard,
+    activeJob,
+    latestRender,
+    variants,
+    poster,
+    copyKit,
+  } = view;
   const cta = primaryCtaFor(project.stage);
   const permission = await renderPermission(session, project);
 
@@ -71,6 +82,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             posterAssetId={poster?.id ?? null}
             projectName={project.name}
           />
+          {copyKit && copyKit.lines.length > 0 ? <CopyKitPanel lines={copyKit.lines} /> : null}
         </div>
       ) : null}
 

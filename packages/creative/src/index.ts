@@ -6,3 +6,4 @@ export * from './storyboard-engine.ts';
 export * from './timing.ts';
 export * from './revision-compiler.ts';
 export * from './variant-planner.ts';
+export * from './copy-writer.ts';

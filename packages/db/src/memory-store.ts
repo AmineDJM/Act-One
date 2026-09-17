@@ -9,6 +9,7 @@ import {
   retryDelayMs,
 } from '@act-one/core';
 import type {
+  CopyKit,
   Invitation,
   LogLevel,
   LogQuery,
@@ -77,6 +78,7 @@ export class MemoryStore implements Store {
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
     jobs: new Map<string, Job>(),
     costs: new Map<string, GenerationCost>(),
+    copy: new Map<string, CopyKit>(),
     log: new Map<string, OperationalEvent>(),
     invitations: new Map<string, Invitation>(),
     comments: new Map<string, Comment>(),
@@ -690,6 +692,17 @@ export class MemoryStore implements Store {
       }
       return counts;
     },
+  };
+
+  readonly copy = {
+    create: async (kit: CopyKit) => {
+      this.tables.copy.set(kit.id, kit);
+      return kit;
+    },
+    getLatestForProject: async (organizationId: string, projectId: string) =>
+      this.scoped(this.tables.copy, organizationId)
+        .filter((kit) => kit.projectId === projectId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null,
   };
 
   readonly costs = {

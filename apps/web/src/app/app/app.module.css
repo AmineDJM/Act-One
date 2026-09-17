@@ -292,3 +292,26 @@
   max-width: 200px;
 }
 .switcher select:hover { border-color: var(--line-strong); color: var(--text); }
+
+/* --- launch copy ---------------------------------------------------------- */
+
+.copyGroup { display: grid; gap: var(--space-2); }
+.copyGroup h4 {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.copyGroup ul { list-style: none; display: grid; gap: var(--space-2); }
+.copyGroup li {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.copyGroup p { font-size: 0.9rem; white-space: pre-wrap; }
+.copyFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.copyFoot .btn { height: 28px; font-size: 0.78rem; }

@@ -1,5 +1,6 @@
 import { AppError, newId, notFound, redactDetail, redactMessage, resequence } from '@act-one/core';
 import type {
+  CopyKit,
   Invitation,
   LogLevel,
   LogQuery,
@@ -1322,6 +1323,28 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly copy = {
+    create: async (kit: CopyKit) =>
+      this.tenant(kit.organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO copy_kits (id, organization_id, project_id, concept_id, lines, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [kit.id, kit.organizationId, kit.projectId, kit.conceptId, JSON.stringify(kit.lines), kit.createdAt],
+        );
+        return kit;
+      }),
+
+    getLatestForProject: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT * FROM copy_kits WHERE project_id = $1 AND organization_id = $2
+           ORDER BY created_at DESC LIMIT 1`,
+          [projectId, organizationId],
+        );
+        return r.rows[0] ? toCopyKit(r.rows[0]) : null;
+      }),
+  };
+
   readonly costs = {
     record: async (cost: GenerationCost) =>
       this.tenant(cost.organizationId, async (c) => {
@@ -2050,6 +2073,17 @@ function toCost(row: Row): GenerationCost {
     succeeded: Boolean(row['succeeded']),
     isRetry: Boolean(row['is_retry']),
     metadata: (row['metadata'] as Record<string, unknown>) ?? {},
+    createdAt: iso(row['created_at']),
+  };
+}
+
+function toCopyKit(row: Row): CopyKit {
+  return {
+    id: row['id'] as string,
+    organizationId: row['organization_id'] as string,
+    projectId: row['project_id'] as string,
+    conceptId: row['concept_id'] as string,
+    lines: (row['lines'] as CopyKit['lines']) ?? [],
     createdAt: iso(row['created_at']),
   };
 }

@@ -220,8 +220,14 @@ export async function createCampaignAction(
     if (!project.latestRenderId) return { error: 'Render the master film first.' };
 
     await enqueue(project, 'generate_campaign', { renderId: project.latestRenderId }, 4);
+
+    // Separate job on purpose. The copy is quick and the cuts are not, so a
+    // copy failure must never cost somebody their campaign — and they get the
+    // headlines while the cuts are still rendering.
+    await enqueue(project, 'generate_copy', {}, 5);
+
     revalidatePath(`/app/projects/${project.id}`);
-    return { error: null, message: 'Cutting your campaign.' };
+    return { error: null, message: 'Cutting your campaign and writing the launch copy.' };
   } catch (error) {
     return { error: reportError('createCampaignAction', error).publicMessage };
   }
