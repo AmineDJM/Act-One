@@ -231,6 +231,22 @@ export class PgStore implements Store {
         const r = await c.query<{ count: number }>('SELECT COUNT(*)::int AS count FROM users');
         return num(r.rows[0]?.count);
       }),
+
+    list: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM users ORDER BY created_at DESC LIMIT $1', [
+          Math.min(Math.max(limit, 1), 1000),
+        ]);
+        return r.rows.map(toUser);
+      }),
+
+    countSuperAdmins: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ count: number }>(
+          'SELECT COUNT(*)::int AS count FROM users WHERE is_super_admin',
+        );
+        return num(r.rows[0]?.count);
+      }),
   };
 
   readonly memberships = {
@@ -1270,6 +1286,34 @@ export class PgStore implements Store {
           since ? [organizationId, since] : [organizationId],
         );
         return num(r.rows[0]?.total);
+      }),
+
+    dailySeries: async (since: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{
+          day: string;
+          cost: number | null;
+          credits: number | null;
+          calls: number;
+          failures: number;
+        }>(
+          `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+                  SUM(actual_cost_usd) AS cost,
+                  SUM(credits_charged) AS credits,
+                  COUNT(*)::int AS calls,
+                  COUNT(*) FILTER (WHERE NOT succeeded)::int AS failures
+           FROM generation_costs
+           WHERE created_at >= $1
+           GROUP BY 1 ORDER BY 1`,
+          [since],
+        );
+        return r.rows.map((row) => ({
+          day: row.day,
+          costUsd: num(row.cost),
+          creditsCharged: num(row.credits),
+          calls: num(row.calls),
+          failures: num(row.failures),
+        }));
       }),
 
     platformSummary: async (since: string) =>

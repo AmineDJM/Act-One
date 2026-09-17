@@ -190,6 +190,13 @@ export class MemoryStore implements Store {
       return stripPassword(next);
     },
     count: async () => this.tables.users.size,
+    list: async (limit = 200) =>
+      [...this.tables.users.values()]
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .slice(0, limit)
+        .map(stripPassword),
+    countSuperAdmins: async () =>
+      [...this.tables.users.values()].filter((u) => u.isSuperAdmin).length,
   };
 
   readonly memberships = {
@@ -655,6 +662,21 @@ export class MemoryStore implements Store {
       this.scoped(this.tables.costs, organizationId)
         .filter((c) => !since || c.createdAt >= since)
         .reduce((sum, c) => sum + c.actualCostUsd, 0),
+    dailySeries: async (since: string) => {
+      const byDay = new Map<string, { day: string; costUsd: number; creditsCharged: number; calls: number; failures: number }>();
+      for (const row of this.tables.costs.values()) {
+        if (row.createdAt < since) continue;
+        const day = row.createdAt.slice(0, 10);
+        const bucket = byDay.get(day) ?? { day, costUsd: 0, creditsCharged: 0, calls: 0, failures: 0 };
+        bucket.costUsd += row.actualCostUsd;
+        bucket.creditsCharged += row.creditsCharged;
+        bucket.calls += 1;
+        if (!row.succeeded) bucket.failures += 1;
+        byDay.set(day, bucket);
+      }
+      return [...byDay.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
+    },
+
     platformSummary: async (since: string) => {
       const rows = [...this.tables.costs.values()].filter((c) => c.createdAt >= since);
       const byProvider = new Map<string, { costUsd: number; calls: number; failures: number }>();

@@ -382,3 +382,94 @@ export async function testAllProvidersAction(): Promise<ProviderHealthSummary[]>
       }),
   );
 }
+
+/**
+ * Grants or revokes platform access.
+ *
+ * Two refusals are deliberate and not configurable. An operator cannot revoke
+ * their own access, because the confirmation dialog they would need is the
+ * console they just locked themselves out of; and the last super admin cannot
+ * be removed, because there is no way back into the console from inside the
+ * product — it would need somebody with database access to repair.
+ */
+export async function setStaffAccessAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await requireSuperAdmin();
+  const userId = String(formData.get('userId') ?? '');
+  const grant = String(formData.get('grant') ?? '') === 'true';
+
+  const store = getStore();
+  const target = await store.users.get(userId);
+  if (!target) return { ok: false, message: 'No such person.' };
+  if (target.isSuperAdmin === grant) {
+    return { ok: true, message: grant ? 'Already staff.' : 'Already not staff.' };
+  }
+
+  if (!grant) {
+    if (target.id === actor.id) {
+      return {
+        ok: false,
+        message: 'You cannot revoke your own access — ask another operator to do it.',
+      };
+    }
+    if ((await store.users.countSuperAdmins()) <= 1) {
+      return {
+        ok: false,
+        message: 'This is the last operator. Grant somebody else access first.',
+      };
+    }
+  }
+
+  await store.users.update(userId, { isSuperAdmin: grant });
+  revalidatePath('/admin/staff');
+
+  await recordAdminEvent(
+    actor.id,
+    grant ? 'staff.granted' : 'staff.revoked',
+    `${grant ? 'Granted' : 'Revoked'} platform access for ${target.email}.`,
+    { targetUserId: target.id, targetEmail: target.email },
+  );
+
+  return {
+    ok: true,
+    message: grant ? `${target.email} can now reach the console.` : `${target.email} no longer has access.`,
+  };
+}
+
+/**
+ * Suspends or restores a workspace.
+ *
+ * Suspension stops new work starting without deleting anything: an unpaid
+ * invoice should not cost somebody the film they already made.
+ */
+export async function setOrganizationSuspendedAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await requireSuperAdmin();
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const suspend = String(formData.get('suspend') ?? '') === 'true';
+
+  const store = getStore();
+  const organization = await store.organizations.get(organizationId);
+  if (!organization) return { ok: false, message: 'No such workspace.' };
+
+  await store.organizations.update(organizationId, { isSuspended: suspend });
+  revalidatePath('/admin/customers');
+
+  await recordAdminEvent(
+    actor.id,
+    suspend ? 'organization.suspended' : 'organization.restored',
+    `${suspend ? 'Suspended' : 'Restored'} ${organization.name}.`,
+    { organizationId, name: organization.name },
+  );
+
+  return {
+    ok: true,
+    message: suspend
+      ? `${organization.name} is suspended. Existing films are untouched.`
+      : `${organization.name} can start work again.`,
+  };
+}

@@ -92,6 +92,15 @@ export interface UserRepo {
   getByEmail(email: string): Promise<(User & { passwordHash: string | null }) | null>;
   update(id: string, patch: Partial<User>): Promise<User>;
   count(): Promise<number>;
+  /** Everyone, for the staff console. There is no tenant to scope this to. */
+  list(limit?: number): Promise<User[]>;
+  /**
+   * How many people hold platform access.
+   *
+   * Used to refuse the revoke that would leave nobody able to reach the
+   * console — which is not recoverable from inside the product.
+   */
+  countSuperAdmins(): Promise<number>;
 }
 
 export interface MembershipRepo {
@@ -243,6 +252,15 @@ export interface CostRepo {
     byProvider: { provider: string; costUsd: number; calls: number; failures: number }[];
     byOperation: { operation: string; costUsd: number; calls: number }[];
   }>;
+  /**
+   * Spend per day, for the dashboard.
+   *
+   * Only days with rows come back — a caller plotting this must fill the gaps,
+   * or a straight line gets drawn across an outage.
+   */
+  dailySeries(since: string): Promise<
+    { day: string; costUsd: number; creditsCharged: number; calls: number; failures: number }[]
+  >;
 }
 
 /**

@@ -1,0 +1,93 @@
+.chart {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  --tone: var(--accent);
+}
+.chart[data-tone='positive'] { --tone: var(--positive); }
+.chart[data-tone='danger'] { --tone: var(--danger); }
+
+.chart figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.chart figcaption span {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.chart figcaption strong {
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart svg { width: 100%; height: 72px; display: block; overflow: visible; }
+.line {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.5;
+  /* preserveAspectRatio="none" stretches the stroke horizontally; this keeps
+     the drawn weight even rather than smeared. */
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.area { fill: color-mix(in oklab, var(--tone) 14%, transparent); stroke: none; }
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.breakdown { list-style: none; display: grid; gap: var(--space-3); }
+/*
+ * The note sits under the label, inside the first column, rather than spanning
+ * a second grid row. Wrapping it pushed every following bar down by a line and
+ * turned an even list into a ragged one.
+ */
+.breakdown li {
+  display: grid;
+  grid-template-columns: 164px 1fr 92px;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: 0.86rem;
+}
+@media (max-width: 720px) {
+  .breakdown li { grid-template-columns: 116px 1fr 72px; gap: var(--space-3); }
+}
+.breakdownLabel {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.breakdownTrack {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.breakdownFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  min-width: 2px;
+}
+.breakdownValue { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 0.8rem; }
+.breakdownNote { display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 1px; }

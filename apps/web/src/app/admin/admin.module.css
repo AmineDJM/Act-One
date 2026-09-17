@@ -51,30 +51,50 @@
 .head { margin-bottom: var(--space-7); display: flex; flex-direction: column; gap: var(--space-3); }
 .head h1 { font-size: 1.85rem; letter-spacing: -0.03em; }
 
+/*
+ * A fixed four across, not auto-fit.
+ *
+ * auto-fit packed five tiles into the first row and three into the second, at
+ * two different heights, because grid rows size independently and only some
+ * tiles carry a note. A dashboard whose tiles are different sizes reads as an
+ * accident even when every number on it is right.
+ */
 .metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-7);
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
 }
+@media (max-width: 1000px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .metrics { grid-template-columns: 1fr; } }
+
 .metric {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
   background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-height: 116px;
+  box-shadow: var(--shadow-sm);
 }
 .metricLabel {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.metricValue { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.metricNote { font-size: 0.8rem; color: var(--text-muted); }
+.metricValue {
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* Pinned to the bottom so a tile with a note is the same height as one without. */
+.metricNote { font-size: 0.8rem; color: var(--text-muted); margin-top: auto; }
 
 .providerList { display: flex; flex-direction: column; gap: var(--space-4); }
 .provider {
@@ -347,10 +367,161 @@
   word-break: break-word;
 }
 
-.section { margin-bottom: var(--space-7); display: grid; gap: var(--space-4); }
+.section { margin-bottom: var(--space-6); display: grid; gap: var(--space-4); }
 .section > h2 {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   color: var(--text-secondary);
 }
+/* Sections that follow a block of charts need the gap reasserting, because the
+   chart grid's own bottom margin is tuned for chart-to-chart spacing. */
+.chartPair + .section { margin-top: var(--space-6); }
+
+/* --- setup panel ---------------------------------------------------------- */
+
+/*
+ * Reads as a status board, not a form. An operator lands here on day one
+ * wanting one question answered — can this thing make a film yet — and the
+ * whole panel is built around answering it before anything else.
+ */
+.setup {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  display: grid;
+  gap: var(--space-5);
+  position: relative;
+  overflow: hidden;
+}
+.setup::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--warning);
+}
+.setup[data-live='true']::before { background: var(--positive); }
+
+.setupHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.setupHead h2 { font-size: 1.15rem; letter-spacing: -0.025em; margin-bottom: var(--space-2); }
+
+.checklist {
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+.checklist li {
+  display: grid;
+  grid-template-columns: 20px 132px 1fr;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: 0.88rem;
+  border-top: 1px solid var(--line);
+}
+.checklist li:first-child { border-top: 0; }
+.checklist li > span:last-child { color: var(--text-secondary); }
+@media (max-width: 720px) {
+  .checklist li { grid-template-columns: 20px 1fr; }
+  .checklist li > span:last-child { grid-column: 2; }
+}
+
+.tick {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+.checklist li[data-ready='true'] .tick { color: var(--positive); }
+.checklist li[data-ready='false'][data-required='true'] .tick { color: var(--warning); }
+
+.healthStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.healthStrip span[data-ok='true'] { color: var(--positive); }
+.healthStrip span[data-ok='false'] { color: var(--danger); }
+
+.paste summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: var(--space-2) 0;
+  transition: color var(--duration) var(--ease);
+}
+.paste summary:hover { color: var(--text); }
+.paste form { display: grid; gap: var(--space-3); padding-top: var(--space-3); }
+.paste textarea {
+  height: auto;
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  resize: vertical;
+}
+.pasteActions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+
+.importResult {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  display: grid;
+  gap: var(--space-3);
+  font-size: 0.86rem;
+}
+.importResult[data-ok='true'] { border-left-color: var(--positive); }
+.importResult ul { list-style: none; display: grid; gap: var(--space-1); font-family: var(--font-mono); font-size: 0.78rem; }
+.importResult li[data-ok='true'] { color: var(--positive); }
+.importResult li[data-ok='false'] { color: var(--danger); }
+
+/* --- access --------------------------------------------------------------- */
+
+.staffList {
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.staffRow {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 130px auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+}
+.staffRow:last-child { border-bottom: 0; }
+.staffRow > span:last-child { grid-column: 1 / -1; font-size: 0.82rem; }
+@media (max-width: 720px) {
+  .staffRow { grid-template-columns: 1fr; }
+}
+.staffEmail { display: block; font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+.staffMeta { font-size: 0.84rem; color: var(--text-muted); }
+
+.chartPair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.notice[data-tone='danger'] { border-left-color: var(--danger); }

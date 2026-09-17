@@ -2,29 +2,38 @@ import Link from 'next/link';
 import { creditsToUsd } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
 import { listProviderState } from '@/server/platform.ts';
+import { BreakdownBars, Sparkline } from '@/components/Chart.tsx';
 import styles from './admin.module.css';
 
 export const dynamic = 'force-dynamic';
 
+const WINDOW_DAYS = 30;
+
 /**
  * Operator overview.
  *
- * Deliberately the numbers that decide whether this business works — margin,
- * cost per film, failure rate — rather than vanity counts. If gross margin is
- * negative, nothing else on this page matters.
+ * Ordered by what would ruin the business first. Margin, then whether the
+ * platform is healthy, then volume — not signup counts, which look good on a
+ * screenshot and tell an operator nothing they can act on.
  */
 export default async function AdminOverview() {
   const store = getStore();
-  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const to = new Date();
+  const from = new Date(to.getTime() - WINDOW_DAYS * 86_400_000);
+  const since = from.toISOString();
 
-  const [organizations, users, jobStates, summary, providers, activeRenders] = await Promise.all([
-    store.organizations.count(),
-    store.users.count(),
-    store.jobs.countByState(),
-    store.costs.platformSummary(since),
-    listProviderState(),
-    store.renders.listActive(20),
-  ]);
+  const [organizations, users, jobStates, summary, series, providers, activeRenders, levels, topEvents] =
+    await Promise.all([
+      store.organizations.count(),
+      store.users.count(),
+      store.jobs.countByState(),
+      store.costs.platformSummary(since),
+      store.costs.dailySeries(since),
+      listProviderState(),
+      store.renders.listActive(20),
+      store.log.levelCounts(since),
+      store.log.topEvents(since, 5),
+    ]);
 
   const revenue = creditsToUsd(summary.totalCreditsCharged);
   const margin = revenue - summary.totalCostUsd;
@@ -33,16 +42,21 @@ export default async function AdminOverview() {
   const calls = summary.byProvider.reduce((sum, p) => sum + p.calls, 0);
   const unconfigured = providers.filter((p) => !p.configured);
 
+  const usd = (value: number) => `$${value.toFixed(2)}`;
+  const plain = (value: number) => value.toLocaleString('en-US');
+
   return (
     <>
       <header className={styles.head}>
         <h1>Overview</h1>
-        <p className="lede">Last 30 days.</p>
+        <p className="lede">The last {WINDOW_DAYS} days.</p>
       </header>
 
       {unconfigured.length > 0 ? (
         <div className={styles.notice}>
-          <strong>{unconfigured.length} integration{unconfigured.length === 1 ? '' : 's'} not configured</strong>{' '}
+          <strong>
+            {unconfigured.length} integration{unconfigured.length === 1 ? '' : 's'} not configured
+          </strong>{' '}
           ({unconfigured.map((p) => p.id).join(', ')}).{' '}
           <Link href="/admin/providers" style={{ color: 'var(--accent-text)' }}>
             Configure them →
@@ -50,96 +64,128 @@ export default async function AdminOverview() {
         </div>
       ) : null}
 
+      {levels.error > 0 ? (
+        <div className={styles.notice} data-tone="danger">
+          <strong>
+            {plain(levels.error)} error{levels.error === 1 ? '' : 's'} logged
+          </strong>{' '}
+          in this window.{' '}
+          <Link href="/admin/logs?level=error&window=30d" style={{ color: 'var(--accent-text)' }}>
+            Read them →
+          </Link>
+        </div>
+      ) : null}
+
+      {/* Margin first: if this is negative, nothing else on the page matters. */}
       <div className={styles.metrics}>
-        <Metric label="Organisations" value={organizations.toLocaleString('en-US')} />
-        <Metric label="Users" value={users.toLocaleString('en-US')} />
-        <Metric
-          label="Provider spend"
-          value={`$${summary.totalCostUsd.toFixed(2)}`}
-          note="What vendors charged us"
-        />
-        <Metric
-          label="Credit revenue"
-          value={`$${revenue.toFixed(2)}`}
-          note="What we charged customers"
-        />
-        <Metric
-          label="Gross margin"
-          value={`${marginPct.toFixed(0)}%`}
-          note={`$${margin.toFixed(2)}`}
-        />
+        <Metric label="Gross margin" value={`${marginPct.toFixed(0)}%`} note={usd(margin)} />
+        <Metric label="Credit revenue" value={usd(revenue)} note="What we charged customers" />
+        <Metric label="Provider spend" value={usd(summary.totalCostUsd)} note="What vendors charged us" />
         <Metric
           label="Provider failures"
           value={calls > 0 ? `${((failures / calls) * 100).toFixed(1)}%` : '—'}
-          note={`${failures} of ${calls} calls`}
+          note={`${plain(failures)} of ${plain(calls)} calls`}
         />
-        <Metric label="Renders in flight" value={String(activeRenders.length)} />
+        <Metric label="Renders in flight" value={plain(activeRenders.length)} />
         <Metric
           label="Jobs queued"
-          value={String(jobStates['queued'] ?? 0)}
-          note={`${jobStates['failed'] ?? 0} failed`}
+          value={plain(jobStates['queued'] ?? 0)}
+          note={`${plain(jobStates['failed'] ?? 0)} failed`}
+        />
+        <Metric label="Organisations" value={plain(organizations)} />
+        <Metric label="Users" value={plain(users)} />
+      </div>
+
+      <div className={styles.chartPair}>
+        <Sparkline
+          label="Provider spend"
+          data={series.map((row) => ({ day: row.day, value: row.costUsd }))}
+          from={from}
+          to={to}
+          format={usd}
+        />
+        <Sparkline
+          label="Credit revenue"
+          data={series.map((row) => ({ day: row.day, value: creditsToUsd(row.creditsCharged) }))}
+          from={from}
+          to={to}
+          format={usd}
+          tone="positive"
         />
       </div>
 
-      <section style={{ marginBottom: 'var(--space-7)' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-4)' }}>Spend by provider</h2>
+      {failures > 0 ? (
+        <div className={styles.chartPair}>
+          <Sparkline
+            label="Provider calls"
+            data={series.map((row) => ({ day: row.day, value: row.calls }))}
+            from={from}
+            to={to}
+            format={plain}
+          />
+          <Sparkline
+            label="Provider failures"
+            data={series.map((row) => ({ day: row.day, value: row.failures }))}
+            from={from}
+            to={to}
+            format={plain}
+            tone="danger"
+          />
+        </div>
+      ) : null}
+
+      <section className={styles.section}>
+        <h2>Where the money goes</h2>
         {summary.byProvider.length === 0 ? (
-          <div className={styles.empty}>No provider spend recorded yet.</div>
+          <p className={styles.empty}>No provider spend recorded yet.</p>
         ) : (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Provider</th>
-                <th className={styles.num}>Calls</th>
-                <th className={styles.num}>Failures</th>
-                <th className={styles.num}>Cost</th>
-                <th className={styles.num}>Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.byProvider.map((row) => (
-                <tr key={row.provider}>
-                  <td>{row.provider}</td>
-                  <td className={styles.num}>{row.calls.toLocaleString('en-US')}</td>
-                  <td className={styles.num}>{row.failures}</td>
-                  <td className={styles.num}>${row.costUsd.toFixed(4)}</td>
-                  <td className={styles.num}>
-                    {summary.totalCostUsd > 0
-                      ? `${((row.costUsd / summary.totalCostUsd) * 100).toFixed(0)}%`
-                      : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <BreakdownBars
+            rows={summary.byProvider.map((row) => ({
+              label: row.provider,
+              value: row.costUsd,
+              ...(row.failures > 0
+                ? { note: `${plain(row.failures)} of ${plain(row.calls)} calls failed` }
+                : {}),
+            }))}
+            format={(value) => `$${value.toFixed(4)}`}
+          />
         )}
       </section>
 
-      <section>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-4)' }}>Spend by operation</h2>
+      <section className={styles.section}>
+        <h2>What runs most</h2>
         {summary.byOperation.length === 0 ? (
-          <div className={styles.empty}>Nothing yet.</div>
+          <p className={styles.empty}>Nothing yet.</p>
         ) : (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Operation</th>
-                <th className={styles.num}>Calls</th>
-                <th className={styles.num}>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.byOperation.map((row) => (
-                <tr key={row.operation}>
-                  <td className="mono">{row.operation}</td>
-                  <td className={styles.num}>{row.calls.toLocaleString('en-US')}</td>
-                  <td className={styles.num}>${row.costUsd.toFixed(4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <BreakdownBars
+            rows={summary.byOperation.map((row) => ({
+              label: row.operation,
+              value: row.costUsd,
+              note: `${plain(row.calls)} call${row.calls === 1 ? '' : 's'}`,
+            }))}
+            format={(value) => `$${value.toFixed(4)}`}
+          />
         )}
       </section>
+
+      {topEvents.length > 0 ? (
+        <section className={styles.section}>
+          <h2>What the platform has been doing</h2>
+          <div className={styles.chipRow}>
+            {topEvents.map((row) => (
+              <Link
+                key={row.event}
+                href={`/admin/logs?q=${encodeURIComponent(row.event)}&window=30d`}
+                className={styles.chip}
+                data-level={row.level}
+              >
+                <code>{row.event}</code>
+                <span>{plain(row.count)}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
