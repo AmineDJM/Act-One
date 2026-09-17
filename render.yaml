@@ -1,0 +1,96 @@
+# Act One — Render blueprint
+#
+# Two services and one database. They are separate services on purpose: a film
+# takes minutes to render and holds gigabytes, which must never happen inside an
+# HTTP request where a proxy timeout would kill it halfway.
+#
+# Almost nothing is configured here. Provider API keys, model routing, plans,
+# prices and the creative budget all live in the database and are edited from
+# the Super Admin console — the variables below are only what is needed to boot
+# before anybody has signed in.
+
+databases:
+  - name: act-one-db
+    databaseName: act_one
+    plan: standard
+    postgresMajorVersion: '16'
+
+services:
+  # ---------------------------------------------------------------------------
+  # Web: the marketing site, the customer app and the staff console.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: act-one-web
+    runtime: node
+    plan: standard
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start --workspace @act-one/web
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: act-one-db
+          property: connectionString
+      # Vault key for provider credentials and customer product logins.
+      # Generate with: node -e "console.log(JSON.stringify({k1:require('crypto').randomBytes(32).toString('base64')}))"
+      # Rotating means ADDING a key and moving the active pointer — never
+      # replacing, or every stored secret becomes unreadable.
+      - key: ACT_ONE_SECRET_KEYS
+        sync: false
+      - key: ACT_ONE_SECRET_ACTIVE_KEY
+        value: k1
+      # Canonical origin. Without it every canonical tag, sitemap entry and
+      # social card URL points at localhost.
+      - key: ACT_ONE_SITE_URL
+        sync: false
+      - key: ACT_ONE_PRODUCT_NAME
+        value: Act One
+      - key: ACT_ONE_SUPPORT_EMAIL
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # Worker: research, concepts, storyboards, rendering, sound, QA.
+  # ---------------------------------------------------------------------------
+  - type: worker
+    name: act-one-worker
+    runtime: node
+    # Rendering is CPU and memory bound. A smaller instance does not render
+    # more slowly — it runs out of memory and the job is reclaimed and retried,
+    # which costs more than the larger instance would have.
+    plan: pro
+    region: frankfurt
+    buildCommand: npm ci
+    startCommand: npm run worker
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: act-one-db
+          property: connectionString
+      - key: ACT_ONE_SECRET_KEYS
+        sync: false
+      - key: ACT_ONE_SECRET_ACTIVE_KEY
+        value: k1
+      # Two concurrent renders per host. More makes every one of them slower
+      # and risks the OOM killer taking the whole worker rather than one job.
+      - key: ACT_ONE_WORKER_CONCURRENCY
+        value: '2'
+      # Remotion drives Chrome's old headless mode, which current Chrome
+      # binaries no longer ship. Point this at chrome-headless-shell.
+      - key: ACT_ONE_CHROME_HEADLESS_SHELL
+        sync: false
+      # Browsers for research. Set to local-chromium only for self-hosted
+      # deployments — authenticated customer products should run on isolated
+      # managed browsers, where the container is destroyed with the session.
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/project/.cache/ms-playwright
