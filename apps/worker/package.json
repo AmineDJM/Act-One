@@ -1,0 +1,20 @@
+{
+  "name": "@act-one/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "dev": "node --watch --experimental-strip-types src/index.ts"
+  },
+  "dependencies": {
+    "@act-one/core": "*",
+    "@act-one/creative": "*",
+    "@act-one/db": "*",
+    "@act-one/motion": "*",
+    "@act-one/pipeline": "*",
+    "@act-one/providers": "*",
+    "@act-one/qa": "*",
+    "@act-one/sound": "*"
+  }
+}
