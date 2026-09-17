@@ -16,6 +16,7 @@ import { runStoryboard } from './stages/storyboard.ts';
 import { runRender } from './stages/render.ts';
 import { runCampaign } from './stages/campaign.ts';
 import { runRevision } from './stages/revision.ts';
+import { runSceneAssets } from './stages/assets.ts';
 
 /**
  * The job runner.
@@ -177,6 +178,13 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
       return runResearch(context, deps.vault ? { vault: deps.vault } : {});
 
     case 'generate_scene_assets':
+      return runSceneAssets(context, {
+        storyboardId: String(payload['storyboardId'] ?? context.project.activeStoryboardId ?? ''),
+        ...(Array.isArray(payload['sceneIds'])
+          ? { sceneIds: asStringArray(payload['sceneIds']) }
+          : {}),
+      });
+
     case 'render_animatic':
     case 'generate_copy':
       // Declared in the job taxonomy and dispatched here so an enqueued job is

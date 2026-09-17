@@ -18,6 +18,7 @@
     "@act-one/sound": "*",
     "zod": "^4.0.0",
     "@act-one/qa": "*",
-    "@act-one/motion": "*"
+    "@act-one/motion": "*",
+    "@act-one/three-d": "*"
   }
 }
