@@ -6,6 +6,7 @@ import {
   conceptSetIsDiverse,
   leastDivergentPair,
   lexicalOverlap,
+  ACTIONABLE_CTAS,
   ctaNeedsAction,
   primaryCtaFor,
   CTA_LABELS,
@@ -105,21 +106,53 @@ describe('primary CTA', () => {
     expect(primaryCtaFor('created')).toBe('understand_product');
     expect(primaryCtaFor('concepting')).toBe('watch_progress');
     expect(primaryCtaFor('concepts_ready')).toBe('choose_concept');
-    expect(primaryCtaFor('film_ready')).toBe('review_film');
+    expect(primaryCtaFor('film_ready')).toBe('create_variants');
   });
 
-  it('offers a way forward from an approved storyboard and from a failure', () => {
-    // Both of these produced a CTA the UI had no action for, so the page
-    // rendered no button: a finished storyboard could not be rendered, and a
-    // failed project could only be restarted by creating a whole new one.
+  it('offers a way forward at every point the customer has to act', () => {
+    // Each of these produced a CTA the UI had no action for, so the page
+    // rendered no button at all: a finished storyboard could not be rendered, a
+    // finished film could not be cut, and a failed project could only be
+    // restarted by creating a whole new one.
     expect(primaryCtaFor('storyboard_ready')).toBe('render_film');
+    expect(primaryCtaFor('film_ready')).toBe('create_variants');
     expect(primaryCtaFor('failed')).toBe('retry');
   });
 
-  it('only ever asks the customer to wait while work is actually running', () => {
-    const waiting = ProjectStage.options.filter((stage) => !ctaNeedsAction(primaryCtaFor(stage)));
+  it('never produces a CTA the page has no button for', () => {
+    // The invariant the three bugs above all broke. ACTIONABLE_CTAS is what the
+    // project page wires; anything the state machine can produce that needs a
+    // button must be in it.
+    const needing = new Set(
+      ProjectStage.options.map(primaryCtaFor).filter((cta) => ctaNeedsAction(cta)),
+    );
+    for (const cta of needing) {
+      expect(ACTIONABLE_CTAS, `${cta} has no action`).toContain(cta);
+    }
+  });
+
+  it('wires nothing it cannot reach', () => {
+    // The other direction: an action wired for a CTA no stage produces is dead
+    // code that looks like a feature.
+    const produced = new Set(ProjectStage.options.map(primaryCtaFor));
+    for (const cta of ACTIONABLE_CTAS) {
+      expect(produced, `${cta} is wired but unreachable`).toContain(cta);
+    }
+  });
+
+  it('only asks the customer to wait while work is actually running', () => {
+    const waiting = ProjectStage.options.filter((stage) => primaryCtaFor(stage) === 'watch_progress');
     expect(waiting.sort()).toEqual(
-      ['capturing_product', 'concepting', 'generating_assets', 'qa', 'rendering', 'researching', 'storyboarding'].sort(),
+      [
+        'capturing_product',
+        'concepting',
+        'generating_assets',
+        'qa',
+        'rendering',
+        'researching',
+        'storyboarding',
+        'understanding_ready',
+      ].sort(),
     );
   });
 });

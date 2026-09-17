@@ -186,16 +186,12 @@ function headlineFor(cta: PrimaryCta, projectName: string): string {
   switch (cta) {
     case 'understand_product':
       return 'Let us read your product.';
-    case 'view_understanding':
-      return 'Here is what we understood.';
     case 'choose_concept':
       return 'Three directions are ready.';
     case 'render_film':
       return 'Your storyboard is ready to argue with.';
-    case 'review_film':
-      return `${projectName} is finished.`;
     case 'create_variants':
-      return 'Cut it for every channel.';
+      return `${projectName} is finished.`;
     case 'retry':
       return 'Something went wrong.';
     default:
@@ -212,8 +208,8 @@ function bodyFor(cta: PrimaryCta, watermarked: boolean, reason: string): string 
         ? reason || 'Your plan renders a watermarked preview.'
         : 'Change anything above before we render — a revision at this stage costs nothing. ' +
           'Rendering covers scene rendering, product cinematography, sound design and the master export.';
-    case 'review_film':
-      return 'Download the master, or cut it for every channel you are launching on.';
+    case 'create_variants':
+      return 'Your film is above. Cut it for every channel you are launching on, and we will write the launch copy to go with it.';
     case 'watch_progress':
       return 'This runs in the background. You can close the tab.';
     case 'retry':

@@ -62,7 +62,9 @@ export function ProjectCta(props: {
       ? render
       : props.cta === 'create_variants'
         ? campaign
-        : props.cta === 'retry'
+        : // A project that never started, and a failed one, both resume from the
+          // furthest stage that has what it needs.
+          props.cta === 'retry' || props.cta === 'understand_product'
           ? retry
           : null;
   const pending = rendering || cutting || retrying;

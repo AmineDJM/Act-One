@@ -28,11 +28,9 @@ export type ProjectStage = z.infer<typeof ProjectStage>;
 /** What the customer is asked to do next, derived from stage. Never stored. */
 export const PrimaryCta = z.enum([
   'understand_product',
-  'view_understanding',
   'choose_concept',
   'render_film',
   'watch_progress',
-  'review_film',
   'create_variants',
   'retry',
 ]);
@@ -45,7 +43,12 @@ export function primaryCtaFor(stage: ProjectStage): PrimaryCta {
     case 'researching':
       return 'watch_progress';
     case 'understanding_ready':
-      return 'view_understanding';
+      /*
+       * Research enqueues concept generation as it finishes, so this stage
+       * always has a job behind it. The understanding itself is on the page
+       * already; there is nothing to press.
+       */
+      return 'watch_progress';
     case 'concepting':
       return 'watch_progress';
     case 'concepts_ready':
@@ -67,7 +70,9 @@ export function primaryCtaFor(stage: ProjectStage): PrimaryCta {
     case 'qa':
       return 'watch_progress';
     case 'film_ready':
-      return 'review_film';
+      // The film is delivered in its own panel, with a player and a download.
+      // What is left to do is cut it for the channels they are launching on.
+      return 'create_variants';
     case 'failed':
       return 'retry';
     default:
@@ -76,26 +81,45 @@ export function primaryCtaFor(stage: ProjectStage): PrimaryCta {
 }
 
 /**
- * The CTAs that are a state of waiting rather than something to press.
- *
- * Every other CTA must resolve to an action in the UI. One that does not
- * renders no button at all, which is worse than a wrong button: the page simply
- * stops offering a way forward and the customer has nowhere to go.
+ * CTAs that are a state of waiting rather than something to press.
  */
 export const PASSIVE_CTAS: readonly PrimaryCta[] = ['watch_progress'];
 
-/** True when this CTA needs the UI to give the customer something to press. */
+/**
+ * CTAs whose control lives elsewhere on the page.
+ *
+ * Choosing a concept happens on the three concept cards, each carrying its own
+ * button — a fourth button in the banner above them would be asking the same
+ * question twice.
+ */
+export const DELEGATED_CTAS: readonly PrimaryCta[] = ['choose_concept'];
+
+/**
+ * True when the CTA itself must carry a button.
+ *
+ * A CTA that is neither passive nor delegated and has no action renders nothing
+ * at all, which is worse than a wrong button: the page stops offering a way
+ * forward and the customer has nowhere to go. That is how a finished storyboard
+ * became unrenderable, a failed project unrecoverable, and a finished film
+ * uncuttable — three times, the same mistake.
+ */
 export function ctaNeedsAction(cta: PrimaryCta): boolean {
-  return !PASSIVE_CTAS.includes(cta);
+  return !PASSIVE_CTAS.includes(cta) && !DELEGATED_CTAS.includes(cta);
 }
+
+/** Exactly the CTAs the project page wires an action to. */
+export const ACTIONABLE_CTAS: readonly PrimaryCta[] = [
+  'understand_product',
+  'render_film',
+  'create_variants',
+  'retry',
+];
 
 export const CTA_LABELS: Record<PrimaryCta, string> = {
   understand_product: 'Understand my product',
-  view_understanding: 'See what we found',
   choose_concept: 'Choose a concept',
   render_film: 'Render the film',
   watch_progress: 'Working…',
-  review_film: 'Watch your film',
   create_variants: 'Create the launch campaign',
   retry: 'Try again',
 };
