@@ -50,3 +50,38 @@ export function expandHex(value: string): string {
 }
 
 export const nonEmpty = (max = 500) => z.string().trim().min(1).max(max);
+
+/**
+ * An enum array that degrades instead of failing.
+ *
+ * Models return plausible-but-unlisted values for taxonomy fields —
+ * "website" for a channel, "social" for a platform. Rejecting those fails the
+ * whole response over a field that is advisory, which is how a concept worth
+ * keeping gets thrown away for naming a channel we did not enumerate.
+ *
+ * Known synonyms are mapped, unrecognised values are dropped, and an empty
+ * result falls back rather than erroring. Critical fields must NOT use this —
+ * a visual type or a repair action silently becoming a default would hide a
+ * real disagreement about what the film should do.
+ */
+export function lenientEnumArray<T extends string>(
+  allowed: readonly T[],
+  options: { synonyms?: Record<string, T>; fallback: T[]; max?: number },
+) {
+  const valid = new Set<string>(allowed);
+  const synonyms = options.synonyms ?? {};
+
+  return z
+    .array(z.union([z.string(), z.number(), z.boolean()]))
+    .default([])
+    .transform((values) => {
+      const mapped = values
+        .map((value) => String(value).toLowerCase().trim().replace(/[\s-]+/g, '_'))
+        .map((value) => (valid.has(value) ? (value as T) : synonyms[value]))
+        .filter((value): value is T => value !== undefined);
+
+      const unique = [...new Set(mapped)];
+      const kept = options.max ? unique.slice(0, options.max) : unique;
+      return kept.length > 0 ? kept : options.fallback;
+    });
+}

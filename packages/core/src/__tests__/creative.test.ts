@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  Channel,
+  lenientEnumArray,
   conceptDivergence,
   conceptSetIsDiverse,
   leastDivergentPair,
@@ -147,5 +149,49 @@ describe('idea-level veto', () => {
       creativeSystem: 'editorial_tech',
     });
     expect(conceptDivergence(a, b)).toBeGreaterThan(0.45);
+  });
+});
+
+describe('lenientEnumArray', () => {
+  it('maps the synonyms models actually return', () => {
+    const schema = lenientEnumArray(Channel.options, {
+      synonyms: { website: 'homepage_hero', social: 'paid_social', twitter: 'x' },
+      fallback: ['homepage_hero'],
+    });
+    expect(schema.parse(['Website', 'social', 'Twitter'])).toEqual([
+      'homepage_hero',
+      'paid_social',
+      'x',
+    ]);
+  });
+
+  it('drops what it cannot map rather than failing the whole response', () => {
+    const schema = lenientEnumArray(Channel.options, { fallback: ['homepage_hero'] });
+    // A concept worth keeping must not be thrown away for naming a channel we
+    // did not enumerate.
+    expect(schema.parse(['linkedin', 'billboard', 'skywriting'])).toEqual(['linkedin']);
+  });
+
+  it('falls back when nothing survives', () => {
+    const schema = lenientEnumArray(Channel.options, { fallback: ['homepage_hero'] });
+    expect(schema.parse(['billboard'])).toEqual(['homepage_hero']);
+    expect(schema.parse([])).toEqual(['homepage_hero']);
+  });
+
+  it('deduplicates and respects the cap', () => {
+    const schema = lenientEnumArray(Channel.options, {
+      synonyms: { web: 'homepage_hero' },
+      fallback: ['homepage_hero'],
+      max: 2,
+    });
+    expect(schema.parse(['web', 'homepage_hero', 'linkedin', 'x'])).toEqual([
+      'homepage_hero',
+      'linkedin',
+    ]);
+  });
+
+  it('tolerates non-string values without throwing', () => {
+    const schema = lenientEnumArray(Channel.options, { fallback: ['homepage_hero'] });
+    expect(schema.parse([42, true, 'linkedin'])).toEqual(['linkedin']);
   });
 });

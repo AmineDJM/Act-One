@@ -5,10 +5,11 @@ import {
   ProjectBrief,
   type ProjectBrief as ProjectBriefType,
   can,
-  hasEntitlement,
-  withinLimit,
+  canRender,
+  canStartProject,
   type Job,
   type JobKind,
+  storyboardDuration,
   type Project,
   type ProjectStage,
 } from '@act-one/core';
@@ -41,26 +42,20 @@ export async function createProject(session: Session, input: CreateProjectInput)
 
   const organization = await store.organizations.get(session.organizationId);
   if (!organization) throw new AppError('not_found', 'Workspace not found.');
-  if (organization.isSuspended) {
-    throw new AppError('forbidden', 'This workspace is suspended. Contact support.');
-  }
-
-  const { plan, entitlements } = await entitlementsFor(organization);
-  if (!entitlements.has('research.run')) {
-    throw new AppError('entitlement_required', 'Your plan cannot start new research.');
-  }
+  const { plan } = await entitlementsFor(organization);
 
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
   const used = await store.projects.countCreatedSince(organization.id, monthStart.toISOString());
 
-  if (!withinLimit(plan.limits.projectsPerMonth, used)) {
+  // The decision itself is a pure function in @act-one/core, so the worker and
+  // the app cannot drift into answering the same question differently.
+  const decision = canStartProject({ plan, organization, projectsThisMonth: used });
+  if (!decision.allowed) {
     throw new AppError(
-      'entitlement_required',
-      `${plan.name} includes ${plan.limits.projectsPerMonth} project${
-        plan.limits.projectsPerMonth === 1 ? '' : 's'
-      } a month. Upgrade to start another.`,
+      decision.remedy === 'contact' ? 'forbidden' : 'entitlement_required',
+      decision.reason,
     );
   }
 
@@ -183,26 +178,24 @@ export async function renderPermission(session: Session, project: Project) {
   const organization = await store.organizations.get(session.organizationId);
   if (!organization) throw new AppError('not_found', 'Workspace not found.');
 
-  const { plan, entitlements } = await entitlementsFor(organization);
-  const renders = await store.renders.countForProject(session.organizationId, project.id);
+  const { plan } = await entitlementsFor(organization);
+  const [renders, storyboard] = await Promise.all([
+    store.renders.countForProject(session.organizationId, project.id),
+    project.activeStoryboardId
+      ? store.storyboards.get(session.organizationId, project.activeStoryboardId)
+      : null,
+  ]);
 
-  if (!entitlements.has('render.clean')) {
-    return {
-      allowed: entitlements.has('render.watermarked'),
-      watermarked: true,
-      reason: `${plan.name} renders a watermarked preview. Upgrade for a clean master.`,
-      plan,
-    };
-  }
-  if (!withinLimit(plan.limits.rendersPerProject, renders)) {
-    return {
-      allowed: false,
-      watermarked: false,
-      reason: `${plan.name} includes ${plan.limits.rendersPerProject} renders per project.`,
-      plan,
-    };
-  }
-  return { allowed: true, watermarked: false, reason: '', plan };
+  const decision = canRender({
+    plan,
+    organization,
+    rendersForProject: renders,
+    // Length is checked before rendering rather than after: a customer should
+    // not discover their plan's ceiling from a truncated film.
+    durationSeconds: storyboard ? storyboardDuration(storyboard) : 0,
+  });
+
+  return { allowed: decision.allowed, watermarked: decision.watermarked, reason: decision.reason, plan };
 }
 
 function hostLabel(url: string): string {

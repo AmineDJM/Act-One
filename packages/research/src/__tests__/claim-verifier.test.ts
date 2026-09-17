@@ -124,3 +124,33 @@ describe('overlapRatio', () => {
     ).toBeGreaterThan(0.6);
   });
 });
+
+describe('phrase grounding', () => {
+  it('grounds a reworded claim that shares a phrase with the evidence', () => {
+    // Bag-of-words overlap alone scores this under half, because the claim is
+    // longer than the headline it restates. It is still plainly grounded.
+    const result = verifyClaim(
+      claim(
+        'The product replaces the spreadsheet that finance teams currently rely on when they reconcile invoices at month end',
+      ),
+      corpus,
+    );
+    expect(result.status).toBe('grounded');
+  });
+
+  it('does not ground a claim that merely shares common words', () => {
+    const result = verifyClaim(
+      claim('Includes a native mobile application for iOS and Android devices'),
+      corpus,
+    );
+    expect(result.status).toBe('unsupported');
+  });
+
+  it('still rejects an invented figure even when the phrase matches', () => {
+    const result = verifyClaim(
+      claim('Teams close their books 87x faster with automated reconciliation'),
+      corpus,
+    );
+    expect(result.status).toBe('fabricated_number');
+  });
+});

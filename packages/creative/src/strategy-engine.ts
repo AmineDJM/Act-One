@@ -3,6 +3,7 @@ import {
   CreativeSystemId,
   NarrativeStructure,
   Channel,
+  lenientEnumArray,
   conceptSetIsDiverse,
   conceptDivergence,
   leastDivergentPair,
@@ -48,7 +49,34 @@ const ConceptResponse = z.object({
   productUiUsage: z.string().trim().min(1).max(600),
   generativeUsage: z.string().trim().min(1).max(600),
   estimatedDurationSeconds: z.number().int().min(6).max(180),
-  recommendedChannels: z.array(Channel).min(1).max(5),
+  // Advisory, so it degrades rather than failing the whole concept. A model
+  // returning "website" instead of "homepage_hero" must not cost us the idea.
+  recommendedChannels: lenientEnumArray(Channel.options, {
+    synonyms: {
+      website: 'homepage_hero',
+      homepage: 'homepage_hero',
+      web: 'homepage_hero',
+      landing_page: 'homepage_hero',
+      social: 'paid_social',
+      social_media: 'paid_social',
+      instagram: 'paid_social',
+      facebook: 'paid_social',
+      meta: 'paid_social',
+      ads: 'paid_social',
+      twitter: 'x',
+      producthunt: 'product_hunt',
+      yt: 'youtube',
+      shorts: 'youtube',
+      reels: 'paid_social',
+      email: 'linkedin',
+      investors: 'investor',
+      pitch: 'investor',
+      events: 'conference',
+      trade_show: 'conference',
+    },
+    fallback: ['homepage_hero'],
+    max: 5,
+  }),
   keyScenes: z.array(z.string().trim().min(1).max(200)).min(3).max(5),
   /** Moment ids from the brief this concept intends to film. */
   momentIds: z.array(z.string()).max(6).default([]),
@@ -261,6 +289,7 @@ export class CreativeStrategyEngine {
             `That system suits: ${system.suitsWhen.join('; ')}`,
             `That system forbids: ${system.prohibitions.join('; ')}`,
             `Target runtime: about ${duration} seconds`,
+            `Channels must be chosen from: ${Channel.options.join(', ')}`,
             hasRealFootage
               ? `We have real captured footage of the product. Use it for anything that shows the product working.`
               : `We have NO captured product footage. Do not describe scenes that depend on showing the real UI in detail, and never invent a fake interface.`,

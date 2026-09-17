@@ -11,6 +11,7 @@ export * from './domain/creative.ts';
 export * from './domain/storyboard.ts';
 export * from './domain/org.ts';
 export * from './domain/billing.ts';
+export * from './domain/entitlement-policy.ts';
 export * from './domain/asset.ts';
 export * from './domain/render.ts';
 export * from './domain/cost.ts';

@@ -113,7 +113,20 @@ export function verifyClaim(
 
   let best: { id: string; ratio: number } | null = null;
   for (const item of evidence) {
-    const ratio = overlapRatio(claim.text, item.excerpt);
+    // Two signals, either of which grounds a claim.
+    //
+    // Bag-of-words overlap is the blunt one, and it punishes long claims: a
+    // fifteen-word sentence restating a six-word headline can share every
+    // meaningful term and still score under half. Against a real site that
+    // emptied the brief a second time.
+    //
+    // A shared run of three consecutive content words is far stronger evidence
+    // of grounding than any ratio — it essentially cannot happen by chance —
+    // so a phrase match counts as full support rather than lowering the bar.
+    const ratio = Math.max(
+      overlapRatio(claim.text, item.excerpt),
+      sharesPhrase(claim.text, item.excerpt) ? 1 : 0,
+    );
     if (!best || ratio > best.ratio) best = { id: item.id, ratio };
   }
 
@@ -142,6 +155,33 @@ export function overlapRatio(claimText: string, excerpt: string): number {
     if (excerptWords.has(word)) shared += 1;
   }
   return shared / claimWords.size;
+}
+
+/**
+ * Whether two texts share a run of `n` consecutive content words.
+ *
+ * Stopwords are stripped first, so "the books without a week of" and
+ * "books without week" are the same phrase — which is what makes this survive
+ * the rewording a writer does naturally.
+ */
+export function sharesPhrase(a: string, b: string, n = 3): boolean {
+  const gramsB = new Set(contentGrams(b, n));
+  if (gramsB.size === 0) return false;
+  return contentGrams(a, n).some((gram) => gramsB.has(gram));
+}
+
+function contentGrams(text: string, n: number): string[] {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !STOPWORDS.has(word));
+
+  const grams: string[] = [];
+  for (let i = 0; i + n <= words.length; i += 1) {
+    grams.push(words.slice(i, i + n).join(' '));
+  }
+  return grams;
 }
 
 export type VerificationReport = {

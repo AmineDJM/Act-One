@@ -347,11 +347,14 @@ function allLogos(captures: PageCapture[]): BrandLogo[] {
     for (const candidate of capture.styleProfile?.logoCandidates ?? []) {
       const url = absolutize(capture.url, candidate.src);
       if (!url) continue;
-      const format = /\.svg(\?|$)/i.test(url)
+      // Inline marks arrive as data URLs, which carry their type in the
+      // prefix rather than a file extension — and they are the ones we most
+      // want to identify, because vector is what survives a 4K logo reveal.
+      const format = /^data:image\/svg\+xml/i.test(url) || /\.svg(\?|$)/i.test(url)
         ? 'svg'
-        : /\.png(\?|$)/i.test(url)
+        : /^data:image\/png/i.test(url) || /\.png(\?|$)/i.test(url)
           ? 'png'
-          : /\.jpe?g(\?|$)/i.test(url)
+          : /^data:image\/jpe?g/i.test(url) || /\.jpe?g(\?|$)/i.test(url)
             ? 'jpg'
             : 'unknown';
       logos.push({
