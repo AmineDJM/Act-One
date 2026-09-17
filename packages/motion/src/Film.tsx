@@ -192,10 +192,12 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
       case 'product_sequence':
       case 'floating_ui':
       case 'feature_stack':
-        // Product scenes render real capture only. With nothing captured the
-        // storyboard engine has already routed this elsewhere; this guard means
-        // a broken asset reference yields an honest empty frame rather than an
-        // invented interface.
+        // Product scenes render real capture only — never an invented
+        // interface. When the asset is missing they fall through to type, which
+        // is the honest shot: the storyboard engine keeps recipe and visual type
+        // coherent, so reaching `typeFallback` here means a broken asset
+        // reference, and four seconds of brand-coloured nothing is a worse
+        // answer than the line of copy the scene was written around.
         return assets[0] ? (
           <ProductWindow
             src={assets[0]}
@@ -205,9 +207,10 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             delaySeconds={scene.motionRecipe.delay}
             easing={easing}
             chrome={scene.visualType !== 'product_ui_3d'}
-            label={scene.momentIds[0] ? undefined : undefined}
           />
-        ) : null;
+        ) : (
+          typeFallback()
+        );
 
       case 'product_zoom':
         return assets[0] ? (
@@ -219,13 +222,17 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             easing={easing}
             delaySeconds={scene.motionRecipe.delay}
           />
-        ) : null;
+        ) : (
+          typeFallback()
+        );
 
       case 'spatial_cards':
       case 'image_wall':
         return assets.length > 0 ? (
           <SpatialCards srcs={assets} tokens={tokens} durationSeconds={scene.duration} easing={easing} />
-        ) : null;
+        ) : (
+          typeFallback()
+        );
 
       case 'cursor_sequence':
         return assets[0] ? (
@@ -236,7 +243,9 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             durationSeconds={scene.duration}
             easing={easing}
           />
-        ) : null;
+        ) : (
+          typeFallback()
+        );
 
       case 'logo_reveal':
         return (
@@ -291,25 +300,32 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
                 durationSeconds={scene.duration}
                 easing={easing}
               />
-            ) : null}
+            ) : (
+              typeFallback()
+            )}
           </DepthTransition>
         );
 
       default:
-        return text ? (
-          <Framed tokens={tokens} placement="center_left">
-            <WordReveal
-              text={text}
-              token={tokens.type.statement}
-              color={tokens.onCanvas.primary}
-              tokens={tokens}
-              maxWidth={tokens.grid.safe.width * 0.8}
-              maxLines={3}
-              easing={easing}
-              durationSeconds={scene.duration}
-            />
-          </Framed>
-        ) : null;
+        return typeFallback();
+    }
+
+    /** Type on brand canvas: what a scene falls back to when its footage is gone. */
+    function typeFallback() {
+      return text ? (
+        <Framed tokens={tokens} placement="center_left">
+          <WordReveal
+            text={text}
+            token={tokens.type.statement}
+            color={tokens.onCanvas.primary}
+            tokens={tokens}
+            maxWidth={tokens.grid.safe.width * 0.8}
+            maxLines={3}
+            easing={easing}
+            durationSeconds={scene.duration}
+          />
+        </Framed>
+      ) : null;
     }
   })();
 

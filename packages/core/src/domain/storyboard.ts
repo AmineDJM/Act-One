@@ -52,6 +52,54 @@ export const MotionRecipeName = z.enum([
 ]);
 export type MotionRecipeName = z.infer<typeof MotionRecipeName>;
 
+/**
+ * Which motion recipes a visual type can actually drive.
+ *
+ * A recipe is not decoration on top of a scene, it *is* the scene: at render
+ * time `cursor_sequence` needs a captured frame to move a cursor across, and
+ * `statistic_reveal` needs a figure in the first line of on-screen text. Pair a
+ * recipe with a visual type that cannot feed it and the renderer has nothing to
+ * draw — which is how a scene ends up as flat brand colour for four seconds.
+ *
+ * The first entry is the default for that type; the rest are the alternatives a
+ * film can rotate through so twenty typographic scenes are not twenty identical
+ * typographic scenes.
+ */
+export const RECIPES_FOR_VISUAL: Record<VisualType, readonly MotionRecipeName[]> = {
+  kinetic_typography: ['kinetic_headline', 'editorial_headline', 'word_reveal', 'mask_reveal'],
+  statistic: ['statistic_reveal', 'metric_reveal'],
+  quote: ['quote_hold'],
+  logo_reveal: ['logo_reveal', 'cta_end_card'],
+  transition: ['depth_transition', 'hard_cut', 'hold'],
+  product_ui: ['product_window', 'product_sequence', 'floating_ui', 'feature_stack', 'cursor_sequence'],
+  product_ui_3d: ['product_window', 'spatial_cards', 'window_explosion'],
+  screenshot_motion: ['product_zoom', 'product_window', 'image_wall'],
+  real_media: ['image_wall', 'spatial_cards'],
+  cinematic_3d: ['depth_transition', 'spatial_cards'],
+  generated_broll: ['image_wall', 'depth_transition', 'hold'],
+  mixed_media: ['window_explosion', 'split_screen', 'spatial_cards'],
+};
+
+/** True when a recipe can be rendered by the visual type carrying it. */
+export function recipeSuitsVisual(recipe: MotionRecipeName, visualType: VisualType): boolean {
+  return RECIPES_FOR_VISUAL[visualType].includes(recipe);
+}
+
+/**
+ * A recipe the visual type can render, keeping the preferred one when it is
+ * already valid and otherwise stepping away from `avoid` so consecutive scenes
+ * do not share a treatment.
+ */
+export function coherentRecipe(
+  visualType: VisualType,
+  preferred: MotionRecipeName,
+  avoid: MotionRecipeName | null = null,
+): MotionRecipeName {
+  const options = RECIPES_FOR_VISUAL[visualType];
+  if (options.includes(preferred) && preferred !== avoid) return preferred;
+  return options.find((option) => option !== avoid) ?? options[0]!;
+}
+
 export const EasingName = z.enum([
   'linear',
   'out_quint',        // the workhorse for confident UI motion

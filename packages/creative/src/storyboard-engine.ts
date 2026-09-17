@@ -3,6 +3,7 @@ import {
   MODE_BUDGETS,
   findMoment,
   newId,
+  coherentRecipe,
   resequence,
   round3,
   storyboardDuration,
@@ -12,6 +13,7 @@ import {
   type CreativeTreatment,
   type EasingName,
   type MotionRecipe,
+  type MotionRecipeName,
   type ProductUnderstanding,
   type ProjectBrief,
   type Scene,
@@ -219,6 +221,13 @@ export class StoryboardEngine {
     const allowThreeD = input.brief.creativeMode !== 'authentic' || true;
     const copyAdjustments: StoryboardResult['copyAdjustments'] = [];
 
+    /*
+     * Carried across scenes so each one can step away from the treatment the
+     * last one used. Without it a film with no product capture routes every
+     * beat to the same typographic recipe and reads as a template.
+     */
+    let previousRecipe: MotionRecipeName | null = null;
+
     const scenes: Scene[] = plan.scenes.map((planned, index) => {
       const archetype = this.resolveArchetype(system, planned.archetypeId, index, plan.scenes.length);
       const moment = planned.momentId ? findMoment(input.understanding, planned.momentId) : undefined;
@@ -255,6 +264,8 @@ export class StoryboardEngine {
         input.treatment.voiceStrategy === 'none' ? '' : planned.narration.trim();
 
       const sceneId = newId('scn');
+      const motionRecipe = motionFor(archetype, input.brand, system, visualType, previousRecipe);
+      previousRecipe = motionRecipe.name;
 
       return {
         id: sceneId,
@@ -268,7 +279,7 @@ export class StoryboardEngine {
         visualType,
         assetRefs: moment?.screenshots ?? [],
         momentIds: moment ? [moment.id] : [],
-        motionRecipe: motionFor(archetype, input.brand, system),
+        motionRecipe,
         cameraRecipe: cameraFor(archetype, input.brand),
         soundCues: [],
         voiceOver: narration.length > 0,
@@ -420,6 +431,8 @@ function motionFor(
   archetype: SceneArchetype,
   brand: BrandSystem,
   system: CreativeSystem,
+  visualType: VisualType,
+  avoid: MotionRecipeName | null,
 ): MotionRecipe {
   const easingByBrand: Record<BrandSystem['motionStyle'], EasingName> = {
     precise: 'out_quint',
@@ -437,7 +450,14 @@ function motionFor(
   };
 
   return {
-    name: archetype.motion,
+    /*
+     * The archetype names the recipe it was written for, but routing may have
+     * moved the scene to a different visual type — a product beat with no
+     * capture behind it becomes typography. Carrying the product recipe across
+     * that move left scenes whose renderer had no asset to draw and returned an
+     * empty frame, so the recipe follows the visual type, not the archetype.
+     */
+    name: coherentRecipe(visualType, archetype.motion, avoid),
     // The brand's own motion language wins over the system's default: two
     // brands using the same system should still move differently.
     easing: easingByBrand[brand.motionStyle] ?? system.pacing.defaultEasing,

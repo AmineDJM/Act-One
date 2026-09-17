@@ -1,4 +1,4 @@
-import { newId, type BrandSystem, type Concept, type ProductUnderstanding, type ProjectBrief, type Scene, type Storyboard } from '@act-one/core';
+import { newId, type BrandSystem, type Concept, type CreativeTreatment, type ProductUnderstanding, type ProjectBrief, type Scene, type Storyboard } from '@act-one/core';
 
 export function brandFixture(over: Partial<BrandSystem> = {}): BrandSystem {
   const now = '2026-01-01T00:00:00.000Z';
@@ -177,6 +177,31 @@ export function storyboardFixture(scenes: Scene[], over: Partial<Storyboard> = {
     status: 'draft',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  };
+}
+
+export function treatmentFixture(over: Partial<CreativeTreatment> = {}): CreativeTreatment {
+  return {
+    id: 'trt_1',
+    conceptId: 'cpt_1',
+    projectId: 'prj_1',
+    title: 'From friction to flow',
+    tagline: 'The work moves the moment it lands.',
+    script: '',
+    visualLanguage: 'Dense type on near-black, one accent, no gradients.',
+    typographyDirection: 'Display weight for statements, mono for figures.',
+    cameraLanguage: 'Locked off, with one push when the product appears.',
+    rhythm: 'Fast at the top, a held beat before the mark.',
+    motionStyleNotes: 'Snap in, settle, never bounce.',
+    soundStyle: 'Low pulse, a single impact on the turn.',
+    voiceStrategy: 'none',
+    generativeMediaStrategy: 'None. Everything is rendered or captured.',
+    productUiUsage: 'Real capture only.',
+    exclusions: ['No stock footage', 'No fake interface'],
+    cta: 'Start shipping with flow.',
+    confidence: 0.8,
+    createdAt: new Date('2025-01-01T00:00:00.000Z').toISOString(),
     ...over,
   };
 }
