@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -271,10 +271,12 @@ async function renderOnce(
   // from the mix rather than failing the render — a film with no whoosh is
   // still a film.
   const resolvedPaths = await resolveLibraryPaths(context, design);
+  const voiceTracks = await speakNarration(context, storyboard, params.workDir, params.attempt);
   const plan = buildMix({
     design,
     resolvedPaths,
     durationSeconds: storyboardDuration(storyboard),
+    ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
 
   const audioPath = path.join(params.workDir, `mix-${params.attempt}.m4a`);
@@ -369,6 +371,93 @@ async function inspect(
   }
 
   return issues;
+}
+
+/**
+ * Speaks the narration the storyboard was approved with.
+ *
+ * The storyboard panel shows narration in quotes and the customer approves it,
+ * so a film that never says any of it is a film that does not match what they
+ * signed off. Written per scene rather than as one long take, because each line
+ * has to land inside its own scene — a single file drifts against the cut the
+ * moment any scene's duration changes.
+ *
+ * A stock persona, never a cloned voice: cloning needs a recorded consent grant
+ * naming the person, and nothing here has one. The provider refuses without it
+ * and this does not ask.
+ *
+ * Failure is survivable in exactly the way a missing sound effect is. A film
+ * that lost its voice-over is still a film, and losing the picture because a
+ * speech API was down would be the worse trade.
+ */
+async function speakNarration(
+  context: StageContext,
+  storyboard: Storyboard,
+  workDir: string,
+  attempt: number,
+): Promise<{ path: string; atSeconds: number; durationSeconds: number }[]> {
+  const spoken = storyboard.scenes.filter(
+    (scene) => scene.voiceOver && scene.narration.trim().length > 0,
+  );
+  if (storyboard.voiceStrategy === 'none' || spoken.length === 0) return [];
+
+  const speech = context.registry.speech();
+  const persona = PERSONA_FOR_STRATEGY[storyboard.voiceStrategy] ?? 'narrator_neutral';
+  const tracks: { path: string; atSeconds: number; durationSeconds: number }[] = [];
+
+  for (const scene of spoken) {
+    try {
+      const result = await speech.synthesize(
+        {
+          text: scene.narration.trim(),
+          persona,
+          // Rate is set from the room the line has to fit in, not from taste: a
+          // line written for 2.4 seconds must not run 3.
+          rate: speakingRateFor(scene.narration, scene.duration),
+          format: 'wav',
+        },
+        { organizationId: context.organizationId, projectId: context.project.id },
+      );
+
+      const file = path.join(workDir, `vo-${attempt}-${scene.index}.wav`);
+      await writeFile(file, result.audio);
+      tracks.push({
+        path: file,
+        atSeconds: scene.startTime,
+        durationSeconds: Math.min(result.durationSecondsEstimate, scene.duration),
+      });
+    } catch (error) {
+      console.error(
+        `[render] narration for scene ${scene.index} failed:`,
+        (error as Error).message.slice(0, 200),
+      );
+    }
+  }
+
+  return tracks;
+}
+
+/** Each voice strategy has a register; none of them is a cloned person. */
+const PERSONA_FOR_STRATEGY: Record<string, 'narrator_neutral' | 'narrator_warm' | 'narrator_low'> = {
+  founder: 'narrator_warm',
+  narrator: 'narrator_neutral',
+  documentary: 'narrator_low',
+};
+
+/**
+ * How fast to read so the line fits its scene.
+ *
+ * Clamped hard at both ends: a line rushed past 1.15 sounds panicked, and one
+ * slowed below 0.85 sounds drugged. Outside that range the honest answer is
+ * that the copy is wrong for the cut, which the timing engine already fixes
+ * upstream.
+ */
+export function speakingRateFor(narration: string, seconds: number): number {
+  const words = narration.trim().split(/\s+/).length;
+  // Around 2.6 words a second is an unhurried read.
+  const needed = words / 2.6;
+  if (seconds <= 0) return 1;
+  return Math.min(1.15, Math.max(0.85, needed / seconds));
 }
 
 async function resolveLibraryPaths(
