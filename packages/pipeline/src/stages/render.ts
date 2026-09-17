@@ -34,6 +34,15 @@ export type RenderOptions = {
   maxRepairAttempts?: number;
   /** Skips vision QA. Used for previews and animatics, where it is not worth it. */
   skipVisionQa?: boolean;
+  /**
+   * True when this render is a campaign cut rather than the film itself.
+   *
+   * A cut must not become the project's latest render, or the page offers a
+   * six-second bumper as the master, the cuts stop appearing beside it — they
+   * hang off a render nothing points at any more — and the next campaign is cut
+   * from a cut.
+   */
+  isCut?: boolean;
 };
 
 export async function runRender(
@@ -176,10 +185,15 @@ export async function runRender(
       ...(passed ? {} : { error: 'Quality checks did not pass.' }),
     });
 
-    await store.projects.update(organizationId, project.id, {
-      latestRenderId: render.id,
-      stage: passed ? 'film_ready' : 'failed',
-    });
+    await store.projects.update(
+      organizationId,
+      project.id,
+      options.isCut
+        ? // A cut that fails is one missing format, not a failed project: the
+          // film is still finished and the other cuts still arrive.
+          {}
+        : { latestRenderId: render.id, stage: passed ? 'film_ready' : 'failed' },
+    );
 
     await context.progress(1, passed ? 'Done' : 'Finished with issues');
     return { renderId: render.id, assetId: master.asset.id, qaPassed: passed, issues };

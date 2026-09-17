@@ -61,6 +61,7 @@ export async function runCampaign(
         // recomposed — paying for it again per cut is waste.
         skipVisionQa: true,
         maxRepairAttempts: 1,
+        isCut: true,
       });
 
       await store.variants.update(organizationId, variant.id, {

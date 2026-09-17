@@ -155,8 +155,16 @@ export async function loadProjectView(session: Session, projectId: string) {
 
   // The finished film, and the cuts made from it. Without these the project
   // page can say a film is ready but has nothing to hand over.
+  /*
+   * The project's own pointer first. Scanning the render list finds whatever
+   * finished most recently, and campaign cuts are renders too — so after a
+   * campaign the "master" was whichever cut rendered last, and the cuts
+   * disappeared because they hang off the real master's id.
+   */
   const latestRender =
-    renders.find((render) => render.status === 'completed' && render.masterAssetId) ?? null;
+    renders.find((render) => render.id === project.latestRenderId && render.masterAssetId) ??
+    renders.find((render) => render.status === 'completed' && render.masterAssetId) ??
+    null;
   const variants = latestRender
     ? await store.variants.listForRender(session.organizationId, latestRender.id)
     : [];
