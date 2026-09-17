@@ -21,7 +21,8 @@
     "migrate": "node --experimental-strip-types packages/db/src/cli/migrate.ts",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\"",
-    "verify": "npm run typecheck && npm run test"
+    "verify": "npm run typecheck && npm run test",
+    "demo": "vite-node scripts/demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
