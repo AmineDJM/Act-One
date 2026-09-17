@@ -1,0 +1,81 @@
+import type { CostOperation } from '@act-one/core';
+
+/**
+ * Providers are replaceable infrastructure. The rules that keep them that way:
+ *
+ *  1. Nothing outside this package may import a vendor SDK or mention a vendor
+ *     model name. Callers ask for a capability and a quality tier.
+ *  2. Every call that costs money reports through a CostSink, so the ledger is
+ *     complete by construction rather than by remembering to log.
+ *  3. Every provider declares health, so routing can fall back without the
+ *     pipeline knowing which vendor it is talking to.
+ */
+export type ProviderKind = 'llm' | 'browser' | 'media' | 'speech' | 'storage';
+
+export type CostRecord = {
+  provider: string;
+  model?: string | null;
+  operation: CostOperation;
+  estimatedCostUsd: number;
+  actualCostUsd: number;
+  quantity?: number;
+  unit?: string;
+  succeeded?: boolean;
+  isRetry?: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+/** Where spend is recorded. The DB-backed implementation lives in @act-one/db. */
+export interface CostSink {
+  record(cost: CostRecord): Promise<void>;
+}
+
+export class NullCostSink implements CostSink {
+  readonly records: CostRecord[] = [];
+  async record(cost: CostRecord): Promise<void> {
+    this.records.push(cost);
+  }
+}
+
+export type ProviderHealth = {
+  provider: string;
+  kind: ProviderKind;
+  healthy: boolean;
+  checkedAt: string;
+  latencyMs?: number;
+  message?: string;
+};
+
+export interface Provider {
+  readonly name: string;
+  readonly kind: ProviderKind;
+  health(): Promise<ProviderHealth>;
+}
+
+/** Context threaded into every provider call so costs attribute correctly. */
+export type CallContext = {
+  organizationId: string;
+  projectId?: string | null;
+  sceneId?: string | null;
+  renderId?: string | null;
+  /** Aborts in-flight provider work when a render is cancelled. */
+  signal?: AbortSignal;
+};
+
+export class ProviderError extends Error {
+  readonly provider: string;
+  readonly retryable: boolean;
+  readonly status?: number;
+
+  constructor(
+    provider: string,
+    message: string,
+    opts: { retryable?: boolean; status?: number; cause?: unknown } = {},
+  ) {
+    super(`[${provider}] ${message}`, opts.cause ? { cause: opts.cause } : undefined);
+    this.name = 'ProviderError';
+    this.provider = provider;
+    this.retryable = opts.retryable ?? false;
+    this.status = opts.status;
+  }
+}
