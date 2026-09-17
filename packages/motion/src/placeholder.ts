@@ -1,6 +1,6 @@
 import { neutralRamp } from '@act-one/design';
 import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
-import type { FilmProps } from './Film.tsx';
+import type { FilmProps } from './composition.ts';
 
 /**
  * A film used only by Remotion Studio so compositions have something to show.

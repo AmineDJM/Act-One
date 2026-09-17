@@ -4,7 +4,8 @@ import { Composition, continueRender, delayRender, registerRoot } from 'remotion
 import './fonts.ts';
 import { waitForFonts } from './fonts.ts';
 import { ASPECT_DIMENSIONS, DEFAULT_FPS, dimensionsFor, type AspectRatio, type RenderQuality } from '@act-one/core';
-import { Film, filmDurationInFrames, type FilmProps } from './Film.tsx';
+import { Film } from './Film.tsx';
+import { compositionId, filmDurationInFrames, type FilmProps } from './composition.ts';
 import { PLACEHOLDER_FILM_PROPS } from './placeholder.ts';
 
 /**
@@ -58,13 +59,5 @@ export const RemotionRoot: React.FC = () => {
     </>
   );
 };
-
-export function compositionId(aspect: AspectRatio): string {
-  return `film-${aspect.replace(':', 'x')}`;
-}
-
-export function dimensionsForRender(aspect: AspectRatio, quality: RenderQuality) {
-  return dimensionsFor(aspect, quality);
-}
 
 registerRoot(RemotionRoot);

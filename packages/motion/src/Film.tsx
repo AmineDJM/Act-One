@@ -1,4 +1,5 @@
 import React from 'react';
+import { type FilmProps } from './composition.ts';
 import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
 import {
   storyboardDuration,
@@ -19,18 +20,6 @@ import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './component
  * after a one-scene repair produce exactly the same film minus that shot, and
  * what makes the storyboard editor's preview honest rather than approximate.
  */
-export type FilmProps = {
-  storyboard: Storyboard;
-  brand: BrandSystem;
-  /** Asset id -> resolvable URL. Provided by the render worker. */
-  assetUrls: Record<string, string>;
-  typeScale?: { displayRatio: number; bodyRatio: number; tracking: number; lineHeight: number };
-  theme?: 'dark' | 'light' | 'auto';
-  watermarkLabel?: string | null;
-  cta?: string;
-  tagline?: string;
-};
-
 export const Film: React.FC<FilmProps> = ({
   storyboard,
   brand,
@@ -394,6 +383,4 @@ function aspectFor(width: number, height: number): '16:9' | '9:16' | '1:1' | '4:
   return '16:9';
 }
 
-export function filmDurationInFrames(storyboard: Storyboard, fps: number): number {
-  return Math.max(1, Math.round(storyboardDuration(storyboard) * fps));
-}
+

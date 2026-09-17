@@ -94,7 +94,11 @@ export type StoryboardResult = {
 };
 
 export class StoryboardEngine {
-  constructor(private readonly llm: LlmProvider) {}
+  private readonly llm: LlmProvider;
+
+  constructor(llm: LlmProvider) {
+    this.llm = llm;
+  }
 
   async build(input: StoryboardInput, context: CallContext): Promise<StoryboardResult> {
     const system = getSystem(input.concept.creativeSystem);

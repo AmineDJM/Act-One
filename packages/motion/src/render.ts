@@ -4,8 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
 import { DEFAULT_FPS, dimensionsFor, type AspectRatio, type RenderQuality } from '@act-one/core';
-import { compositionId } from './entry.tsx';
-import type { FilmProps } from './Film.tsx';
+import { compositionId, type FilmProps } from './composition.ts';
 
 /**
  * Server-side rendering.

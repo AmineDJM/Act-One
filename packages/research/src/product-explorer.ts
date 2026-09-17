@@ -106,10 +106,13 @@ export type ExploreResult = {
 };
 
 export class ProductExplorer {
-  constructor(
-    private readonly browser: BrowserAutomationProvider,
-    private readonly llm: LlmProvider,
-  ) {}
+  private readonly browser: BrowserAutomationProvider;
+  private readonly llm: LlmProvider;
+
+  constructor(browser: BrowserAutomationProvider, llm: LlmProvider) {
+    this.browser = browser;
+    this.llm = llm;
+  }
 
   async explore(options: ExploreOptions, context: CallContext): Promise<ExploreResult> {
     const policy = policyForAuthenticatedProduct({

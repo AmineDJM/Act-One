@@ -119,7 +119,11 @@ export type StrategyResult = {
 };
 
 export class CreativeStrategyEngine {
-  constructor(private readonly llm: LlmProvider) {}
+  private readonly llm: LlmProvider;
+
+  constructor(llm: LlmProvider) {
+    this.llm = llm;
+  }
 
   async generate(input: StrategyInput, context: CallContext): Promise<StrategyResult> {
     const assignments = this.assignStructures(input);

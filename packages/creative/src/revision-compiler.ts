@@ -112,7 +112,11 @@ export type ResolvedRevision = {
 };
 
 export class RevisionCompiler {
-  constructor(private readonly llm: LlmProvider | null = null) {}
+  private readonly llm: LlmProvider | null;
+
+  constructor(llm: LlmProvider | null = null) {
+    this.llm = llm;
+  }
 
   /** Resolves an instruction into a scoped, structured edit. */
   async resolve(

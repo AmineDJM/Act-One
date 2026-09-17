@@ -59,11 +59,19 @@ export type ResearchResult = {
  * with every claim required to cite the excerpt that supports it.
  */
 export class ProductResearchAgent {
+  private readonly browser: BrowserAutomationProvider;
+  private readonly llm: LlmProvider;
+  private readonly browserFallback: BrowserAutomationProvider | null;
+
   constructor(
-    private readonly browser: BrowserAutomationProvider,
-    private readonly llm: LlmProvider,
-    private readonly browserFallback: BrowserAutomationProvider | null = null,
-  ) {}
+    browser: BrowserAutomationProvider,
+    llm: LlmProvider,
+    browserFallback: BrowserAutomationProvider | null = null,
+  ) {
+    this.browser = browser;
+    this.llm = llm;
+    this.browserFallback = browserFallback;
+  }
 
   async research(input: ResearchInput, context: CallContext): Promise<ResearchResult> {
     const root = normalizeUrl(input.websiteUrl);

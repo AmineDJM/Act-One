@@ -23,15 +23,26 @@ export type CostRecordInput = {
  * what a vendor charged us into what we charge the customer.
  */
 export class DbCostSink {
+  private readonly store: Store;
+  private readonly scope: {
+    organizationId: string;
+    projectId?: string | null;
+    renderId?: string | null;
+    marginMultiplier?: number;
+  };
+
   constructor(
-    private readonly store: Store,
-    private readonly scope: {
+    store: Store,
+    scope: {
       organizationId: string;
       projectId?: string | null;
       renderId?: string | null;
       marginMultiplier?: number;
     },
-  ) {}
+  ) {
+    this.store = store;
+    this.scope = scope;
+  }
 
   async record(cost: CostRecordInput): Promise<void> {
     const credits = usdToCredits(cost.actualCostUsd, this.scope.marginMultiplier ?? 3.2);

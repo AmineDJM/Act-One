@@ -50,7 +50,11 @@ const num = (value: unknown): number => (typeof value === 'number' ? value : Num
  * while RLS is what actually guarantees isolation if one is ever forgotten.
  */
 export class PgStore implements Store {
-  constructor(private readonly db: Database) {}
+  private readonly db: Database;
+
+  constructor(db: Database) {
+    this.db = db;
+  }
 
   async close(): Promise<void> {
     await this.db.close();

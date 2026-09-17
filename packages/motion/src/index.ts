@@ -1,5 +1,15 @@
 export * from './easing.ts';
-export { Film, filmDurationInFrames, type FilmProps } from './Film.tsx';
-export { compositionId, dimensionsForRender } from './entry.tsx';
+/*
+ * Deliberately no `.tsx` here. The worker imports this entry from a plain Node
+ * process, where `--experimental-strip-types` can strip `.ts` but not JSX; the
+ * React components live behind the `./entry` subpath that only Remotion's
+ * bundler resolves.
+ */
+export {
+  compositionId,
+  dimensionsForRender,
+  filmDurationInFrames,
+  type FilmProps,
+} from './composition.ts';
 export { PLACEHOLDER_FILM_PROPS } from './placeholder.ts';
 export { renderFilm, bundleFilm, type RenderFilmOptions, type RenderFilmResult } from './render.ts';

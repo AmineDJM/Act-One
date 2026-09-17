@@ -69,7 +69,11 @@ export type DirectionInput = {
 };
 
 export class CreativeDirector {
-  constructor(private readonly llm: LlmProvider) {}
+  private readonly llm: LlmProvider;
+
+  constructor(llm: LlmProvider) {
+    this.llm = llm;
+  }
 
   async direct(input: DirectionInput, context: CallContext): Promise<CreativeTreatment> {
     const system = getSystem(input.concept.creativeSystem);
