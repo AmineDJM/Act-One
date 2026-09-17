@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
   AppError,
+  CommentTarget,
   ProductCredentialKind,
   can,
   newId,
@@ -17,6 +18,7 @@ import { getStore } from '@/server/store.ts';
 import { createProject, enqueue, getProjectOr404 } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
 import { authorizeProductAccess, revokeProductAccess } from '@/server/credentials.ts';
+import { postComment, resolveComment } from '@/server/collaboration.ts';
 
 export type FormState = { error: string | null; message?: string };
 
@@ -346,4 +348,42 @@ export async function revokeProductAction(
 /** Accepts a comma or newline separated list, which is how people type them. */
 function splitPaths(raw: string): string[] {
   return raw.split(/[\n,]+/).map((path) => path.trim()).filter((path) => path.length > 0);
+}
+
+export async function postCommentAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const projectId = String(formData.get('projectId') ?? '');
+    const atRaw = String(formData.get('atSeconds') ?? '').trim();
+
+    await postComment(session, {
+      projectId,
+      target: CommentTarget.catch('project').parse(formData.get('target')),
+      targetId: String(formData.get('targetId') ?? projectId),
+      body: String(formData.get('body') ?? ''),
+      atSeconds: atRaw ? Math.max(0, Number(atRaw)) : null,
+    });
+
+    revalidatePath(`/app/projects/${projectId}`);
+    return { error: null, message: 'Posted.' };
+  } catch (error) {
+    return { error: reportError('postCommentAction', error).publicMessage };
+  }
+}
+
+export async function resolveCommentAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    await resolveComment(session, String(formData.get('commentId') ?? ''));
+    revalidatePath(`/app/projects/${String(formData.get('projectId') ?? '')}`);
+    return { error: null };
+  } catch (error) {
+    return { error: reportError('resolveCommentAction', error).publicMessage };
+  }
 }

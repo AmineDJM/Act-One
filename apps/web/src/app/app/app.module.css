@@ -399,3 +399,35 @@
   background: var(--surface-raised);
   color: var(--text-muted);
 }
+
+/* --- notes ---------------------------------------------------------------- */
+
+.noteList { list-style: none; display: grid; gap: var(--space-2); }
+.noteList li {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  display: grid;
+  gap: var(--space-2);
+}
+/* A resolved note is history, not a task; it recedes rather than disappearing. */
+.noteList li[data-resolved='true'] { opacity: 0.55; border-style: dashed; }
+.noteHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+.noteHead time { color: var(--text-muted); font-size: 0.76rem; }
+.noteHead form { margin-left: auto; }
+.noteHead .btn { height: 24px; font-size: 0.74rem; }
+.noteList p { font-size: 0.9rem; white-space: pre-wrap; }
+
+.noteForm { display: grid; gap: var(--space-3); }
+.noteForm textarea { height: auto; padding: var(--space-3) var(--space-4); resize: vertical; }
+.noteActions { display: flex; align-items: center; gap: var(--space-3); }
+.noteActions label { display: flex; align-items: center; gap: var(--space-2); }
+.noteActions .input { width: 76px; height: 34px; }
+.noteActions .btn { margin-left: auto; }

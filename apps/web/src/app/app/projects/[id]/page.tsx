@@ -16,6 +16,7 @@ import { StoryboardPanel } from './StoryboardPanel.tsx';
 import { FilmDelivery } from './FilmDelivery.tsx';
 import { CopyKitPanel } from './CopyKit.tsx';
 import { ProductAccess } from './ProductAccess.tsx';
+import { Notes } from './Notes.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     poster,
     copyKit,
     access,
+    notes,
   } = view;
 
   /*
@@ -96,6 +98,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           {copyKit && copyKit.lines.length > 0 ? <CopyKitPanel lines={copyKit.lines} /> : null}
         </div>
       ) : null}
+
+      {/* Notes sit with the work, wherever the project has got to. */}
+      <div className={styles.panels}>
+        <Notes
+          projectId={project.id}
+          canComment={can(session.actor, 'comment:write')}
+          filmSeconds={latestRender?.durationSeconds ?? null}
+          notes={notes.map((note) => ({
+            id: note.id,
+            body: note.body,
+            atSeconds: note.atSeconds,
+            authorName: note.authorName,
+            createdAt: note.createdAt,
+            resolvedAt: note.resolvedAt,
+          }))}
+        />
+      </div>
 
       <div className={styles.panels}>
         <ProductAccess

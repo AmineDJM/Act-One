@@ -15,6 +15,7 @@ import {
 } from '@act-one/core';
 import { getStore } from './store.ts';
 import { loadProductAccess } from './credentials.ts';
+import { loadComments } from './collaboration.ts';
 import { entitlementsFor } from './platform.ts';
 import type { Session } from './auth.ts';
 
@@ -174,9 +175,11 @@ export async function loadProjectView(session: Session, projectId: string) {
     : [];
   const copyKit = await store.copy.getLatestForProject(session.organizationId, project.id);
   const access = await loadProductAccess(session, project.id);
+  const notes = await loadComments(session, project.id);
 
   return {
     access,
+    notes,
     copyKit,
     latestRender,
     variants,
