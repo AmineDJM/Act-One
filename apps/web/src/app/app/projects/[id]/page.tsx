@@ -6,7 +6,7 @@ import {
   toAppError,
   type PrimaryCta,
 } from '@act-one/core';
-import { requireSession } from '@/server/auth.ts';
+import { requireSessionForPage } from '@/server/auth.ts';
 import { loadProjectView, renderPermission } from '@/server/projects.ts';
 import { ProjectCta } from './ProjectCta.tsx';
 import { ConceptChoice } from './ConceptChoice.tsx';
@@ -18,8 +18,8 @@ import styles from '../../app.module.css';
 export const dynamic = 'force-dynamic';
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
   const { id } = await params;
+  const session = await requireSessionForPage(`/app/projects/${id}`);
 
   let view: Awaited<ReturnType<typeof loadProjectView>>;
   try {

@@ -15,7 +15,10 @@ export type AuthState = { error: string | null };
  * their product — not an empty dashboard asking them to start over.
  */
 export async function signUpAction(_previous: AuthState, formData: FormData): Promise<AuthState> {
-  let destination = '/app';
+  // Somebody who arrived from an invitation has somewhere specific to be, and
+  // creating an account must not lose it — that link is the whole reason they
+  // signed up.
+  let destination = safeRedirect(String(formData.get('next') ?? ''));
 
   try {
     const session = await signUp({
@@ -47,7 +50,16 @@ export async function signInAction(_previous: AuthState, formData: FormData): Pr
     return { error: reportError('signInAction', error).publicMessage };
   }
 
-  // Only ever redirect within this app: an open redirect on a login form is a
-  // phishing primitive.
-  redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/app');
+  redirect(safeRedirect(next));
+}
+
+/**
+ * Where to send somebody after they authenticate.
+ *
+ * Only ever within this app: an open redirect on a login form is a phishing
+ * primitive, and `//evil.example` is a protocol-relative URL that leaves the
+ * site while looking like a path.
+ */
+function safeRedirect(target: string): string {
+  return target.startsWith('/') && !target.startsWith('//') ? target : '/app';
 }

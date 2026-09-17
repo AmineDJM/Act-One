@@ -16,11 +16,16 @@ export default async function SignUpPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (await getSession()) redirect('/app');
-
   const params = await searchParams;
   const rawWebsite = typeof params['website'] === 'string' ? params['website'] : '';
   const website = normalizeUrl(rawWebsite) ?? '';
+  const raw = typeof params['next'] === 'string' ? params['next'] : '';
+  // Same rule as the actions: within this app only, never protocol-relative.
+  const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
+
+  // Somebody already signed in who followed an invitation should land on the
+  // invitation, not be bounced to their existing workspace.
+  if (await getSession()) redirect(next || '/app');
 
   return (
     <div className={styles.wrap}>
@@ -29,9 +34,12 @@ export default async function SignUpPage({
           <span className={styles.mark} aria-hidden="true" />
           {PRODUCT_NAME}
         </Link>
-        <SignUpForm website={website} />
+        <SignUpForm website={website} next={next} />
         <p className={styles.foot}>
-          Already have an account? <Link href="/auth/sign-in">Sign in</Link>
+          Already have an account?{' '}
+          <Link href={next ? `/auth/sign-in?next=${encodeURIComponent(next)}` : '/auth/sign-in'}>
+            Sign in
+          </Link>
         </p>
       </div>
     </div>

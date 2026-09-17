@@ -1,17 +1,19 @@
-import { ROLE_PERMISSIONS } from '@act-one/core';
-import { requireSession } from '@/server/auth.ts';
+import { ROLE_PERMISSIONS, can } from '@act-one/core';
+import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { loadTeam } from '@/server/team.ts';
 import { SignOutButton } from './SignOutButton.tsx';
+import { TeamPanel } from './TeamPanel.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-  const session = await requireSession();
+  const session = await requireSessionForPage('/app/settings');
   const store = getStore();
-  const [organization, members] = await Promise.all([
+  const [organization, team] = await Promise.all([
     store.organizations.get(session.organizationId),
-    store.memberships.listForOrganization(session.organizationId),
+    loadTeam(session),
   ]);
 
   return (
@@ -48,24 +50,25 @@ export default async function SettingsPage() {
           <SignOutButton />
         </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <h3>Team</h3>
-            <span className="badge">{members.length} member{members.length === 1 ? '' : 's'}</span>
-          </div>
-          <ul className={styles.claims}>
-            {members.map((member) => (
-              <li key={member.id}>
-                <span className={styles.cite}>{member.role}</span>
-                {member.user.email}
-              </li>
-            ))}
-          </ul>
-          <p className="hint">
-            Owners manage billing. Admins manage members and product access. Editors do the creative
-            work. Reviewers can read and comment.
-          </p>
-        </section>
+        <TeamPanel
+          members={team.members.map((member) => ({
+            id: member.id,
+            userId: member.userId,
+            email: member.user.email,
+            name: member.user.name,
+            role: member.role,
+          }))}
+          pending={team.pending.map((invitation) => ({
+            id: invitation.id,
+            email: invitation.email,
+            role: invitation.role,
+            expiresAt: invitation.expiresAt,
+          }))}
+          seatsUsed={team.seatsUsed}
+          seatLimit={team.seatLimit}
+          canManage={can(session.actor, 'member:manage')}
+          viewerUserId={session.user.id}
+        />
       </div>
     </>
   );

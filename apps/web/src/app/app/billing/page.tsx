@@ -1,5 +1,5 @@
 import { creditsToUsd, planById } from '@act-one/core';
-import { requireSession } from '@/server/auth.ts';
+import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { getPlatformConfig } from '@/server/platform.ts';
 import { BillingActions } from './BillingActions.tsx';
@@ -8,7 +8,7 @@ import styles from '../app.module.css';
 export const dynamic = 'force-dynamic';
 
 export default async function BillingPage() {
-  const session = await requireSession();
+  const session = await requireSessionForPage('/app/billing');
   const store = getStore();
 
   const [organization, subscription, { plans }] = await Promise.all([

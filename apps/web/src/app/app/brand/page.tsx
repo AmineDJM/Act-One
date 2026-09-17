@@ -1,12 +1,12 @@
 import Link from 'next/link';
-import { requireSession } from '@/server/auth.ts';
+import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BrandPage() {
-  const session = await requireSession();
+  const session = await requireSessionForPage('/app/brand');
   const brands = await getStore().brands.list(session.organizationId);
 
   return (

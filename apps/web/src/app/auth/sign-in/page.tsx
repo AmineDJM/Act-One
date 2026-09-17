@@ -16,10 +16,14 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (await getSession()) redirect('/app');
-
   const params = await searchParams;
-  const next = typeof params['next'] === 'string' ? params['next'] : '/app';
+  const raw = typeof params['next'] === 'string' ? params['next'] : '';
+  // Same rule as the actions: within this app only, never protocol-relative.
+  const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/app';
+
+  // Somebody already signed in who followed an invitation should land on the
+  // invitation, not be bounced to their existing workspace.
+  if (await getSession()) redirect(next);
 
   return (
     <div className={styles.wrap}>
@@ -30,7 +34,10 @@ export default async function SignInPage({
         </Link>
         <SignInForm next={next} />
         <p className={styles.foot}>
-          No account yet? <Link href="/auth/sign-up">Create one</Link>
+          No account yet?{' '}
+          <Link href={next === '/app' ? '/auth/sign-up' : `/auth/sign-up?next=${encodeURIComponent(next)}`}>
+            Create one
+          </Link>
         </p>
       </div>
     </div>

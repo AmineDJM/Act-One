@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { signUpAction, type AuthState } from '../actions.ts';
 import styles from '../auth.module.css';
 
-export function SignUpForm({ website }: { website: string }) {
+export function SignUpForm({ website, next }: { website: string; next: string }) {
   const [state, action, pending] = useActionState<AuthState, FormData>(signUpAction, { error: null });
 
   return (
@@ -20,6 +20,7 @@ export function SignUpForm({ website }: { website: string }) {
         </div>
       ) : null}
       <input type="hidden" name="website" value={website} />
+      <input type="hidden" name="next" value={next} />
 
       {state.error ? (
         <p className={styles.error} role="alert">

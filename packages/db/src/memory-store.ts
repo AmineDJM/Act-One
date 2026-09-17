@@ -9,6 +9,7 @@ import {
   retryDelayMs,
 } from '@act-one/core';
 import type {
+  Invitation,
   LogLevel,
   LogQuery,
   OperationalEvent,
@@ -58,7 +59,10 @@ export class MemoryStore implements Store {
     organizations: new Map<string, Organization>(),
     users: new Map<string, User & { passwordHash: string | null }>(),
     memberships: new Map<string, Membership>(),
-    sessions: new Map<string, { id: string; userId: string; tokenHash: string; expiresAt: string }>(),
+    sessions: new Map<
+      string,
+      { id: string; userId: string; tokenHash: string; expiresAt: string; organizationId?: string | null }
+    >(),
     subscriptions: new Map<string, Subscription>(),
     brands: new Map<string, BrandSystem>(),
     projects: new Map<string, Project>(),
@@ -74,6 +78,7 @@ export class MemoryStore implements Store {
     jobs: new Map<string, Job>(),
     costs: new Map<string, GenerationCost>(),
     log: new Map<string, OperationalEvent>(),
+    invitations: new Map<string, Invitation>(),
     comments: new Map<string, Comment>(),
     approvals: new Map<string, Approval>(),
     revisions: new Map<string, RevisionRequest & { organizationId: string }>(),
@@ -241,14 +246,54 @@ export class MemoryStore implements Store {
       this.scoped(this.tables.memberships, organizationId).length,
   };
 
+  readonly invitations = {
+    create: async (invitation: Invitation) => {
+      this.tables.invitations.set(invitation.id, invitation);
+      return invitation;
+    },
+    listForOrganization: async (organizationId: string) =>
+      [...this.tables.invitations.values()]
+        .filter((row) => row.organizationId === organizationId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+    findByTokenHash: async (tokenHash: string) =>
+      [...this.tables.invitations.values()].find((row) => row.tokenHash === tokenHash) ?? null,
+    markAccepted: async (id: string, at: string) => {
+      const existing = this.require(this.tables.invitations.get(id), 'Invitation');
+      const next = { ...existing, acceptedAt: at };
+      this.tables.invitations.set(id, next);
+      return next;
+    },
+    revoke: async (organizationId: string, id: string) => {
+      const existing = this.tables.invitations.get(id);
+      if (existing?.organizationId === organizationId) this.tables.invitations.delete(id);
+    },
+  };
+
   readonly sessions = {
-    create: async (session: { id: string; userId: string; tokenHash: string; expiresAt: string }) => {
-      this.tables.sessions.set(session.tokenHash, session);
+    create: async (session: {
+      id: string;
+      userId: string;
+      tokenHash: string;
+      expiresAt: string;
+      organizationId?: string | null;
+    }) => {
+      this.tables.sessions.set(session.tokenHash, {
+        ...session,
+        organizationId: session.organizationId ?? null,
+      });
     },
     findByTokenHash: async (tokenHash: string) => {
       const found = this.tables.sessions.get(tokenHash);
       if (!found) return null;
-      return { userId: found.userId, expiresAt: found.expiresAt };
+      return {
+        userId: found.userId,
+        expiresAt: found.expiresAt,
+        organizationId: found.organizationId ?? null,
+      };
+    },
+    setOrganization: async (tokenHash: string, organizationId: string) => {
+      const found = this.tables.sessions.get(tokenHash);
+      if (found) this.tables.sessions.set(tokenHash, { ...found, organizationId });
     },
     delete: async (tokenHash: string) => {
       this.tables.sessions.delete(tokenHash);

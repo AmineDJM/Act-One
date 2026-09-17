@@ -11,7 +11,7 @@ import {
   type Project,
   type ProjectStage,
 } from '@act-one/core';
-import { requireSession } from '@/server/auth.ts';
+import { requireSession, switchWorkspace } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { createProject, enqueue, getProjectOr404 } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
@@ -267,4 +267,17 @@ function resumePointFor(project: Project): { kind: JobKind; stage: ProjectStage 
   if (project.selectedConceptId) return { kind: 'build_storyboard', stage: 'storyboarding' };
   if (project.productUnderstandingId) return { kind: 'generate_concepts', stage: 'concepting' };
   return { kind: 'research_product', stage: 'researching' };
+}
+
+/**
+ * Moves this session into another workspace.
+ *
+ * The id arrives from the client, which is exactly why switchWorkspace refuses
+ * any workspace the caller is not a member of — this is the one place an
+ * organisation id is allowed in from outside.
+ */
+export async function switchWorkspaceAction(organizationId: string): Promise<void> {
+  await requireSession();
+  const moved = await switchWorkspace(organizationId);
+  if (moved) revalidatePath('/app', 'layout');
 }

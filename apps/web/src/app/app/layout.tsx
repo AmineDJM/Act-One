@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PRODUCT_NAME } from '@act-one/core';
 import { getSession } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher.tsx';
 import styles from './app.module.css';
 
 export const metadata: Metadata = {
@@ -27,7 +28,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await getSession();
   if (!session) redirect('/auth/sign-in?next=/app');
 
-  const organization = await getStore().organizations.get(session.organizationId);
+  const store = getStore();
+  const [organization, memberships] = await Promise.all([
+    store.organizations.get(session.organizationId),
+    store.memberships.listForUser(session.user.id),
+  ]);
+
+  const workspaces = (
+    await Promise.all(memberships.map((membership) => store.organizations.get(membership.organizationId)))
+  )
+    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+    .map((candidate) => ({ id: candidate.id, name: candidate.name }));
 
   return (
     <div className={styles.shell}>
@@ -45,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ))}
           </nav>
           <div className={styles.spacer} />
+          <WorkspaceSwitcher current={session.organizationId} workspaces={workspaces} />
           {organization ? (
             <span className={styles.credits} title="Creative credits">
               {organization.creditBalance.toLocaleString('en-US')} credits

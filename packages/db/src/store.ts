@@ -9,6 +9,7 @@ import type {
   CreativeTreatment,
   CredentialAuditEvent,
   GenerationCost,
+  Invitation,
   LogLevel,
   LogQuery,
   OperationalEvent,
@@ -51,6 +52,7 @@ export interface Store {
   readonly organizations: OrganizationRepo;
   readonly users: UserRepo;
   readonly memberships: MembershipRepo;
+  readonly invitations: InvitationRepo;
   readonly sessions: SessionRepo;
   readonly subscriptions: SubscriptionRepo;
   readonly brands: BrandRepo;
@@ -113,9 +115,36 @@ export interface MembershipRepo {
   countForOrganization(organizationId: string): Promise<number>;
 }
 
+/**
+ * Pending invitations.
+ *
+ * Looked up by token hash, never by raw token, so the value in the link is
+ * never compared against anything stored — the same reason sessions work this
+ * way, with the difference that an invite is valid for days rather than the
+ * length of a visit.
+ */
+export interface InvitationRepo {
+  create(invitation: Invitation): Promise<Invitation>;
+  listForOrganization(organizationId: string): Promise<Invitation[]>;
+  /** Cross-tenant by nature: whoever holds the link has not joined anything yet. */
+  findByTokenHash(tokenHash: string): Promise<Invitation | null>;
+  markAccepted(id: string, at: string): Promise<Invitation>;
+  revoke(organizationId: string, id: string): Promise<void>;
+}
+
 export interface SessionRepo {
-  create(session: { id: string; userId: string; tokenHash: string; expiresAt: string }): Promise<void>;
-  findByTokenHash(tokenHash: string): Promise<{ userId: string; expiresAt: string } | null>;
+  create(session: {
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+    organizationId?: string | null;
+  }): Promise<void>;
+  findByTokenHash(
+    tokenHash: string,
+  ): Promise<{ userId: string; expiresAt: string; organizationId: string | null } | null>;
+  /** Moves this session into another workspace the user belongs to. */
+  setOrganization(tokenHash: string, organizationId: string): Promise<void>;
   delete(tokenHash: string): Promise<void>;
   deleteExpired(): Promise<number>;
 }

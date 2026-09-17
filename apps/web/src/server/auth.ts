@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import {
   AppError,
   newId,
@@ -100,9 +101,18 @@ export async function verifyPassword(password: string, stored: string | null): P
   return timingSafeEqual(expected, derived);
 }
 
-/** Sessions are stored as a hash, so a leaked database does not grant access. */
-function hashToken(token: string): string {
+/**
+ * Sessions and invitations are stored as a hash, so a leaked database does not
+ * grant access. Exported because an invitation is the same kind of bearer
+ * credential, valid for days rather than the length of a visit.
+ */
+export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/** A bearer token with 256 bits of entropy, safe in a URL. */
+export function newToken(): string {
+  return randomBytes(32).toString('base64url');
 }
 
 export async function createSession(userId: string): Promise<string> {
@@ -171,8 +181,25 @@ export async function getSession(): Promise<Session | null> {
 
   const store = getStore();
   const memberships = await store.memberships.listForUser(user.id);
-  const membership = memberships[0];
-  if (!membership) return null;
+  if (memberships.length === 0) return null;
+
+  /*
+   * The session names the workspace it is in, and that name is only ever
+   * honoured if it still matches a live membership — so a session pointing at a
+   * workspace somebody has been removed from falls back rather than granting
+   * access to it.
+   *
+   * Falling back to the first membership is what this used to do
+   * unconditionally, which meant accepting an invitation put somebody in a
+   * workspace they could then never see.
+   */
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const chosen = token
+    ? (await store.sessions.findByTokenHash(hashToken(token)))?.organizationId ?? null
+    : null;
+
+  const membership =
+    memberships.find((candidate) => candidate.organizationId === chosen) ?? memberships[0]!;
 
   return {
     user,
@@ -182,9 +209,44 @@ export async function getSession(): Promise<Session | null> {
   };
 }
 
+/**
+ * Moves the current session into another workspace.
+ *
+ * Refuses a workspace the caller does not belong to: this is the one place an
+ * organisation id arrives from outside, so it is the one place that has to
+ * check.
+ */
+export async function switchWorkspace(organizationId: string): Promise<boolean> {
+  const user = await getCurrentUser();
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!user || !token) return false;
+
+  const store = getStore();
+  const memberships = await store.memberships.listForUser(user.id);
+  if (!memberships.some((membership) => membership.organizationId === organizationId)) return false;
+
+  await store.sessions.setOrganization(hashToken(token), organizationId);
+  return true;
+}
+
 export async function requireSession(): Promise<Session> {
   const session = await getSession();
   if (!session) throw unauthorized();
+  return session;
+}
+
+/**
+ * The session, for a page.
+ *
+ * A layout's redirect does not protect the page beneath it: Next renders both
+ * at once, so a signed-out visitor to /app/settings had the page throw a 401
+ * before the layout could send them anywhere, and saw an error screen instead
+ * of a sign-in form. Pages redirect; actions and route handlers throw, which is
+ * the right answer for a caller that is not a browser following a link.
+ */
+export async function requireSessionForPage(returnTo: string): Promise<Session> {
+  const session = await getSession();
+  if (!session) redirect(`/auth/sign-in?next=${encodeURIComponent(returnTo)}`);
   return session;
 }
 

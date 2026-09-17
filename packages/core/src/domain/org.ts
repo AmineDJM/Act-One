@@ -101,3 +101,41 @@ export type ActorContext = {
 export function can(actor: ActorContext, permission: Permission): boolean {
   return roleHasPermission(actor.role, permission);
 }
+
+/**
+ * An invitation to join a workspace.
+ *
+ * The token is stored hashed, exactly like a session. A pending invite sitting
+ * in a database in plaintext is a standing credential for somebody else's
+ * workspace, and invites live for days rather than minutes.
+ */
+export const Invitation = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  email: z.string().email(),
+  role: MemberRole,
+  tokenHash: z.string(),
+  invitedByUserId: z.string(),
+  acceptedAt: z.string().nullable().default(null),
+  expiresAt: z.string(),
+  createdAt: z.string(),
+});
+export type Invitation = z.infer<typeof Invitation>;
+
+/** How long an unaccepted invitation stays usable. */
+export const INVITE_TTL_DAYS = 14;
+
+export function inviteIsUsable(invitation: Invitation, now = new Date()): boolean {
+  if (invitation.acceptedAt) return false;
+  return new Date(invitation.expiresAt).getTime() > now.getTime();
+}
+
+/** Why an invitation cannot be used, in words for the person holding the link. */
+export function inviteRefusal(invitation: Invitation | null, now = new Date()): string | null {
+  if (!invitation) return 'That invitation link is not valid.';
+  if (invitation.acceptedAt) return 'That invitation has already been used.';
+  if (new Date(invitation.expiresAt).getTime() <= now.getTime()) {
+    return 'That invitation has expired. Ask for a new one.';
+  }
+  return null;
+}

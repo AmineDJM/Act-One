@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { CTA_LABELS, primaryCtaFor } from '@act-one/core';
-import { requireSession } from '@/server/auth.ts';
+import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { NewProjectForm } from './NewProjectForm.tsx';
 import styles from './app.module.css';
@@ -8,7 +8,7 @@ import styles from './app.module.css';
 export const dynamic = 'force-dynamic';
 
 export default async function ProjectsPage() {
-  const session = await requireSession();
+  const session = await requireSessionForPage('/app');
   const projects = await getStore().projects.list(session.organizationId);
 
   return (

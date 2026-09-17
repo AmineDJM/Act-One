@@ -1,5 +1,6 @@
 import { AppError, newId, notFound, redactDetail, redactMessage, resequence } from '@act-one/core';
 import type {
+  Invitation,
   LogLevel,
   LogQuery,
   OperationalEvent,
@@ -330,23 +331,103 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly invitations = {
+    create: async (invitation: Invitation) =>
+      this.tenant(invitation.organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO invitations
+             (id, organization_id, email, role, token_hash, invited_by, accepted_at, expires_at, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           ON CONFLICT (organization_id, email) DO UPDATE SET
+             role = EXCLUDED.role,
+             token_hash = EXCLUDED.token_hash,
+             invited_by = EXCLUDED.invited_by,
+             accepted_at = NULL,
+             expires_at = EXCLUDED.expires_at,
+             created_at = EXCLUDED.created_at`,
+          [
+            invitation.id, invitation.organizationId, invitation.email.toLowerCase(),
+            invitation.role, invitation.tokenHash, invitation.invitedByUserId,
+            invitation.acceptedAt, invitation.expiresAt, invitation.createdAt,
+          ],
+        );
+        return invitation;
+      }),
+
+    listForOrganization: async (organizationId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT * FROM invitations WHERE organization_id = $1 ORDER BY created_at DESC',
+          [organizationId],
+        );
+        return r.rows.map(toInvitation);
+      }),
+
+    findByTokenHash: async (tokenHash: string) =>
+      /*
+       * Platform scope on purpose: whoever is holding this link is not a member
+       * of anything yet, so there is no tenant to scope the lookup to. The hash
+       * itself is the only thing that identifies the row.
+       */
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM invitations WHERE token_hash = $1', [tokenHash]);
+        return r.rows[0] ? toInvitation(r.rows[0]) : null;
+      }),
+
+    markAccepted: async (id: string, at: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('UPDATE invitations SET accepted_at = $2 WHERE id = $1 RETURNING *', [
+          id,
+          at,
+        ]);
+        if (!r.rows[0]) throw notFound('Invitation');
+        return toInvitation(r.rows[0]);
+      }),
+
+    revoke: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query('DELETE FROM invitations WHERE id = $1 AND organization_id = $2', [
+          id,
+          organizationId,
+        ]);
+      }),
+  };
+
   readonly sessions = {
-    create: async (s: { id: string; userId: string; tokenHash: string; expiresAt: string }) =>
+    create: async (s: {
+      id: string;
+      userId: string;
+      tokenHash: string;
+      expiresAt: string;
+      organizationId?: string | null;
+    }) =>
       this.asPlatform(async (c) => {
         await c.query(
-          'INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES ($1,$2,$3,$4)',
-          [s.id, s.userId, s.tokenHash, s.expiresAt],
+          'INSERT INTO sessions (id, user_id, token_hash, expires_at, organization_id) VALUES ($1,$2,$3,$4,$5)',
+          [s.id, s.userId, s.tokenHash, s.expiresAt, s.organizationId ?? null],
         );
       }),
 
     findByTokenHash: async (tokenHash: string) =>
       this.asPlatform(async (c) => {
         const r = await c.query(
-          'SELECT user_id, expires_at FROM sessions WHERE token_hash = $1',
+          'SELECT user_id, expires_at, organization_id FROM sessions WHERE token_hash = $1',
           [tokenHash],
         );
         if (!r.rows[0]) return null;
-        return { userId: r.rows[0]['user_id'] as string, expiresAt: iso(r.rows[0]['expires_at']) };
+        return {
+          userId: r.rows[0]['user_id'] as string,
+          expiresAt: iso(r.rows[0]['expires_at']),
+          organizationId: (r.rows[0]['organization_id'] as string) ?? null,
+        };
+      }),
+
+    setOrganization: async (tokenHash: string, organizationId: string) =>
+      this.asPlatform(async (c) => {
+        await c.query('UPDATE sessions SET organization_id = $2 WHERE token_hash = $1', [
+          tokenHash,
+          organizationId,
+        ]);
       }),
 
     delete: async (tokenHash: string) =>
@@ -1969,6 +2050,20 @@ function toCost(row: Row): GenerationCost {
     succeeded: Boolean(row['succeeded']),
     isRetry: Boolean(row['is_retry']),
     metadata: (row['metadata'] as Record<string, unknown>) ?? {},
+    createdAt: iso(row['created_at']),
+  };
+}
+
+function toInvitation(row: Row): Invitation {
+  return {
+    id: row['id'] as string,
+    organizationId: row['organization_id'] as string,
+    email: row['email'] as string,
+    role: row['role'] as Invitation['role'],
+    tokenHash: row['token_hash'] as string,
+    invitedByUserId: row['invited_by'] as string,
+    acceptedAt: row['accepted_at'] ? iso(row['accepted_at']) : null,
+    expiresAt: iso(row['expires_at']),
     createdAt: iso(row['created_at']),
   };
 }
