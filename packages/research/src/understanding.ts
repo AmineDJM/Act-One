@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  derivedId,
   newId,
   momentStrength,
   type CallContextLike,
@@ -164,7 +165,7 @@ export async function synthesiseUnderstanding(
     // noise: the real capture always wins.
     .filter((suggestion) => !capturedMoments.some((m) => similarTitle(m.title, suggestion.title)))
     .map((suggestion) => ({
-      id: newId('mom'),
+      id: derivedId('mom', input.websiteUrl, suggestion.title),
       title: suggestion.title,
       description: suggestion.description,
       startState: suggestion.startState,

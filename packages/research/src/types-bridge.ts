@@ -6,6 +6,7 @@
  * from quietly growing.
  */
 export {
+  derivedId,
   newId,
   claimIsSupported,
   momentStrength,

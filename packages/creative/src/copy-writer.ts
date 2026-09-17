@@ -4,6 +4,7 @@ import {
   COPY_LIMITS,
   COPY_ORDER,
   CopySurface,
+  WEASEL_PHRASES,
   newId,
   usableCopy,
   type Concept,
@@ -42,6 +43,13 @@ const CopyPlan = z.object({
     .max(24),
 });
 
+/*
+ * The banned phrases are generated from the standard rather than typed out
+ * again here. Two lists of forbidden words drift the moment one of them is
+ * edited, and the failure is silent: the model keeps writing a phrase the
+ * filter then throws away, and the customer gets fewer lines than they should
+ * with no explanation of why.
+ */
 const SYSTEM_PROMPT = `You are writing the launch copy that surrounds a film, in the company's own voice.
 
 Rules:
@@ -49,7 +57,8 @@ Rules:
 - Use the company's own words and tone. Do not write like an advertisement for a different company.
 - Any line asserting something checkable — a number, a comparison, a named customer — must set "claim" to the supported claim it rests on, copied character for character from the list you are given. If no claim supports it, do not write the line.
 - Lines that assert nothing checkable leave "claim" empty. Most lines are these.
-- No exclamation marks. No "revolutionary", "game-changing", "seamless", "unleash", "supercharge".
+- No superlatives and no priority claims: no "the best", "the only X that", "world's first", "#1", "guaranteed". They are objective claims in advertising law and this company cannot substantiate them.
+- No exclamation marks. None of these, in any form: ${WEASEL_PHRASES.join(', ')}.
 - Respect the length limit given for each surface. A line over its limit is discarded.
 - Write two or three options for the short surfaces, one for the long ones.
 

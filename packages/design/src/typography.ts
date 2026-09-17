@@ -1,3 +1,5 @@
+import { trackingScaleFor } from '@act-one/core';
+
 /**
  * Type metrics and fitting.
  *
@@ -228,12 +230,21 @@ export function opticalCenterOffset(fontSizePx: number, family: string): number 
   return (metrics.capHeight / 2) * fontSizePx;
 }
 
-/** Tracking in em appropriate to a size. Large type needs tighter spacing. */
-export function opticalTracking(fontSizePx: number, baseTracking: number): number {
-  // Below ~24px, tighten less; above ~80px, tighten more. Matches how optical
-  // sizing works in real type families.
-  if (fontSizePx <= 24) return baseTracking * 0.4;
-  if (fontSizePx >= 96) return baseTracking * 1.25;
-  const t = (fontSizePx - 24) / (96 - 24);
-  return baseTracking * (0.4 + t * 0.85);
+/**
+ * Tracking in em appropriate to an optical size.
+ *
+ * Display type is tracked in and small type is tracked out, because a digital
+ * family is drawn once and scaled, so spacing correct at body size is loose at
+ * display size. Metal type was cut separately per size and did this for you.
+ * See TYPE_STANDARDS.tracking.
+ *
+ * Sized against frame height rather than absolute pixels, so the same film
+ * tracks identically at 1080p and 4K.
+ */
+export function opticalTracking(
+  fontSizePx: number,
+  baseTracking: number,
+  frameHeightPx: number,
+): number {
+  return baseTracking * trackingScaleFor(fontSizePx, frameHeightPx);
 }

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  containsStatistic,
+  superlativesIn,
+  weaselPhrasesIn,
+} from '../standards/editorial.ts';
 import { nonEmpty } from '../zod-helpers.ts';
 
 export const CopySurface = z.enum([
@@ -67,6 +72,20 @@ export function usableCopy(lines: CopyLine[], supportedClaims: readonly string[]
   const supported = new Set(supportedClaims.map((claim) => claim.trim().toLowerCase()));
   return lines.filter((line) => {
     if (!copyFitsSurface(line)) return false;
+
+    /*
+     * The editorial floor, applied to copy as well as to the film. A line that
+     * hedges or claims a superlative goes out under the customer's name on
+     * their own launch day, where it is quoted back at them for years — and a
+     * superlative is an objective claim in advertising law whether a model
+     * wrote it or a person did.
+     */
+    if (weaselPhrasesIn(line.text).length > 0) return false;
+    if (superlativesIn(line.text).length > 0) return false;
+
+    // A figure that cites nothing is a figure we invented.
+    if (containsStatistic(line.text) && !line.claim.trim()) return false;
+
     if (!line.claim.trim()) return true;
     return supported.has(line.claim.trim().toLowerCase());
   });

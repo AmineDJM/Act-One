@@ -1,9 +1,30 @@
 import {
-  MIN_LARGE_TEXT_CONTRAST,
-  MIN_TEXT_CONTRAST,
-  READING_WORDS_PER_SECOND,
+  COLOR_STANDARDS,
+  CONVERSION_STANDARDS,
+  EDITORIAL_STANDARDS,
+  HOOK_SECONDS,
+  LAYOUT_STANDARDS,
+  MAX_CONSECUTIVE_SAME_TREATMENT,
+  MAX_TYPE_FAMILIES,
+  MEASURE_MAX_ON_SCREEN,
+  MIN_RHYTHM_VARIATION,
+  MIN_SHOT_SECONDS,
+  MOTION_STANDARDS,
+  TYPE_STANDARDS,
+  TITLE_SAFE_INSET,
+  cite,
+  contrastFloorInFrame,
+  withinInset,
+  ctaIsVague,
+  containsStatistic,
+  longestRun,
   newId,
+  opensOnSubject,
+  readingSecondsFor,
+  rhythmVariation,
+  superlativesIn,
   visualMix,
+  weaselPhrasesIn,
   type BrandSystem,
   type QaIssue,
   type Scene,
@@ -112,36 +133,91 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     }
 
     const words = text.split(/\s+/).filter(Boolean).length;
-    const needed = 0.45 + words / READING_WORDS_PER_SECOND;
+    const needed = readingSecondsFor(text);
     if (scene.duration < needed) {
       add({
         check: 'text_overflow',
         severity: 'blocker',
-        message: `${words} words need ${needed.toFixed(1)}s to read; the scene runs ${scene.duration.toFixed(1)}s.`,
+        message:
+          `${words} words need ${needed.toFixed(1)}s to read; the scene runs ` +
+          `${scene.duration.toFixed(1)}s (${cite(TYPE_STANDARDS.readingTime)}).`,
         confidence: 1,
         repair: 'reduce_duration',
       });
     }
 
+    // Measure. A held frame is read under time pressure, so the comfortable
+    // line is shorter than it is on a page.
+    const longest = Math.max(0, ...lines.map((line) => line.length));
+    if (longest > MEASURE_MAX_ON_SCREEN) {
+      add({
+        check: 'text_overflow',
+        severity: 'minor',
+        message:
+          `A line runs ${longest} characters; ${MEASURE_MAX_ON_SCREEN} is the comfortable ` +
+          `maximum on screen (${cite(TYPE_STANDARDS.measure)}).`,
+        confidence: 0.9,
+        repair: 'rewrite_copy',
+      });
+    }
+
+    for (const phrase of weaselPhrasesIn(text)) {
+      add({
+        check: 'unsupported_claim',
+        severity: 'major',
+        message: `"${phrase}" asserts evidence without carrying any (${cite(EDITORIAL_STANDARDS.weasel)}).`,
+        confidence: 1,
+        repair: 'rewrite_copy',
+      });
+    }
+
+    for (const superlative of superlativesIn(text)) {
+      add({
+        check: 'unsupported_claim',
+        severity: 'major',
+        message:
+          `"${superlative}" is an objective claim in advertising law and needs substantiation ` +
+          `(${cite(EDITORIAL_STANDARDS.superlatives)}).`,
+        confidence: 0.9,
+        repair: 'rewrite_copy',
+      });
+    }
+
+    // A number on screen reads as a fact whoever put it there.
+    if (containsStatistic(text) && scene.claimEvidenceIds.length === 0) {
+      add({
+        check: 'unsupported_claim',
+        severity: 'blocker',
+        message:
+          `"${text.slice(0, 60)}" puts a figure on screen with nothing behind it ` +
+          `(${cite(EDITORIAL_STANDARDS.numbers)}).`,
+        confidence: 1,
+        repair: 'rewrite_copy',
+      });
+    }
+
     const ratio = contrastRatio(tokens.onCanvas.primary, tokens.canvas);
-    const minimum = token.sizePx >= tokens.frame.height * 0.04 ? MIN_LARGE_TEXT_CONTRAST : MIN_TEXT_CONTRAST;
+    const minimum = contrastFloorInFrame(token.sizePx, tokens.frame.height);
     if (ratio < minimum) {
       add({
         check: 'contrast',
         severity: 'blocker',
-        message: `Text contrast is ${ratio.toFixed(1)}:1 against the canvas; ${minimum}:1 is the floor.`,
+        message:
+          `Text contrast is ${ratio.toFixed(1)}:1 against the canvas; ${minimum}:1 is the floor ` +
+          `(${cite(COLOR_STANDARDS.textContrast)}).`,
         confidence: 1,
         repair: 'adjust_contrast',
       });
     }
   }
 
-  // A cut under this reads as a glitch rather than a beat.
-  if (scene.duration < 0.5) {
+  if (scene.duration < MIN_SHOT_SECONDS) {
     add({
       check: 'transition_quality',
       severity: 'major',
-      message: `${scene.duration.toFixed(2)}s is too short to register as a scene.`,
+      message:
+        `${scene.duration.toFixed(2)}s is below the ${MIN_SHOT_SECONDS}s floor: the viewer ` +
+        `registers a disturbance rather than a shot (${cite(MOTION_STANDARDS.minimumShot)}).`,
       confidence: 1,
       repair: 'reduce_duration',
     });
@@ -246,38 +322,94 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     add({
       check: 'transition_quality',
       severity: 'major',
-      message: `Only ${distinct.size} distinct motion treatments across ${scenes.length} scenes.`,
+      message:
+        `Only ${distinct.size} distinct motion treatments across ${scenes.length} scenes ` +
+        `(${cite(MOTION_STANDARDS.variety)}).`,
       confidence: 0.9,
       repair: 'manual_review',
     });
   }
 
-  let run = 1;
-  for (let i = 1; i < motions.length; i += 1) {
-    run = motions[i] === motions[i - 1] ? run + 1 : 1;
-    if (run >= 3) {
-      add({
-        check: 'transition_quality',
-        severity: 'minor',
-        message: `The same treatment runs for ${run} consecutive scenes.`,
-        confidence: 0.85,
-        repair: 'manual_review',
-      });
-      break;
-    }
+  const run = longestRun(motions);
+  if (run > MAX_CONSECUTIVE_SAME_TREATMENT) {
+    add({
+      check: 'transition_quality',
+      severity: 'minor',
+      message:
+        `The same treatment runs for ${run} consecutive scenes; ` +
+        `${MAX_CONSECUTIVE_SAME_TREATMENT} is the most that reads as a choice ` +
+        `(${cite(MOTION_STANDARDS.variety)}).`,
+      confidence: 0.85,
+      repair: 'manual_review',
+    });
   }
 
   // Every scene the same length is a slideshow, however good each frame is.
   const durations = scenes.map((scene) => scene.duration);
-  const mean = durations.reduce((sum, d) => sum + d, 0) / durations.length;
-  const spread = Math.sqrt(durations.reduce((sum, d) => sum + (d - mean) ** 2, 0) / durations.length);
-  if (scenes.length >= 5 && spread / mean < 0.12) {
+  const variation = rhythmVariation(durations);
+  if (scenes.length >= 5 && variation < MIN_RHYTHM_VARIATION) {
     add({
       check: 'composition',
       severity: 'major',
-      message: 'Every scene is nearly the same length. The edit has no rhythm.',
+      message:
+        `Shot lengths vary by ${(variation * 100).toFixed(0)}% of their mean; below ` +
+        `${(MIN_RHYTHM_VARIATION * 100).toFixed(0)}% the edit has no rhythm ` +
+        `(${cite(MOTION_STANDARDS.rhythm)}).`,
       confidence: 0.9,
       repair: 'manual_review',
+    });
+  }
+
+  // The opening. Three seconds is where viewers leave, on every platform that
+  // publishes retention data, and a logo sting spends exactly that window.
+  if (!opensOnSubject(scenes)) {
+    add({
+      check: 'composition',
+      severity: 'major',
+      message:
+        `The film opens on branding for its first ${HOOK_SECONDS}s rather than on the ` +
+        `problem or the product (${cite(CONVERSION_STANDARDS.hook)}).`,
+      confidence: 0.9,
+      repair: 'manual_review',
+    });
+  }
+
+  /*
+   * Typefaces. Counted from the resolved tokens rather than per scene, because
+   * that is where a film's families are actually decided — and the mono face is
+   * excluded, since it labels data rather than setting copy and reads as
+   * notation rather than as a third voice.
+   */
+  const families = new Set(
+    [tokens.type.display.family, tokens.type.statement.family, tokens.type.body.family].filter(
+      Boolean,
+    ),
+  );
+  if (families.size > MAX_TYPE_FAMILIES) {
+    add({
+      check: 'brand_consistency',
+      severity: 'major',
+      message:
+        `${families.size} typefaces across the film; ${MAX_TYPE_FAMILIES} is the limit ` +
+        `(${cite(TYPE_STANDARDS.families)}).`,
+      confidence: 1,
+      repair: 'manual_review',
+    });
+  }
+
+  // Sound-off legibility. A film whose meaning is only in the narration is a
+  // film most of a feed audience will never understand.
+  const spoken = scenes.filter((scene) => (scene.narration ?? '').trim().length > 0).length;
+  const written = scenes.filter((scene) => scene.onScreenText.join('').trim().length > 0).length;
+  if (spoken > 0 && written === 0) {
+    add({
+      check: 'composition',
+      severity: 'major',
+      message:
+        `Every line in this film is spoken and none of it is on screen; muted playback ` +
+        `carries none of it (${cite(CONVERSION_STANDARDS.soundOff)}).`,
+      confidence: 1,
+      repair: 'rewrite_copy',
     });
   }
 
@@ -298,7 +430,21 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     add({
       check: 'safe_area',
       severity: 'blocker',
-      message: 'The layout grid falls outside the frame-safe area.',
+      message: `The layout grid falls outside title safe (${cite(LAYOUT_STANDARDS.titleSafe)}).`,
+      confidence: 1,
+      repair: 'manual_review',
+    });
+  }
+
+  // The grid must also clear the published standard, not merely our own
+  // margins: the two are set independently and only one of them is the floor.
+  if (!withinInset(grid.safe, frame, TITLE_SAFE_INSET)) {
+    add({
+      check: 'safe_area',
+      severity: 'blocker',
+      message:
+        `The grid's safe box is inside the ${(TITLE_SAFE_INSET * 100).toFixed(1)}% text-safe ` +
+        `inset (${cite(LAYOUT_STANDARDS.titleSafe)}).`,
       confidence: 1,
       repair: 'manual_review',
     });

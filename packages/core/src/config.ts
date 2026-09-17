@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  TITLE_SAFE_INSET,
+  VERTICAL_CHROME_BOTTOM,
+  VERTICAL_CHROME_RIGHT,
+} from './standards/layout.ts';
 
 /**
  * Working product name. Branding is not final; nothing should hardcode it.
@@ -48,24 +53,29 @@ export const MODE_BUDGETS = {
 } as const satisfies Record<string, CreativeBudget>;
 
 /**
- * Frame-safe areas as fractions of the frame. Typography never crosses these,
- * in any aspect ratio. Vertical needs far more bottom margin because of
- * platform UI chrome (captions, handles, CTA buttons).
+ * Frame-safe areas as fractions of the frame, for each aspect we deliver.
+ *
+ * Every one of these clears EBU R 95 title safe (a 5% inset on each edge) with
+ * room to spare, because a layout that only just clears the standard looks
+ * cramped even where nothing is actually cut off. The standard is the floor,
+ * not the design.
+ *
+ * Vertical is not symmetrical, and that is the platforms' doing rather than
+ * ours: the caption block, the handle and the action rail sit across the lower
+ * part of a 9:16 frame, and their exact boxes move between app versions. So the
+ * bottom margin carries `VERTICAL_CHROME_BOTTOM` on top of title safe, and is
+ * generous rather than fitted to any one version of any one app.
  */
 export const SAFE_AREAS = {
   '16:9': { top: 0.06, bottom: 0.08, left: 0.055, right: 0.055 },
-  '9:16': { top: 0.11, bottom: 0.19, left: 0.07, right: 0.07 },
+  '9:16': {
+    top: TITLE_SAFE_INSET + 0.06,
+    bottom: TITLE_SAFE_INSET + VERTICAL_CHROME_BOTTOM,
+    left: 0.07,
+    right: TITLE_SAFE_INSET + VERTICAL_CHROME_RIGHT,
+  },
   '1:1': { top: 0.08, bottom: 0.1, left: 0.07, right: 0.07 },
   '4:5': { top: 0.08, bottom: 0.13, left: 0.07, right: 0.07 },
 } as const;
 
 export const DEFAULT_FPS = 30;
-
-/** WCAG-ish minimum contrast for on-screen film typography. */
-export const MIN_TEXT_CONTRAST = 4.5;
-export const MIN_LARGE_TEXT_CONTRAST = 3.0;
-
-/** Reading speed used to time on-screen text. Words per second, comfortable. */
-export const READING_WORDS_PER_SECOND = 2.6;
-/** Narration pace for voice-over timing. */
-export const NARRATION_WORDS_PER_SECOND = 2.35;

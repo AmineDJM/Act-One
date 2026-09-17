@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { newId, type ProductMoment } from '@act-one/core';
+import { derivedId, newId, type ProductMoment } from '@act-one/core';
 import type {
   BrowserAutomationProvider,
   BrowserSession,
@@ -383,7 +383,10 @@ export class ProductExplorer {
       const bounds = planned.focusSelector ? await session.boundsOf(planned.focusSelector) : null;
 
       moments.push({
-        id: newId('mom'),
+        // Stable across crawls, for the same reason evidence ids are: a scene
+        // points at the moment it dramatises, and re-reading the product must
+        // not orphan that link.
+        id: derivedId('mom', url, planned.title),
         title: planned.title,
         description: planned.description,
         startState: planned.startState,

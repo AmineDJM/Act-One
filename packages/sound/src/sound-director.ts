@@ -1,4 +1,7 @@
 import {
+  LUFS_BROADCAST,
+  LUFS_STREAMING_PLATFORM,
+  LUFS_WEB,
   newId,
   storyboardDuration,
   type Scene,
@@ -73,14 +76,23 @@ export type SoundDirectionInput = {
 };
 
 /**
- * Loudness targets.
+ * Loudness targets, per channel.
  *
  * Getting this wrong is the single most common audio defect in automated video:
  * a film mastered at broadcast loudness is turned down by every social platform
  * and comes back sounding limp, while one mastered too quietly is inaudible on
  * a laptop speaker.
+ *
+ * Broadcast is EBU R 128's −23 LUFS and is not ours to choose. The other two
+ * are the platform normalisation targets: social sits at the platforms' own
+ * −14, and web a little under it, which leaves the dynamics intact instead of
+ * having them limited on the way in. See AUDIO_STANDARDS.
  */
-const LOUDNESS_TARGETS = { web: -16, social: -14, broadcast: -23 } as const;
+const LOUDNESS_TARGETS = {
+  web: LUFS_WEB,
+  social: LUFS_STREAMING_PLATFORM,
+  broadcast: LUFS_BROADCAST,
+} as const;
 
 export function directSound(input: SoundDirectionInput): SoundDesign {
   const library = input.library ?? DEFAULT_LIBRARY;
@@ -135,9 +147,16 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
           enterAtSeconds: Number(enterAt.toFixed(3)),
           fadeInSeconds: input.behaviour.openOnMusic ? 0.8 : 1.6,
           fadeOutSeconds: track.hasOutro ? 2.2 : 1.2,
-          // Music sits well under everything else; the mix brings it up only
-          // where nothing is competing.
-          baseGainDb: input.hasVoiceOver ? -18 : -13,
+          /*
+           * One bed level, whether or not anybody is speaking.
+           *
+           * It used to drop to −18 dB for the whole film the moment there was
+           * narration, which is the drawn fade AUDIO_STANDARDS.ducking exists
+           * to rule out: it holds the music down through every pause and every
+           * passage with no voice in it at all. The sidechain in the mix is
+           * what creates room for the voice, and it releases in the gaps.
+           */
+          baseGainDb: -13,
         }
       : null,
     cues: cues.sort((a, b) => a.atSeconds - b.atSeconds),

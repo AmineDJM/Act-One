@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resequence, type Scene, type Storyboard } from '@act-one/core';
+import { LUFS_BROADCAST, LUFS_WEB, TRUE_PEAK_CEILING } from '@act-one/core';
 import { directSound, buildMix, mixArgs, muxArgs, DEFAULT_LIBRARY, validateLibrary, findSfx } from '../index.ts';
 
 function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualType'>): Scene {
@@ -129,10 +130,26 @@ describe('directSound', () => {
     expect(directSound({ storyboard, behaviour: cinematic, channel: 'broadcast' }).targetLufs).toBe(-23);
   });
 
-  it('leaves music quieter when there is narration to make room for', () => {
+  it('sets one bed level whether or not anybody is speaking', () => {
+    /*
+     * Room for the voice comes from the sidechain, which releases in the gaps.
+     * Dropping the bed for the whole film instead is the drawn fade
+     * AUDIO_STANDARDS.ducking rules out: it holds the music down through every
+     * pause and through the passages with no narration in them at all.
+     */
     const withVo = directSound({ storyboard, behaviour: cinematic, hasVoiceOver: true });
     const withoutVo = directSound({ storyboard, behaviour: cinematic, hasVoiceOver: false });
-    expect(withVo.music!.baseGainDb).toBeLessThan(withoutVo.music!.baseGainDb);
+    expect(withVo.music!.baseGainDb).toBe(withoutVo.music!.baseGainDb);
+  });
+
+  it('masters to the standard, not to a number somebody liked', () => {
+    // EBU R 128 is not ours to choose; the other two are the platforms'.
+    expect(directSound({ storyboard, behaviour: cinematic, channel: 'broadcast' }).targetLufs).toBe(
+      LUFS_BROADCAST,
+    );
+    expect(directSound({ storyboard, behaviour: cinematic, channel: 'web' }).targetLufs).toBe(
+      LUFS_WEB,
+    );
   });
 
   it('matches tempo to the cut rate', () => {
@@ -207,5 +224,27 @@ describe('buildMix', () => {
     const args = muxArgs('/tmp/v.mp4', '/tmp/a.m4a', '/tmp/out.mp4');
     expect(args).toContain('copy');
     expect(args).toContain('+faststart');
+  });
+});
+
+describe('loudness compliance', () => {
+  const storyboard = board([scene({ id: 's1', duration: 5, visualType: 'kinetic_typography' })]);
+  const resolvedPaths = Object.fromEntries(
+    [...DEFAULT_LIBRARY.music, ...DEFAULT_LIBRARY.sfx].map((item) => [
+      item.storageKey,
+      `/audio/${item.id}.wav`,
+    ]),
+  );
+
+  it('holds true peak inside the EBU R 128 ceiling, with margin for the encoder', () => {
+    const design = directSound({ storyboard, behaviour: cinematic });
+    const plan = buildMix({ design, resolvedPaths, durationSeconds: 5 });
+
+    const match = /TP=(-?[\d.]+)/.exec(plan.filterGraph);
+    expect(match).not.toBeNull();
+    const truePeak = Number(match![1]);
+    // Inside the ceiling, and not so far inside that we are throwing away level.
+    expect(truePeak).toBeLessThanOrEqual(TRUE_PEAK_CEILING);
+    expect(truePeak).toBeGreaterThan(TRUE_PEAK_CEILING - 2);
   });
 });

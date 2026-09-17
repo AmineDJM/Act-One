@@ -1,13 +1,17 @@
 import {
-  MIN_LARGE_TEXT_CONTRAST,
-  MIN_TEXT_CONTRAST,
+  CONTRAST_AA_LARGE,
+  CONTRAST_AA_NORMAL,
+  MODULAR_SCALES,
   cornerRadiusScale,
   fontFor,
+  leadingFor,
+  modularStep,
   type AspectRatio,
   type BrandSystem,
+  type ModularScaleName,
   type RenderQuality,
 } from '@act-one/core';
-import { ensureContrast, isDark, mix, withAlpha } from './color.ts';
+import { clamp, ensureContrast, isDark, mix, withAlpha } from './color.ts';
 import { createFrame, createGrid, type Frame, type Grid } from './layout.ts';
 import { metricsFor, opticalTracking } from './typography.ts';
 
@@ -60,6 +64,8 @@ export type TokenOptions = {
   theme?: 'dark' | 'light' | 'auto';
   /** Type scale multipliers from the creative system. */
   scale?: { displayRatio: number; bodyRatio: number; tracking: number; lineHeight: number };
+  /** The interval every other size steps by. Defaults to a perfect fourth. */
+  scaleRatio?: ModularScaleName;
 };
 
 export function resolveTokens(brand: BrandSystem, options: TokenOptions): DesignTokens {
@@ -75,9 +81,9 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
 
   const neutrals = darkCanvas ? [...brand.neutrals].reverse() : brand.neutrals;
   const primaryText = neutrals[0] ?? (darkCanvas ? '#ffffff' : '#0a0a0c');
-  const secondaryText = ensureContrast(neutrals[2] ?? primaryText, canvas, MIN_TEXT_CONTRAST);
-  const mutedText = ensureContrast(neutrals[3] ?? secondaryText, canvas, MIN_LARGE_TEXT_CONTRAST);
-  const accent = ensureContrast(brand.primaryColor, canvas, MIN_LARGE_TEXT_CONTRAST);
+  const secondaryText = ensureContrast(neutrals[2] ?? primaryText, canvas, CONTRAST_AA_NORMAL);
+  const mutedText = ensureContrast(neutrals[3] ?? secondaryText, canvas, CONTRAST_AA_LARGE);
+  const accent = ensureContrast(brand.primaryColor, canvas, CONTRAST_AA_LARGE);
 
   const display = fontFor(brand, 'display');
   const body = fontFor(brand, 'body');
@@ -94,6 +100,34 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
   // smaller 16:9 frame — sizing on width would make vertical type tiny.
   const displaySize = Math.round(frame.height * scale.displayRatio);
   const bodySize = Math.round(frame.height * scale.bodyRatio);
+
+  /*
+   * Every other size is a step on one ratio rather than a multiplier somebody
+   * liked. Sizes chosen individually look almost related, which the eye reads
+   * as a mistake; sizes from a ratio look deliberate even to a viewer who
+   * could not name the ratio. See TYPE_STANDARDS.modularScale.
+   *
+   * Two anchors, because they answer different questions: display is sized for
+   * impact and body for legibility. The steps hang off whichever anchor they
+   * belong to.
+   */
+  const ratio = MODULAR_SCALES[options.scaleRatio ?? 'perfect_fourth'];
+  const step = (anchor: number, steps: number) => Math.round(modularStep(anchor, ratio, steps));
+  const statementSize = step(displaySize, -2);
+  const captionSize = step(bodySize, -2);
+  const monoSize = step(bodySize, -1);
+
+  /*
+   * Leading follows the optical size, and the creative system's own preference
+   * is honoured only within the range the standard allows. A system that wants
+   * airy display type gets it; a system that would set 120px headlines at body
+   * leading does not, because that is not a style, it is a mistake.
+   */
+  const leading = (size: number, preferred?: number) => {
+    const standard = leadingFor(size, frame.height);
+    if (preferred === undefined) return standard;
+    return clamp(preferred, standard * 0.9, standard * 1.15);
+  };
 
   // Radius scales with the frame so a 1080p and a 4K render match, and is
   // anchored to the radius actually measured from the brand's site.
@@ -119,31 +153,31 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
         family: display.renderFamily,
         weight: display.weights[display.weights.length - 1] ?? 700,
         sizePx: displaySize,
-        lineHeight: scale.lineHeight,
-        tracking: opticalTracking(displaySize, scale.tracking),
+        lineHeight: leading(displaySize, scale.lineHeight),
+        tracking: opticalTracking(displaySize, scale.tracking, frame.height),
         case: 'sentence',
       },
       statement: {
         family: display.renderFamily,
         weight: display.weights[0] ?? 600,
-        sizePx: Math.round(displaySize * 0.58),
-        lineHeight: scale.lineHeight * 1.12,
-        tracking: opticalTracking(Math.round(displaySize * 0.58), scale.tracking),
+        sizePx: statementSize,
+        lineHeight: leading(statementSize, scale.lineHeight * 1.12),
+        tracking: opticalTracking(statementSize, scale.tracking, frame.height),
         case: 'sentence',
       },
       body: {
         family: body.renderFamily,
         weight: 400,
         sizePx: bodySize,
-        lineHeight: 1.45,
-        tracking: opticalTracking(bodySize, body.tracking),
+        lineHeight: leading(bodySize),
+        tracking: opticalTracking(bodySize, body.tracking, frame.height),
         case: 'sentence',
       },
       caption: {
         family: mono.renderFamily,
         weight: 500,
-        sizePx: Math.round(bodySize * 0.72),
-        lineHeight: 1.35,
+        sizePx: captionSize,
+        lineHeight: leading(captionSize),
         // Small mono labels need positive tracking to stay legible in motion.
         tracking: 0.08,
         case: 'upper',
@@ -151,8 +185,8 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
       mono: {
         family: mono.renderFamily,
         weight: 400,
-        sizePx: Math.round(bodySize * 0.88),
-        lineHeight: 1.5,
+        sizePx: monoSize,
+        lineHeight: leading(monoSize),
         tracking: 0,
         case: 'sentence',
       },

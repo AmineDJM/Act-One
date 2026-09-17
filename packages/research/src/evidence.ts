@@ -1,4 +1,4 @@
-import { newId, type Evidence, type EvidenceKind } from '@act-one/core';
+import { derivedId, type Evidence, type EvidenceKind } from '@act-one/core';
 import type { PageCapture } from '@act-one/providers';
 import type { PageIntent } from './crawl-plan.ts';
 
@@ -22,7 +22,13 @@ export function extractEvidence(capture: PageCapture, options: ExtractOptions): 
     const text = excerpt.trim().replace(/\s+/g, ' ');
     if (text.length < 12 || text.length > 1200) return;
     evidence.push({
-      id: newId('evt'),
+      /*
+       * Derived from what the evidence is, not from when we found it. The same
+       * sentence on the same page is the same evidence next month, and a fresh
+       * random id every crawl silently invalidates every citation pointing at
+       * it — which turns "re-read my product" into "break my storyboard".
+       */
+      id: derivedId('evt', kind, capture.url, text),
       kind,
       sourceUrl: capture.url,
       excerpt: text,

@@ -5,6 +5,13 @@ export * from './config.ts';
 export * from './zod-helpers.ts';
 export * from './env-block.ts';
 
+/*
+ * The professional standards every engine measures against: contrast, measure,
+ * safe areas, shot length, loudness, verification, conversion. Cited, so a
+ * finding can be checked rather than merely believed.
+ */
+export * from './standards/index.ts';
+
 export * from './domain/evidence.ts';
 export * from './domain/product.ts';
 export * from './domain/brand.ts';

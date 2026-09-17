@@ -318,3 +318,155 @@ describe('frame selection', () => {
     expect(times).toEqual([...times].sort((a, b) => a - b));
   });
 });
+
+/**
+ * Standards enforcement.
+ *
+ * Each of these is a rule the platform was taught rather than a number
+ * somebody picked, so each finding names the standard it comes from — a
+ * customer or an operator can check whether we are right rather than having to
+ * take our word for it.
+ */
+describe('professional standards', () => {
+  it('blocks a figure on screen with nothing behind it, and says which rule', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({
+          id: 'a',
+          duration: 4,
+          visualType: 'statistic',
+          onScreenText: ['3x faster'],
+          claimEvidenceIds: [],
+        }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    const issue = issues.find((i) => i.check === 'unsupported_claim' && i.severity === 'blocker');
+    expect(issue).toBeDefined();
+    expect(issue!.message).toMatch(/Reuters/);
+  });
+
+  it('lets the same figure through once it cites its evidence', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({
+          id: 'a',
+          duration: 4,
+          visualType: 'statistic',
+          onScreenText: ['3x faster'],
+          claimEvidenceIds: ['evd_1'],
+        }),
+      ]),
+      brand,
+      aspect: '16:9',
+      knownEvidenceIds: new Set(['evd_1']),
+    });
+
+    expect(issues.some((i) => i.check === 'unsupported_claim')).toBe(false);
+  });
+
+  it('catches the phrases that assert evidence without carrying any', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({
+          id: 'a',
+          duration: 5,
+          visualType: 'kinetic_typography',
+          onScreenText: ['Industry-leading reconciliation'],
+        }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    const issue = issues.find((i) => i.message.includes('industry-leading'));
+    expect(issue).toBeDefined();
+    expect(issue!.severity).toBe('major');
+  });
+
+  it('catches a superlative that would need substantiating in law', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({
+          id: 'a',
+          duration: 5,
+          visualType: 'kinetic_typography',
+          onScreenText: ['The only ledger that closes itself'],
+        }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    expect(issues.some((i) => /advertising law/.test(i.message))).toBe(true);
+  });
+
+  it('refuses a cut too short to register as a shot', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([scene({ id: 'a', duration: 0.3, visualType: 'transition' })]),
+      brand,
+      aspect: '16:9',
+    });
+
+    const issue = issues.find((i) => i.check === 'transition_quality');
+    expect(issue).toBeDefined();
+    expect(issue!.message).toMatch(/0\.5s floor/);
+  });
+
+  it('calls out an edit with no rhythm', () => {
+    // Six scenes of exactly the same length. Every frame could be beautiful.
+    const issues = runDeterministicChecks({
+      storyboard: board(
+        Array.from({ length: 6 }, (_, i) =>
+          scene({ id: `s${i}`, duration: 3, visualType: 'kinetic_typography' }),
+        ),
+      ),
+      brand,
+      aspect: '16:9',
+    });
+
+    const issue = issues.find((i) => i.check === 'composition' && /rhythm/.test(i.message));
+    expect(issue).toBeDefined();
+  });
+
+  it('calls out a film that opens on its own logo', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 4, visualType: 'logo_reveal' }),
+        scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Then the point'] }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    expect(issues.some((i) => /opens on branding/.test(i.message))).toBe(true);
+  });
+
+  it('accepts a logo that is out of the way inside the hook', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 1.2, visualType: 'logo_reveal' }),
+        scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['The point'] }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    expect(issues.some((i) => /opens on branding/.test(i.message))).toBe(false);
+  });
+
+  it('calls out a film whose meaning is only in the narration', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 4, visualType: 'kinetic_typography', narration: 'Everything is spoken.' }),
+        scene({ id: 'b', duration: 4, visualType: 'transition', narration: 'Nothing is written.' }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    expect(issues.some((i) => /muted playback/.test(i.message))).toBe(true);
+  });
+});

@@ -149,7 +149,15 @@ describe('typography', () => {
   });
 
   it('tightens tracking optically as size grows', () => {
-    expect(Math.abs(opticalTracking(120, -0.03))).toBeGreaterThan(Math.abs(opticalTracking(18, -0.03)));
+    expect(Math.abs(opticalTracking(120, -0.03, 1080))).toBeGreaterThan(
+      Math.abs(opticalTracking(18, -0.03, 1080)),
+    );
+  });
+
+  it('tracks a 4K render exactly as it tracks the 1080p one', () => {
+    // The tell of an absolute-pixel rule is type that tightens as the
+    // resolution goes up — the same film, set differently at two sizes.
+    expect(opticalTracking(200, -0.03, 2160)).toBeCloseTo(opticalTracking(100, -0.03, 1080), 6);
   });
 });
 
