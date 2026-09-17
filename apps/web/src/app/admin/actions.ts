@@ -473,3 +473,88 @@ export async function setOrganizationSuspendedAction(
       : `${organization.name} can start work again.`,
   };
 }
+
+/**
+ * Puts a workspace on a plan directly.
+ *
+ * Every platform needs this within a week of launch: a design partner on a
+ * comped plan, a trial extended by hand, an enterprise deal invoiced outside
+ * Stripe. Without it the only way to do any of those is a SQL console, and the
+ * change leaves no trace.
+ *
+ * This changes what the workspace is entitled to; it does not touch their
+ * Stripe subscription. Anyone billing through Stripe keeps billing through
+ * Stripe, and the effective plan still comes from the subscription while one is
+ * live — so this is a grant, not a way to silently stop charging somebody.
+ */
+export async function setOrganizationPlanAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await requireSuperAdmin();
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const planId = String(formData.get('planId') ?? '');
+
+  const { plans } = await getPlatformConfig();
+  const plan = plans.find((candidate) => candidate.id === planId);
+  if (!plan) return { ok: false, message: 'No such plan.' };
+
+  const store = getStore();
+  const organization = await store.organizations.get(organizationId);
+  if (!organization) return { ok: false, message: 'No such workspace.' };
+
+  await store.organizations.update(organizationId, { planId: plan.id });
+  revalidatePath('/admin/customers');
+
+  await recordAdminEvent(actor.id, 'organization.plan_set', `Put ${organization.name} on ${plan.name}.`, {
+    organizationId,
+    from: organization.planId,
+    to: plan.id,
+  });
+
+  const subscription = await store.subscriptions.getForOrganization(organizationId);
+  return {
+    ok: true,
+    message: subscription
+      ? `${organization.name} is on ${plan.name}. Their live Stripe subscription still decides what they are charged.`
+      : `${organization.name} is on ${plan.name}.`,
+  };
+}
+
+/** Adds credits to a workspace by hand — goodwill, a failed render, a trial. */
+export async function grantCreditsAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await requireSuperAdmin();
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const amount = Number(formData.get('credits') ?? 0);
+
+  if (!Number.isInteger(amount) || amount === 0) {
+    return { ok: false, message: 'Enter a whole number of credits.' };
+  }
+  if (Math.abs(amount) > 100_000) {
+    // A slipped keystroke here is a five-figure gift, so it needs a second pair
+    // of hands rather than a bigger text box.
+    return { ok: false, message: 'Over 100,000 credits in one go needs a second operator.' };
+  }
+
+  const store = getStore();
+  const organization = await store.organizations.get(organizationId);
+  if (!organization) return { ok: false, message: 'No such workspace.' };
+
+  const updated = await store.organizations.adjustCredits(organizationId, amount);
+  if (!updated) {
+    return { ok: false, message: `That would take ${organization.name} below zero credits.` };
+  }
+  revalidatePath('/admin/customers');
+
+  await recordAdminEvent(
+    actor.id,
+    'credits.granted',
+    `${amount > 0 ? 'Granted' : 'Removed'} ${Math.abs(amount)} credits ${amount > 0 ? 'to' : 'from'} ${organization.name}.`,
+    { organizationId, amount, balanceBefore: organization.creditBalance },
+  );
+
+  return { ok: true, message: `${organization.name} now has ${updated.creditBalance} credits.` };
+}

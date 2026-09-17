@@ -1,6 +1,7 @@
 import { creditsToUsd, planById } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
 import { getPlatformConfig } from '@/server/platform.ts';
+import { CustomerControls } from './CustomerControls.tsx';
 import styles from '../admin.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,15 @@ export default async function CustomersPage() {
                     style={{ color: margin < 0 ? 'var(--danger)' : undefined }}
                   >
                     ${margin.toFixed(2)}
+                  </td>
+                  <td>
+                    <CustomerControls
+                      organizationId={row.organization.id}
+                      name={row.organization.name}
+                      planId={row.organization.planId}
+                      plans={plans.map((candidate) => ({ id: candidate.id, name: candidate.name }))}
+                      suspended={row.organization.isSuspended}
+                    />
                   </td>
                 </tr>
               );

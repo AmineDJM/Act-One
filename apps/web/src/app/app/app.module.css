@@ -163,3 +163,33 @@
   color: var(--text-secondary);
 }
 .gaps ul { margin-top: var(--space-2); padding-left: var(--space-5); display: flex; flex-direction: column; gap: 4px; }
+
+/* --- plan selection ------------------------------------------------------- */
+
+.planRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+.planOption {
+  display: grid;
+  /* head / price / facts / button, with the facts block absorbing the slack so
+     every button in the row sits on the same line. */
+  grid-template-rows: auto auto 1fr auto;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+.planOption[data-current='true'] { border-color: var(--accent); }
+.planOptionHead { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.planPrice {
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.planPrice span { font-size: 0.8rem; font-weight: 400; color: var(--text-muted); letter-spacing: 0; }
+.planFacts { list-style: none; display: grid; gap: 4px; font-size: 0.82rem; color: var(--text-secondary); }

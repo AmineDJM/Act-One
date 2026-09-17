@@ -525,3 +525,22 @@
   margin-bottom: var(--space-3);
 }
 .notice[data-tone='danger'] { border-left-color: var(--danger); }
+
+.customerControls summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  list-style: none;
+  transition: color var(--duration) var(--ease);
+}
+.customerControls summary::-webkit-details-marker { display: none; }
+.customerControls summary:hover { color: var(--text); }
+.customerControlRow {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0;
+}
+.customerControlRow form { display: flex; align-items: center; gap: var(--space-2); }
+.customerControlRow .input { height: 34px; width: auto; min-width: 92px; font-size: 0.84rem; }
+.customerControlRow .btn { height: 34px; font-size: 0.84rem; }
