@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
   AppError,
+  ProductCredentialKind,
   can,
   newId,
   normalizeUrl,
@@ -15,6 +16,7 @@ import { requireSession, switchWorkspace } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { createProject, enqueue, getProjectOr404 } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
+import { authorizeProductAccess, revokeProductAccess } from '@/server/credentials.ts';
 
 export type FormState = { error: string | null; message?: string };
 
@@ -286,4 +288,62 @@ export async function switchWorkspaceAction(organizationId: string): Promise<voi
   await requireSession();
   const moved = await switchWorkspace(organizationId);
   if (moved) revalidatePath('/app', 'layout');
+}
+
+/**
+ * Connects the customer's own product so the film can show the real thing.
+ *
+ * The whole quality argument of this product rests on filming a real interface
+ * rather than inventing one, and without this there was no way to let us in —
+ * every film was typography over brand colour because it had no choice.
+ */
+export async function authorizeProductAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const projectId = String(formData.get('projectId') ?? '');
+
+    await authorizeProductAccess(session, {
+      projectId,
+      kind: ProductCredentialKind.catch('password').parse(formData.get('kind')),
+      loginUrl: String(formData.get('loginUrl') ?? ''),
+      username: String(formData.get('username') ?? ''),
+      secret: String(formData.get('secret') ?? ''),
+      allowedPaths: splitPaths(String(formData.get('allowedPaths') ?? '')),
+      deniedPaths: splitPaths(String(formData.get('deniedPaths') ?? '')),
+      confirmed: formData.get('confirmed') === 'on',
+    });
+
+    const project = await getProjectOr404(session, projectId);
+    // Explore straight away. Somebody who just handed over access expects
+    // something to happen, and the capture is what makes their film different.
+    await enqueue(project, 'capture_product_moments', {}, 7);
+
+    revalidatePath(`/app/projects/${projectId}`);
+    return { error: null, message: 'Signing in and looking around your product now.' };
+  } catch (error) {
+    return { error: reportError('authorizeProductAction', error).publicMessage };
+  }
+}
+
+export async function revokeProductAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const projectId = String(formData.get('projectId') ?? '');
+    await revokeProductAccess(session, projectId);
+    revalidatePath(`/app/projects/${projectId}`);
+    return { error: null, message: 'Access withdrawn.' };
+  } catch (error) {
+    return { error: reportError('revokeProductAction', error).publicMessage };
+  }
+}
+
+/** Accepts a comma or newline separated list, which is how people type them. */
+function splitPaths(raw: string): string[] {
+  return raw.split(/[\n,]+/).map((path) => path.trim()).filter((path) => path.length > 0);
 }

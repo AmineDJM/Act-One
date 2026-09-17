@@ -127,3 +127,19 @@ export function matchesLogQuery(event: OperationalEvent, query: LogQuery): boole
   }
   return true;
 }
+
+/**
+ * Strips terminal escape sequences and control characters from text we did not
+ * write.
+ *
+ * Library errors are written for a terminal: Playwright's messages carry ANSI
+ * colour codes, and they rendered in the customer's audit trail as `[2m` in the
+ * middle of a sentence. Anything quoted from a tool has to be flattened before
+ * it is shown to somebody.
+ */
+// eslint-disable-next-line no-control-regex
+const CONTROL_SEQUENCES = /\u001b\[[0-9;]*[A-Za-z]|[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+
+export function plainText(value: string): string {
+  return value.replace(CONTROL_SEQUENCES, '').replace(/[ \t]+/g, ' ').trim();
+}

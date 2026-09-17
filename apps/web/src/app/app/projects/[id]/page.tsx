@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import {
   CTA_LABELS,
+  can,
   primaryCtaFor,
   storyboardDuration,
   toAppError,
@@ -14,6 +15,7 @@ import { BrandConfirm } from './BrandConfirm.tsx';
 import { StoryboardPanel } from './StoryboardPanel.tsx';
 import { FilmDelivery } from './FilmDelivery.tsx';
 import { CopyKitPanel } from './CopyKit.tsx';
+import { ProductAccess } from './ProductAccess.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +43,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     variants,
     poster,
     copyKit,
+    access,
   } = view;
 
   /*
@@ -95,6 +98,30 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       ) : null}
 
       <div className={styles.panels}>
+        <ProductAccess
+          projectId={project.id}
+          productHost={safeHost(project.websiteUrl)}
+          canManage={can(session.actor, 'credentials:manage')}
+          access={
+            access.credential
+              ? {
+                  loginUrl: access.credential.loginUrl,
+                  username: access.credential.username,
+                  kind: access.credential.kind,
+                  authorizedAt: access.credential.authorizedAt,
+                  lastUsedAt: access.credential.lastUsedAt,
+                  allowedPaths: access.credential.allowedPaths,
+                  deniedPaths: access.credential.deniedPaths,
+                  audit: access.audit.map((event) => ({
+                    action: event.action,
+                    detail: event.detail,
+                    createdAt: event.createdAt,
+                  })),
+                }
+              : null
+          }
+        />
+
         {understanding ? (
           <section className={styles.panel}>
             <div className={styles.panelHead}>

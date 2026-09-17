@@ -1,4 +1,12 @@
-import { AppError, newId, notFound, redactDetail, redactMessage, resequence } from '@act-one/core';
+import {
+  AppError,
+  newId,
+  notFound,
+  plainText,
+  redactDetail,
+  redactMessage,
+  resequence,
+} from '@act-one/core';
 import type {
   CopyKit,
   Invitation,
@@ -1734,7 +1742,14 @@ export class PgStore implements Store {
         await c.query(
           `INSERT INTO credential_audit_events (id, organization_id, project_id, credential_id, action, detail, created_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [event.id, event.organizationId, event.projectId, event.credentialId, event.action, event.detail, event.createdAt],
+          [
+            event.id, event.organizationId, event.projectId, event.credentialId, event.action,
+            // Flattened here rather than at each call site: these details are
+            // quoted from libraries that write for a terminal, and the customer
+            // reads them.
+            redactMessage(plainText(event.detail)),
+            event.createdAt,
+          ],
         );
       }),
 

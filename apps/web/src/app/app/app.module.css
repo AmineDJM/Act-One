@@ -315,3 +315,87 @@
 .copyGroup p { font-size: 0.9rem; white-space: pre-wrap; }
 .copyFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .copyFoot .btn { height: 28px; font-size: 0.78rem; }
+
+/* --- product access ------------------------------------------------------- */
+
+/*
+ * The one place the product asks for something genuinely dangerous, so the
+ * promises are the design: what we will do, and what we will not, before any
+ * field asks for anything.
+ */
+.promises { list-style: none; display: grid; gap: var(--space-2); font-size: 0.86rem; }
+.promises li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+  color: var(--text-secondary);
+}
+.promises li::before {
+  content: '✓';
+  color: var(--positive);
+  font-size: 0.78rem;
+}
+.promises li[data-yes='false']::before { content: '·'; color: var(--text-muted); }
+
+.accessSummary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--accent-text);
+  padding: var(--space-2) 0;
+}
+.accessForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+}
+/* The consent line and the button are decisions, not fields: full width. */
+.accessForm > label:last-of-type,
+.accessForm > button { grid-column: 1 / -1; }
+
+.consent {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+.consent input { margin-top: 3px; }
+
+.auditTrail summary { cursor: pointer; font-size: 0.86rem; color: var(--text-secondary); }
+.auditTrail ol {
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.auditTrail li {
+  display: grid;
+  grid-template-columns: 62px 96px 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+  font-size: 0.8rem;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+.auditTrail time { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+.auditTrail li[data-action='blocked'] .cite { color: var(--warning); }
+.auditTrail li[data-action='authorized'] .cite,
+.auditTrail li[data-action='revoked'] .cite { color: var(--accent-text); }
+
+.pathList { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.pathList code {
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}

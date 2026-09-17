@@ -4,6 +4,7 @@ import {
   matchesLogQuery,
   newId,
   notFound,
+  plainText,
   redactDetail,
   redactMessage,
   retryDelayMs,
@@ -912,7 +913,12 @@ export class MemoryStore implements Store {
       });
     },
     audit: async (event: CredentialAuditEvent) => {
-      this.tables.credentialAudit.set(event.id, event);
+      // Flattened here rather than at each call site: these details are quoted
+      // from libraries that write for a terminal, and the customer reads them.
+      this.tables.credentialAudit.set(event.id, {
+        ...event,
+        detail: redactMessage(plainText(event.detail)),
+      });
     },
     listAudit: async (organizationId: string, credentialId: string) =>
       this.scoped(this.tables.credentialAudit, organizationId)

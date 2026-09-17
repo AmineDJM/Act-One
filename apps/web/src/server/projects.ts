@@ -14,6 +14,7 @@ import {
   type ProjectStage,
 } from '@act-one/core';
 import { getStore } from './store.ts';
+import { loadProductAccess } from './credentials.ts';
 import { entitlementsFor } from './platform.ts';
 import type { Session } from './auth.ts';
 
@@ -172,8 +173,10 @@ export async function loadProjectView(session: Session, projectId: string) {
     ? await store.assets.listForProject(session.organizationId, project.id, 'poster_frame')
     : [];
   const copyKit = await store.copy.getLatestForProject(session.organizationId, project.id);
+  const access = await loadProductAccess(session, project.id);
 
   return {
+    access,
     copyKit,
     latestRender,
     variants,

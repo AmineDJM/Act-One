@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { matchesLogQuery, redactDetail, redactMessage, type OperationalEvent } from '@act-one/core';
+import { matchesLogQuery, newId, plainText, redactDetail, redactMessage, type OperationalEvent } from '@act-one/core';
 import { MemoryStore } from '../memory-store.ts';
 
 function event(over: Partial<OperationalEvent> = {}): OperationalEvent {
@@ -130,5 +130,45 @@ describe('operational log', () => {
 
     expect(await store.log.prune('2026-01-01T00:00:00.000Z')).toBe(1);
     expect((await store.log.list()).map((r) => r.id)).toEqual(['new']);
+  });
+});
+
+describe('credential audit trail', () => {
+  it('flattens terminal escape codes before the customer reads them', async () => {
+    // Playwright errors carry ANSI colour, and this trail is shown to the
+    // person whose product we signed into.
+    const store = new MemoryStore();
+    await store.credentials.audit({
+      id: newId('evt'),
+      credentialId: 'sec_1',
+      organizationId: 'org_1',
+      projectId: 'prj_1',
+      action: 'blocked',
+      detail: 'navigating to \u001b[2m"https://app.example.com"\u001b[22m until load',
+      createdAt: new Date().toISOString(),
+    });
+
+    const [event] = await store.credentials.listAudit('org_1', 'sec_1');
+    expect(event?.detail).toBe('navigating to "https://app.example.com" until load');
+  });
+
+  it('redacts a credential that reached the trail inside an error', async () => {
+    const store = new MemoryStore();
+    await store.credentials.audit({
+      id: newId('evt'),
+      credentialId: 'sec_1',
+      organizationId: 'org_1',
+      projectId: 'prj_1',
+      action: 'blocked',
+      detail: 'auth failed for sk-live-9Z8y7X6w5V4u3T2s',
+      createdAt: new Date().toISOString(),
+    });
+
+    const [event] = await store.credentials.listAudit('org_1', 'sec_1');
+    expect(event?.detail).not.toContain('sk-live-9Z8y7X6w5V4u3T2s');
+  });
+
+  it('is the same flattening the helper does', () => {
+    expect(plainText('a\u001b[31mb')).toBe('ab');
   });
 });
