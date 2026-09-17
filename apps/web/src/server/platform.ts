@@ -81,7 +81,8 @@ export const PROVIDER_SLOTS = [
   {
     id: 'supabase',
     label: 'Supabase Storage',
-    purpose: 'Permanent storage for every captured, generated and rendered asset.',
+    purpose:
+      'Optional. Assets are written to local disk by default, which is enough for a single box — point this at a bucket when the disk is ephemeral or more than one machine renders.',
     required: false,
     fields: [
       { key: 'url', label: 'Project URL', placeholder: 'https://xyz.supabase.co', secret: false },

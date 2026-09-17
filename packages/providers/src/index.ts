@@ -5,6 +5,7 @@ export * from './registry.ts';
 
 export * from './llm/types.ts';
 export { OpenAiLlmProvider, tryParseJson, priceFor } from './llm/openai.ts';
+export { toStrictJsonSchema, supportsStrictMode } from './llm/json-schema.ts';
 export { ScriptedLlmProvider, type ScriptedResponse } from './llm/scripted.ts';
 
 export * from './browser/types.ts';

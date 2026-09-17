@@ -23,7 +23,7 @@ function scrypt(
   password: string,
   salt: Buffer,
   keylen: number,
-  options: { N: number; r: number; p: number },
+  options: { N: number; r: number; p: number; maxmem?: number },
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     scryptCallback(password, salt, keylen, options, (error, derived) => {
@@ -44,7 +44,20 @@ const SESSION_TTL_DAYS = 30;
  * which is the property that matters against GPU cracking. Parameters are the
  * Node defaults raised to a cost that takes ~100ms on server hardware.
  */
-const SCRYPT_PARAMS = { N: 32768, r: 8, p: 1, keylen: 64 } as const;
+const SCRYPT_PARAMS = {
+  N: 32768,
+  r: 8,
+  p: 1,
+  keylen: 64,
+  /**
+   * Node's scrypt defaults maxmem to 32 MiB, and N=32768 with r=8 needs
+   * 128 * N * r = exactly 32 MiB plus overhead — so it throws, and nobody can
+   * create an account. The failure is a generic internal error, which is why
+   * it survived a typecheck and a test suite and only appeared when a browser
+   * actually submitted the form.
+   */
+  maxmem: 96 * 1024 * 1024,
+} as const;
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
@@ -52,6 +65,7 @@ export async function hashPassword(password: string): Promise<string> {
     N: SCRYPT_PARAMS.N,
     r: SCRYPT_PARAMS.r,
     p: SCRYPT_PARAMS.p,
+    maxmem: SCRYPT_PARAMS.maxmem,
   });
   return `scrypt$${SCRYPT_PARAMS.N}$${SCRYPT_PARAMS.r}$${SCRYPT_PARAMS.p}$${salt.toString('base64')}$${derived.toString('base64')}`;
 }
@@ -64,6 +78,7 @@ export async function verifyPassword(password: string, stored: string | null): P
       N: SCRYPT_PARAMS.N,
       r: SCRYPT_PARAMS.r,
       p: SCRYPT_PARAMS.p,
+      maxmem: SCRYPT_PARAMS.maxmem,
     });
     return false;
   }
@@ -75,7 +90,9 @@ export async function verifyPassword(password: string, stored: string | null): P
     password,
     Buffer.from(saltB64, 'base64'),
     Buffer.from(hashB64, 'base64').length,
-    { N: Number(n), r: Number(r), p: Number(p) },
+    // Cost parameters come from the stored hash, so an old hash keeps
+    // verifying after the active parameters change.
+    { N: Number(n), r: Number(r), p: Number(p), maxmem: SCRYPT_PARAMS.maxmem },
   );
 
   const expected = Buffer.from(hashB64, 'base64');

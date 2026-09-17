@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { httpRequest } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
+import { toStrictJsonSchema } from './json-schema.ts';
 import type {
   CompleteJsonOptions,
   CompleteOptions,
@@ -125,8 +126,16 @@ export class OpenAiLlmProvider implements LlmProvider {
     let totalIn = 0;
     let totalOut = 0;
 
+    // Structured outputs where the schema can express them: the model is then
+    // constrained by the API rather than asked nicely, and the repair loop
+    // below becomes a fallback instead of the primary mechanism.
+    const strict = toStrictJsonSchema(options.schema, options.schemaName);
+
     for (let attempt = 0; attempt <= repairAttempts; attempt += 1) {
-      const result = await this.call(conversation, options, context, { json: true });
+      const result = await this.call(conversation, options, context, {
+        json: true,
+        ...(strict ? { strict } : {}),
+      });
       totalCost += result.usage.costUsd;
       totalIn += result.usage.inputTokens;
       totalOut += result.usage.outputTokens;
@@ -175,7 +184,7 @@ export class OpenAiLlmProvider implements LlmProvider {
     messages: LlmMessage[],
     options: CompleteOptions,
     context: CallContext,
-    mode: { json: boolean } | undefined,
+    mode: { json: boolean; strict?: { name: string; schema: Record<string, unknown> } } | undefined,
   ): Promise<LlmResult<string>> {
     const tier = options.tier ?? 'balanced';
     const model = this.modelFor(tier);
@@ -185,7 +194,14 @@ export class OpenAiLlmProvider implements LlmProvider {
       temperature: options.temperature ?? 0.7,
       max_completion_tokens: options.maxOutputTokens ?? 4096,
     };
-    if (mode?.json) body['response_format'] = { type: 'json_object' };
+    if (mode?.strict) {
+      body['response_format'] = {
+        type: 'json_schema',
+        json_schema: { name: mode.strict.name, schema: mode.strict.schema, strict: true },
+      };
+    } else if (mode?.json) {
+      body['response_format'] = { type: 'json_object' };
+    }
 
     const response = await httpRequest<unknown>(this.name, `${this.baseUrl}/chat/completions`, {
       method: 'POST',

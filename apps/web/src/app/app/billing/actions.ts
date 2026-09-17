@@ -1,11 +1,12 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { AppError, can, planById, toAppError } from '@act-one/core';
+import { AppError, can, planById } from '@act-one/core';
 import { requireSession } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { getPlatformConfig } from '@/server/platform.ts';
 import { createCheckoutSession, createCreditCheckout, createPortalSession } from '@/server/stripe.ts';
+import { reportError } from '@/server/report.ts';
 
 export type FormState = { error: string | null };
 
@@ -32,7 +33,7 @@ export async function startCheckoutAction(
 
     url = await createCheckoutSession({ organization, email: session.user.email, plan, interval });
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('startCheckoutAction', error).publicMessage };
   }
   redirect(url);
 }
@@ -43,7 +44,7 @@ export async function openPortalAction(_previous: FormState): Promise<FormState>
     const { organization } = await billingContext();
     url = await createPortalSession(organization);
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('openPortalAction', error).publicMessage };
   }
   redirect(url);
 }
@@ -61,7 +62,7 @@ export async function buyCreditsAction(
     }
     url = await createCreditCheckout({ organization, email: session.user.email, credits });
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('buyCreditsAction', error).publicMessage };
   }
   redirect(url);
 }

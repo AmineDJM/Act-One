@@ -1,9 +1,10 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { normalizeUrl, toAppError } from '@act-one/core';
+import { normalizeUrl } from '@act-one/core';
 import { signIn, signUp } from '@/server/auth.ts';
 import { createProject } from '@/server/projects.ts';
+import { reportError } from '@/server/report.ts';
 
 export type AuthState = { error: string | null };
 
@@ -29,7 +30,7 @@ export async function signUpAction(_previous: AuthState, formData: FormData): Pr
       destination = `/app/projects/${project.id}`;
     }
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('signUpAction', error).publicMessage };
   }
 
   // redirect() throws, so it must sit outside the try or it is caught as a
@@ -43,7 +44,7 @@ export async function signInAction(_previous: AuthState, formData: FormData): Pr
   try {
     await signIn(String(formData.get('email') ?? ''), String(formData.get('password') ?? ''));
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('signInAction', error).publicMessage };
   }
 
   // Only ever redirect within this app: an open redirect on a login form is a

@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { AppError, normalizeUrl, toAppError, newId, can } from '@act-one/core';
+import { AppError, normalizeUrl, newId, can } from '@act-one/core';
 import { requireSession } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { createProject, enqueue, getProjectOr404 } from '@/server/projects.ts';
+import { reportError } from '@/server/report.ts';
 
 export type FormState = { error: string | null; message?: string };
 
@@ -31,7 +32,7 @@ export async function createProjectAction(
     });
     destination = `/app/projects/${project.id}`;
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('createProjectAction', error).publicMessage };
   }
 
   redirect(destination);
@@ -74,7 +75,7 @@ export async function chooseConceptAction(
     revalidatePath(`/app/projects/${project.id}`);
     return { error: null, message: `Building the storyboard for "${concept.name}".` };
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('chooseConceptAction', error).publicMessage };
   }
 }
 
@@ -99,7 +100,7 @@ export async function regenerateConceptsAction(
     revalidatePath(`/app/projects/${project.id}`);
     return { error: null, message: 'Working on three new directions.' };
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('regenerateConceptsAction', error).publicMessage };
   }
 }
 
@@ -125,7 +126,7 @@ export async function confirmBrandAction(
     revalidatePath(`/app/projects/${projectId}`);
     return { error: null, message: 'Brand confirmed.' };
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('confirmBrandAction', error).publicMessage };
   }
 }
 
@@ -151,7 +152,7 @@ export async function reviseStoryboardAction(
     revalidatePath(`/app/projects/${projectId}`);
     return { error: null, message: 'Applying that now.' };
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('reviseStoryboardAction', error).publicMessage };
   }
 }
 
@@ -197,7 +198,7 @@ export async function startRenderAction(
         : 'Rendering your film.',
     };
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('startRenderAction', error).publicMessage };
   }
 }
 
@@ -214,6 +215,6 @@ export async function createCampaignAction(
     revalidatePath(`/app/projects/${project.id}`);
     return { error: null, message: 'Cutting your campaign.' };
   } catch (error) {
-    return { error: toAppError(error).publicMessage };
+    return { error: reportError('createCampaignAction', error).publicMessage };
   }
 }

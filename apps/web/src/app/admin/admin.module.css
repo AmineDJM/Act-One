@@ -98,7 +98,21 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  align-items: end;
+  align-items: start;
+}
+/*
+ * Every field is label / control / hint, and each one spans the same three
+ * parent rows, so the labels share a line, the inputs share a line, and the
+ * hints share a line no matter how many lines any individual label or hint
+ * takes. This replaced `align-items: end`, which lined the fields up by their
+ * bottom edge — fine until two columns in a row had hints of different
+ * lengths, at which point the inputs themselves stopped being level.
+ */
+.providerBody > :global(.field) {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  gap: var(--space-2);
 }
 .providerActions {
   border-top: 1px solid var(--line);

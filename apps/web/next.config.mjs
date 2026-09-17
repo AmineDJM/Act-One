@@ -13,10 +13,10 @@ const nextConfig = {
   ],
   poweredByHeader: false,
   compress: true,
-  experimental: {
-    // Keeps the heavy Node-only packages out of the client bundle entirely.
-    serverComponentsExternalPackages: ['pg', 'playwright-core', 'stripe'],
-  },
+  // Keeps the heavy Node-only packages out of the client bundle entirely.
+  // (Moved out of `experimental` in Next 15 — the old key is ignored silently
+  // apart from a startup warning, which is exactly how it stays wrong.)
+  serverExternalPackages: ['pg', 'playwright-core', 'stripe'],
   async headers() {
     return [
       {
