@@ -91,6 +91,7 @@
 
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-5); }
 .panel {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -226,6 +227,7 @@
 
 .memberList { list-style: none; display: grid; gap: var(--space-2); }
 .memberList li {
+  min-width: 0;
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
@@ -251,6 +253,12 @@
 
 .inviteResult {
   display: grid;
+  /*
+   * A long URL in a nowrap code block widens its grid track, and the track
+   * widens the panel, and the panel pushed the copy button outside the card.
+   * min-width: 0 lets the track stay narrow and the code block scroll instead.
+   */
+  min-width: 0;
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--line);
@@ -259,7 +267,7 @@
   background: var(--surface-raised);
   font-size: 0.88rem;
 }
-.inviteLink { display: flex; gap: var(--space-3); align-items: center; }
+.inviteLink { display: flex; gap: var(--space-3); align-items: center; min-width: 0; }
 .inviteLink code {
   flex: 1;
   min-width: 0;

@@ -123,9 +123,9 @@ export function TeamPanel({
             <div className="field">
               <label htmlFor="invite-role">As</label>
               <select id="invite-role" name="role" className="input" defaultValue="editor" disabled={full}>
-                <option value="admin">Admin — manages people and access</option>
-                <option value="editor">Editor — does the creative work</option>
-                <option value="reviewer">Reviewer — reads and comments</option>
+                <option value="admin">Admin</option>
+                <option value="editor">Editor</option>
+                <option value="reviewer">Reviewer</option>
               </select>
             </div>
             <button className="btn" type="submit" disabled={inviting || full}>
