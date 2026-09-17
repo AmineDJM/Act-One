@@ -1,0 +1,243 @@
+/* Landing surfaces. Kept in one module so the marketing pages share a rhythm. */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(14px);
+  background: color-mix(in oklab, var(--canvas) 78%, transparent);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--duration) var(--ease);
+}
+.navInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 68px;
+  gap: var(--space-5);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--accent);
+  position: relative;
+  flex: none;
+}
+.mark::after {
+  content: '';
+  position: absolute;
+  inset: 6px 6px auto auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--canvas);
+}
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+.navLinks a:hover { color: var(--text); }
+@media (max-width: 720px) {
+  .navLinks { display: none; }
+}
+
+.hero {
+  padding-block: clamp(var(--space-7), 8vh, var(--space-9)) var(--space-8);
+  position: relative;
+  overflow: hidden;
+}
+/*
+ * A single soft light source rather than a gradient wash. The brief is explicit
+ * that generic purple AI gradients are an anti-pattern, and the product cannot
+ * credibly sell restraint from behind one.
+ */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: -40% 20% auto -10%;
+  height: 70vh;
+  background: radial-gradient(
+    ellipse 60% 50% at 30% 40%,
+    color-mix(in oklab, var(--accent) 16%, transparent),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.heroInner { position: relative; z-index: 1; }
+.heroTitle { max-width: 16ch; margin-block: var(--space-5) var(--space-5); }
+.heroLede { margin-bottom: var(--space-7); }
+
+.starter {
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.starterRow {
+  display: flex;
+  gap: var(--space-3);
+}
+.starterRow .input { flex: 1; height: 52px; font-size: 1rem; }
+@media (max-width: 620px) {
+  .starterRow { flex-direction: column; }
+}
+.starterNote {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.section { padding-block: var(--space-8); }
+/* The section immediately after the hero would otherwise stack two full
+   blocks of padding into a screen of nothing. */
+.hero + .section { padding-top: var(--space-6); }
+.sectionHead {
+  max-width: 68ch;
+  margin-bottom: var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.step {
+  background: var(--surface);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 190px;
+}
+.stepIndex {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent-text);
+  letter-spacing: 0.08em;
+}
+.step h3 { font-size: 1.05rem; }
+.step p { font-size: 0.92rem; color: var(--text-secondary); }
+
+.contrast {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-5);
+}
+.contrastCard {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  background: var(--surface);
+}
+.contrastCard h3 { margin-bottom: var(--space-4); font-size: 1.05rem; }
+.contrastList { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.contrastList li {
+  display: flex;
+  gap: var(--space-3);
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.tick { color: var(--positive); flex: none; font-family: var(--font-mono); }
+.cross { color: var(--text-muted); flex: none; font-family: var(--font-mono); }
+
+.systems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.system {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  transition: border-color var(--duration) var(--ease);
+}
+.system:hover { border-color: var(--line-strong); }
+.systemSwatch {
+  height: 132px;
+  display: flex;
+  align-items: center;
+  padding: var(--space-5);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-size: 1.5rem;
+  line-height: 1.05;
+}
+.systemBody { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.systemBody p { font-size: 0.9rem; color: var(--text-secondary); }
+
+.faq { display: flex; flex-direction: column; gap: var(--space-1); max-width: 76ch; }
+.faqItem {
+  border-bottom: 1px solid var(--line);
+  padding-block: var(--space-5);
+}
+.faqItem summary {
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 1.02rem;
+  letter-spacing: -0.015em;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.faqItem summary::-webkit-details-marker { display: none; }
+.faqItem summary::after {
+  content: '+';
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex: none;
+}
+.faqItem[open] summary::after { content: '−'; }
+.faqItem p {
+  margin-top: var(--space-4);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  max-width: 68ch;
+}
+
+.footer {
+  border-top: 1px solid var(--line);
+  padding-block: var(--space-7);
+  margin-top: var(--space-9);
+}
+.footerInner {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+.footerLinks { display: flex; gap: var(--space-5); flex-wrap: wrap; }
+.footerLinks a:hover { color: var(--text-secondary); }
+
+.cta {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: clamp(var(--space-6), 6vw, var(--space-9));
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-5);
+}

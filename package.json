@@ -2,15 +2,17 @@
   "name": "act-one",
   "private": true,
   "version": "0.1.0",
-  "description": "Act One — give us your product, get a launch film.",
+  "description": "Act One \u2014 give us your product, get a launch film.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc --build --force",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "npm --workspace @act-one/web run dev",
@@ -18,7 +20,8 @@
     "worker": "npm --workspace @act-one/worker run start",
     "migrate": "node --experimental-strip-types packages/db/src/cli/migrate.ts",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\"",
+    "verify": "npm run typecheck && npm run test"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

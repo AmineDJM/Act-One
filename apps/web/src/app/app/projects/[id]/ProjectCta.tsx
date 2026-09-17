@@ -1,0 +1,86 @@
+'use client';
+
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import type { PrimaryCta } from '@act-one/core';
+import { startRenderAction, createCampaignAction, type FormState } from '../../actions.ts';
+import styles from '../../app.module.css';
+
+/**
+ * The single strong call to action.
+ *
+ * While work is in flight this becomes a progress panel and polls — a customer
+ * who has to refresh to find out whether their film is done does not believe
+ * the film is being made.
+ */
+export function ProjectCta(props: {
+  projectId: string;
+  cta: PrimaryCta;
+  label: string;
+  headline: string;
+  body: string;
+  progress: number | null;
+  status: string | null;
+  disabled: boolean;
+}) {
+  const router = useRouter();
+  const working = props.cta === 'watch_progress';
+
+  const [renderState, render, rendering] = useActionState<FormState, FormData>(startRenderAction, {
+    error: null,
+  });
+  const [campaignState, campaign, cutting] = useActionState<FormState, FormData>(
+    createCampaignAction,
+    { error: null },
+  );
+
+  useEffect(() => {
+    if (!working) return;
+    // Server-rendered state, refreshed on an interval. Long enough not to
+    // hammer the database, short enough that a finished stage appears while
+    // the customer is still looking at the page.
+    const timer = setInterval(() => router.refresh(), 4000);
+    return () => clearInterval(timer);
+  }, [working, router]);
+
+  const action =
+    props.cta === 'render_film' ? render : props.cta === 'create_variants' ? campaign : null;
+  const pending = rendering || cutting;
+  const result = renderState.error ?? campaignState.error;
+
+  return (
+    <section className={styles.cta}>
+      <div className={styles.ctaCopy}>
+        <h2>{props.headline}</h2>
+        <p>{props.status && working ? props.status : props.body}</p>
+        {working ? (
+          <div
+            className={styles.progress}
+            role="progressbar"
+            aria-valuenow={Math.round((props.progress ?? 0) * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className={styles.progressBar} style={{ width: `${(props.progress ?? 0.05) * 100}%` }} />
+          </div>
+        ) : null}
+        {result ? (
+          <p role="alert" style={{ color: 'var(--danger)', fontSize: '0.88rem' }}>
+            {result}
+          </p>
+        ) : null}
+      </div>
+
+      {action ? (
+        <form action={action}>
+          <input type="hidden" name="projectId" value={props.projectId} />
+          <button className="btn btn--lg" type="submit" disabled={pending || props.disabled}>
+            {pending ? 'Starting…' : props.label}
+          </button>
+        </form>
+      ) : working ? (
+        <span className="badge">Working…</span>
+      ) : null}
+    </section>
+  );
+}

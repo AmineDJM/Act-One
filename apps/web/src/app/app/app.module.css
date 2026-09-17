@@ -1,0 +1,165 @@
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.topbar {
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--canvas) 86%, transparent);
+  backdrop-filter: blur(14px);
+}
+.topbarInner { display: flex; align-items: center; gap: var(--space-6); height: 60px; }
+.brand { display: flex; align-items: center; gap: var(--space-3); font-weight: 600; letter-spacing: -0.02em; }
+.mark { width: 20px; height: 20px; border-radius: 5px; background: var(--accent); position: relative; flex: none; }
+.mark::after {
+  content: ''; position: absolute; inset: 5px 5px auto auto;
+  width: 6px; height: 6px; border-radius: 1px; background: var(--canvas);
+}
+.tabs { display: flex; gap: var(--space-5); font-size: 0.92rem; color: var(--text-secondary); }
+.tabs a:hover { color: var(--text); }
+.spacer { margin-left: auto; }
+.credits {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 3px 10px;
+}
+
+.main { flex: 1; padding-block: var(--space-7) var(--space-9); }
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-5); margin-bottom: var(--space-6); flex-wrap: wrap; }
+.head h1 { font-size: 1.7rem; letter-spacing: -0.03em; }
+
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+.project {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: border-color var(--duration) var(--ease);
+  min-height: 160px;
+}
+.project:hover { border-color: var(--line-strong); }
+.projectName { font-weight: 600; letter-spacing: -0.02em; }
+.projectHost { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); }
+.projectFoot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+
+.empty {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-9) var(--space-6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Project detail */
+.cta {
+  border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--line));
+  background: linear-gradient(
+    to bottom right,
+    color-mix(in oklab, var(--accent) 10%, var(--surface)),
+    var(--surface)
+  );
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+.ctaCopy { display: flex; flex-direction: column; gap: var(--space-2); max-width: 60ch; }
+.ctaCopy h2 { font-size: 1.15rem; letter-spacing: -0.02em; }
+.ctaCopy p { font-size: 0.92rem; color: var(--text-secondary); }
+
+.progress {
+  height: 3px;
+  background: var(--surface-raised);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: var(--space-3);
+}
+.progressBar { height: 100%; background: var(--accent); transition: width 600ms var(--ease); }
+
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-5); }
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.panelHead { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.panelHead h3 { font-size: 1rem; }
+.kv { display: flex; flex-direction: column; gap: var(--space-3); font-size: 0.9rem; }
+.kvRow { display: flex; gap: var(--space-4); justify-content: space-between; }
+.kvRow dt { color: var(--text-muted); flex: none; }
+.kvRow dd { color: var(--text-secondary); text-align: right; }
+.claims { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); font-size: 0.9rem; }
+.claims li { display: flex; gap: var(--space-3); color: var(--text-secondary); }
+.cite {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--accent-text);
+  flex: none;
+  padding-top: 2px;
+}
+
+.swatches { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.swatch {
+  width: 40px; height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); flex: none;
+}
+
+.concepts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+.concept {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.conceptTop { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); flex: 1; }
+.conceptName { font-size: 1.15rem; font-weight: 600; letter-spacing: -0.025em; }
+.conceptIdea { font-size: 0.92rem; color: var(--text-secondary); }
+.conceptHook {
+  font-size: 0.9rem;
+  color: var(--text);
+  border-left: 2px solid var(--accent);
+  padding-left: var(--space-3);
+}
+.beats { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); font-size: 0.85rem; color: var(--text-muted); }
+.beats li { display: flex; gap: var(--space-3); }
+.beatIndex { font-family: var(--font-mono); font-size: 0.68rem; padding-top: 2px; color: var(--accent-text); }
+.conceptFoot {
+  border-top: 1px solid var(--line);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--surface-raised);
+}
+.conceptMeta { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+.concept[data-selected='true'] { border-color: var(--accent); }
+
+.gaps {
+  border: 1px solid color-mix(in oklab, var(--warning) 26%, var(--line));
+  background: color-mix(in oklab, var(--warning) 6%, transparent);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.gaps ul { margin-top: var(--space-2); padding-left: var(--space-5); display: flex; flex-direction: column; gap: 4px; }

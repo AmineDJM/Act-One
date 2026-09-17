@@ -1,0 +1,19 @@
+{
+  "name": "@act-one/pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@act-one/core": "*",
+    "@act-one/creative": "*",
+    "@act-one/db": "*",
+    "@act-one/design": "*",
+    "@act-one/providers": "*",
+    "@act-one/research": "*",
+    "@act-one/sound": "*",
+    "zod": "^4.0.0"
+  }
+}

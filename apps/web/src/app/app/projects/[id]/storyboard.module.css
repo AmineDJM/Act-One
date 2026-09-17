@@ -1,0 +1,75 @@
+.timeline {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-3);
+}
+.scene {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+  overflow: hidden;
+}
+.scene[data-status='assets_pending'] { border-color: color-mix(in oklab, var(--warning) 40%, var(--line)); }
+.scene[data-status='failed'],
+.scene[data-status='needs_repair'] { border-color: color-mix(in oklab, var(--danger) 40%, var(--line)); }
+
+.sceneHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+.sceneIndex { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-text); }
+.sceneType { font-size: 0.75rem; color: var(--text-muted); text-transform: capitalize; }
+.sceneTime { margin-left: auto; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+
+.sceneBody { padding: var(--space-4); flex: 1; display: flex; flex-direction: column; gap: var(--space-2); }
+.sceneText { font-size: 0.95rem; font-weight: 500; letter-spacing: -0.02em; }
+.scenePurpose { font-size: 0.85rem; color: var(--text-muted); }
+.sceneVo { font-size: 0.8rem; color: var(--text-secondary); font-style: italic; }
+
+.sceneFoot {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sceneMeta { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-muted); }
+.sceneCited {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--positive);
+  margin-left: auto;
+}
+
+.revise {
+  margin-top: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 720px;
+}
+.suggestions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.suggestion {
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+.suggestion:hover { border-color: var(--line-strong); color: var(--text); }

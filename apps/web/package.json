@@ -1,0 +1,30 @@
+{
+  "name": "@act-one/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@act-one/core": "*",
+    "@act-one/creative": "*",
+    "@act-one/db": "*",
+    "@act-one/design": "*",
+    "@act-one/providers": "*",
+    "@act-one/research": "*",
+    "next": "^15.1.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "server-only": "^0.0.1",
+    "stripe": "^17.5.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"
+  }
+}
