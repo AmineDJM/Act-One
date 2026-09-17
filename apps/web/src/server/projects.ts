@@ -8,6 +8,8 @@ import {
   canRender,
   canStartProject,
   type Job,
+  jobAdvancesProject,
+  jobIsTerminal,
   type JobKind,
   storyboardDuration,
   type Project,
@@ -163,10 +165,30 @@ export async function loadProjectView(session: Session, projectId: string) {
    * campaign the "master" was whichever cut rendered last, and the cuts
    * disappeared because they hang off the real master's id.
    */
+  /*
+   * Films only. The fallback below takes whatever finished last, so without
+   * this a customer who previewed their cut or ran a campaign would be handed
+   * an animatic or a six-second bumper as the deliverable.
+   */
+  const deliverables = renders.filter((render) => render.kind === 'film');
   const latestRender =
-    renders.find((render) => render.id === project.latestRenderId && render.masterAssetId) ??
-    renders.find((render) => render.status === 'completed' && render.masterAssetId) ??
+    deliverables.find((render) => render.id === project.latestRenderId && render.masterAssetId) ??
+    deliverables.find((render) => render.status === 'completed' && render.masterAssetId) ??
     null;
+
+  /*
+   * The animatic for the storyboard on screen. A preview of a storyboard the
+   * customer has since replaced describes a cut that no longer exists, so it is
+   * matched to the active storyboard rather than simply being the newest one.
+   */
+  const animatic =
+    renders.find(
+      (render) =>
+        render.kind === 'animatic' &&
+        render.status === 'completed' &&
+        render.masterAssetId &&
+        render.storyboardId === project.activeStoryboardId,
+    ) ?? null;
   const variants = latestRender
     ? await store.variants.listForRender(session.organizationId, latestRender.id)
     : [];
@@ -182,6 +204,7 @@ export async function loadProjectView(session: Session, projectId: string) {
     notes,
     copyKit,
     latestRender,
+    animatic,
     variants,
     poster: posters[0] ?? null,
     project,
@@ -196,7 +219,17 @@ export async function loadProjectView(session: Session, projectId: string) {
     storyboard:
       storyboards.find((board) => board.id === project.activeStoryboardId) ?? storyboards[0] ?? null,
     renders,
-    activeJob: jobs.find((job) => job.state !== 'completed' && job.state !== 'failed') ?? null,
+    /*
+     * The job the customer is waiting on. A side errand — a timing preview, the
+     * launch copy — runs beside the project without being what the project is
+     * doing, and letting one answer this question put "Working on it" over the
+     * whole page and took away the button that renders the film.
+     */
+    activeJob:
+      jobs.find((job) => !jobIsTerminal(job.state) && jobAdvancesProject(job.kind)) ?? null,
+    /** The timing preview being built right now, reported where it was asked for. */
+    animaticJob:
+      jobs.find((job) => job.kind === 'render_animatic' && !jobIsTerminal(job.state)) ?? null,
     jobs,
     organization,
     plan,

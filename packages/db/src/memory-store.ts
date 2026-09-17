@@ -559,8 +559,11 @@ export class MemoryStore implements Store {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     update: async (organizationId: string, id: string, patch: Partial<Render>) =>
       this.patch(this.tables.renders, organizationId, id, patch, 'Render'),
+    /** Films only — cuts and animatics do not spend the plan's allowance. */
     countForProject: async (organizationId: string, projectId: string) =>
-      this.scoped(this.tables.renders, organizationId).filter((r) => r.projectId === projectId).length,
+      this.scoped(this.tables.renders, organizationId).filter(
+        (r) => r.projectId === projectId && r.kind === 'film',
+      ).length,
     listActive: async (limit = 50) =>
       [...this.tables.renders.values()]
         .filter((r) => !['completed', 'failed', 'canceled'].includes(r.status))

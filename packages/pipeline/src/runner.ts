@@ -16,6 +16,7 @@ import { runStoryboard } from './stages/storyboard.ts';
 import { runRender } from './stages/render.ts';
 import { runCampaign } from './stages/campaign.ts';
 import { runCopy } from './stages/copy.ts';
+import { runAnimatic } from './stages/animatic.ts';
 import { runRevision } from './stages/revision.ts';
 import { runSceneAssets } from './stages/assets.ts';
 
@@ -48,7 +49,7 @@ const RUNNING_STATE: Record<JobKind, JobState> = {
   research_product: 'researching',
   extract_brand: 'researching',
   generate_concepts: 'concepting',
-  render_animatic: 'concepting',
+  render_animatic: 'rendering_motion',
   build_storyboard: 'storyboarding',
   capture_product_moments: 'capturing_product',
   generate_scene_assets: 'generating_assets',
@@ -56,7 +57,7 @@ const RUNNING_STATE: Record<JobKind, JobState> = {
   render_variant: 'rendering_motion',
   repair_scene: 'storyboarding',
   generate_campaign: 'rendering_motion',
-  generate_copy: 'completed',
+  generate_copy: 'writing_copy',
 };
 
 export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): Promise<JobOutcome> {
@@ -190,9 +191,11 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
       return runCopy(context);
 
     case 'render_animatic':
-      // Declared in the job taxonomy and dispatched here so an enqueued job is
-      // never silently dropped, but not yet implemented as its own stage.
-      return { skipped: true, kind: job.kind };
+      return runAnimatic(context, {
+        ...(typeof payload['storyboardId'] === 'string'
+          ? { storyboardId: payload['storyboardId'] }
+          : {}),
+      });
 
     default:
       throw new Error(`No handler for job kind: ${job.kind as string}`);

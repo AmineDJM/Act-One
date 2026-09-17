@@ -1,4 +1,5 @@
 import { AppError, newId, secretContextFor } from '../shared.ts';
+import { stageReached } from '@act-one/core';
 import { ProductResearchAgent, ProductExplorer } from '@act-one/research';
 import type { SecretVault } from '@act-one/providers';
 import { policyForAuthenticatedProduct } from '@act-one/providers';
@@ -115,10 +116,17 @@ export async function runResearch(
   const existing = existingBrands.find((brand) => brand.confirmedByUser);
   const brand = existing ?? (await store.brands.create(result.brand));
 
+  /*
+   * The stage only moves forward. This same stage runs again when a customer
+   * authorises their product later on — new screens, a better brief — and a
+   * project that already has a film would otherwise be told it had just
+   * finished reading its own website, with the film still sitting on the page
+   * underneath the wrong headline.
+   */
   await store.projects.update(organizationId, project.id, {
     productUnderstandingId: understanding.id,
     brandId: brand.id,
-    stage: 'understanding_ready',
+    ...(stageReached(project.stage, 'concepting') ? {} : { stage: 'understanding_ready' }),
   });
 
   await context.progress(1, 'Done');

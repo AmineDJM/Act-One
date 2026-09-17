@@ -1050,13 +1050,13 @@ export class PgStore implements Store {
       this.tenant(render.organizationId, async (c) => {
         await c.query(
           `INSERT INTO renders
-             (id, organization_id, project_id, storyboard_id, version, aspect, quality, fps,
+             (id, organization_id, project_id, storyboard_id, kind, version, aspect, quality, fps,
               status, watermarked, duration_seconds, cost_usd, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
           [
-            render.id, render.organizationId, render.projectId, render.storyboardId, render.version,
-            render.aspect, render.quality, render.fps, render.status, render.watermarked,
-            render.durationSeconds, render.costUsd, render.createdAt,
+            render.id, render.organizationId, render.projectId, render.storyboardId, render.kind,
+            render.version, render.aspect, render.quality, render.fps, render.status,
+            render.watermarked, render.durationSeconds, render.costUsd, render.createdAt,
           ],
         );
         return render;
@@ -1105,10 +1105,16 @@ export class PgStore implements Store {
         return toRender(r.rows[0]);
       }),
 
+    /*
+     * Films only. This count is what the plan's renders-per-project limit is
+     * measured against, and counting campaign cuts and timing previews meant a
+     * customer spent their allowance on work they never chose to pay for.
+     */
     countForProject: async (organizationId: string, projectId: string) =>
       this.tenant(organizationId, async (c) => {
         const r = await c.query<{ count: number }>(
-          'SELECT COUNT(*)::int AS count FROM renders WHERE project_id = $1 AND organization_id = $2',
+          `SELECT COUNT(*)::int AS count FROM renders
+             WHERE project_id = $1 AND organization_id = $2 AND kind = 'film'`,
           [projectId, organizationId],
         );
         return num(r.rows[0]?.count);
@@ -2012,6 +2018,7 @@ function toRender(row: Row): Render {
     projectId: row['project_id'] as string,
     storyboardId: row['storyboard_id'] as string,
     organizationId: row['organization_id'] as string,
+    kind: (row['kind'] as Render['kind']) ?? 'film',
     version: num(row['version']),
     aspect: row['aspect'] as Render['aspect'],
     quality: row['quality'] as Render['quality'],

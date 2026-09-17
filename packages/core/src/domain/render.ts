@@ -36,11 +36,25 @@ export type RenderStatus = z.infer<typeof RenderStatus>;
 export const AudioStem = z.enum(['full', 'no_voice', 'no_music', 'clean_product']);
 export type AudioStem = z.infer<typeof AudioStem>;
 
+/**
+ * What a render is for.
+ *
+ * A film is the deliverable. A cut is one channel's version of a finished film.
+ * An animatic is a rough preview of a storyboard, built before anybody has
+ * committed to rendering. They are three different things and only the first
+ * one is what a customer bought, so nothing may treat them as interchangeable:
+ * the project's master, its version numbers and the plan's render allowance all
+ * count films.
+ */
+export const RenderKind = z.enum(['film', 'cut', 'animatic']);
+export type RenderKind = z.infer<typeof RenderKind>;
+
 export const Render = z.object({
   id: z.string(),
   projectId: z.string(),
   storyboardId: z.string(),
   organizationId: z.string(),
+  kind: RenderKind.default('film'),
   version: z.number().int().min(1).default(1),
   aspect: AspectRatio.default('16:9'),
   quality: RenderQuality.default('hd'),

@@ -9,6 +9,7 @@ import {
   type AspectRatio,
   type QaIssue,
   type Render,
+  type RenderKind,
   type RenderQuality,
   type Storyboard,
 } from '@act-one/core';
@@ -35,14 +36,15 @@ export type RenderOptions = {
   /** Skips vision QA. Used for previews and animatics, where it is not worth it. */
   skipVisionQa?: boolean;
   /**
-   * True when this render is a campaign cut rather than the film itself.
+   * What this render is: the film, a campaign cut, or a timing animatic.
    *
-   * A cut must not become the project's latest render, or the page offers a
-   * six-second bumper as the master, the cuts stop appearing beside it — they
-   * hang off a render nothing points at any more — and the next campaign is cut
-   * from a cut.
+   * Only a film is a deliverable. Anything else must not become the project's
+   * latest render — or the page offers a six-second bumper as the master, the
+   * cuts stop appearing beside it because they hang off a render nothing points
+   * at any more, and the next campaign is cut from a cut — and must not spend a
+   * render from the customer's plan.
    */
-  isCut?: boolean;
+  kind?: RenderKind;
 };
 
 export async function runRender(
@@ -52,6 +54,7 @@ export async function runRender(
   const { store, registry, project, organizationId } = context;
   const aspect = options.aspect ?? '16:9';
   const quality = options.quality ?? 'hd';
+  const kind = options.kind ?? 'film';
 
   const storyboard = await store.storyboards.get(organizationId, options.storyboardId);
   if (!storyboard) throw new AppError('not_found', 'Storyboard not found.');
@@ -71,7 +74,10 @@ export async function runRender(
     projectId: project.id,
     storyboardId: storyboard.id,
     organizationId,
-    version: (await store.renders.countForProject(organizationId, project.id)) + 1,
+    kind,
+    // Films are numbered; cuts and animatics ride the version of the film they
+    // come from, so "version 3" always means the customer's third film.
+    version: (await store.renders.countForProject(organizationId, project.id)) + (kind === 'film' ? 1 : 0),
     aspect,
     quality,
     fps: DEFAULT_FPS,
@@ -175,7 +181,18 @@ export async function runRender(
         })
       : null;
 
-    const passed = !issues.some((issue) => issue.severity === 'blocker');
+    /*
+     * Quality gates exist to stop us delivering a bad film. An animatic is not
+     * delivered — it is the customer looking at their own cut while they are
+     * still changing it — so it is never failed for the state of the thing they
+     * are in the middle of fixing. Held to the same bar, a preview of a
+     * storyboard with one unsupported claim in it renders perfectly and is then
+     * thrown away, and the customer presses a button that does nothing.
+     *
+     * The issues are returned either way, and the storyboard shows them.
+     */
+    const blocked = issues.some((issue) => issue.severity === 'blocker');
+    const passed = !blocked || kind === 'animatic';
     await store.renders.update(organizationId, render.id, {
       status: passed ? 'completed' : 'failed',
       masterAssetId: master.asset.id,
@@ -188,15 +205,18 @@ export async function runRender(
     await store.projects.update(
       organizationId,
       project.id,
-      options.isCut
-        ? // A cut that fails is one missing format, not a failed project: the
-          // film is still finished and the other cuts still arrive.
-          {}
-        : { latestRenderId: render.id, stage: passed ? 'film_ready' : 'failed' },
+      kind === 'film'
+        ? { latestRenderId: render.id, stage: passed ? 'film_ready' : 'failed' }
+        : // A cut that fails is one missing format, not a failed project: the
+          // film is still finished and the other cuts still arrive. An animatic
+          // that fails cost the customer nothing and changed nothing.
+          {},
     );
 
-    await context.progress(1, passed ? 'Done' : 'Finished with issues');
-    return { renderId: render.id, assetId: master.asset.id, qaPassed: passed, issues };
+    await context.progress(1, blocked ? 'Finished with issues' : 'Done');
+    // The honest QA result, not the delivery decision above: an animatic that
+    // completes with blockers still has blockers, and the caller is told so.
+    return { renderId: render.id, assetId: master.asset.id, qaPassed: !blocked, issues };
   } catch (error) {
     await store.renders.update(organizationId, render.id, {
       status: 'failed',

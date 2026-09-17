@@ -41,6 +41,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     storyboard,
     activeJob,
     latestRender,
+    animatic,
+    animaticJob,
     variants,
     poster,
     copyKit,
@@ -229,7 +231,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               </p>
             </div>
           </div>
-          <StoryboardPanel projectId={project.id} storyboard={storyboard} />
+          <StoryboardPanel
+            projectId={project.id}
+            storyboard={storyboard}
+            animaticAssetId={animatic?.masterAssetId ?? null}
+            animaticPosterAssetId={animatic?.posterAssetId ?? null}
+            animaticProgress={animaticJob ? animaticJob.progress : null}
+          />
         </section>
       ) : null}
     </>

@@ -387,3 +387,26 @@ export async function resolveCommentAction(
     return { error: reportError('resolveCommentAction', error).publicMessage };
   }
 }
+
+/**
+ * Renders the storyboard as a moving thing, before the film costs anything.
+ *
+ * Reading a list of scene durations and feeling a cut are different activities,
+ * and a revision is free at this stage and not at the next one.
+ */
+export async function previewTimingAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const project = await getProjectOr404(session, String(formData.get('projectId') ?? ''));
+    if (!project.activeStoryboardId) return { error: 'There is no storyboard to preview yet.' };
+
+    await enqueue(project, 'render_animatic', { storyboardId: project.activeStoryboardId }, 6);
+    revalidatePath(`/app/projects/${project.id}`);
+    return { error: null, message: 'Building a preview of the cut.' };
+  } catch (error) {
+    return { error: reportError('previewTimingAction', error).publicMessage };
+  }
+}

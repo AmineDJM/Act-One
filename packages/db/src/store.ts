@@ -238,6 +238,7 @@ export interface RenderRepo {
   get(organizationId: string, id: string): Promise<Render | null>;
   listForProject(organizationId: string, projectId: string): Promise<Render[]>;
   update(organizationId: string, id: string, patch: Partial<Render>): Promise<Render>;
+  /** Films only. Cuts and animatics are not what a plan's allowance counts. */
   countForProject(organizationId: string, projectId: string): Promise<number>;
   listActive(limit?: number): Promise<Render[]>;
 }

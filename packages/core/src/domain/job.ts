@@ -14,6 +14,7 @@ export const JobState = z.enum([
   'compositing',
   'sound',
   'qa',
+  'writing_copy',
   'completed',
   'failed',
   'canceled',
@@ -62,6 +63,22 @@ export const TERMINAL_JOB_STATES: readonly JobState[] = ['completed', 'failed', 
 
 export function jobIsTerminal(state: JobState): boolean {
   return TERMINAL_JOB_STATES.includes(state);
+}
+
+/**
+ * Work the customer is not waiting on.
+ *
+ * Most jobs move the project along, and while one is running there is nothing
+ * for the customer to do but watch. A side errand is different: it produces
+ * something extra beside the project without changing where the project is, so
+ * it must not take over the page. Previewing the timing of a storyboard should
+ * not put "Working on it" over the whole project and take away the button that
+ * renders the film — previewing and then rendering is the point of previewing.
+ */
+export const SIDE_ERRAND_JOBS: readonly JobKind[] = ['render_animatic', 'generate_copy'];
+
+export function jobAdvancesProject(kind: JobKind): boolean {
+  return !SIDE_ERRAND_JOBS.includes(kind);
 }
 
 /** Exponential backoff with jitter, capped. Keeps a bad provider from hammering us. */

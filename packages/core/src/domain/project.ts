@@ -25,6 +25,44 @@ export const ProjectStage = z.enum([
 ]);
 export type ProjectStage = z.infer<typeof ProjectStage>;
 
+/**
+ * The order the stages happen in, for the one question worth asking about two
+ * of them: has this project already gone past there?
+ *
+ * `failed` is deliberately last-but-outside: a failed project has not made
+ * progress, it has stopped, so comparing it against a stage is meaningless and
+ * every caller below treats it as "not past anything".
+ */
+const STAGE_ORDER: readonly ProjectStage[] = [
+  'created',
+  'researching',
+  'understanding_ready',
+  'concepting',
+  'concepts_ready',
+  'storyboarding',
+  'storyboard_ready',
+  'capturing_product',
+  'generating_assets',
+  'rendering',
+  'qa',
+  'film_ready',
+];
+
+/**
+ * True when the project has already reached `stage` or gone beyond it.
+ *
+ * Used to stop a re-run of an early step dragging a finished project backwards:
+ * re-reading a product to pick up newly authorised screens should refresh the
+ * understanding, not tell a customer with a finished film that we have just
+ * finished reading their website.
+ */
+export function stageReached(current: ProjectStage, stage: ProjectStage): boolean {
+  const at = STAGE_ORDER.indexOf(current);
+  const target = STAGE_ORDER.indexOf(stage);
+  if (at < 0 || target < 0) return false;
+  return at >= target;
+}
+
 /** What the customer is asked to do next, derived from stage. Never stored. */
 export const PrimaryCta = z.enum([
   'understand_product',
