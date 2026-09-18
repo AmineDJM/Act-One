@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { PRODUCT_NAME, STAGE_STATUS, failureStatus, primaryCtaFor, type Project } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
@@ -9,6 +10,7 @@ import { ProjectList, type ProjectCard } from './ProjectList.tsx';
 import styles from './app.module.css';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Projects · Act One' };
 
 /**
  * One project, one launch.

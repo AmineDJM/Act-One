@@ -21,6 +21,7 @@ import {
   type ProjectStage,
   type Entitlement,
   timelineFor,
+  customerFacingFailure,
 } from '@act-one/core';
 import { getStore } from './store.ts';
 import { loadProductAccess } from './credentials.ts';
@@ -322,7 +323,7 @@ export async function loadProjectView(session: Session, projectId: string) {
      * generic message exists so internal failure text does not leak; a failure
      * caused by what the customer typed is not internal.
      */
-    failure: jobs.find((job) => job.state === 'failed' && job.lastError)?.lastError ?? null,
+    failure: customerFacingFailure(jobs.find((job) => job.state === 'failed' && job.lastError)?.lastError),
     jobs,
     organization,
     plan,

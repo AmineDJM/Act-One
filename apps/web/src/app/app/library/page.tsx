@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { AssetSource, LibraryCategory } from '@act-one/core';
 import type { LibraryFilter } from '@act-one/db';
 import { requireSessionForPage } from '@/server/auth.ts';
@@ -10,6 +11,7 @@ import { LibraryUploader } from './LibraryUploader.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Library · Act One' };
 
 type Search = Record<string, string | string[] | undefined>;
 

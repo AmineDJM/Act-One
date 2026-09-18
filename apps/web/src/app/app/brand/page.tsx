@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PRODUCT_NAME, can } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
@@ -11,6 +12,7 @@ import { BrandVoicePanel } from './BrandVoicePanel.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Brand · Act One' };
 
 /**
  * Brand DNA, per project.

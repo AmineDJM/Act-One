@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import {
   CTA_LABELS,
@@ -31,6 +32,7 @@ import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Project · Act One' };
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

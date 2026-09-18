@@ -317,6 +317,16 @@ export interface QaReportRepo {
   getForRender(organizationId: string, renderId: string): Promise<QaReport | null>;
 }
 
+/** How the console asks for jobs. */
+export type JobQuery = {
+  state?: JobState;
+  kind?: JobKind;
+  organizationId?: string;
+  projectId?: string;
+  since?: string;
+  limit?: number;
+};
+
 export interface JobRepo {
   enqueue(job: Job): Promise<Job>;
   get(organizationId: string, id: string): Promise<Job | null>;
@@ -332,6 +342,10 @@ export interface JobRepo {
   /** Releases jobs whose worker died holding the lock. */
   reapStale(olderThanMs: number): Promise<number>;
   countByState(): Promise<Record<string, number>>;
+  /** The platform's recent jobs, newest first, for the console. */
+  listRecent(query?: JobQuery): Promise<Job[]>;
+  /** One job by id across the platform, for the console. */
+  getAny(id: string): Promise<Job | null>;
   /**
    * What a job of this kind usually takes here: the median over recent
    * completed ones, across the platform. Null until there are at least two,

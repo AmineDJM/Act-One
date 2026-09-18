@@ -55,7 +55,7 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { AssetProjectLink, LibraryFilter, PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -1511,6 +1511,31 @@ export class PgStore implements Store {
         return Object.fromEntries(r.rows.map((row) => [row.state, num(row.count)]));
       }),
 
+    listRecent: async (query: JobQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const where: string[] = [];
+        const params: unknown[] = [];
+        const bind = (value: unknown) => `$${params.push(value)}`;
+        if (query.state) where.push(`state = ${bind(query.state)}`);
+        if (query.kind) where.push(`kind = ${bind(query.kind)}`);
+        if (query.organizationId) where.push(`organization_id = ${bind(query.organizationId)}`);
+        if (query.projectId) where.push(`project_id = ${bind(query.projectId)}`);
+        if (query.since) where.push(`created_at >= ${bind(query.since)}`);
+        const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
+        const r = await c.query(
+          `SELECT * FROM jobs ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+           ORDER BY created_at DESC LIMIT ${limit}`,
+          params,
+        );
+        return r.rows.map(toJob);
+      }),
+
+    getAny: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM jobs WHERE id = $1', [id]);
+        return r.rows[0] ? toJob(r.rows[0]) : null;
+      }),
+
     typicalDurationMs: async (kind: JobKind) =>
       this.asPlatform(async (c) => {
         const r = await c.query<{ median: number | null; samples: number }>(
@@ -1707,6 +1732,7 @@ export class PgStore implements Store {
         if (query.source) where.push(`source = ${bind(query.source)}`);
         if (query.organizationId) where.push(`organization_id = ${bind(query.organizationId)}`);
         if (query.projectId) where.push(`project_id = ${bind(query.projectId)}`);
+        if (query.jobId) where.push(`job_id = ${bind(query.jobId)}`);
         if (query.event) where.push(`event = ${bind(query.event)}`);
         if (query.since) where.push(`at >= ${bind(query.since)}`);
         if (query.search) {

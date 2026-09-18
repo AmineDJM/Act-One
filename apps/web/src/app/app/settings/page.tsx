@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { ROLE_PERMISSIONS, can } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
@@ -7,6 +8,7 @@ import { TeamPanel } from './TeamPanel.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Settings · Act One' };
 
 export default async function SettingsPage() {
   const session = await requireSessionForPage('/app/settings');

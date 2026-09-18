@@ -516,6 +516,7 @@
   /* --- skeletons ------------------------------------------------------------ */
 
   .skeleton {
+    display: block;
     background: linear-gradient(90deg, var(--surface-raised) 0%, var(--surface-hover) 50%, var(--surface-raised) 100%);
     background-size: 200% 100%;
     border-radius: var(--radius-sm);

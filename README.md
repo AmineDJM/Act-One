@@ -55,6 +55,18 @@ there, the screenshot as our own asset, the excerpt, the claims the brief
 took from it — and stays inspectable after the film exists, under **Research
 sources** on the project page.
 
+### The console is the expert surface
+
+Customers see nine human steps and statuses in capitals. Staff see the
+queue as it is, under **Console → Jobs**: every job across the platform
+with its kind, state, worker, attempts, timings and last error verbatim,
+narrowed by window, state, kind, workspace or project; and one job all
+the way down — the payload, every provider call made while it ran with
+model, cost, outcome and browser session id, the lines the customer was
+shown, and the operational log entries that name it. None of it reaches
+the product: provider names, models, session ids and raw errors live here
+and nowhere a customer looks.
+
 ### Brand DNA, per project
 
 A brand belongs to a project. It is measured from that project's own site —

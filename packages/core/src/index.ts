@@ -34,6 +34,7 @@ export * from './domain/progress.ts';
 export * from './domain/activity.ts';
 export * from './domain/voice.ts';
 export * from './domain/spoken.ts';
+export * from './domain/failure.ts';
 export * from './domain/speech-usage.ts';
 export * from './domain/collaboration.ts';
 export * from './domain/credentials.ts';

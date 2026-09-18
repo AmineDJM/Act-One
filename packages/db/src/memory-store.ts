@@ -56,7 +56,7 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { AssetProjectLink, LibraryFilter, PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -806,6 +806,16 @@ export class MemoryStore implements Store {
       }
       return counts;
     },
+    listRecent: async (query: JobQuery = {}) =>
+      [...this.tables.jobs.values()]
+        .filter((job) => !query.state || job.state === query.state)
+        .filter((job) => !query.kind || job.kind === query.kind)
+        .filter((job) => !query.organizationId || job.organizationId === query.organizationId)
+        .filter((job) => !query.projectId || job.projectId === query.projectId)
+        .filter((job) => !query.since || job.createdAt >= query.since)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, Math.min(Math.max(query.limit ?? 100, 1), 500)),
+    getAny: async (id: string) => this.tables.jobs.get(id) ?? null,
     typicalDurationMs: async (kind: JobKind) => {
       const durations = [...this.tables.jobs.values()]
         .filter((job) => job.kind === kind && job.state === 'completed' && job.startedAt)

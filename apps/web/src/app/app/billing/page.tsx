@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { creditsToUsd, planById } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
@@ -6,6 +7,7 @@ import { BillingActions } from './BillingActions.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Billing · Act One' };
 
 export default async function BillingPage() {
   const session = await requireSessionForPage('/app/billing');

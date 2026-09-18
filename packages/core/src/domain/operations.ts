@@ -48,6 +48,7 @@ export type LogQuery = {
   source?: LogSource;
   organizationId?: string;
   projectId?: string;
+  jobId?: string;
   event?: string;
   /** Substring match against message and event. */
   search?: string;
@@ -113,6 +114,7 @@ function redactValue(value: unknown): unknown {
  * differently in tests than in production is worse than no log view.
  */
 export function matchesLogQuery(event: OperationalEvent, query: LogQuery): boolean {
+  if (query.jobId && event.jobId !== query.jobId) return false;
   if (query.level && event.level !== query.level) return false;
   if (query.minLevel && !atLeastLevel(event.level, query.minLevel)) return false;
   if (query.source && event.source !== query.source) return false;
