@@ -173,12 +173,19 @@ The worker is separate because rendering takes minutes and holds gigabytes —
 work that must never run inside an HTTP request, where a proxy timeout kills it
 halfway and leaves the customer looking at a spinner.
 
-Two things the render host needs:
+Three things the worker host needs, all installed by the build:
 
-- **`chrome-headless-shell`.** Remotion drives Chrome's *old* headless mode,
-  which current Chrome binaries no longer ship; a full `chrome` fails to launch.
+- **Chromium**, for research. `npm run browsers` installs Playwright's build
+  under `PLAYWRIGHT_BROWSERS_PATH`; `ACT_ONE_CHROMIUM_PATH` overrides it.
+- **`chrome-headless-shell`**, for rendering. Remotion drives Chrome's *old*
+  headless mode, which current Chrome binaries no longer ship; a full `chrome`
+  fails to launch. The same script installs it; `ACT_ONE_CHROME_HEADLESS_SHELL`
+  overrides it.
 - **FFmpeg.** Bundled via `ffmpeg-static`, overridable with
   `ACT_ONE_FFMPEG_PATH`.
+
+The Postgres plan in `render.yaml` is `basic-1gb`: films live in object
+storage, so the database grows with customers, not with render volume.
 
 ### Rotating the vault key
 

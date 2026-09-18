@@ -12,7 +12,10 @@
 databases:
   - name: act-one-db
     databaseName: act_one
-    plan: standard
+    # Films live in object storage, not here: the database holds briefs,
+    # storyboards, jobs and the ledger. Grow the plan with the customer count,
+    # not with the render volume.
+    plan: basic-1gb
     postgresMajorVersion: '16'
 
 services:
@@ -24,7 +27,9 @@ services:
     runtime: node
     plan: standard
     region: frankfurt
-    buildCommand: npm ci && npm run build
+    # --include=dev: NODE_ENV=production is set for the build as well, and a
+    # production install skips the TypeScript and bundler the build itself needs.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start --workspace @act-one/web
     healthCheckPath: /
     autoDeploy: true
@@ -65,7 +70,10 @@ services:
     # which costs more than the larger instance would have.
     plan: pro
     region: frankfurt
-    buildCommand: npm ci
+    # Both browsers are installed at build time — Playwright's Chromium for
+    # research and Remotion's chrome-headless-shell for rendering — so the
+    # first job does not begin with a download.
+    buildCommand: npm ci --include=dev && npm run browsers
     startCommand: npm run worker
     autoDeploy: true
     envVars:
@@ -85,12 +93,10 @@ services:
       # and risks the OOM killer taking the whole worker rather than one job.
       - key: ACT_ONE_WORKER_CONCURRENCY
         value: '2'
-      # Remotion drives Chrome's old headless mode, which current Chrome
-      # binaries no longer ship. Point this at chrome-headless-shell.
-      - key: ACT_ONE_CHROME_HEADLESS_SHELL
-        sync: false
-      # Browsers for research. Set to local-chromium only for self-hosted
-      # deployments — authenticated customer products should run on isolated
-      # managed browsers, where the container is destroyed with the session.
+      # Where `npm run browsers` puts Playwright's Chromium. Under the project
+      # directory so the build's download is there at run time. Public research
+      # runs on it; authenticated customer products run on Browserbase, where
+      # the container is destroyed with the session — configured in the
+      # Super Admin console, not here.
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: /opt/render/project/.cache/ms-playwright
