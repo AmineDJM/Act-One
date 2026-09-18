@@ -110,7 +110,8 @@ export default function StandardsPage() {
           <p className="secondary" style={{ marginTop: 'var(--space-2)' }}>
             {all.length} rules the engines measure against. {counts.checked} are checked on every
             render, {counts.designed_in} cannot be broken by the engines, and {counts.documented}{' '}
-            are written down so the system has one answer, not yet mechanised.
+            {counts.documented === 1 ? 'is' : 'are'} written down so the system has one answer, not
+            yet mechanised.
           </p>
         </div>
       </div>
