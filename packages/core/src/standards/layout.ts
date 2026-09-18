@@ -73,7 +73,10 @@ export const LAYOUT_STANDARDS = {
     rule: 'A subject that is not centred sits near a third, not near the middle.',
     source: 'Photographic and cinematographic convention',
     authority: 'convention',
-    enforcement: 'documented',
+    // Designed in by the layout engine, which has no continuous position to
+    // land near the middle by accident: every placement is an anchor — a
+    // margin, the centre, or the lower third.
+    enforcement: 'designed_in',
     because:
       'The failure mode is the accidental near-centre: close enough to look like a miss ' +
       'rather than a choice.',

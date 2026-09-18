@@ -15,10 +15,17 @@ export const CONVERSION_STANDARDS = {
     rule: 'A film carries one idea. Everything in it serves that idea.',
     source: 'Ogilvy, Confessions of an Advertising Man; standard positioning practice',
     authority: 'convention',
+    // Not checkable by arithmetic: whether every scene serves one idea is a
+    // judgement about meaning, not a measurement. It is enforced where
+    // judgement happens — the treatment is written around a single idea and
+    // the customer approves exactly one concept — and it stays documented so
+    // the console does not claim a check that does not exist.
     enforcement: 'documented',
     because:
       'A viewer retains one thing. A film that says four things is a film that says nothing, ' +
-      'and listing features is the default an automated system falls into.',
+      'and listing features is the default an automated system falls into. This is the one rule ' +
+      'here no check can decide: it is held by the treatment, which argues one idea, and by the ' +
+      'customer, who approves one concept.',
   },
   hook: {
     id: 'conversion.hook',
@@ -55,7 +62,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'Evidence goes after the claim it supports, not at the end in a block.',
     source: 'Standard narrative and direct-response practice',
     authority: 'convention',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because:
       'A claim carries doubt until it is answered. Collecting all proof into a logo wall ' +
       'at the end answers doubts the viewer stopped holding two scenes ago.',
@@ -75,7 +82,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'No invented scarcity, countdowns or deadlines.',
     source: 'Advertising standards practice (ASA/CAP Code; FTC)',
     authority: 'guidance',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because:
       'Fabricated urgency is a regulated deceptive practice, and it is the first thing an ' +
       'automated copywriter reaches for.',
@@ -134,3 +141,41 @@ export function opensOnSubject(
   }
   return true;
 }
+
+/**
+ * The vocabulary of invented urgency.
+ *
+ * Matched against on-screen copy and narration. A real deadline a customer
+ * supplies as a claim is not caught by this — it has evidence behind it; this
+ * catches the reflex an automated copywriter reaches for when it has none.
+ */
+export const FAKE_URGENCY_PATTERNS: readonly RegExp[] = [
+  /\b(?:only|just)\s+today\b/i,
+  /\btoday\s+only\b/i,
+  /\bhurry\b/i,
+  /\blimited[\s-]+(?:time|offer|spots?|seats?|places?)\b/i,
+  /\bends?\s+(?:soon|tonight|today|friday|this\s+week)\b/i,
+  /\blast\s+chance\b/i,
+  /\bdon'?t\s+miss\s+out\b/i,
+  /\bbefore\s+it'?s\s+(?:gone|too\s+late)\b/i,
+  /\boffer\s+expires\b/i,
+  /\bact\s+now\b/i,
+  /\bwhile\s+(?:supplies|stocks?|spots?)\s+last\b/i,
+  /\b(?:only\s+)?\d+\s+(?:spots?|seats?|licen[cs]es?|places?)\s+(?:left|remaining)\b/i,
+  /\bcountdown\b/i,
+  /\bselling\s+(?:out\s+)?fast\b/i,
+];
+
+export function urgencyPhrasesIn(text: string): string[] {
+  return FAKE_URGENCY_PATTERNS.flatMap((pattern) => {
+    const match = pattern.exec(text);
+    return match ? [match[0]] : [];
+  });
+}
+
+/**
+ * Where a block of proof at the end of a film begins, as a fraction of its
+ * runtime. Proof is meant to follow the claim it supports; two or more proof
+ * scenes in a row this late are a logo wall by another name.
+ */
+export const PROOF_BLOCK_START = 0.7;

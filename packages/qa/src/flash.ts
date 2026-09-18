@@ -4,6 +4,12 @@ import {
   cite,
   newId,
   type QaIssue,
+  COLOR_STANDARDS,
+  MIN_REDNESS_CHANGE,
+  RED_FLOOR,
+  STUDIO_BLACK_8BIT,
+  STUDIO_RANGE_TOLERANCE,
+  STUDIO_WHITE_8BIT,
 } from '@act-one/core';
 
 /**
@@ -144,6 +150,164 @@ export function flashIssues(luminance: readonly number[], fps: number): QaIssue[
     confidence: 1,
     repair: 'manual_review' as const,
   }));
+}
+
+/**
+ * Everything the frame-statistics pass reads per frame.
+ *
+ * `signalstats` reports luma and chroma statistics per frame; `metadata=print`
+ * writes them as `lavfi.signalstats.KEY=value` lines. One pass over the film
+ * feeds three checks: luminance flashes, red flashes and the studio range.
+ */
+export type FrameStats = {
+  yavg: number[];
+  ymin: number[];
+  ymax: number[];
+  /** Mean Cr per frame, 0..255. Red content pushes it above 128. */
+  vavg: number[];
+};
+
+export function parseFrameStats(output: string): FrameStats {
+  const stats: FrameStats = { yavg: [], ymin: [], ymax: [], vavg: [] };
+  const keys: [RegExp, keyof FrameStats][] = [
+    [/signalstats\.YAVG=([\d.]+)/, 'yavg'],
+    [/signalstats\.YMIN=([\d.]+)/, 'ymin'],
+    [/signalstats\.YMAX=([\d.]+)/, 'ymax'],
+    [/signalstats\.VAVG=([\d.]+)/, 'vavg'],
+  ];
+  for (const line of output.split('\n')) {
+    for (const [pattern, key] of keys) {
+      const match = pattern.exec(line);
+      if (!match) continue;
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) stats[key].push(value);
+    }
+  }
+  return stats;
+}
+
+/** Mean Cr as redness: 0 neutral, 1 fully red, negative towards cyan. */
+export function redness(vavg: number, fullRange = false): number {
+  const centre = 128;
+  const span = fullRange ? 127 : 112;
+  return Math.max(-1, Math.min(1, (vavg - centre) / span));
+}
+
+/**
+ * Counts saturated-red flashes, paired the way luminance flashes are.
+ *
+ * WCAG's general threshold has a companion for red: a transition to or from
+ * a saturated red counts even when the luminance barely moves, because red
+ * provokes the visual cortex more than an equal-luminance change of another
+ * colour. The chroma of a whole frame is a coarse proxy for "saturated red
+ * covering enough of the picture" — coarse in the safe direction, because a
+ * small red element cannot move a frame's mean Cr by a fifth of its range.
+ */
+export function findRedFlashes(
+  rednessSeries: readonly number[],
+  fps: number,
+  limit = MAX_FLASHES_PER_SECOND,
+): FlashEvent[] {
+  if (rednessSeries.length < 2 || fps <= 0) return [];
+  const flashes: number[] = [];
+  let anchorIndex = 0;
+  let pendingDirection = 0;
+
+  for (let i = 1; i < rednessSeries.length; i += 1) {
+    const from = rednessSeries[anchorIndex]!;
+    const to = rednessSeries[i]!;
+    const change = to - from;
+    if (Math.abs(change) < MIN_REDNESS_CHANGE) continue;
+    // One side of the transition has to actually be red.
+    if (Math.max(from, to) < RED_FLOOR) {
+      anchorIndex = i;
+      continue;
+    }
+    const direction = change > 0 ? 1 : -1;
+    anchorIndex = i;
+    if (pendingDirection === 0) {
+      pendingDirection = direction;
+    } else if (direction !== pendingDirection) {
+      flashes.push(i);
+      pendingDirection = 0;
+    } else {
+      pendingDirection = direction;
+    }
+  }
+
+  const window = Math.max(1, Math.round(fps));
+  const events: FlashEvent[] = [];
+  let reportedUntil = -1;
+  for (let start = 0; start < flashes.length; start += 1) {
+    const from = flashes[start]!;
+    let count = 0;
+    for (let i = start; i < flashes.length && flashes[i]! < from + window; i += 1) count += 1;
+    if (count > limit && from > reportedUntil) {
+      events.push({ atSeconds: from / fps, count });
+      reportedUntil = from + window;
+    }
+  }
+  return events;
+}
+
+export function redFlashIssues(rednessSeries: readonly number[], fps: number): QaIssue[] {
+  return findRedFlashes(rednessSeries, fps).map((event) => ({
+    id: newId('evt'),
+    sceneId: null,
+    atSeconds: Number(event.atSeconds.toFixed(2)),
+    detectedBy: 'deterministic' as const,
+    evidenceAssetId: null,
+    check: 'flicker' as const,
+    severity: 'blocker' as const,
+    message:
+      `${event.count} saturated-red flashes in one second at ${event.atSeconds.toFixed(1)}s ` +
+      `(${cite(MOTION_STANDARDS.redFlash)}). Red transitions are more provocative than ` +
+      'luminance flashes of the same rate, and this is never shipped.',
+    confidence: 0.9,
+    repair: 'manual_review' as const,
+  }));
+}
+
+/**
+ * Frames outside the studio range, on a limited-range file.
+ *
+ * Luma below 16 or above 235 is clipped by whatever plays the film outside a
+ * browser, and where it clips is not ours to choose. A full-range file is a
+ * different failure and is caught by the container check.
+ */
+export function rangeIssues(stats: Pick<FrameStats, 'ymin' | 'ymax'>, fullRange: boolean, fps: number): QaIssue[] {
+  if (fullRange) return [];
+  const low = STUDIO_BLACK_8BIT - STUDIO_RANGE_TOLERANCE;
+  const high = STUDIO_WHITE_8BIT + STUDIO_RANGE_TOLERANCE;
+  let firstBad = -1;
+  let count = 0;
+  const frames = Math.max(stats.ymin.length, stats.ymax.length);
+  for (let i = 0; i < frames; i += 1) {
+    const min = stats.ymin[i] ?? STUDIO_BLACK_8BIT;
+    const max = stats.ymax[i] ?? STUDIO_WHITE_8BIT;
+    if (min < low || max > high) {
+      count += 1;
+      if (firstBad < 0) firstBad = i;
+    }
+  }
+  if (count === 0) return [];
+  return [
+    {
+      id: newId('evt'),
+      sceneId: null,
+      atSeconds: fps > 0 ? Number((firstBad / fps).toFixed(2)) : null,
+      detectedBy: 'deterministic' as const,
+      evidenceAssetId: null,
+      check: 'composition' as const,
+      severity: 'major' as const,
+      message:
+        `${count} frame${count === 1 ? '' : 's'} carry luma outside the studio range ` +
+        `(${STUDIO_BLACK_8BIT}–${STUDIO_WHITE_8BIT}), first at ${(firstBad / fps).toFixed(1)}s ` +
+        `(${cite(COLOR_STANDARDS.broadcastRange)}). They will clip on anything but a browser.`,
+      confidence: 0.95,
+      repair: 'manual_review' as const,
+    },
+  ];
 }
 
 /**

@@ -27,7 +27,7 @@ export const MOTION_STANDARDS = {
     source: 'WCAG 2.2 SC 2.3.1, and ITU-R BT.1702',
     clause: 'guidance on harmful flashing',
     authority: 'normative',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because: 'Saturated red transitions are more provocative than luminance flashes of the same rate.',
   },
   minimumShot: {
@@ -56,7 +56,10 @@ export const MOTION_STANDARDS = {
     rule: 'Successive shots of the same subject change angle by at least thirty degrees.',
     source: 'Classical continuity editing',
     authority: 'convention',
-    enforcement: 'documented',
+    // Checked on the storyboard, where "the same subject" is decidable: two
+    // consecutive scenes on one capture with the same treatment and the same
+    // camera move are the same framing twice.
+    enforcement: 'checked',
     because: 'A smaller change reads as a jump cut — the image twitches instead of moving on.',
   },
   axisOfAction: {
@@ -64,7 +67,7 @@ export const MOTION_STANDARDS = {
     rule: 'Screen direction is kept: elements do not cross the line between shots.',
     source: 'Classical continuity editing — the 180-degree rule',
     authority: 'convention',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because:
       'Reversing direction across a cut disorients the viewer even in abstract motion graphics, ' +
       'where there is no subject to be confused about.',
@@ -179,3 +182,14 @@ export function longestRun<T>(values: readonly T[]): number {
   }
   return best;
 }
+
+/**
+ * Red flash thresholds, on the chroma of a frame.
+ *
+ * Redness is the frame's mean Cr, centred: 0 is neutral, 1 is as red as a
+ * frame can be. A saturated-red transition is a change in redness at least
+ * this large, in which the redder frame is at least this red. Paired and
+ * counted exactly as luminance flashes are.
+ */
+export const MIN_REDNESS_CHANGE = 0.2;
+export const RED_FLOOR = 0.25;

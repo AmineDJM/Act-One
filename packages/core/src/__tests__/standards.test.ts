@@ -89,6 +89,27 @@ describe('the standards themselves', () => {
     expect(EDITORIAL_STANDARDS.attribution.enforcement).toBe('checked');
   });
 
+  it('leaves exactly one rule documented, and says why', () => {
+    // Twelve rules were once "documented": written on the console and
+    // enforced by nothing. Eleven are now checked or designed in. The one
+    // that remains is a judgement about meaning — a film carrying one idea —
+    // and its text says so, so nobody reads the label as a check that exists.
+    const all = ALL.flatMap((group) => Object.values(group));
+    const documented = all.filter((s) => s.enforcement === 'documented');
+    expect(documented.map((s) => s.id)).toEqual(['conversion.one_idea']);
+    expect(documented[0]!.because).toMatch(/no check can decide/);
+    for (const id of [
+      'motion.red_flash', 'motion.thirty_degree', 'motion.axis_of_action',
+      'color.distribution', 'color.broadcast_range',
+      'conversion.proof_placement', 'conversion.no_fake_urgency', 'audio.dialogue_lead',
+    ]) {
+      expect(all.find((s) => s.id === id)?.enforcement, id).toBe('checked');
+    }
+    for (const id of ['color.non_text_contrast', 'editorial.consent', 'layout.thirds']) {
+      expect(all.find((s) => s.id === id)?.enforcement, id).toBe('designed_in');
+    }
+  });
+
   it('never claims a published clause for a house rule', () => {
     // The distinction is the whole point: a rule we invented must not be
     // dressed up as one somebody standardised.

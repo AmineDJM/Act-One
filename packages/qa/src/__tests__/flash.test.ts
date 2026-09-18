@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { MAX_FLASHES_PER_SECOND } from '@act-one/core';
-import { findFlashes, flashIssues, isFullRange, parseYAvg, relativeLuminance } from '../index.ts';
+import {
+  findFlashes,
+  findRedFlashes,
+  flashIssues,
+  isFullRange,
+  parseFrameStats,
+  parseYAvg,
+  rangeIssues,
+  redness,
+  relativeLuminance,
+} from '../index.ts';
 
 /** A sequence that alternates between two luminances every `holdFrames`. */
 function alternating(dark: number, bright: number, holdFrames: number, frames: number): number[] {
@@ -123,5 +133,49 @@ describe('reading luminance from a frame', () => {
 
     // YMIN and YMAX must not be mistaken for the average.
     expect(parseYAvg(output)).toEqual([7.08889, 112.5]);
+  });
+});
+
+describe('red flash', () => {
+
+  it('reads chroma as redness, centred on neutral', () => {
+    expect(redness(128)).toBe(0);
+    expect(redness(240)).toBeCloseTo(1, 1);
+    expect(redness(16)).toBeCloseTo(-1, 1);
+  });
+
+  it('catches a saturated red strobing against neutral', () => {
+    // Red, neutral, red, neutral — every three frames at 30fps.
+    const series = alternating(0.05, 0.6, 3, 90);
+    expect(findRedFlashes(series, 30).length).toBeGreaterThan(0);
+  });
+
+  it('ignores the same alternation between two colours that are not red', () => {
+    // Cyan to neutral is a chroma change of the same size, and not red.
+    const series = alternating(-0.6, -0.05, 3, 90);
+    expect(findRedFlashes(series, 30)).toEqual([]);
+  });
+
+  it('parses every statistic the pass needs from one metadata file', () => {
+    const output = [
+      'frame:0    pts:0       pts_time:0',
+      'lavfi.signalstats.YMIN=16',
+      'lavfi.signalstats.YAVG=40.5',
+      'lavfi.signalstats.YMAX=235',
+      'lavfi.signalstats.VAVG=128',
+      'frame:1    pts:1       pts_time:0.033',
+      'lavfi.signalstats.YMIN=12',
+      'lavfi.signalstats.YAVG=200',
+      'lavfi.signalstats.YMAX=240',
+      'lavfi.signalstats.VAVG=201',
+    ].join('\n');
+    const stats = parseFrameStats(output);
+    expect(stats).toEqual({ yavg: [40.5, 200], ymin: [16, 12], ymax: [235, 240], vavg: [128, 201] });
+    // The second frame sits outside the studio range on both ends.
+    const issues = rangeIssues(stats, false, 30);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.message).toMatch(/1 frame carry luma outside the studio range/);
+    expect(rangeIssues({ ymin: [16, 15], ymax: [235, 236] }, false, 30)).toEqual([]);
+    expect(rangeIssues(stats, true, 30)).toEqual([]);
   });
 });

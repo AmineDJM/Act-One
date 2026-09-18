@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AppError,
+  AUDIO_STANDARDS,
   DEFAULT_FPS,
+  DIALOGUE_LEAD_MIN,
+  cite,
   dimensionsFor,
   displayHost,
   firstClause,
@@ -13,6 +16,7 @@ import {
   REAL_PRODUCT_VISUAL_TYPES,
   storyboardDuration,
   type AspectRatio,
+  type BrandSystem,
   type ProductUnderstanding,
   type QaIssue,
   type Render,
@@ -22,10 +26,13 @@ import {
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
+import { resolveTokens } from '@act-one/design';
 import {
+  bedReductionDb,
   buildMix,
   directSound,
   masterLoudness,
+  measureDialogueLead,
   mixArgs,
   muxArgs,
   posterArgs,
@@ -38,9 +45,14 @@ import {
   flashIssues,
   inspectFrame,
   isFullRange,
-  parseYAvg,
   planRepairs,
   relativeLuminance,
+  colourShares,
+  distributionIssues,
+  parseFrameStats,
+  rangeIssues,
+  redFlashIssues,
+  redness,
   runDeterministicChecks,
   selectFramesToInspect,
   verifyMaster,
@@ -190,6 +202,7 @@ export async function runRender(
        * blocker, because the picture is finished and withholding it helps
        * nobody — but it never ships unremarked.
        */
+      issues = [...issues, ...rendered.soundIssues];
       if (rendered.missingAudio.length > 0) {
         issues = [
           ...issues,
@@ -400,7 +413,7 @@ async function renderOnce(
     system: ReturnType<typeof getSystem>;
     understanding: ProductUnderstanding | null;
   },
-): Promise<{ path: string; missingAudio: string[] }> {
+): Promise<{ path: string; missingAudio: string[]; soundIssues: QaIssue[] }> {
   const { storyboard, brand, system } = params;
 
   await context.progress(0.15, params.attempt === 0 ? 'Rendering the film' : 'Re-rendering repaired scenes');
@@ -456,12 +469,52 @@ async function renderOnce(
   // render — but it is reported, and the caller turns it into a QA finding.
   const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
   const voiceTracks = await speakNarration(context, storyboard, params.workDir, params.attempt);
-  const plan = buildMix({
+
+  /*
+   * The voice has to lead the bed by the standard's four LU, measured, not
+   * assumed. The sidechain ducks the music under narration by a fixed ratio,
+   * which is the right tool and still a guess about how much: a loud bed
+   * ducks to not enough. So the bed and the voice are metered separately
+   * inside the voice windows, and if the lead is short the bed is taken down
+   * by the difference and mixed again — one correction, then a finding.
+   */
+  let plan = buildMix({
     design,
     resolvedPaths,
     durationSeconds: storyboardDuration(storyboard),
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
+  const soundIssues: QaIssue[] = [];
+  if (voiceTracks.length > 0 && design.music) {
+    let lead = await measureDialogueLead(plan, voiceTracks, { ...(context.signal ? { signal: context.signal } : {}) });
+    const reduction = lead ? bedReductionDb(lead) : 0;
+    if (lead && reduction > 0) {
+      plan = buildMix({
+        design: { ...design, music: { ...design.music, baseGainDb: design.music.baseGainDb - reduction } },
+        resolvedPaths,
+        durationSeconds: storyboardDuration(storyboard),
+        voiceTracks,
+      });
+      lead = await measureDialogueLead(plan, voiceTracks, { ...(context.signal ? { signal: context.signal } : {}) });
+    }
+    if (lead && lead.leadLu < DIALOGUE_LEAD_MIN) {
+      soundIssues.push({
+        id: newId('evt'),
+        sceneId: null,
+        atSeconds: voiceTracks[0]?.atSeconds ?? null,
+        detectedBy: 'deterministic',
+        evidenceAssetId: null,
+        check: 'audio_balance',
+        severity: 'major',
+        message:
+          `The voice sits ${lead.leadLu.toFixed(1)} LU above the music while speaking; ` +
+          `${DIALOGUE_LEAD_MIN} is the floor (${cite(AUDIO_STANDARDS.dialogueLead)}). ` +
+          'The bed was taken down once already and the words still do not carry.',
+        confidence: 0.9,
+        repair: 'manual_review',
+      });
+    }
+  }
 
   const premasterPath = path.join(params.workDir, `premix-${params.attempt}.wav`);
   const mixed = await runFfmpeg(mixArgs(plan, premasterPath), {
@@ -472,7 +525,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio };
+    return { path: silentPath, missingAudio, soundIssues };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -501,10 +554,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return await mux(context, silentPath, premasterPath, params, missingAudio);
+    return { ...(await mux(context, silentPath, premasterPath, params, missingAudio)), soundIssues };
   }
 
-  return await mux(context, silentPath, audioPath, params, missingAudio);
+  return { ...(await mux(context, silentPath, audioPath, params, missingAudio)), soundIssues };
 }
 
 /**
@@ -566,11 +619,56 @@ async function checkFlashRate(
     }
 
     const raw = await readFile(metadataPath, 'utf8').catch(() => '');
-    const luminance = parseYAvg(raw).map((value) => relativeLuminance(value, isFullRange(probe.stderr)));
-    return flashIssues(luminance, DEFAULT_FPS);
+    const fullRange = isFullRange(probe.stderr);
+    const stats = parseFrameStats(raw);
+    const luminance = stats.yavg.map((value) => relativeLuminance(value, fullRange));
+    // One pass, three rules: the general flash threshold, its red companion,
+    // and the studio range every frame has to stay inside.
+    return [
+      ...flashIssues(luminance, DEFAULT_FPS),
+      ...redFlashIssues(stats.vavg.map((value) => redness(value, fullRange)), DEFAULT_FPS),
+      ...rangeIssues(stats, fullRange, DEFAULT_FPS),
+    ];
   } finally {
     await rm(metadataPath, { force: true }).catch(() => undefined);
   }
+}
+
+/**
+ * The 60/30/10 rule, on the frames that are the film's own composition.
+ *
+ * Up to three typographic scenes, longest first, each read at its settled
+ * moment. Product scenes are skipped: their colours are the customer's.
+ */
+async function checkColourDistribution(
+  context: StageContext,
+  params: { storyboard: Storyboard; brand: BrandSystem; aspect: AspectRatio; masterPath: string; workDir: string },
+): Promise<QaIssue[]> {
+  const tokens = resolveTokens(params.brand, { aspect: params.aspect });
+  const candidates = params.storyboard.scenes
+    .filter((scene) => ['kinetic_typography', 'statistic', 'quote'].includes(scene.visualType))
+    .filter((scene) => scene.onScreenText.some((line) => line.trim().length > 0))
+    .sort((a, b) => b.duration - a.duration)
+    .slice(0, 3);
+
+  const issues: QaIssue[] = [];
+  for (const scene of candidates) {
+    const framePath = path.join(params.workDir, `palette-${scene.id}.jpg`);
+    const extracted = await runFfmpeg(
+      posterArgs(params.masterPath, scene.startTime + scene.duration * 0.6, framePath),
+      { signal: context.signal, timeoutMs: 60_000 },
+    );
+    if (!extracted.ok) continue;
+    try {
+      issues.push(...distributionIssues(await colourShares(framePath, tokens), scene));
+    } catch (error) {
+      // A frame that will not decode is the container check's problem, not this one's.
+      console.error('[render] palette measurement failed:', (error as Error).message);
+    } finally {
+      await rm(framePath, { force: true }).catch(() => undefined);
+    }
+  }
+  return issues;
 }
 
 /** Puts the picture and the mix together, falling back to the silent cut. */
@@ -609,6 +707,13 @@ async function inspect(
 
   const issues: QaIssue[] = [
     ...(await checkFlashRate(context, params.masterPath, params.workDir)),
+    ...(await checkColourDistribution(context, {
+      storyboard: params.storyboard,
+      brand: params.brand,
+      aspect: params.aspect,
+      masterPath: params.masterPath,
+      workDir: params.workDir,
+    })),
     ...runDeterministicChecks({
       storyboard: params.storyboard,
       brand: params.brand,

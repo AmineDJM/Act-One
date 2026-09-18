@@ -6,3 +6,4 @@ export * from './ffmpeg.ts';
 export * from './synthesis.ts';
 export * from './scores.ts';
 export * from './build-library.ts';
+export * from './dialogue-lead.ts';

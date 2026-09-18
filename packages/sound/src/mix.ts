@@ -35,6 +35,13 @@ export type MixPlan = {
   outputLabel: string;
   targetLufs: number;
   durationSeconds: number;
+  /**
+   * The graph up to the busses, and what the busses are called, so a
+   * measurement can listen to the music and the voice separately — the
+   * dialogue-lead check needs the bed under the words, not the mix of both.
+   */
+  busGraph: string;
+  busses: { music: string | null; voice: string | null; sfx: string | null };
 };
 
 export type BuildMixOptions = {
@@ -90,16 +97,23 @@ export function buildMix(options: BuildMixOptions): MixPlan {
     });
   }
 
+  const graph = buildFilterGraph(inputs, design, options.durationSeconds);
   return {
     inputs,
-    filterGraph: buildFilterGraph(inputs, design, options.durationSeconds),
+    filterGraph: graph.full,
     outputLabel: 'mixout',
     targetLufs: design.targetLufs,
     durationSeconds: options.durationSeconds,
+    busGraph: graph.busGraph,
+    busses: graph.busses,
   };
 }
 
-function buildFilterGraph(inputs: AudioInput[], design: SoundDesign, duration: number): string {
+function buildFilterGraph(
+  inputs: AudioInput[],
+  design: SoundDesign,
+  duration: number,
+): { full: string; busGraph: string; busses: MixPlan['busses'] } {
   const chains: string[] = [];
   const musicLabels: string[] = [];
   const voiceLabels: string[] = [];
@@ -144,11 +158,21 @@ function buildFilterGraph(inputs: AudioInput[], design: SoundDesign, duration: n
   const sfxBus = combine(parts, sfxLabels, 'sfxbus');
 
   let duckedMusic = musicBus;
+  let voiceToMix = voiceBus;
   if (musicBus && voiceBus) {
+    /*
+     * The voice feeds two filters — the compressor's key and the mix — and a
+     * filter output can be consumed once. This used to hand the same label
+     * to both, and FFmpeg refused the graph: every film with narration would
+     * have failed to mix. No film ever had narration, so nobody saw it until
+     * a test gave one a voice.
+     */
+    parts.push(`[${voiceBus}]asplit=2[voicekey][voicemix]`);
+    voiceToMix = 'voicemix';
     // A real sidechain, not a static envelope: static ducking pumps audibly
     // every time the narration pauses for breath.
     parts.push(
-      `[${musicBus}][${voiceBus}]sidechaincompress=` +
+      `[${musicBus}][voicekey]sidechaincompress=` +
         'threshold=0.055:ratio=7:attack=12:release=320:makeup=1[musicducked]',
     );
     duckedMusic = 'musicducked';
@@ -159,11 +183,14 @@ function buildFilterGraph(inputs: AudioInput[], design: SoundDesign, duration: n
     duckedMusic = 'musicducked';
   }
 
-  const busses = [duckedMusic, voiceBus, sfxBus].filter((label): label is string => Boolean(label));
+  const busGraph = parts.join(';');
+  const named = { music: duckedMusic, voice: voiceToMix, sfx: sfxBus };
+
+  const busses = [duckedMusic, voiceToMix, sfxBus].filter((label): label is string => Boolean(label));
   if (busses.length === 0) {
     // Silence still needs to be a real track, or the muxer drops the stream.
     parts.push(`anullsrc=r=48000:cl=stereo,atrim=duration=${fixed(duration)}[mixout]`);
-    return parts.join(';');
+    return { full: parts.join(';'), busGraph, busses: named };
   }
 
   const mixInputs = busses.map((label) => `[${label}]`).join('');
@@ -188,7 +215,7 @@ function buildFilterGraph(inputs: AudioInput[], design: SoundDesign, duration: n
       `afade=t=out:st=${fixed(Math.max(0, duration - 0.35))}:d=0.35[mixout]`,
   );
 
-  return parts.join(';');
+  return { full: parts.join(';'), busGraph, busses: named };
 }
 
 function combine(parts: string[], labels: string[], outLabel: string): string | null {

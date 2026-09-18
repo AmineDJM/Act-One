@@ -10,6 +10,7 @@ import {
   MIN_RHYTHM_VARIATION,
   MIN_SHOT_SECONDS,
   MOTION_STANDARDS,
+  PROOF_BLOCK_START,
   TYPE_STANDARDS,
   TITLE_SAFE_INSET,
   cite,
@@ -24,7 +25,9 @@ import {
   readingSecondsFor,
   rhythmVariation,
   sceneShowsSomething,
+  storyboardDuration,
   superlativesIn,
+  urgencyPhrasesIn,
   visualMix,
   weaselPhrasesIn,
   type BrandSystem,
@@ -193,6 +196,18 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
         message:
           `"${line}" ends mid-thought. On-screen copy is read once and nothing follows it ` +
           `on the frame (${cite(EDITORIAL_STANDARDS.plainLanguage)}).`,
+        confidence: 0.95,
+        repair: 'rewrite_copy',
+      });
+    }
+
+    for (const phrase of urgencyPhrasesIn(`${text} ${scene.narration}`)) {
+      add({
+        check: 'unsupported_claim',
+        severity: 'major',
+        message:
+          `"${phrase}" invents urgency (${cite(CONVERSION_STANDARDS.noFakeUrgency)}). ` +
+          'A deadline the company has not set is a deceptive practice, not a hook.',
         confidence: 0.95,
         repair: 'rewrite_copy',
       });
@@ -459,6 +474,79 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
       confidence: 0.9,
       repair: 'manual_review',
     });
+  }
+
+  /*
+   * Proof that arrives after the viewer stopped doubting.
+   *
+   * A statistic answers the claim before it. Two or more of them in a row in
+   * the last third of the film are a logo wall by another name: the doubts
+   * they answer were held two scenes earlier, and by now the viewer has moved
+   * on or left.
+   */
+  const total = storyboardDuration(storyboard);
+  for (let i = 0; i < scenes.length - 1; i += 1) {
+    const here = scenes[i]!;
+    const next = scenes[i + 1]!;
+    if (here.visualType !== 'statistic' || next.visualType !== 'statistic') continue;
+    if (total > 0 && here.startTime / total >= PROOF_BLOCK_START) {
+      add({
+        check: 'composition',
+        severity: 'minor',
+        message:
+          `Scenes ${here.index + 1} and ${next.index + 1} stack proof at the end of the film ` +
+          `(${cite(CONVERSION_STANDARDS.proofPlacement)}). Evidence belongs after the claim it supports.`,
+        confidence: 0.85,
+        repair: 'manual_review',
+      });
+      break;
+    }
+  }
+
+  /*
+   * Two shots of one capture.
+   *
+   * On the storyboard "the same subject" is decidable: consecutive scenes on
+   * the same asset. The thirty-degree rule says the second must change its
+   * angle — here, its treatment or its camera — or it reads as a jump cut. The
+   * axis-of-action rule says a lateral move must not reverse across the cut.
+   */
+  for (let i = 1; i < scenes.length; i += 1) {
+    const previous = scenes[i - 1]!;
+    const scene = scenes[i]!;
+    const shared = scene.assetRefs[0] && scene.assetRefs[0] === previous.assetRefs[0];
+    if (!shared) continue;
+
+    if (
+      scene.motionRecipe.name === previous.motionRecipe.name &&
+      scene.cameraRecipe.move === previous.cameraRecipe.move
+    ) {
+      add({
+        check: 'transition_quality',
+        severity: 'minor',
+        message:
+          `Scenes ${previous.index + 1} and ${scene.index + 1} show the same capture with the same ` +
+          `treatment and camera move (${cite(MOTION_STANDARDS.thirtyDegree)}). The cut between ` +
+          'them is a jump cut.',
+        confidence: 0.9,
+        repair: 'manual_review',
+      });
+    }
+
+    const before = previous.cameraRecipe.toX - previous.cameraRecipe.fromX;
+    const after = scene.cameraRecipe.toX - scene.cameraRecipe.fromX;
+    if (Math.abs(before) > 0.005 && Math.abs(after) > 0.005 && Math.sign(before) !== Math.sign(after)) {
+      add({
+        check: 'transition_quality',
+        severity: 'minor',
+        message:
+          `The camera drifts ${before > 0 ? 'right' : 'left'} across scene ${previous.index + 1} and ` +
+          `${after > 0 ? 'right' : 'left'} across scene ${scene.index + 1}, on the same capture ` +
+          `(${cite(MOTION_STANDARDS.axisOfAction)}). Screen direction reversed across the cut.`,
+        confidence: 0.9,
+        repair: 'manual_review',
+      });
+    }
   }
 
   /*

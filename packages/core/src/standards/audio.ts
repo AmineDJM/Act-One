@@ -56,7 +56,7 @@ export const AUDIO_STANDARDS = {
     rule: 'Voice sits 4 to 6 LU above the music bed while it is speaking.',
     source: 'Standard dubbing-stage practice',
     authority: 'convention',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because:
       'Below about 4 LU the words stop carrying over a bed; above about 6 the music stops ' +
       'doing anything. Automated mixes fail on the first side almost every time.',

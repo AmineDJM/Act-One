@@ -75,7 +75,11 @@ export const EDITORIAL_STANDARDS = {
     rule: 'No real person is depicted, voiced or imitated without their explicit consent.',
     source: 'Act One house rule; right-of-publicity law in most jurisdictions',
     authority: 'normative',
-    enforcement: 'documented',
+    // Designed in where it could be broken: every speech provider refuses to
+    // clone a voice without a consent grant that names the person and covers
+    // the project, and the render stage never asks for one — narration is a
+    // stock persona. Faces are never generated: product scenes are captures.
+    enforcement: 'designed_in',
     because:
       'Cloning a founder’s voice or face for a film they did not approve is both unlawful ' +
       'in most places and the single fastest way to destroy trust in an automated system.',

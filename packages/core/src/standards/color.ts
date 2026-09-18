@@ -35,7 +35,11 @@ export const COLOR_STANDARDS = {
     source: 'WCAG 2.2',
     clause: 'SC 1.4.11 (Non-text Contrast, AA)',
     authority: 'normative',
-    enforcement: 'documented',
+    // Designed in at token resolution: the accent that draws every meaningful
+    // mark — the metric highlight, the cursor's click, the bar in a chart — is
+    // corrected against the canvas to 3:1 before any scene sees it. Hairlines
+    // and surfaces are decoration and are allowed to be quiet.
+    enforcement: 'designed_in',
     because: 'A chart nobody can see is a decoration.',
   },
   accentRestraint: {
@@ -53,7 +57,7 @@ export const COLOR_STANDARDS = {
     rule: 'Roughly 60% canvas, 30% secondary, 10% accent across a frame.',
     source: 'Interior-design convention, adopted by graphic design',
     authority: 'convention',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because:
       'An accent stops working as an accent once it covers a third of the frame — ' +
       'it becomes the canvas, and whatever it was pointing at loses its emphasis.',
@@ -74,7 +78,7 @@ export const COLOR_STANDARDS = {
     source: 'ITU-R BT.709 / EBU R 103',
     clause: 'signal tolerance',
     authority: 'normative',
-    enforcement: 'documented',
+    enforcement: 'checked',
     because:
       'Values outside it are clipped somewhere in the chain, and the clipping is not ours to control. ' +
       'It matters the moment a film is played anywhere but a browser.',
@@ -147,3 +151,22 @@ export const STUDIO_WHITE_8BIT = 235;
  */
 export const MAX_ACCENT_AREA = 0.18;
 export const MAX_ACCENT_COLORS = 2;
+
+/**
+ * How much of a typographic frame the accent may cover before it stops
+ * being an accent. Measured from rendered frames, not from the storyboard:
+ * the storyboard says which colour a mark has, the frame says how much of it
+ * there is.
+ */
+export const MAX_ACCENT_SHARE = 0.2;
+
+/** How much of a typographic frame should still be canvas. */
+export const MIN_CANVAS_SHARE = 0.45;
+
+/**
+ * Tolerance, in 8-bit code values, around the studio range.
+ *
+ * Chroma subsampling and the encoder's rounding put a frame's darkest luma at
+ * 15 or 17 as readily as at 16; a check with no tolerance fails every black.
+ */
+export const STUDIO_RANGE_TOLERANCE = 1;

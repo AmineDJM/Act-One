@@ -22,6 +22,7 @@ export const QaCheck = z.enum([
   'asset_resolution',
   'audio_loudness',
   'audio_clipping',
+  'audio_balance',
   'missing_audio',
   'fake_product_ui',
   'legible_generated_text',
