@@ -71,7 +71,7 @@ export function canStartProject(params: {
     const limit = params.plan.limits.projectsPerMonth;
     return {
       allowed: false,
-      reason: `${params.plan.name} includes ${limit} project${limit === 1 ? '' : 's'} a month.`,
+      reason: `${params.plan.name} includes ${plural(limit, 'project')} a month.`,
       remedy: 'upgrade',
     };
   }
@@ -99,27 +99,32 @@ export function canRender(params: {
   }
 
   const clean = hasEntitlement(params.plan, 'render.clean');
-  if (!clean) {
-    return hasEntitlement(params.plan, 'render.watermarked')
-      ? {
-          allowed: true,
-          watermarked: true,
-          reason: `${params.plan.name} renders a watermarked preview.`,
-          remedy: 'upgrade',
-        }
-      : {
-          allowed: false,
-          watermarked: false,
-          reason: `${params.plan.name} cannot render.`,
-          remedy: 'upgrade',
-        };
-  }
+  const watermarked = !clean;
 
-  if (!withinLimit(params.plan.limits.rendersPerProject, params.rendersForProject)) {
+  if (!clean && !hasEntitlement(params.plan, 'render.watermarked')) {
     return {
       allowed: false,
       watermarked: false,
-      reason: `${params.plan.name} includes ${params.plan.limits.rendersPerProject} renders per project.`,
+      reason: `${params.plan.name} cannot render.`,
+      remedy: 'upgrade',
+    };
+  }
+
+  /*
+   * The limits below apply to every plan.
+   *
+   * This used to return early for any plan without `render.clean`, so a free
+   * customer was checked for neither. The pricing page advertised two renders
+   * a month and a thirty-second ceiling, and a free account rendered a
+   * forty-eight second film — whether the output carries a watermark is a
+   * different question from whether the render is allowed at all, and
+   * conflating them meant the cheapest plan was the only one with no limits.
+   */
+  if (!withinLimit(params.plan.limits.rendersPerProject, params.rendersForProject)) {
+    return {
+      allowed: false,
+      watermarked,
+      reason: `${params.plan.name} includes ${plural(params.plan.limits.rendersPerProject, 'render')} per project.`,
       remedy: 'upgrade',
     };
   }
@@ -129,13 +134,19 @@ export function canRender(params: {
   if (params.durationSeconds > params.plan.limits.maxMasterDurationSeconds) {
     return {
       allowed: false,
-      watermarked: false,
+      watermarked,
       reason: `${params.plan.name} renders up to ${params.plan.limits.maxMasterDurationSeconds}s; this film is ${Math.round(params.durationSeconds)}s.`,
       remedy: 'upgrade',
     };
   }
 
-  return { ...ALLOWED, watermarked: false };
+  return {
+    ...ALLOWED,
+    watermarked,
+    ...(watermarked
+      ? { reason: `${params.plan.name} renders a watermarked preview.`, remedy: 'upgrade' as const }
+      : {}),
+  };
 }
 
 export function canSpendCredits(params: {
@@ -154,7 +165,7 @@ export function canAddSeat(params: { plan: Plan; currentSeats: number }): Access
   if (withinLimit(params.plan.limits.maxSeats, params.currentSeats)) return ALLOWED;
   return {
     allowed: false,
-    reason: `${params.plan.name} includes ${params.plan.limits.maxSeats} seats.`,
+    reason: `${params.plan.name} includes ${plural(params.plan.limits.maxSeats, 'seat')}.`,
     remedy: 'upgrade',
   };
 }
@@ -167,4 +178,15 @@ export function generativeAllowanceSeconds(plan: Plan): number {
 
 export function missingEntitlements(plan: Plan, required: Entitlement[]): Entitlement[] {
   return required.filter((entitlement) => !hasEntitlement(plan, entitlement));
+}
+
+/**
+ * A count with its noun, pluralised.
+ *
+ * These strings are shown to a customer at the moment they are being told no,
+ * which is the worst possible moment to look careless — "Free includes 1
+ * renders per project" was on screen next to a disabled button.
+ */
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }

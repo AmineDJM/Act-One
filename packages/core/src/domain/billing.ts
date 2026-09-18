@@ -84,7 +84,14 @@ export const DEFAULT_PLANS: Plan[] = [
     ],
     limits: {
       projectsPerMonth: 2,
-      rendersPerProject: 0,
+      /*
+       * One watermarked render, which is what the pricing page sells and what
+       * the free tier is for: seeing your own film. This said 0 — a number
+       * that never mattered because `canRender` returned before reading it for
+       * any plan without a clean render, so free had no limits at all rather
+       * than none it could use.
+       */
+      rendersPerProject: 1,
       maxMasterDurationSeconds: 30,
       maxSeats: 1,
       maxBrands: 1,

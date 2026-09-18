@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { PrimaryCta } from '@act-one/core';
 import {
@@ -9,6 +10,7 @@ import {
   startRenderAction,
   type FormState,
 } from '../../actions.ts';
+import { site } from '@/lib/site.ts';
 import styles from '../../app.module.css';
 
 /**
@@ -27,6 +29,8 @@ export function ProjectCta(props: {
   progress: number | null;
   status: string | null;
   disabled: boolean;
+  /** What to do about it when the action is blocked by the plan. */
+  remedy?: 'none' | 'upgrade' | 'wait' | 'billing' | 'contact';
 }) {
   const router = useRouter();
   const working = props.cta === 'watch_progress';
@@ -93,7 +97,23 @@ export function ProjectCta(props: {
         ) : null}
       </div>
 
-      {action ? (
+      {/*
+        * A blocked action offers the way out rather than a dead button.
+        *
+        * Hitting a plan ceiling used to leave a greyed-out control beside a
+        * sentence explaining why, and nothing to press — which is the one
+        * moment a customer has decided they want the thing badly enough to
+        * pay for it.
+        */}
+      {action && props.disabled && props.remedy === 'upgrade' ? (
+        <Link href="/app/billing" className="btn btn--lg">
+          See plans
+        </Link>
+      ) : action && props.disabled && props.remedy === 'contact' ? (
+        <a href={`mailto:${site.supportEmail}`} className="btn btn--lg btn--secondary">
+          Talk to us
+        </a>
+      ) : action ? (
         <form action={action}>
           <input type="hidden" name="projectId" value={props.projectId} />
           <button className="btn btn--lg" type="submit" disabled={pending || props.disabled}>

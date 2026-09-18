@@ -271,7 +271,15 @@ export async function renderPermission(session: Session, project: Project) {
     durationSeconds: storyboard ? storyboardDuration(storyboard) : 0,
   });
 
-  return { allowed: decision.allowed, watermarked: decision.watermarked, reason: decision.reason, plan };
+  return {
+    allowed: decision.allowed,
+    watermarked: decision.watermarked,
+    reason: decision.reason,
+    // Carried through, because a blocked action needs somewhere to go: a
+    // disabled button beside a sentence explaining why is a dead end.
+    remedy: decision.remedy,
+    plan,
+  };
 }
 
 function hostLabel(url: string): string {

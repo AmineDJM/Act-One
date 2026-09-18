@@ -1,4 +1,5 @@
 import { AppError, storyboardEstimatedCost } from '@act-one/core';
+import { planFor } from '../entitlements.ts';
 import { CreativeDirector, StoryboardEngine } from '@act-one/creative';
 import { runDeterministicChecks } from '@act-one/qa';
 import type { StageContext } from '../context.ts';
@@ -50,6 +51,23 @@ export async function runStoryboard(
   await context.progress(0.4, 'Building the storyboard');
 
   const version = await store.storyboards.nextVersion(organizationId, project.id);
+
+  /*
+   * Plan a film the customer can actually render.
+   *
+   * The concept estimates a runtime and the plan caps one, and nothing
+   * reconciled them: a free account whose plan renders thirty seconds got a
+   * storyboard of forty-eight, approved it, pressed render, and was told its
+   * plan renders up to thirty. The ceiling belongs at planning time, where it
+   * costs nothing, rather than at the one moment the customer has decided they
+   * want the film.
+   */
+  const plan = await planFor(store, organizationId);
+  const ceiling = plan.limits.maxMasterDurationSeconds;
+  const wanted =
+    project.brief.durationSeconds ?? concept.estimatedDurationSeconds ?? ceiling;
+  const target = Math.min(wanted, ceiling);
+
   const engine = new StoryboardEngine(registry.llm());
   const built = await engine.build(
     {
@@ -60,6 +78,7 @@ export async function runStoryboard(
       brand,
       brief: project.brief,
       version,
+      targetDurationSeconds: target,
     },
     call,
   );

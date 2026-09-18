@@ -86,6 +86,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         progress={activeJob ? activeJob.progress : null}
         status={activeJob?.statusMessage ?? null}
         disabled={!permission.allowed && cta === 'render_film'}
+        remedy={permission.remedy}
       />
 
       {/* The film comes first once it exists: it is what everything else was for. */}

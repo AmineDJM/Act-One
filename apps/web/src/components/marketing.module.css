@@ -22,6 +22,11 @@
   gap: var(--space-3);
   font-weight: 600;
   letter-spacing: -0.02em;
+  /* A wordmark that breaks across two lines is not a wordmark. On a 390px
+     phone the nav squeezed this into "Act" over "One"; the brand holds its
+     line and the row's other items give up the space instead. */
+  white-space: nowrap;
+  flex: none;
 }
 .mark {
   width: 22px;

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_PLANS,
+  canRender,
   effectivePlan,
   hasEntitlement,
   masterQualityFor,
@@ -66,5 +67,63 @@ describe('plan promises', () => {
     expect(
       effectivePlan({ plans: DEFAULT_PLANS, organization: org('launch'), subscription: null }).id,
     ).toBe('launch');
+  });
+});
+
+describe('limits apply to every plan', () => {
+  const org = () => ({ isSuspended: false, creditBalance: 0, planId: 'free' });
+
+  it('holds the free tier to the runtime its pricing page advertises', () => {
+    /*
+     * `canRender` used to return early for any plan without a clean render, so
+     * neither limit below was ever read for a free customer. The pricing page
+     * said thirty seconds and a free account rendered forty-eight.
+     */
+    const free = planById(DEFAULT_PLANS, 'free');
+    const long = canRender({
+      plan: free,
+      organization: org(),
+      rendersForProject: 0,
+      durationSeconds: free.limits.maxMasterDurationSeconds + 1,
+    });
+
+    expect(long.allowed).toBe(false);
+    expect(long.reason).toMatch(/renders up to/);
+  });
+
+  it('holds the free tier to its render count', () => {
+    const free = planById(DEFAULT_PLANS, 'free');
+    const again = canRender({
+      plan: free,
+      organization: org(),
+      rendersForProject: free.limits.rendersPerProject,
+      durationSeconds: 10,
+    });
+
+    expect(again.allowed).toBe(false);
+    expect(again.reason).toMatch(/per project/);
+    // Said to a customer at the moment they are told no, so it reads properly:
+    // "1 renders" next to a disabled button looks careless.
+    expect(again.reason).toBe('Free includes 1 render per project.');
+  });
+
+  it('still lets a free customer see one film of their own', () => {
+    // The free tier's whole job. A paywall here is a paywall in front of the
+    // only thing that converts.
+    const free = planById(DEFAULT_PLANS, 'free');
+    expect(free.limits.rendersPerProject).toBeGreaterThan(0);
+    const first = canRender({ plan: free, organization: org(), rendersForProject: 0, durationSeconds: 25 });
+    expect(first.allowed).toBe(true);
+    expect(first.watermarked).toBe(true);
+  });
+
+  it('sells no plan a limit of zero for something it lists as a feature', () => {
+    for (const plan of DEFAULT_PLANS) {
+      const canRenderAtAll =
+        hasEntitlement(plan, 'render.clean') || hasEntitlement(plan, 'render.watermarked');
+      if (!canRenderAtAll) continue;
+      expect(plan.limits.rendersPerProject, `${plan.id} renders`).not.toBe(0);
+      expect(plan.limits.maxMasterDurationSeconds, `${plan.id} runtime`).toBeGreaterThan(0);
+    }
   });
 });
