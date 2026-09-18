@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CREDIT_USD_VALUE, planById } from '@act-one/core';
 import { Nav } from '@/components/Nav.tsx';
+import { getSignUpPolicy } from '@/server/product.ts';
 import { Footer } from '@/components/Footer.tsx';
 import { getPlatformConfig } from '@/server/platform.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
@@ -63,7 +64,7 @@ export default async function PricingPage() {
 
   return (
     <>
-      <Nav />
+      <Nav policy={await getSignUpPolicy()} />
       <main id="main">
         <section className={`shell ${styles.section}`} style={{ paddingTop: 'var(--space-8)' }}>
           <div className={styles.sectionHead}>

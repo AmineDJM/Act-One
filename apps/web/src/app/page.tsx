@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { DEFAULT_PLANS, PRODUCT_NAME } from '@act-one/core';
+import { DEFAULT_PLANS, PRODUCT_NAME, signUpPolicy } from '@act-one/core';
+import { getProductConfig } from '@/server/product.ts';
 import { CREATIVE_SYSTEMS } from '@act-one/creative';
 import { Nav } from '@/components/Nav.tsx';
 import { Footer } from '@/components/Footer.tsx';
@@ -81,24 +82,32 @@ const SYSTEM_FRAMES: Record<string, { poster: string; company: string }> = {
   editorial_tech: { poster: '/work/halyard.png', company: 'Halyard' },
 };
 
-export default function HomePage() {
+/*
+ * Rendered on request and kept for a minute: the phase and the landing copy
+ * are read from the console, and a change there should reach the public
+ * page without a deploy — but not cost a database read per visitor.
+ */
+export const revalidate = 60;
+
+export default async function HomePage() {
   const launch = DEFAULT_PLANS.find((plan) => plan.id === 'launch');
+  const config = await getProductConfig();
+  const policy = signUpPolicy(config);
 
   return (
     <>
-      <Nav />
+      <Nav policy={policy} />
       <main id="main">
         <section className={styles.hero}>
           <div className={`shell ${styles.heroInner}`}>
             <div className={styles.heroCopy}>
-              <p className="eyebrow">Launch films for software companies</p>
-              <h1 className={styles.heroTitle}>{site.tagline}</h1>
+              <p className="eyebrow">{config.landing.eyebrow}</p>
+              <h1 className={styles.heroTitle}>{config.landing.headline || site.tagline}</h1>
               <p className={`lede ${styles.heroLede}`}>
-                Give us your product. We understand what it does, learn how your brand looks, develop
-                three creative directions, and produce the launch film — with the restraint of a studio
-                that has made a hundred of them.
+                {config.landing.subheadline ||
+                  'Give us your product. We understand what it does, learn how your brand looks, develop three creative directions, and produce the launch film — with the restraint of a studio that has made a hundred of them.'}
               </p>
-              <StartProject />
+              <StartProject cta={config.landing.ctaLabel} policy={policy} />
             </div>
 
             {/*
@@ -239,7 +248,7 @@ export default function HomePage() {
               Free to research, free to see your brand, free to read three concepts.
               {launch ? ` Rendering starts at €${(launch.monthlyPriceCents / 100).toLocaleString('en-US')}.` : ''}
             </p>
-            <StartProject cta="Understand my product" />
+            <StartProject cta={config.landing.ctaLabel} policy={policy} idPrefix="website-cta" />
             <Link href="/pricing" className="btn btn--secondary">
               See pricing
             </Link>

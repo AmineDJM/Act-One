@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PRODUCT_NAME } from '@act-one/core';
 import { getSession } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { getSignUpPolicy } from '@/server/product.ts';
 import { Wordmark } from '@/components/ui/Wordmark.tsx';
 import { NavTabs } from '@/components/ui/NavTabs.tsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.tsx';
@@ -45,12 +46,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .map((candidate) => ({ id: candidate.id, name: candidate.name }));
 
   const credits = organization?.creditBalance ?? 0;
+  const policy = await getSignUpPolicy();
 
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
         <div className={`shell ${styles.topbarInner}`}>
-          <Wordmark href="/app" />
+          <Wordmark href="/app" tag={policy.tag ?? undefined} />
           <NavTabs tabs={TABS} className={styles.tabs} />
           <div className={styles.spacer} />
           <WorkspaceSwitcher current={session.organizationId} workspaces={workspaces} />

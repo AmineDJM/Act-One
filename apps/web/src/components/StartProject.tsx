@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { normalizeUrl } from '@act-one/core';
+import { normalizeUrl, type SignUpPolicy } from '@act-one/core';
 import styles from './marketing.module.css';
 
 /**
@@ -16,8 +16,19 @@ import styles from './marketing.module.css';
  * asking somebody to sign up and only then telling them their URL was wrong is
  * how a funnel leaks.
  */
-export function StartProject({ cta = 'Understand my product' }: { cta?: string }) {
+export function StartProject({
+  cta = 'Understand my product',
+  policy,
+  idPrefix = 'website',
+}: {
+  cta?: string;
+  /** What the product offers right now; without it, an account is offered. */
+  policy?: SignUpPolicy;
+  /** The form appears twice on the landing page; ids must not. */
+  idPrefix?: string;
+}) {
   const router = useRouter();
+  const byInvitation = Boolean(policy && !policy.open);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -32,18 +43,19 @@ export function StartProject({ cta = 'Understand my product' }: { cta?: string }
     setError(null);
     setPending(true);
     // Carry the URL through sign-up so the first thing after an account exists
-    // is the product working, not an empty dashboard.
-    router.push(`/auth/sign-up?website=${encodeURIComponent(normalized)}`);
+    // is the product working, not an empty dashboard. While the product is by
+    // invitation, the same address goes with the request for one.
+    router.push(`${byInvitation && policy?.applications ? '/request-access' : '/auth/sign-up'}?website=${encodeURIComponent(normalized)}`);
   }
 
   return (
     <form className={styles.starter} onSubmit={submit} noValidate>
       <div className={styles.starterRow}>
-        <label htmlFor="website" className="sr-only">
+        <label htmlFor={idPrefix} className="sr-only">
           Your product website
         </label>
         <input
-          id="website"
+          id={idPrefix}
           // Named as well as identified: without it the browser's autofill
           // heuristics never see this as a URL field, and a password manager
           // has nothing to key on. React's value binding works either way,
@@ -60,21 +72,21 @@ export function StartProject({ cta = 'Understand my product' }: { cta?: string }
             if (error) setError(null);
           }}
           aria-invalid={error ? 'true' : undefined}
-          aria-describedby={error ? 'website-error' : 'website-hint'}
+          aria-describedby={error ? `${idPrefix}-error` : `${idPrefix}-hint`}
           required
         />
         <button className="btn btn--lg" type="submit" disabled={pending}>
-          {pending ? 'Opening…' : cta}
+          {pending ? 'Opening…' : byInvitation ? policy!.ctaLabel : cta}
         </button>
       </div>
       {error ? (
-        <p id="website-error" className={styles.starterNote} style={{ color: 'var(--danger)' }} role="alert">
+        <p id={`${idPrefix}-error`} className={styles.starterNote} style={{ color: 'var(--danger)' }} role="alert">
           {error}
         </p>
       ) : (
-        <p id="website-hint" className={styles.starterNote}>
-          Free. No card. You will see the product understanding, your brand and three concepts before
-          anything is charged.
+        <p id={`${idPrefix}-hint`} className={styles.starterNote}>
+          {policy?.phaseLine ??
+            'Free. No card. You will see the product understanding, your brand and three concepts before anything is charged.'}
         </p>
       )}
     </form>

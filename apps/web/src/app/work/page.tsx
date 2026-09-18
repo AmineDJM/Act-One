@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Nav } from '@/components/Nav.tsx';
+import { getSignUpPolicy } from '@/server/product.ts';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { FilmCard } from '@/components/FilmCard.tsx';
@@ -56,10 +57,10 @@ const DEMOS = [
   },
 ];
 
-export default function WorkPage() {
+export default async function WorkPage() {
   return (
     <>
-      <Nav />
+      <Nav policy={await getSignUpPolicy()} />
       <main id="main">
         <section className={`shell ${styles.section}`} style={{ paddingTop: 'var(--space-8)' }}>
           <div className={styles.sectionHead}>

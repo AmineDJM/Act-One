@@ -55,6 +55,23 @@ there, the screenshot as our own asset, the excerpt, the claims the brief
 took from it — and stays inspectable after the film exists, under **Research
 sources** on the project page.
 
+### The product's phase, and the door
+
+Where the product is in its life is one setting in the console, under
+**Product**: a private beta, a public beta, or production. The public
+pages read it within a minute — the button says *Request access*, *Join
+the beta* or *Start free*; the sign-up page asks for an invitation code,
+says plainly that it is a beta, or asks for nothing; the name beside the
+mark carries ™ or ® only as the console says it has earned it. Nothing
+about the phase is written into a page by hand.
+
+In a private beta the door is an invitation code: bounded by uses and by
+time, withdrawable from the console, one use per person, and never a
+credential — it lets a person create an account, nothing more. People
+without one may request access; a person reads each request and either
+declines it or invites, which makes a single-use code and the link to send.
+Nothing is sent on anyone's behalf.
+
 ### The console is the expert surface
 
 Customers see nine human steps and statuses in capitals. Staff see the

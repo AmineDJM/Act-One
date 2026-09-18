@@ -649,3 +649,18 @@
 }
 .tableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
 .tableWrap .table td, .tableWrap .table th { white-space: nowrap; }
+
+/* --- product ---------------------------------------------------------------- */
+
+.fieldset { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5); display: grid; gap: var(--space-3); background: var(--surface); margin: 0; min-width: 0; }
+.fieldset > legend { padding: 0 var(--space-2); font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.radioRow, .checkRow { display: flex; gap: var(--space-3); align-items: flex-start; font-size: 0.92rem; cursor: pointer; }
+.radioRow input, .checkRow input { margin-top: 4px; accent-color: var(--accent); }
+.radioRow > span { display: flex; flex-direction: column; gap: 2px; }
+.radioRow strong { font-weight: 500; }
+.radioRow .muted { font-size: 0.84rem; }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); }
+.linkList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.linkList li { display: flex; gap: var(--space-3); align-items: center; font-size: 0.82rem; flex-wrap: wrap; }
+.linkList code { font-family: var(--font-mono); color: var(--text-secondary); overflow-wrap: anywhere; }
+.customerRow[data-pending] { opacity: 0.7; }

@@ -212,6 +212,8 @@ describe('the doors', () => {
   });
 
   it('is what the forms report, in words, not internals', async () => {
+    // The forms are read with the door open: the phase gate has its own suite.
+    await store.platform.updateSettings({ product: { phase: 'production' } }, 'test');
     const { email } = await founder('ada');
     resetRequest();
     const failed = await signInAction({ error: null }, form({ email, password: 'nope-nope-nope' }));

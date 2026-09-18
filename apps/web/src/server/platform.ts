@@ -6,6 +6,8 @@ import {
   CreativeBudget,
   type Entitlement,
   type Organization,
+  DEFAULT_PRODUCT_CONFIG,
+  ProductConfig,
 } from '@act-one/core';
 import {
   AesSecretVault,
@@ -323,6 +325,8 @@ export type PlatformConfig = {
   plans: Plan[];
   featureFlags: Record<string, boolean>;
   creativeBudget: CreativeBudget;
+  /** The product's phase, landing copy and mark. */
+  product: ProductConfig;
 };
 
 const FALLBACK_CONFIG: PlatformConfig = {
@@ -330,6 +334,7 @@ const FALLBACK_CONFIG: PlatformConfig = {
   plans: DEFAULT_PLANS,
   featureFlags: {},
   creativeBudget: DEFAULT_CREATIVE_BUDGET,
+  product: DEFAULT_PRODUCT_CONFIG,
 };
 
 /**
@@ -356,6 +361,7 @@ export async function getPlatformConfig(): Promise<PlatformConfig> {
   const providers = ProviderConfig.safeParse(settings.providerConfig);
   const plans = Plan.array().safeParse(settings.plans);
   const budget = CreativeBudget.safeParse(settings.creativeBudget);
+  const product = ProductConfig.safeParse(settings.product ?? {});
 
   return {
     providers: providers.success ? providers.data : DEFAULT_PROVIDER_CONFIG,
@@ -364,6 +370,7 @@ export async function getPlatformConfig(): Promise<PlatformConfig> {
     plans: plans.success && plans.data.length > 0 ? plans.data : DEFAULT_PLANS,
     featureFlags: settings.featureFlags ?? {},
     creativeBudget: budget.success ? budget.data : DEFAULT_CREATIVE_BUDGET,
+    product: product.success ? product.data : DEFAULT_PRODUCT_CONFIG,
   };
 }
 
@@ -379,6 +386,7 @@ export async function savePlatformConfig(
       ...(patch.creativeBudget
         ? { creativeBudget: patch.creativeBudget as unknown as Record<string, unknown> }
         : {}),
+      ...(patch.product ? { product: patch.product as unknown as Record<string, unknown> } : {}),
     },
     updatedBy,
   );

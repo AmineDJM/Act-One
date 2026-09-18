@@ -22,6 +22,11 @@ import type {
   ApprovalGate,
   Asset,
   AssetInput,
+  BetaApplication,
+  BetaApplicationStatus,
+  InviteCode,
+  InviteCodeKind,
+  InviteRedemption,
   AudioEdition,
   BrandSystem,
   BrandVoice,
@@ -2267,6 +2272,146 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly invites = {
+    create: async (code: InviteCode) =>
+      this.asPlatform(async (c) => {
+        try {
+          await c.query(
+            `INSERT INTO invite_codes (id, code, kind, note, max_uses, uses, expires_at, created_by_user_id, owner_user_id, created_at, revoked_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+            [code.id, code.code, code.kind, code.note, code.maxUses, code.uses, code.expiresAt, code.createdByUserId, code.ownerUserId, code.createdAt, code.revokedAt],
+          );
+        } catch (error) {
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That code already exists.');
+          throw error;
+        }
+        return code;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM invite_codes WHERE id = $1', [id]);
+        return r.rows[0] ? toInviteCode(r.rows[0]) : null;
+      }),
+
+    getByCode: async (code: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM invite_codes WHERE code = $1', [code]);
+        return r.rows[0] ? toInviteCode(r.rows[0]) : null;
+      }),
+
+    list: async (query: { kind?: InviteCodeKind; ownerUserId?: string; limit?: number } = {}) =>
+      this.asPlatform(async (c) => {
+        const where: string[] = [];
+        const params: unknown[] = [];
+        const bind = (value: unknown) => `$${params.push(value)}`;
+        if (query.kind) where.push(`kind = ${bind(query.kind)}`);
+        if (query.ownerUserId) where.push(`owner_user_id = ${bind(query.ownerUserId)}`);
+        const r = await c.query(
+          `SELECT * FROM invite_codes ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+           ORDER BY created_at DESC LIMIT ${Math.min(Math.max(query.limit ?? 200, 1), 1000)}`,
+          params,
+        );
+        return r.rows.map(toInviteCode);
+      }),
+
+    redeem: async (codeId: string, userId: string, now = new Date().toISOString()) =>
+      this.asPlatform(async (c) => {
+        // The same person twice is not a second use.
+        const seen = await c.query('SELECT 1 FROM invite_redemptions WHERE code_id = $1 AND user_id = $2', [codeId, userId]);
+        if (seen.rows[0]) return false;
+        // One statement decides: the conditions and the increment are the
+        // same row lock, so two people racing for the last use get one each.
+        const r = await c.query(
+          `UPDATE invite_codes SET uses = uses + 1
+           WHERE id = $1 AND revoked_at IS NULL
+             AND (expires_at IS NULL OR expires_at > $2)
+             AND (max_uses IS NULL OR uses < max_uses)
+           RETURNING id`,
+          [codeId, now],
+        );
+        if (!r.rows[0]) return false;
+        await c.query('INSERT INTO invite_redemptions (code_id, user_id, at) VALUES ($1, $2, $3)', [codeId, userId, now]);
+        return true;
+      }),
+
+    revoke: async (id: string) =>
+      this.asPlatform(async (c) => {
+        await c.query('UPDATE invite_codes SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL', [id]);
+      }),
+
+    listRedemptions: async (codeId: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM invite_redemptions WHERE code_id = $1 ORDER BY at', [codeId]);
+        return r.rows.map(toRedemption);
+      }),
+
+    redemptionFor: async (userId: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM invite_redemptions WHERE user_id = $1 ORDER BY at LIMIT 1', [userId]);
+        return r.rows[0] ? toRedemption(r.rows[0]) : null;
+      }),
+  };
+
+  readonly applications = {
+    create: async (application: BetaApplication) =>
+      this.asPlatform(async (c) => {
+        await c.query(
+          `INSERT INTO beta_applications (id, email, name, company, website, message, status, invite_code_id, note, created_at, decided_at, decided_by_user_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [
+            application.id, application.email, application.name, application.company, application.website, application.message,
+            application.status, application.inviteCodeId, application.note, application.createdAt, application.decidedAt, application.decidedByUserId,
+          ],
+        );
+        return application;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM beta_applications WHERE id = $1', [id]);
+        return r.rows[0] ? toApplication(r.rows[0]) : null;
+      }),
+
+    getByEmail: async (email: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM beta_applications WHERE lower(email) = lower($1) ORDER BY created_at DESC LIMIT 1', [email.trim()]);
+        return r.rows[0] ? toApplication(r.rows[0]) : null;
+      }),
+
+    list: async (query: { status?: BetaApplicationStatus; limit?: number } = {}) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `SELECT * FROM beta_applications ${query.status ? 'WHERE status = $1' : ''}
+           ORDER BY created_at DESC LIMIT ${Math.min(Math.max(query.limit ?? 200, 1), 1000)}`,
+          query.status ? [query.status] : [],
+        );
+        return r.rows.map(toApplication);
+      }),
+
+    update: async (id: string, patch: Partial<BetaApplication>) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `UPDATE beta_applications SET
+             status = COALESCE($2, status),
+             invite_code_id = COALESCE($3, invite_code_id),
+             note = COALESCE($4, note),
+             decided_at = COALESCE($5, decided_at),
+             decided_by_user_id = COALESCE($6, decided_by_user_id)
+           WHERE id = $1 RETURNING *`,
+          [id, patch.status ?? null, patch.inviteCodeId ?? null, patch.note ?? null, patch.decidedAt ?? null, patch.decidedByUserId ?? null],
+        );
+        if (!r.rows[0]) throw notFound('Application');
+        return toApplication(r.rows[0]);
+      }),
+
+    countByStatus: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ status: string; count: number }>('SELECT status, COUNT(*)::int AS count FROM beta_applications GROUP BY status');
+        return Object.fromEntries(r.rows.map((row) => [row.status, num(row.count)]));
+      }),
+  };
+
   readonly platform = {
     getSettings: async (): Promise<PlatformSettings> =>
       this.asPlatform(async (c) => {
@@ -2277,6 +2422,7 @@ export class PgStore implements Store {
           plans: (row?.['plans'] as unknown[]) ?? [],
           featureFlags: (row?.['feature_flags'] as Record<string, boolean>) ?? {},
           creativeBudget: (row?.['creative_budget'] as Record<string, unknown>) ?? {},
+          product: (row?.['product'] as Record<string, unknown>) ?? {},
           updatedAt: row ? iso(row['updated_at']) : new Date().toISOString(),
         };
       }),
@@ -2284,13 +2430,14 @@ export class PgStore implements Store {
     updateSettings: async (patch: Partial<PlatformSettings>, updatedBy: string) =>
       this.asPlatform(async (c) => {
         const r = await c.query(
-          `INSERT INTO platform_settings (id, provider_config, plans, feature_flags, creative_budget, updated_at, updated_by)
-           VALUES ('singleton', COALESCE($1, '{}'::jsonb), COALESCE($2, '[]'::jsonb), COALESCE($3, '{}'::jsonb), COALESCE($4, '{}'::jsonb), now(), $5)
+          `INSERT INTO platform_settings (id, provider_config, plans, feature_flags, creative_budget, product, updated_at, updated_by)
+           VALUES ('singleton', COALESCE($1, '{}'::jsonb), COALESCE($2, '[]'::jsonb), COALESCE($3, '{}'::jsonb), COALESCE($4, '{}'::jsonb), COALESCE($6, '{}'::jsonb), now(), $5)
            ON CONFLICT (id) DO UPDATE SET
              provider_config = COALESCE($1, platform_settings.provider_config),
              plans = COALESCE($2, platform_settings.plans),
              feature_flags = COALESCE($3, platform_settings.feature_flags),
              creative_budget = COALESCE($4, platform_settings.creative_budget),
+             product = COALESCE($6, platform_settings.product),
              updated_at = now(), updated_by = $5
            RETURNING *`,
           [
@@ -2299,6 +2446,7 @@ export class PgStore implements Store {
             patch.featureFlags ?? null,
             patch.creativeBudget ?? null,
             updatedBy,
+            patch.product ?? null,
           ],
         );
         const row = r.rows[0]!;
@@ -2307,6 +2455,7 @@ export class PgStore implements Store {
           plans: row['plans'] as unknown[],
           featureFlags: row['feature_flags'] as Record<string, boolean>,
           creativeBudget: row['creative_budget'] as Record<string, unknown>,
+          product: (row['product'] as Record<string, unknown>) ?? {},
           updatedAt: iso(row['updated_at']),
         };
       }),
@@ -2486,6 +2635,43 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
  */
 function brandFromRow(data: unknown): BrandSystem {
   return BrandSystemSchema.parse(data);
+}
+
+function toInviteCode(row: Row): InviteCode {
+  return {
+    id: row['id'] as string,
+    code: row['code'] as string,
+    kind: row['kind'] as InviteCode['kind'],
+    note: (row['note'] as string) ?? '',
+    maxUses: row['max_uses'] === null ? null : num(row['max_uses']),
+    uses: num(row['uses']),
+    expiresAt: row['expires_at'] ? iso(row['expires_at']) : null,
+    createdByUserId: (row['created_by_user_id'] as string) ?? null,
+    ownerUserId: (row['owner_user_id'] as string) ?? null,
+    createdAt: iso(row['created_at']),
+    revokedAt: row['revoked_at'] ? iso(row['revoked_at']) : null,
+  };
+}
+
+function toRedemption(row: Row): InviteRedemption {
+  return { codeId: row['code_id'] as string, userId: row['user_id'] as string, at: iso(row['at']) };
+}
+
+function toApplication(row: Row): BetaApplication {
+  return {
+    id: row['id'] as string,
+    email: row['email'] as string,
+    name: (row['name'] as string) ?? '',
+    company: (row['company'] as string) ?? '',
+    website: (row['website'] as string) ?? null,
+    message: (row['message'] as string) ?? '',
+    status: row['status'] as BetaApplication['status'],
+    inviteCodeId: (row['invite_code_id'] as string) ?? null,
+    note: (row['note'] as string) ?? '',
+    createdAt: iso(row['created_at']),
+    decidedAt: row['decided_at'] ? iso(row['decided_at']) : null,
+    decidedByUserId: (row['decided_by_user_id'] as string) ?? null,
+  };
 }
 
 function toAsset(row: Row): Asset {

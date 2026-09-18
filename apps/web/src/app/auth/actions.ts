@@ -5,6 +5,7 @@ import { normalizeUrl } from '@act-one/core';
 import { signIn, signUp } from '@/server/auth.ts';
 import { createProject } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
+import { applyForAccess, redeemInvite, signUpGate } from '@/server/product.ts';
 
 export type AuthState = { error: string | null };
 
@@ -21,11 +22,15 @@ export async function signUpAction(_previous: AuthState, formData: FormData): Pr
   let destination = safeRedirect(String(formData.get('next') ?? ''));
 
   try {
+    // The phase decides whether the door is open, and on which invitation.
+    const gate = await signUpGate(String(formData.get('code') ?? ''));
+
     const session = await signUp({
       email: String(formData.get('email') ?? ''),
       password: String(formData.get('password') ?? ''),
       name: String(formData.get('name') ?? '') || undefined,
     });
+    await redeemInvite(gate.code, session.user.id);
 
     const website = normalizeUrl(String(formData.get('website') ?? ''));
     if (website) {
@@ -62,4 +67,22 @@ export async function signInAction(_previous: AuthState, formData: FormData): Pr
  */
 function safeRedirect(target: string): string {
   return target.startsWith('/') && !target.startsWith('//') ? target : '/app';
+}
+
+export type AccessState = { error: string | null; done?: boolean };
+
+/** A request for access while the product is by invitation. */
+export async function requestAccessAction(_previous: AccessState, formData: FormData): Promise<AccessState> {
+  try {
+    await applyForAccess({
+      email: String(formData.get('email') ?? ''),
+      name: String(formData.get('name') ?? ''),
+      company: String(formData.get('company') ?? ''),
+      website: String(formData.get('website') ?? ''),
+      message: String(formData.get('message') ?? ''),
+    });
+    return { error: null, done: true };
+  } catch (error) {
+    return { error: reportError('requestAccessAction', error).publicMessage };
+  }
 }

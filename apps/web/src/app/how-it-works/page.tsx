@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { CREATIVE_SYSTEMS } from '@act-one/creative';
 import { Nav } from '@/components/Nav.tsx';
+import { getSignUpPolicy } from '@/server/product.ts';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { site, absoluteUrl } from '@/lib/site.ts';
@@ -46,10 +47,10 @@ const STAGES = [
   },
 ];
 
-export default function HowItWorksPage() {
+export default async function HowItWorksPage() {
   return (
     <>
-      <Nav />
+      <Nav policy={await getSignUpPolicy()} />
       <main id="main">
         <section className={`shell ${styles.section}`} style={{ paddingTop: 'var(--space-8)' }}>
           <div className={styles.sectionHead}>

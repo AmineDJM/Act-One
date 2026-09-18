@@ -24,6 +24,11 @@ import type {
   ApprovalGate,
   Asset,
   AssetInput,
+  BetaApplication,
+  BetaApplicationStatus,
+  InviteCode,
+  InviteCodeKind,
+  InviteRedemption,
   AudioEdition,
   BrandSystem,
   BrandVoice,
@@ -86,6 +91,9 @@ export class MemoryStore implements Store {
     scenes: new Map<string, Scene & { organizationId: string }>(),
     assets: new Map<string, Asset>(),
     assetProjects: new Map<string, AssetProjectLink & { organizationId: string }>(),
+    invites: new Map<string, InviteCode>(),
+    redemptions: new Map<string, InviteRedemption>(),
+    applications: new Map<string, BetaApplication>(),
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
@@ -113,7 +121,71 @@ export class MemoryStore implements Store {
     plans: [],
     featureFlags: {},
     creativeBudget: {},
+    product: {},
     updatedAt: new Date().toISOString(),
+  };
+
+  readonly invites = {
+    create: async (code: InviteCode) => {
+      for (const existing of this.tables.invites.values()) {
+        if (existing.code === code.code) throw new AppError('conflict', 'That code already exists.');
+      }
+      this.tables.invites.set(code.id, code);
+      return code;
+    },
+    get: async (id: string) => this.tables.invites.get(id) ?? null,
+    getByCode: async (code: string) => [...this.tables.invites.values()].find((candidate) => candidate.code === code) ?? null,
+    list: async (query: { kind?: InviteCodeKind; ownerUserId?: string; limit?: number } = {}) =>
+      [...this.tables.invites.values()]
+        .filter((code) => !query.kind || code.kind === query.kind)
+        .filter((code) => !query.ownerUserId || code.ownerUserId === query.ownerUserId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, query.limit ?? 200),
+    redeem: async (codeId: string, userId: string, now = new Date().toISOString()) => {
+      const code = this.tables.invites.get(codeId);
+      if (!code || code.revokedAt) return false;
+      if (code.expiresAt && code.expiresAt <= now) return false;
+      if (code.maxUses !== null && code.uses >= code.maxUses) return false;
+      if (this.tables.redemptions.has(`${codeId}:${userId}`)) return false;
+      this.tables.invites.set(codeId, { ...code, uses: code.uses + 1 });
+      this.tables.redemptions.set(`${codeId}:${userId}`, { codeId, userId, at: now });
+      return true;
+    },
+    revoke: async (id: string) => {
+      const code = this.tables.invites.get(id);
+      if (code && !code.revokedAt) this.tables.invites.set(id, { ...code, revokedAt: new Date().toISOString() });
+    },
+    listRedemptions: async (codeId: string) =>
+      [...this.tables.redemptions.values()].filter((entry) => entry.codeId === codeId).sort((a, b) => a.at.localeCompare(b.at)),
+    redemptionFor: async (userId: string) => [...this.tables.redemptions.values()].find((entry) => entry.userId === userId) ?? null,
+  };
+
+  readonly applications = {
+    create: async (application: BetaApplication) => {
+      this.tables.applications.set(application.id, application);
+      return application;
+    },
+    get: async (id: string) => this.tables.applications.get(id) ?? null,
+    getByEmail: async (email: string) =>
+      [...this.tables.applications.values()]
+        .filter((candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase())
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null,
+    list: async (query: { status?: BetaApplicationStatus; limit?: number } = {}) =>
+      [...this.tables.applications.values()]
+        .filter((candidate) => !query.status || candidate.status === query.status)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, query.limit ?? 200),
+    update: async (id: string, patch: Partial<BetaApplication>) => {
+      const existing = this.require(this.tables.applications.get(id), 'Application');
+      const next = { ...existing, ...patch, id };
+      this.tables.applications.set(id, next);
+      return next;
+    },
+    countByStatus: async () => {
+      const counts: Record<string, number> = {};
+      for (const application of this.tables.applications.values()) counts[application.status] = (counts[application.status] ?? 0) + 1;
+      return counts;
+    },
   };
 
   private providerSecrets = new Map<

@@ -4,6 +4,11 @@ import type {
   Asset,
   AssetInput,
   AssetSource,
+  BetaApplication,
+  BetaApplicationStatus,
+  InviteCode,
+  InviteCodeKind,
+  InviteRedemption,
   LibraryCategory,
   BrandSystem,
   Comment,
@@ -79,6 +84,8 @@ export interface Store {
   readonly revisions: RevisionRepo;
   readonly jobEvents: JobEventRepo;
   readonly researchSources: ResearchSourceRepo;
+  readonly invites: InviteRepo;
+  readonly applications: BetaApplicationRepo;
   readonly brandVoices: BrandVoiceRepo;
   readonly voiceConsents: VoiceConsentRepo;
   readonly voiceSettings: VoiceSettingsRepo;
@@ -497,8 +504,40 @@ export type PlatformSettings = {
   plans: unknown[];
   featureFlags: Record<string, boolean>;
   creativeBudget: Record<string, unknown>;
+  /** The product's phase, landing copy and mark: see ProductConfig. */
+  product: Record<string, unknown>;
   updatedAt: string;
 };
+
+/** Invitation codes: the door in a private beta, and the referral programme's currency. */
+export interface InviteRepo {
+  create(code: InviteCode): Promise<InviteCode>;
+  get(id: string): Promise<InviteCode | null>;
+  getByCode(code: string): Promise<InviteCode | null>;
+  list(query?: { kind?: InviteCodeKind; ownerUserId?: string; limit?: number }): Promise<InviteCode[]>;
+  /**
+   * Consumes one use for this person, atomically. False when the code
+   * cannot be used: unknown, withdrawn, expired, exhausted, or already
+   * redeemed by the same person. Two people racing for the last use get
+   * one true and one false, never two trues.
+   */
+  redeem(codeId: string, userId: string, now?: string): Promise<boolean>;
+  revoke(id: string): Promise<void>;
+  listRedemptions(codeId: string): Promise<InviteRedemption[]>;
+  /** The code a person came in on, if any. */
+  redemptionFor(userId: string): Promise<InviteRedemption | null>;
+}
+
+/** Requests for access while the product is by invitation. */
+export interface BetaApplicationRepo {
+  create(application: BetaApplication): Promise<BetaApplication>;
+  get(id: string): Promise<BetaApplication | null>;
+  /** The latest request from this address. */
+  getByEmail(email: string): Promise<BetaApplication | null>;
+  list(query?: { status?: BetaApplicationStatus; limit?: number }): Promise<BetaApplication[]>;
+  update(id: string, patch: Partial<BetaApplication>): Promise<BetaApplication>;
+  countByStatus(): Promise<Record<string, number>>;
+}
 
 export interface PlatformRepo {
   getSettings(): Promise<PlatformSettings>;
