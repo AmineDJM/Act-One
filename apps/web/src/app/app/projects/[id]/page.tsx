@@ -148,6 +148,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               project.brief.voiceStrategy === 'none'
                 ? 'none'
                 : (project.brief.voiceGender ?? null),
+            voiceAccent: project.brief.voiceAccent ?? null,
+            voiceStyle: project.brief.voiceStyle ?? null,
+            voicePace: project.brief.voicePace ?? null,
           }}
           maxDurationSeconds={permission.maxDurationSeconds}
           editable={can(session.actor, 'project:update') && !stageReached(project.stage, 'rendering')}

@@ -24,6 +24,8 @@ import {
   type RenderQuality,
   type Storyboard,
   TONE_LABELS,
+  adaptForSpeech,
+  directVoice,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
@@ -469,7 +471,7 @@ async function renderOnce(
   // A film with no whoosh is still a film, so a missing asset never fails the
   // render — but it is reported, and the caller turns it into a QA finding.
   const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
-  const voiceTracks = await speakNarration(context, storyboard, params.workDir, params.attempt);
+  const voiceTracks = await speakNarration(context, storyboard, params.workDir, params.attempt, params.quality);
 
   /*
    * The voice has to lead the bed by the standard's four LU, measured, not
@@ -790,34 +792,54 @@ async function speakNarration(
   storyboard: Storyboard,
   workDir: string,
   attempt: number,
+  quality: RenderQuality,
 ): Promise<{ path: string; atSeconds: number; durationSeconds: number }[]> {
   const spoken = storyboard.scenes.filter(
     (scene) => scene.voiceOver && scene.narration.trim().length > 0,
   );
   if (storyboard.voiceStrategy === 'none' || spoken.length === 0) return [];
 
-  const speech = context.registry.speech();
+  // A preview is for timing; the studio voice is for the film.
+  const tier = quality === 'preview' ? 'preview' : 'final';
+  const speech = context.registry.speech(tier);
   const persona = PERSONA_FOR_STRATEGY[storyboard.voiceStrategy] ?? 'narrator_neutral';
   const tracks: { path: string; atSeconds: number; durationSeconds: number }[] = [];
+  const brief = context.project.brief;
+  const language = storyboard.language ?? brief.language ?? null;
+  // The direction: the kind of film, the language it was written in, and the
+  // customer's word on who reads it and how. The same object whichever engine reads.
+  const direction = directVoice({
+    context: 'launch_film',
+    language,
+    accent: brief.voiceAccent ?? null,
+    gender: brief.voiceGender ?? null,
+    style: brief.voiceStyle ?? null,
+    pace: brief.voicePace ?? null,
+    tone: brief.tone ?? null,
+  });
 
-  for (const scene of spoken) {
+  for (const [position, scene] of spoken.entries()) {
     try {
-      const brief = context.project.brief;
       const result = await speech.synthesize(
         {
-          text: scene.narration.trim(),
+          text: adaptForSpeech(scene.narration.trim(), { language: direction.language }),
           persona,
           // Rate is set from the room the line has to fit in, not from taste: a
           // line written for 2.4 seconds must not run 3.
           rate: speakingRateFor(scene.narration, scene.duration),
           format: 'wav',
-          // The voice follows the language the film was written in and the
-          // customer's word on who reads it and how.
-          language: storyboard.language ?? brief.language ?? null,
-          gender: brief.voiceGender ?? null,
+          language,
+          gender: direction.gender,
           tone: brief.tone ? TONE_LABELS[brief.tone] : null,
+          direction,
+          quality: tier,
+          // The lines around this one, so the film is one read and not a list of lines.
+          continuity: {
+            previousText: spoken[position - 1]?.narration.trim() ?? null,
+            nextText: spoken[position + 1]?.narration.trim() ?? null,
+          },
         },
-        { organizationId: context.organizationId, projectId: context.project.id },
+        { organizationId: context.organizationId, projectId: context.project.id, sceneId: scene.id },
       );
 
       const file = path.join(workDir, `vo-${attempt}-${scene.index}.wav`);

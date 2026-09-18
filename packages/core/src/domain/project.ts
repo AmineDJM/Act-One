@@ -227,6 +227,14 @@ export const ProjectBrief = z.object({
   tone: Tone.nullable().default(null),
   /** Who narrates. Null: chosen from the tone. Voice strategy 'none' means nobody. */
   voiceGender: z.enum(['female', 'male']).nullable().default(null),
+  /** Where the voice is from: France, US, British… Null: the language's home. */
+  voiceAccent: z.enum(['auto', 'france', 'canada', 'us', 'british', 'international']).nullable().default(null),
+  /** How it is read. Null: from the tone and the kind of film. */
+  voiceStyle: z
+    .enum(['cinematic', 'professional', 'warm', 'editorial', 'confident', 'energetic', 'minimal', 'calm'])
+    .nullable()
+    .default(null),
+  voicePace: z.enum(['slow', 'natural', 'fast']).nullable().default(null),
   channels: z.array(Channel).default([]),
   creativeMode: CreativeMode.default('studio'),
   voiceStrategy: VoiceStrategy.nullable().default(null),

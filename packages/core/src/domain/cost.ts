@@ -9,6 +9,8 @@ export const CostOperation = z.enum([
   'media.video',
   'media.edit',
   'speech.tts',
+  'speech.stt',
+  'speech.clone',
   'render.motion',
   'render.threed',
   'render.composite',

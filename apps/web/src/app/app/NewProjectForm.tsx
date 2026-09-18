@@ -1,7 +1,18 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { DURATION_CHOICES, FILM_LANGUAGES, TONE_LABELS, Tone } from '@act-one/core';
+import {
+  DURATION_CHOICES,
+  FILM_LANGUAGES,
+  TONE_LABELS,
+  Tone,
+  VOICE_ACCENT_LABELS,
+  VOICE_PACE_LABELS,
+  VOICE_STYLE_LABELS,
+  VoiceAccent,
+  VoicePace,
+  VoiceStyle,
+} from '@act-one/core';
 import { createProjectAction, type FormState } from './actions.ts';
 
 export function NewProjectForm({ maxDurationSeconds }: { maxDurationSeconds: number }) {
@@ -75,6 +86,40 @@ export function NewProjectForm({ maxDurationSeconds }: { maxDurationSeconds: num
                 {FILM_LANGUAGES.map((language) => (
                   <option key={language.code} value={language.code}>
                     {language.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="row" style={{ gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+              <label htmlFor="voiceAccent">Accent</label>
+              <select id="voiceAccent" name="voiceAccent" className="input" defaultValue="auto">
+                {VoiceAccent.options.map((accent) => (
+                  <option key={accent} value={accent}>
+                    {VOICE_ACCENT_LABELS[accent]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+              <label htmlFor="voiceStyle">Style</label>
+              <select id="voiceStyle" name="voiceStyle" className="input" defaultValue="">
+                <option value="">Auto</option>
+                {VoiceStyle.options.map((style) => (
+                  <option key={style} value={style}>
+                    {VOICE_STYLE_LABELS[style]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+              <label htmlFor="voicePace">Pace</label>
+              <select id="voicePace" name="voicePace" className="input" defaultValue="">
+                <option value="">Auto</option>
+                {VoicePace.options.map((pace) => (
+                  <option key={pace} value={pace}>
+                    {VOICE_PACE_LABELS[pace]}
                   </option>
                 ))}
               </select>

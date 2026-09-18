@@ -10,6 +10,8 @@ export type HttpOptions = {
   signal?: AbortSignal;
   /** Raw bytes instead of JSON. */
   expect?: 'json' | 'buffer' | 'text';
+  /** Sees the successful response before its body is read: for a header a caller needs. */
+  onResponse?: (response: Response) => void;
 };
 
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -39,7 +41,10 @@ export async function httpRequest<T = unknown>(
       const response = await fetch(url, {
         method: options.method ?? 'GET',
         headers: {
-          ...(options.body !== undefined && !(options.body instanceof Uint8Array)
+          // Multipart bodies carry their own boundary; setting the type here would break it.
+          ...(options.body !== undefined &&
+          !(options.body instanceof Uint8Array) &&
+          !(options.body instanceof FormData)
             ? { 'content-type': 'application/json' }
             : {}),
           ...options.headers,
@@ -64,6 +69,7 @@ export async function httpRequest<T = unknown>(
         throw error;
       }
 
+      options.onResponse?.(response);
       if (options.expect === 'buffer') {
         return new Uint8Array(await response.arrayBuffer()) as T;
       }

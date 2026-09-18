@@ -15,6 +15,7 @@ import {
   generateVaultKey,
   installProxyFromEnvironment,
   secretContext,
+  speechOverrides,
   type ProviderHealth,
   type SecretVault,
 } from '@act-one/providers';
@@ -450,11 +451,19 @@ export async function buildRegistry(scope: {
             }),
           }
         : {}),
-      // The voice the console chose, when it has a key; OpenAI's otherwise.
-      speech:
-        config.providers.speech.primary === 'elevenlabs' && elevenlabs['apiKey']
-          ? new ElevenLabsProvider({ apiKey: elevenlabs['apiKey'], costSink })
-          : new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink }),
+      // The voices the console chose, when they have a key; OpenAI's otherwise.
+      ...speechOverrides(config.providers.speech, {
+        openai: (options) => new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink, ...options }),
+        elevenlabs: elevenlabs['apiKey']
+          ? (options) =>
+              new ElevenLabsProvider({
+                apiKey: elevenlabs['apiKey'],
+                costSink,
+                curated: config.providers.speech.curated,
+                ...options,
+              })
+          : null,
+      }),
       storage:
         supabase['url'] && supabase['serviceKey']
           ? new SupabaseStorageProvider({

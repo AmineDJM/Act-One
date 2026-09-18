@@ -30,5 +30,7 @@ export * from './domain/qa.ts';
 export * from './domain/project.ts';
 export * from './domain/job.ts';
 export * from './domain/progress.ts';
+export * from './domain/voice.ts';
+export * from './domain/spoken.ts';
 export * from './domain/collaboration.ts';
 export * from './domain/credentials.ts';

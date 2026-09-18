@@ -1,4 +1,12 @@
-import { AesSecretVault, DEFAULT_PROVIDER_CONFIG, ProviderConfig, ProviderRegistry, secretContext, type SecretVault } from '@act-one/providers';
+import {
+  AesSecretVault,
+  DEFAULT_PROVIDER_CONFIG,
+  ProviderConfig,
+  ProviderRegistry,
+  secretContext,
+  speechOverrides,
+  type SecretVault,
+} from '@act-one/providers';
 import { Database, DbCostSink, PgStore, type Store } from '@act-one/db';
 import { Plan, DEFAULT_PLANS } from '@act-one/core';
 
@@ -112,11 +120,19 @@ export async function buildRegistry(
             }),
           }
         : {}),
-      // The voice the console chose, when it has a key; OpenAI's otherwise.
-      speech:
-        providerConfig.speech.primary === 'elevenlabs' && elevenlabs['apiKey']
-          ? new ElevenLabsProvider({ apiKey: elevenlabs['apiKey'], costSink })
-          : new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink }),
+      // The voices the console chose, when they have a key; OpenAI's otherwise.
+      ...speechOverrides(providerConfig.speech, {
+        openai: (options) => new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink, ...options }),
+        elevenlabs: elevenlabs['apiKey']
+          ? (options) =>
+              new ElevenLabsProvider({
+                apiKey: elevenlabs['apiKey'],
+                costSink,
+                curated: providerConfig.speech.curated,
+                ...options,
+              })
+          : null,
+      }),
       storage:
         supabase['url'] && supabase['serviceKey']
           ? new SupabaseStorageProvider({

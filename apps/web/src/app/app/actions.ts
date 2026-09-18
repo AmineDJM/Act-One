@@ -8,6 +8,9 @@ import {
   FILM_LANGUAGES,
   ProductCredentialKind,
   Tone,
+  VoiceAccent,
+  VoicePace,
+  VoiceStyle,
   can,
   newId,
   normalizeUrl,
@@ -542,6 +545,15 @@ function briefFromForm(formData: FormData): Partial<ProjectBrief> {
     brief.voiceStrategy = null;
     brief.voiceGender = voice;
   }
+  // Accent, style and pace: "Auto" is null, so the film's context decides.
+  const accent = String(formData.get('voiceAccent') ?? '');
+  if (accent && accent !== 'auto' && VoiceAccent.options.includes(accent as VoiceAccent)) {
+    brief.voiceAccent = accent as VoiceAccent;
+  }
+  const style = String(formData.get('voiceStyle') ?? '');
+  if (VoiceStyle.options.includes(style as VoiceStyle)) brief.voiceStyle = style as VoiceStyle;
+  const pace = String(formData.get('voicePace') ?? '');
+  if (VoicePace.options.includes(pace as VoicePace)) brief.voicePace = pace as VoicePace;
   return brief;
 }
 
@@ -563,6 +575,9 @@ export async function updateBriefAction(_previous: FormState, formData: FormData
       language: null,
       voiceStrategy: null,
       voiceGender: null,
+      voiceAccent: null,
+      voiceStyle: null,
+      voicePace: null,
       ...briefFromForm(formData),
     });
     revalidatePath(`/app/projects/${projectId}`);

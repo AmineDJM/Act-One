@@ -1,7 +1,19 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { DURATION_CHOICES, FILM_LANGUAGES, TONE_LABELS, Tone, languageName } from '@act-one/core';
+import {
+  DURATION_CHOICES,
+  FILM_LANGUAGES,
+  TONE_LABELS,
+  Tone,
+  VOICE_ACCENT_LABELS,
+  VOICE_PACE_LABELS,
+  VOICE_STYLE_LABELS,
+  VoiceAccent,
+  VoicePace,
+  VoiceStyle,
+  languageName,
+} from '@act-one/core';
 import { updateBriefAction, type FormState } from '../../actions.ts';
 import styles from '../../app.module.css';
 
@@ -25,6 +37,9 @@ export function BriefPanel({
     language: string | null;
     tone: Tone | null;
     voice: 'female' | 'male' | 'none' | null;
+    voiceAccent: VoiceAccent | null;
+    voiceStyle: VoiceStyle | null;
+    voicePace: VoicePace | null;
   };
   maxDurationSeconds: number;
   editable: boolean;
@@ -99,6 +114,42 @@ export function BriefPanel({
               The voice speaks the film&rsquo;s language natively, whoever reads.
             </span>
           </div>
+          {brief.voice !== 'none' ? (
+            <div className="row" style={{ gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label htmlFor="brief-accent">Accent</label>
+                <select id="brief-accent" name="voiceAccent" className="input" defaultValue={brief.voiceAccent ?? 'auto'}>
+                  {VoiceAccent.options.map((accent) => (
+                    <option key={accent} value={accent}>
+                      {VOICE_ACCENT_LABELS[accent]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label htmlFor="brief-style">Style</label>
+                <select id="brief-style" name="voiceStyle" className="input" defaultValue={brief.voiceStyle ?? ''}>
+                  <option value="">Auto</option>
+                  {VoiceStyle.options.map((style) => (
+                    <option key={style} value={style}>
+                      {VOICE_STYLE_LABELS[style]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label htmlFor="brief-pace">Pace</label>
+                <select id="brief-pace" name="voicePace" className="input" defaultValue={brief.voicePace ?? ''}>
+                  <option value="">Auto</option>
+                  {VoicePace.options.map((pace) => (
+                    <option key={pace} value={pace}>
+                      {VOICE_PACE_LABELS[pace]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : null}
           <div className="field">
             <label htmlFor="brief-language">Language</label>
             <select
@@ -162,6 +213,22 @@ export function BriefPanel({
                     : 'Decided by the concept'}
             </dd>
           </div>
+          {brief.voice !== 'none' ? (
+            <div className={styles.kvRow}>
+              <dt>Read</dt>
+              <dd>
+                {[
+                  brief.voiceStyle ? VOICE_STYLE_LABELS[brief.voiceStyle].split(' — ')[0] : null,
+                  brief.voicePace ? `${VOICE_PACE_LABELS[brief.voicePace].toLowerCase()} pace` : null,
+                  brief.voiceAccent && brief.voiceAccent !== 'auto'
+                    ? `${VOICE_ACCENT_LABELS[brief.voiceAccent]} accent`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || 'Directed for the kind of film'}
+              </dd>
+            </div>
+          ) : null}
           <div className={styles.kvRow}>
             <dt>Language</dt>
             <dd>{languageName(brief.language) ?? 'The language of your site'}</dd>

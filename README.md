@@ -250,18 +250,40 @@ four are replaceable infrastructure; the moat is product understanding, creative
 strategy, art direction, premium motion systems, real product cinematography,
 Brand DNA, automated QA and the revision system.
 
-One optional fifth: **ElevenLabs**, for the voice. Narration comes from OpenAI's
-voices by default, directed for the film's language and the customer's choice of
-who reads. With an ElevenLabs key saved and chosen under Routing, the voice is
-picked from its library for that language instead, which is the difference
-between a voice reading French and a French voice.
+One optional fifth: **ElevenLabs**, the premium voice. Narration comes from
+OpenAI's voices until its key is saved and chosen for finals under Routing;
+then finals are performed on Eleven v3 by a voice cast for the language, which
+is the difference between a voice reading French and a French voice.
 
 ### The voice
 
-The customer chooses, on the brief: a woman's voice, a man's, or none. The
-storyboard records the language it was written in, and the voice follows it: a
-native voice on ElevenLabs, or OpenAI's voice told to speak as a native. Founder
-and brand voices are cloned only against a recorded consent.
+The customer chooses, on the brief, in plain words: who reads (a woman, a man,
+nobody), the language, and optionally an accent, a style and a pace. Nothing
+about a vendor, a model or a setting reaches them.
+
+Behind that, one object — the voice direction — describes the performance:
+language and locale, gender, profile, tone, energy, pace, an emotional arc,
+what to avoid, and how tightly to hold the voice. The kind of film sets its
+defaults (a launch film is cinematic and restrained; an audio edition is
+editorial and steady), the brief overrides them, and every engine consumes the
+same object, so two engines can be compared blind on the same brief. Before
+any engine sees a line it is adapted for the ear: figures, currencies,
+percentages, years and ordinals are written as a narrator says them, in the
+language of the line; initialisms are spelt out; the organisation's own
+pronunciations are applied first.
+
+Two tiers. **Previews** — animatics, drafts — go to the fast model, or to
+OpenAI, because there the timing is what matters. **Finals** go to the
+premium engine, which on ElevenLabs means v3: stability as a tier rather than
+a dial, at most one audio tag where the direction calls for it, and the lines
+before and after each one so the film is one read. Every passage is then
+transcribed back by a *different* recogniser than the voice that spoke —
+Whisper or Scribe, chosen under Routing — and compared with the script.
+
+Founder and brand voices are cloned only against a recorded consent. The
+provider refuses without one, and a cloned voice can never be cast by
+accident: the library is searched with clones excluded, and naming one
+outright is refused unless the consent travels with the request.
 
 ### Revisions are a conversation
 

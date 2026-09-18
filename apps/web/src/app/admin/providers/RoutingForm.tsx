@@ -18,7 +18,7 @@ export function RoutingForm({
   routing: {
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
-    speech: { primary: string };
+    speech: { primary: string; preview: string; recognizer: string };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -86,14 +86,34 @@ export function RoutingForm({
               <span className="hint">Research is idempotent, so retrying elsewhere is safe.</span>
             </div>
             <div className="field">
-              <label htmlFor="speech-primary">Voice</label>
+              <label htmlFor="speech-primary">Voice, finals</label>
               <select id="speech-primary" name="speech.primary" className="input" defaultValue={routing.speech.primary}>
+                <option value="elevenlabs">ElevenLabs v3 (needs its key under Integrations)</option>
                 <option value="openai-speech">OpenAI (directed voices)</option>
-                <option value="elevenlabs">ElevenLabs (needs its key under Integrations)</option>
               </select>
               <span className="hint">
                 Both follow the film&rsquo;s language and the customer&rsquo;s choice of who reads. ElevenLabs
-                picks a native voice from its library; OpenAI directs one of its own.
+                casts a native voice and performs the direction on v3; OpenAI directs one of its own.
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="speech-preview">Voice, previews</label>
+              <select id="speech-preview" name="speech.preview" className="input" defaultValue={routing.speech.preview}>
+                <option value="same">Same engine, on its fast model</option>
+                <option value="openai-speech">OpenAI</option>
+                <option value="elevenlabs">ElevenLabs</option>
+              </select>
+              <span className="hint">Animatics and drafts. Timing is what matters there, not the performance.</span>
+            </div>
+            <div className="field">
+              <label htmlFor="speech-recognizer">Voice QA listens with</label>
+              <select id="speech-recognizer" name="speech.recognizer" className="input" defaultValue={routing.speech.recognizer}>
+                <option value="openai-speech">OpenAI (Whisper)</option>
+                <option value="elevenlabs">ElevenLabs (Scribe)</option>
+              </select>
+              <span className="hint">
+                Every passage is transcribed back and compared with the script: language, words, numbers.
+                A different ear from the voice that spoke.
               </span>
             </div>
             <div className="field">

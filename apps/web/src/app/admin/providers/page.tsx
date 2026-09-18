@@ -60,10 +60,10 @@ export default async function ProvidersPage() {
         ready: true,
         note:
           config.providers.speech.primary === 'elevenlabs' && state('elevenlabs')?.configured
-            ? 'Narration by ElevenLabs, a native voice per language.'
+            ? 'Narration by ElevenLabs v3: a native voice per language, performing the direction.'
             : state('elevenlabs')?.configured
-              ? 'ElevenLabs key saved. Choose it as the voice under Routing to use it; OpenAI reads meanwhile.'
-              : 'Narration by OpenAI, directed for the film’s language. Add ElevenLabs for a library of native voices.',
+              ? 'ElevenLabs key saved. Choose it for finals under Routing to use it; OpenAI reads meanwhile.'
+              : 'Narration by OpenAI, directed for the film’s language. Add ElevenLabs for the premium voice.',
       },
       {
         label: 'Object storage',
@@ -122,7 +122,11 @@ export default async function ProvidersPage() {
               primary: config.providers.browser.primary,
               fallback: config.providers.browser.fallback,
             },
-            speech: { primary: config.providers.speech.primary },
+            speech: {
+              primary: config.providers.speech.primary,
+              preview: config.providers.speech.preview,
+              recognizer: config.providers.speech.recognizer,
+            },
             media: {
               enabled: config.providers.media.enabled,
               maxCostPerRequestUsd: config.providers.media.maxCostPerRequestUsd,

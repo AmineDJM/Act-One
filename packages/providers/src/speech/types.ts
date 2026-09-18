@@ -1,32 +1,60 @@
+import type { SpeechQuality, TakeVariant, VoiceDirection, VoiceGender } from '@act-one/core';
 import type { CallContext, Provider } from '../types.ts';
 
 export type VoicePersona = 'narrator_neutral' | 'narrator_warm' | 'narrator_low' | 'brand_custom';
 
+/**
+ * One line to be spoken.
+ *
+ * The direction is the contract: a complete, provider-agnostic description of
+ * the performance, so two engines can be given the same brief and compared.
+ * The persona, gender and tone fields are the older, flatter way of saying the
+ * same thing and are still honoured when no direction is given.
+ */
 export type SpeechRequest = {
   text: string;
   persona: VoicePersona;
   /** Provider voice id for a brand/founder voice. Requires a consent record. */
   voiceId?: string;
-  /** 0.7 slow and considered, 1.15 urgent. */
+  /** 0.7 slow and considered, 1.15 urgent. A last resort: copy is rewritten shorter first. */
   rate?: number;
   format?: 'mp3' | 'wav' | 'opus';
   /** ISO 639-1. The voice is chosen for it and told to speak it natively. */
   language?: string | null;
   /** Who narrates, when the customer said. */
-  gender?: 'female' | 'male' | null;
+  gender?: VoiceGender | null;
   /** The register the customer asked for, in words the voice can be directed with. */
   tone?: string | null;
+  /** The full performance direction. Wins over persona, gender and tone. */
+  direction?: VoiceDirection | null;
+  /** Preview is fast and cheap for animatics; final is the studio voice. */
+  quality?: SpeechQuality;
+  /** The lines around this one, so a long piece is read as one performance. */
+  continuity?: {
+    previousText?: string | null;
+    nextText?: string | null;
+    /** Vendor request ids of the previous segments, newest last, when the engine can condition on them. */
+    previousRequestIds?: string[];
+  } | null;
+  /** Reproducibility across takes: same seed, same read, on engines that honour it. */
+  seed?: number | null;
+  /** Which take this is, when several are asked for. */
+  take?: TakeVariant;
 };
 
 /** Who reads when the customer did not say: the register decides. */
-export function defaultGender(persona: VoicePersona): 'female' | 'male' {
+export function defaultGender(persona: VoicePersona): VoiceGender {
   return persona === 'narrator_low' ? 'male' : 'female';
 }
 
-/** The voice's register, in a sentence a voice model can be directed with. */
+/**
+ * The direction in a sentence a voice model can be instructed with: the
+ * structured direction when there is one, the flat fields otherwise.
+ */
 export function voiceDirection(
-  request: Pick<SpeechRequest, 'persona' | 'language' | 'tone'>,
+  request: Pick<SpeechRequest, 'persona' | 'language' | 'tone' | 'direction'>,
 ): string {
+  if (request.direction) return directionPrompt(request.direction);
   const register =
     request.persona === 'narrator_warm'
       ? 'Warm, close and human, as if speaking to one person.'
@@ -48,12 +76,60 @@ export function voiceDirection(
     .join(' ');
 }
 
+const PACE_WORDS = {
+  slow: 'Unhurried; let the pauses breathe.',
+  natural: 'A natural pace, neither hurried nor slow.',
+  fast: 'Brisk and light, without rushing the ends of sentences.',
+} as const;
+
+const ENERGY_WORDS = {
+  low: 'low energy, almost intimate',
+  'medium-low': 'restrained energy',
+  medium: 'even energy',
+  'medium-high': 'lifted energy',
+  high: 'high energy',
+} as const;
+
+/** A structured direction, written out for an engine that takes instructions. */
+export function directionPrompt(direction: VoiceDirection): string {
+  const where = direction.locale ? ` (${direction.locale})` : '';
+  const curve = direction.emotionCurve
+    .map((cue) => `${cue.section}: ${cue.emotion}`)
+    .join('; ');
+  return [
+    `You are the narrator of a premium ${CONTEXT_WORDS[direction.context]} for a studio.`,
+    `Speak as a native speaker of ${direction.language}${where}, with the natural accent of that language and never a foreign one.`,
+    `Voice: ${direction.voiceProfile}. Tone: ${direction.tone}, ${ENERGY_WORDS[direction.energy]}.`,
+    PACE_WORDS[direction.pace],
+    curve ? `Arc: ${curve}.` : '',
+    direction.avoid.length > 0 ? `Avoid: ${direction.avoid.join(', ')}.` : '',
+    'Clean diction, natural pauses at punctuation, no filler.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+const CONTEXT_WORDS: Record<VoiceDirection['context'], string> = {
+  launch_film: 'product launch film',
+  social_cut: 'short social film',
+  explainer: 'product explainer',
+  audio_edition: 'audio edition of a written piece',
+  executive_update: 'executive update',
+  community: 'community piece',
+};
+
 export type SpeechResult = {
   audio: Uint8Array;
   contentType: string;
   durationSecondsEstimate: number;
   costUsd: number;
   model: string;
+  /** The voice that read it, in the vendor's terms; recorded with the asset. */
+  voiceId?: string;
+  /** Characters billed. */
+  characters?: number;
+  /** The vendor's id for this generation, when it can be conditioned on later. */
+  requestId?: string | null;
 };
 
 /**
@@ -93,4 +169,107 @@ export interface SpeechProvider extends Provider {
     consent: VoiceConsent,
     context: CallContext,
   ): Promise<SpeechResult>;
+}
+
+// ---------------------------------------------------------------------------
+// Recognition: what was actually said, for QA
+// ---------------------------------------------------------------------------
+
+export type TranscriptWord = { word: string; start: number; end: number };
+
+export type Transcript = {
+  text: string;
+  /** ISO 639-1 the recogniser heard, or null when it could not tell. */
+  language: string | null;
+  /** 0..1 when the recogniser says how sure it is. */
+  languageConfidence: number | null;
+  durationSeconds: number | null;
+  words: TranscriptWord[];
+  model: string;
+};
+
+export type TranscribeRequest = {
+  audio: Uint8Array;
+  contentType: string;
+  /** The language the audio is supposed to be in. A hint, never an instruction to the QA. */
+  language?: string | null;
+};
+
+/**
+ * Listens back. Used by voice QA to check that the language, the words and
+ * the numbers that came out are the ones that went in; a speech engine is
+ * never trusted to grade its own work, so the recogniser is chosen separately.
+ */
+export interface SpeechRecognizer extends Provider {
+  readonly kind: 'speech';
+  transcribe(request: TranscribeRequest, context: CallContext): Promise<Transcript>;
+}
+
+export function isSpeechRecognizer(provider: unknown): provider is SpeechRecognizer {
+  return (
+    typeof provider === 'object' &&
+    provider !== null &&
+    typeof (provider as SpeechRecognizer).transcribe === 'function'
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Voice library: casting and cloning
+// ---------------------------------------------------------------------------
+
+export type LibraryVoice = {
+  id: string;
+  name: string;
+  /** Set for a voice in the vendor's shared library that is not yet in the account. */
+  publicOwnerId: string | null;
+  language: string | null;
+  locale: string | null;
+  accent: string | null;
+  gender: VoiceGender | null;
+  age: string | null;
+  useCase: string | null;
+  description: string | null;
+  previewUrl: string | null;
+  /** Vendor-specific: premade, professional, cloned, generated. */
+  category: string | null;
+};
+
+export type VoiceSearch = {
+  language: string;
+  locale?: string | null;
+  gender?: VoiceGender | null;
+  useCase?: string | null;
+  limit?: number;
+};
+
+export type VoiceClone = {
+  name: string;
+  description?: string | null;
+  /** Clean recordings of the person, 1 to 3 minutes in total. */
+  samples: { data: Uint8Array; contentType: string; filename: string }[];
+  language?: string | null;
+  labels?: Record<string, string>;
+};
+
+/**
+ * Optional capability: engines with a library to cast from and, under consent,
+ * to clone into. The pipeline checks for it rather than assuming it.
+ */
+export interface VoiceLibrary {
+  /** Voices in the account, and in the shared library when the vendor has one. */
+  searchVoices(query: VoiceSearch, context: CallContext): Promise<LibraryVoice[]>;
+  /** Copies a shared-library voice into the account, so it can be used. */
+  addVoice(voice: Pick<LibraryVoice, 'id' | 'publicOwnerId' | 'name'>, context: CallContext): Promise<{ voiceId: string }>;
+  /** Clones a person's voice. Refuses without a consent that covers the organisation. */
+  cloneVoice(clone: VoiceClone, consent: VoiceConsent, context: CallContext): Promise<{ voiceId: string }>;
+  deleteVoice(voiceId: string, context: CallContext): Promise<void>;
+}
+
+export function hasVoiceLibrary(provider: unknown): provider is SpeechProvider & VoiceLibrary {
+  return (
+    typeof provider === 'object' &&
+    provider !== null &&
+    typeof (provider as VoiceLibrary).searchVoices === 'function' &&
+    typeof (provider as VoiceLibrary).cloneVoice === 'function'
+  );
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AppError } from '@act-one/core';
+import { AppError, type SpeechQuality } from '@act-one/core';
 import { NullCostSink, ProviderError, type CostSink, type ProviderHealth } from './types.ts';
 import { OpenAiLlmProvider } from './llm/openai.ts';
 import type { LlmProvider } from './llm/types.ts';
@@ -11,7 +11,7 @@ import { HiggsfieldProvider } from './media/higgsfield.ts';
 import type { GenerativeMediaProvider } from './media/types.ts';
 import { OpenAiSpeechProvider } from './speech/openai.ts';
 import { ElevenLabsProvider } from './speech/elevenlabs.ts';
-import type { SpeechProvider } from './speech/types.ts';
+import type { SpeechProvider, SpeechRecognizer } from './speech/types.ts';
 import { LocalFsStorageProvider } from './storage/local.ts';
 import { SupabaseStorageProvider } from './storage/supabase.ts';
 import type { StorageProvider } from './storage/types.ts';
@@ -51,10 +51,44 @@ const MediaConfig = z.object({
   maxRetries: z.number().int().min(0).max(5).default(2),
 });
 
-const SpeechConfig = z.object({
-  primary: z.enum(['openai-speech', 'elevenlabs']).default('openai-speech'),
-  enabled: z.boolean().default(true),
+const SpeechEngine = z.enum(['openai-speech', 'elevenlabs']);
+export type SpeechEngine = z.infer<typeof SpeechEngine>;
+
+const CuratedVoiceConfig = z.object({ voiceId: z.string().min(1), name: z.string().default('') });
+const CuratedProfiles = z.object({
+  premium: CuratedVoiceConfig.optional(),
+  warm: CuratedVoiceConfig.optional(),
+  neutral: CuratedVoiceConfig.optional(),
 });
+
+/**
+ * The voice engines. `primary` reads finals; `preview` reads animatics and
+ * drafts, or is the same engine on its cheaper model. The recogniser listens
+ * back for QA and is chosen apart from the engine that spoke, so an engine
+ * never grades itself.
+ */
+const SpeechConfig = z.object({
+  primary: SpeechEngine.default('openai-speech'),
+  preview: z.enum(['same', 'openai-speech', 'elevenlabs']).default('same'),
+  recognizer: SpeechEngine.default('openai-speech'),
+  enabled: z.boolean().default(true),
+  /** Whether customers may clone a voice at all, consent aside. */
+  cloning: z.boolean().default(false),
+  /** Alternative reads offered per passage on plans that carry them, 1 to 3. */
+  takes: z.number().int().min(1).max(3).default(2),
+  /** Passages that fail QA are regenerated this many times before the finding stands. */
+  maxRegenerations: z.number().int().min(0).max(3).default(1),
+  /** Ceiling per project on what the voice may cost us, USD; 0 is no ceiling. */
+  maxCostPerProjectUsd: z.number().min(0).default(0),
+  /** Voices chosen by an operator per locale or language: { 'fr-FR': { female: { premium: {...} } } }. */
+  curated: z
+    .record(
+      z.string(),
+      z.object({ female: CuratedProfiles.optional(), male: CuratedProfiles.optional() }),
+    )
+    .default({}),
+});
+export type SpeechConfig = z.infer<typeof SpeechConfig>;
 
 const StorageConfig = z.object({
   primary: z.enum(['supabase-storage', 'local-fs']).default('supabase-storage'),
@@ -80,7 +114,11 @@ export type RegistryOptions = {
     llm: LlmProvider;
     browser: BrowserAutomationProvider;
     media: GenerativeMediaProvider;
+    /** The engine for finals. */
     speech: SpeechProvider;
+    /** The engine for previews; finals' engine when absent. */
+    speechPreview: SpeechProvider;
+    recognizer: SpeechRecognizer;
     storage: StorageProvider;
   }>;
 };
@@ -160,20 +198,48 @@ export class ProviderRegistry {
     }
   }
 
-  speech(): SpeechProvider {
+  /**
+   * The voice for a quality tier. Finals go to the primary engine; previews
+   * to the preview engine when one is set apart, otherwise to the same engine,
+   * which picks its cheaper model from the request's quality.
+   */
+  speech(quality: SpeechQuality = 'final'): SpeechProvider {
+    if (quality === 'preview' && this.overrides?.speechPreview) return this.overrides.speechPreview;
     if (this.overrides?.speech) return this.overrides.speech;
     if (!this.config.speech.enabled) {
       throw new AppError('provider_unavailable', 'Speech synthesis is disabled.');
     }
-    return this.memo(`speech:${this.config.speech.primary}`, () => {
-      if (this.config.speech.primary === 'elevenlabs') {
+    const engine =
+      quality === 'preview' && this.config.speech.preview !== 'same'
+        ? this.config.speech.preview
+        : this.config.speech.primary;
+    return this.memo(`speech:${engine}`, () => this.buildSpeech(engine));
+  }
+
+  /** Listens back for QA. Never the engine that spoke unless it is the only one with a key. */
+  recognizer(): SpeechRecognizer {
+    if (this.overrides?.recognizer) return this.overrides.recognizer;
+    const engine = this.config.speech.recognizer;
+    return this.memo(`recognizer:${engine}`, () => {
+      if (engine === 'elevenlabs') {
         const elevenlabs = new ElevenLabsProvider({ costSink: this.costSink });
-        // Chosen but without a key: the film still gets a voice, from OpenAI,
-        // rather than no voice and an error at the last stage of a render.
         if (elevenlabs.isConfigured()) return elevenlabs;
       }
       return new OpenAiSpeechProvider({ costSink: this.costSink });
     });
+  }
+
+  private buildSpeech(engine: SpeechEngine): SpeechProvider {
+    if (engine === 'elevenlabs') {
+      const elevenlabs = new ElevenLabsProvider({
+        costSink: this.costSink,
+        curated: this.config.speech.curated,
+      });
+      // Chosen but without a key: the film still gets a voice, from OpenAI,
+      // rather than no voice and an error at the last stage of a render.
+      if (elevenlabs.isConfigured()) return elevenlabs;
+    }
+    return new OpenAiSpeechProvider({ costSink: this.costSink });
   }
 
   storage(): StorageProvider {
@@ -243,6 +309,40 @@ export class ProviderRegistry {
     this.cache.set(key, value);
     return value;
   }
+}
+
+/**
+ * The speech overrides for a registry built from stored credentials: the
+ * final engine, the preview engine when it is a different one, and the
+ * recogniser, each built only when its key is there. Both apps build their
+ * registries through this so the console and the worker cannot disagree
+ * about who reads a film.
+ */
+export function speechOverrides(
+  config: SpeechConfig,
+  build: {
+    openai: (options: { transcriptionModel?: string }) => OpenAiSpeechProvider;
+    /** Null when no ElevenLabs key is stored. */
+    elevenlabs: ((options: Record<string, never>) => ElevenLabsProvider) | null;
+  },
+): { speech: SpeechProvider; speechPreview?: SpeechProvider; recognizer: SpeechRecognizer } {
+  let openai: OpenAiSpeechProvider | null = null;
+  let elevenlabs: ElevenLabsProvider | null = null;
+  const engine = (name: SpeechEngine): SpeechProvider & SpeechRecognizer => {
+    if (name === 'elevenlabs' && build.elevenlabs) {
+      elevenlabs ??= build.elevenlabs({});
+      return elevenlabs;
+    }
+    openai ??= build.openai({});
+    return openai;
+  };
+  const speech = engine(config.primary);
+  const preview = config.preview === 'same' ? null : engine(config.preview);
+  return {
+    speech,
+    ...(preview && preview !== speech ? { speechPreview: preview } : {}),
+    recognizer: engine(config.recognizer),
+  };
 }
 
 /**

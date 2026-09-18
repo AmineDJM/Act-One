@@ -158,6 +158,8 @@ export async function saveRoutingAction(
     speech: {
       ...current.providers.speech,
       primary: String(formData.get('speech.primary') ?? current.providers.speech.primary),
+      preview: String(formData.get('speech.preview') ?? current.providers.speech.preview),
+      recognizer: String(formData.get('speech.recognizer') ?? current.providers.speech.recognizer),
     },
     media: {
       ...current.providers.media,

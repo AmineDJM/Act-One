@@ -26,8 +26,17 @@ export {
 } from './media/higgsfield.ts';
 
 export * from './speech/types.ts';
-export { OpenAiSpeechProvider, estimateNarrationSeconds } from './speech/openai.ts';
-export { ElevenLabsProvider, pcmToWav } from './speech/elevenlabs.ts';
+export { OpenAiSpeechProvider, estimateNarrationSeconds, languageCode } from './speech/openai.ts';
+export {
+  ElevenLabsProvider,
+  ELEVENLABS_MODELS,
+  pcmToWav,
+  withAudioTags,
+  isV3,
+  type ElevenLabsConfig,
+  type CuratedVoice,
+  type CuratedVoices,
+} from './speech/elevenlabs.ts';
 
 export * from './storage/types.ts';
 export { LocalFsStorageProvider } from './storage/local.ts';
