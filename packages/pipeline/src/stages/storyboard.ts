@@ -1,4 +1,4 @@
-import { AppError, storyboardEstimatedCost } from '@act-one/core';
+import { AppError, rankLibraryAssets, storyboardEstimatedCost } from '@act-one/core';
 import { planFor } from '../entitlements.ts';
 import { CreativeDirector, StoryboardEngine, detectLanguage } from '@act-one/creative';
 import { runDeterministicChecks } from '@act-one/qa';
@@ -70,6 +70,24 @@ export async function runStoryboard(
     project.brief.durationSeconds ?? concept.estimatedDurationSeconds ?? ceiling;
   const target = Math.min(wanted, ceiling);
 
+  /*
+   * Real assets first. Everything the library holds for this project — what
+   * the customer uploaded and shared, what the research kept — is put in
+   * front of the planner before it may imagine anything, approved pictures
+   * first. Generative shots are for what nobody has a picture of.
+   */
+  const libraryAssets = rankLibraryAssets(
+    await store.assets.listLibraryForProject(organizationId, project.id),
+  ).filter((asset) => asset.contentType.startsWith('image/'));
+  if (libraryAssets.length > 0) {
+    await context.activity({
+      step: 'storyboard',
+      kind: 'note',
+      label: `${libraryAssets.length} real asset${libraryAssets.length === 1 ? '' : 's'} from the library offered first`,
+      status: 'done',
+    });
+  }
+
   const engine = new StoryboardEngine(registry.llm());
   const built = await engine.build(
     {
@@ -81,6 +99,7 @@ export async function runStoryboard(
       brief: project.brief,
       version,
       targetDurationSeconds: target,
+      libraryAssets,
     },
     call,
   );

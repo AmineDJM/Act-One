@@ -43,6 +43,61 @@ export const AssetRights = z.enum([
 ]);
 export type AssetRights = z.infer<typeof AssetRights>;
 
+/**
+ * What a library asset is a picture of.
+ *
+ * Inferred after upload and never demanded at upload: a founder dropping
+ * forty photos on the page is not asked forty questions. Every category can
+ * be corrected, and a correction is kept over anything inferred later.
+ */
+export const LibraryCategory = z.enum([
+  'product',
+  'founder',
+  'people',
+  'team',
+  'office',
+  'ui',
+  'screenshot',
+  'logo',
+  'brand',
+  'illustration',
+  'reference',
+  'other',
+]);
+export type LibraryCategory = z.infer<typeof LibraryCategory>;
+
+export const LIBRARY_CATEGORY_LABELS: Record<LibraryCategory, string> = {
+  product: 'Product',
+  founder: 'Founder',
+  people: 'People',
+  team: 'Team',
+  office: 'Office',
+  ui: 'UI',
+  screenshot: 'Screenshot',
+  logo: 'Logo',
+  brand: 'Brand',
+  illustration: 'Illustration',
+  reference: 'Reference',
+  other: 'Other',
+};
+
+/** Who or what decided the category: nobody yet, the classifier, or a person. */
+export const CategorySource = z.enum(['none', 'inferred', 'user']);
+export type CategorySource = z.infer<typeof CategorySource>;
+
+/** Where a library asset came from, as the card says it. */
+export const AssetSource = z.enum(['upload', 'browser_research', 'generated', 'rendered', 'edited', 'pipeline']);
+export type AssetSource = z.infer<typeof AssetSource>;
+
+export const ASSET_SOURCE_LABELS: Record<AssetSource, string> = {
+  upload: 'Upload',
+  browser_research: 'Browser Research',
+  generated: 'Generated',
+  rendered: 'Rendered',
+  edited: 'Edited',
+  pipeline: 'Pipeline',
+};
+
 export const Asset = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -66,8 +121,32 @@ export const Asset = z.object({
   costUsd: z.number().min(0).default(0),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string(),
+
+  // --- the library ------------------------------------------------------
+  /**
+   * In the workspace's library: reusable media a person can see, name, tag
+   * and put in a film. Intermediate renders, poster frames and masters stay
+   * out of it; they belong to the production that made them.
+   */
+  library: z.boolean().default(false),
+  /** What a person calls it. The filename until they rename it. */
+  name: z.string().max(200).default(''),
+  category: LibraryCategory.default('other'),
+  categorySource: CategorySource.default('none'),
+  /** What is in the picture, in a sentence, so the library can be searched by content. */
+  description: z.string().max(2000).default(''),
+  tags: z.array(z.string().max(60)).max(40).default([]),
+  favorite: z.boolean().default(false),
+  /** Approved for use: the creative system prefers these over anything else in the library. */
+  approved: z.boolean().default(false),
+  /** The asset this one was made from: a generated shot's reference still, an edit's original. */
+  parentAssetId: z.string().nullable().default(null),
+  uploadedByUserId: z.string().nullable().default(null),
+  source: AssetSource.default('pipeline'),
 });
 export type Asset = z.infer<typeof Asset>;
+/** What a caller hands the store: every library field, and most others, may be left to its default. */
+export type AssetInput = z.input<typeof Asset>;
 
 /** Storage layout: organisation / project / concept / scene / asset. */
 export function storageKeyFor(parts: {
@@ -88,6 +167,11 @@ export function storageKeyFor(parts: {
   return segments.join('/');
 }
 
+/** Library uploads live under the organisation, not a project: one file, any number of projects. */
+export function libraryStorageKeyFor(parts: { organizationId: string; assetId: string; extension: string }): string {
+  return `org/${parts.organizationId}/library/${parts.assetId}.${parts.extension.replace(/^\./, '')}`;
+}
+
 /**
  * May this asset stand for the customer's product on screen?
  *
@@ -101,11 +185,57 @@ export function storageKeyFor(parts: {
  * scenes keep pointing at the capture and pass this the same way a flat one
  * does.
  */
-export function isRealProductAsset(asset: Pick<Asset, 'origin' | 'kind'>): boolean {
+export function isRealProductAsset(asset: Pick<Asset, 'origin' | 'kind'> & Partial<Pick<Asset, 'category'>>): boolean {
   if (asset.origin !== 'captured' && asset.origin !== 'uploaded') return false;
-  return (
-    asset.kind === 'screenshot' ||
-    asset.kind === 'screen_recording' ||
-    asset.kind === 'brand_image'
-  );
+  if (asset.kind === 'screenshot' || asset.kind === 'screen_recording' || asset.kind === 'brand_image') return true;
+  // A library upload is the customer's own picture; when a person or the
+  // classifier says it shows the interface, it is evidence of the interface.
+  return asset.kind === 'user_upload' && (asset.category === 'ui' || asset.category === 'screenshot');
+}
+
+/**
+ * A first guess at what an upload is, from nothing but its name.
+ *
+ * The classifier looks at the picture afterwards; this is what the card says
+ * in the seconds before it has, and what stands when there is no model to
+ * ask. It is deliberately conservative: a name that says nothing is `other`,
+ * not a guess dressed as a finding.
+ */
+export function categoryFromFilename(filename: string, contentType = ''): LibraryCategory {
+  const name = filename.toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[_\-.]+/g, ' ');
+  const has = (pattern: RegExp) => pattern.test(name);
+  if (has(/\b(logo|logotype|wordmark|favicon|brandmark|monogram)\b/)) return 'logo';
+  if (has(/\b(screenshot|screen ?shot|screen ?capture|capture|screen)\b/)) return 'screenshot';
+  if (has(/\b(founder|ceo|cto|coo|cofounder|co founder|portrait|headshot)\b/)) return 'founder';
+  if (has(/\b(team|crew|staff|offsite|all ?hands)\b/)) return 'team';
+  if (has(/\b(office|hq|headquarters|workspace|building|campus)\b/)) return 'office';
+  if (has(/\b(ui|dashboard|interface|app|mockup|mock up|wireframe)\b/)) return 'ui';
+  if (has(/\b(product|device|hardware|packshot|pack shot|packaging|unit)\b/)) return 'product';
+  if (has(/\b(illustration|illus|drawing|vector|sketch|artwork)\b/)) return 'illustration';
+  if (has(/\b(brand|pattern|texture|palette|swatch|gradient|typography|type ?specimen)\b/)) return 'brand';
+  if (has(/\b(reference|ref|moodboard|mood board|inspiration|inspo|benchmark)\b/)) return 'reference';
+  if (has(/\b(people|customer|customers|user|users|person|community|event|conference|talk|meetup)\b/)) return 'people';
+  if (contentType === 'image/svg+xml') return 'logo';
+  return 'other';
+}
+
+/** A name for the card from a filename: the extension off, the separators spaces. */
+export function nameFromFilename(filename: string): string {
+  const base = filename.split(/[\\/]/).pop() ?? filename;
+  return base.replace(/\.[a-z0-9]{2,5}$/i, '').replace(/[_]+/g, ' ').trim().slice(0, 200) || base.slice(0, 200);
+}
+
+/**
+ * The order the creative system looks at the library in.
+ *
+ * Approved first: a person said "use this". Then what they marked as a
+ * favourite, then the newest. Real assets are consulted before anything is
+ * generated, and this is the order they are consulted in.
+ */
+export function rankLibraryAssets<T extends Pick<Asset, 'approved' | 'favorite' | 'createdAt'>>(assets: readonly T[]): T[] {
+  return [...assets].sort((a, b) => {
+    if (a.approved !== b.approved) return a.approved ? -1 : 1;
+    if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 }

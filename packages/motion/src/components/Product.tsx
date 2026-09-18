@@ -335,3 +335,67 @@ export const CursorSequence: React.FC<{
     </div>
   );
 };
+
+/**
+ * A photograph, full frame.
+ *
+ * The library's real pictures — a founder, an office, a product on a table —
+ * are shown the way a documentary would: the whole frame, one slow camera
+ * move, nothing drawn on top of the picture except the words the scene
+ * carries, in the caption size, sitting where the frame's grid puts them.
+ * The restraint is the point; a photograph in a card with a drop shadow is
+ * a slide.
+ */
+export const PhotoHold: React.FC<{
+  src: string;
+  tokens: DesignTokens;
+  camera: CameraRecipe;
+  durationSeconds: number;
+  easing?: EasingName;
+  delaySeconds?: number;
+  children?: React.ReactNode;
+}> = ({ src, tokens, camera, durationSeconds, easing, delaySeconds, children }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const entrance = ease(easing ?? 'out_quint', progress(frame, fps, { delaySeconds: delaySeconds ?? 0, durationSeconds: 0.9 }));
+  const camT = ease(camera.easing, progress(frame, fps, { durationSeconds }));
+  const exit = exitProgress(frame, fps, durationSeconds, 0.35);
+
+  // A static camera still breathes: the quietest possible push keeps a held
+  // photograph from reading as a paused video.
+  const fromScale = camera.move === 'static' ? 1.0 : camera.fromScale;
+  const toScale = camera.move === 'static' ? 1.03 : camera.toScale;
+  const scale = interpolate(camT, fromScale, toScale);
+  const x = interpolate(camT, camera.fromX, camera.toX) * tokens.frame.width;
+  const y = interpolate(camT, camera.fromY, camera.toY) * tokens.frame.height;
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: tokens.canvas, opacity: (1 - exit) * Math.min(1, entrance * 1.4) }}>
+      <Img
+        src={src}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: 'block',
+          transform: `translate(${x}px, ${y}px) scale(${scale})`,
+          transformOrigin: '50% 50%',
+        }}
+      />
+      {children ? (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            // Only where the words sit: the picture stays the picture.
+            background: `linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.0) 45%)`,
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+};

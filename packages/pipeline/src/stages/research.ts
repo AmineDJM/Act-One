@@ -1,5 +1,5 @@
 import { AppError, newId, secretContextFor } from '../shared.ts';
-import { ResearchPageType, credentialIsUsable, stageReached, type ProductUnderstanding, type ResearchSource } from '@act-one/core';
+import { RESEARCH_PAGE_LABELS, ResearchPageType, credentialIsUsable, stageReached, type ProductUnderstanding, type ResearchSource } from '@act-one/core';
 import { ProductResearchAgent, ProductExplorer } from '@act-one/research';
 import type { SecretVault } from '@act-one/providers';
 import { policyForAuthenticatedProduct } from '@act-one/providers';
@@ -88,6 +88,12 @@ export async function runResearch(
       contentType: 'image/png',
       sourceUrl: project.websiteUrl,
       metadata: { role: 'hero' },
+      library: true,
+      name: `${hostOf(project.websiteUrl)} — home`,
+      category: 'screenshot',
+      description: `The homepage of ${hostOf(project.websiteUrl)}, as the research first saw it.`,
+      source: 'browser_research',
+      attachTo: [project.id],
     });
   }
 
@@ -116,10 +122,20 @@ export async function runResearch(
             captureKind: publicCapture.kind,
             label: publicCapture.label,
           },
+          // A product image the site published is the product; a page is a page.
+          library: true,
+          name: publicCapture.label || moment.title,
+          category: publicCapture.kind === 'product_image' ? 'product' : 'screenshot',
+          description: `${moment.title}: ${publicCapture.kind === 'product_image' ? 'a product image published on' : 'the page at'} ${withoutQuery(publicCapture.pageUrl)}.`,
+          source: 'browser_research',
+          attachTo: [project.id],
         });
         return { ...moment, screenshots: [stored.asset.id] };
       }
 
+      // Observed inside the product, with the customer's own access. The
+      // library keeps the picture and the moment's name; never the session
+      // that took it, and never an address with anything in its query.
       const before = await storeAsset(context, {
         data: bytes.before,
         kind: 'screenshot',
@@ -127,8 +143,14 @@ export async function runResearch(
         rights: 'customer_owned',
         extension: 'png',
         contentType: 'image/png',
-        sourceUrl: moment.sourceUrl,
+        sourceUrl: moment.sourceUrl ? withoutQuery(moment.sourceUrl) : null,
         metadata: { momentId: moment.id, state: 'before' },
+        library: true,
+        name: bytes.after ? `${moment.title} — before` : moment.title,
+        category: 'ui',
+        description: `${moment.title}, inside the product${bytes.after ? ', before the action' : ''}.`,
+        source: 'browser_research',
+        attachTo: [project.id],
       });
 
       const after = bytes.after
@@ -139,8 +161,14 @@ export async function runResearch(
             rights: 'customer_owned',
             extension: 'png',
             contentType: 'image/png',
-            sourceUrl: moment.sourceUrl,
+            sourceUrl: moment.sourceUrl ? withoutQuery(moment.sourceUrl) : null,
             metadata: { momentId: moment.id, state: 'after' },
+            library: true,
+            name: `${moment.title} — after`,
+            category: 'ui',
+            description: `${moment.title}, inside the product, after the action.`,
+            source: 'browser_research',
+            attachTo: [project.id],
           })
         : null;
 
@@ -388,6 +416,7 @@ async function keepResearchTrail(
     let screenshotAssetId: string | null = null;
     if (page.screenshot && page.statusCode < 400) {
       try {
+        const pageType = pageTypeOf(page.intent, page.url);
         const stored = await storeAsset(context, {
           data: page.screenshot,
           kind: 'screenshot',
@@ -395,15 +424,24 @@ async function keepResearchTrail(
           rights: 'customer_owned',
           extension: 'png',
           contentType: 'image/png',
-          sourceUrl: page.url,
+          sourceUrl: withoutQuery(page.url),
           metadata: {
             role: 'research',
             source: 'browser_research',
-            pageUrl: page.url,
+            pageUrl: withoutQuery(page.url),
             pageTitle: page.title,
-            pageType: pageTypeOf(page.intent, page.url),
+            pageType,
             capturedAt: page.capturedAt,
           },
+          // Useful to the film later, so it goes in the library: the
+          // customer's own pages are the most honest pictures of the product
+          // there are, and a person may want the pricing page in a shot.
+          library: true,
+          name: page.title.trim().slice(0, 120) || withoutQuery(page.url),
+          category: 'screenshot',
+          description: `${RESEARCH_PAGE_LABELS[pageType]} page at ${withoutQuery(page.url)}${page.reason ? `: ${page.reason}` : ''}.`,
+          source: 'browser_research',
+          attachTo: [project.id],
         });
         screenshotAssetId = stored.asset.id;
       } catch (error) {
@@ -438,4 +476,22 @@ async function keepResearchTrail(
     });
   }
   await store.researchSources.replaceForProject(organizationId, project.id, sources);
+}
+
+/** The address without its query or fragment: a token in a URL is a secret, and the library keeps none. */
+function withoutQuery(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url.split(/[?#]/)[0] ?? url;
+  }
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }

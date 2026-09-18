@@ -10,6 +10,9 @@ import {
   round3,
   sceneShowsSomething,
   storyboardDuration,
+  isRealProductAsset,
+  LIBRARY_CATEGORY_LABELS,
+  type Asset,
   type BrandSystem,
   type CameraRecipe,
   type Concept,
@@ -59,6 +62,8 @@ const ScenePlan = z.object({
         generativeBrief: z.string().max(600).default(''),
         /** Which supported claim this scene asserts, if any. */
         claimText: z.string().max(300).default(''),
+        /** A real picture from the library to show in this scene, by id. */
+        libraryAssetId: z.string().nullable().default(null),
       }),
     )
     .min(3)
@@ -77,10 +82,20 @@ Rules:
 - Never film the same moment in two consecutive scenes. Two shots of one capture in a row is the same picture twice; put a different beat between them or use a different moment.
 - Only write "generativeBrief" for atmospheric, metaphorical or environmental scenes. Never describe a product interface in a generative brief — generated footage must never stand in for the real product.
 - "claimText" must be copied verbatim from the supported claims you are given, or left empty. Never invent a claim.
+- The library lists real pictures the customer supplied or the research kept. Real pictures come before anything imagined: when a beat about people, a place, a product or a proof can be carried by one of them, set "libraryAssetId" to its id and leave "generativeBrief" empty. Prefer pictures marked approved. Use each picture at most once. A UI picture from the library may carry a product beat only when it shows the moment the scene films; a photograph of people, an office or a product carries a human or environmental beat.
 - Every line of on-screen text is a complete thought on its own. Never end a line expecting the next thing to finish it — the end card is composed separately and will not complete your sentence.
 - The first scene is the hook. Do not write the ending: the film closes on its own end card, with the company's name and address. Earn everything in between.
 
 Return JSON only.`;
+
+/**
+ * A library asset as the planner sees it: enough to choose it and to know
+ * what it may stand for, never the bytes.
+ */
+export type LibraryAsset = Pick<
+  Asset,
+  'id' | 'name' | 'category' | 'description' | 'approved' | 'favorite' | 'origin' | 'kind' | 'contentType' | 'width' | 'height'
+>;
 
 export type StoryboardInput = {
   projectId: string;
@@ -91,6 +106,8 @@ export type StoryboardInput = {
   brief: ProjectBrief;
   version: number;
   targetDurationSeconds?: number;
+  /** What the library holds for this project, in the order it should be consulted. */
+  libraryAssets?: LibraryAsset[];
 };
 
 export type StoryboardResult = {
@@ -220,6 +237,8 @@ export class StoryboardEngine {
       ...input.understanding.differentiators,
       ...input.understanding.proofPoints,
     ];
+    // The first sixteen: the ranking put approved and favourite pictures first.
+    const library = (input.libraryAssets ?? []).slice(0, 16);
     const approximateScenes = Math.max(
       4,
       Math.round(target / system.pacing.averageSceneSeconds),
@@ -263,6 +282,16 @@ export class StoryboardEngine {
                   (m) =>
                     `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'} ` +
                     captureNote(m),
+                )
+              : ['- none']),
+            ``,
+            `# Library (real pictures; use these before imagining anything)`,
+            ...(library.length > 0
+              ? library.map(
+                  (asset) =>
+                    `- ${asset.id} — ${asset.name || 'untitled'} [${LIBRARY_CATEGORY_LABELS[asset.category]}` +
+                    `${asset.approved ? ', approved' : asset.favorite ? ', favourite' : ''}]` +
+                    `${asset.description ? `: ${asset.description.slice(0, 200)}` : ''}`,
                 )
               : ['- none']),
             ``,
@@ -320,10 +349,28 @@ export class StoryboardEngine {
      */
     let previousRecipe: MotionRecipeName | null = null;
 
+    /*
+     * Real pictures first. A scene the planner gave a library picture shows
+     * that picture: a product capture from the library carries the product
+     * beat the way a moment's capture does; a photograph is staged as real
+     * media. Each picture once — the model is told, and this is the lock.
+     */
+    const library = new Map((input.libraryAssets ?? []).map((asset) => [asset.id, asset] as const));
+    const used = new Set<string>();
+    // Generated shots are anchored to the brand's own approved material, so
+    // what the model imagines is lit and coloured like what is real.
+    const anchor = (input.libraryAssets ?? []).find(
+      (asset) => asset.approved && (asset.category === 'product' || asset.category === 'brand') && !asset.contentType.includes('svg'),
+    );
+
     const drafted = plan.scenes.map((planned, index): { scene: Scene; planned: typeof planned } => {
       const archetype = this.resolveArchetype(system, planned.archetypeId, index, plan.scenes.length);
       const moment = planned.momentId ? findMoment(input.understanding, planned.momentId) : undefined;
-      const hasRealAsset = Boolean(moment && moment.screenshots.length > 0);
+      const picked = planned.libraryAssetId && !used.has(planned.libraryAssetId) ? library.get(planned.libraryAssetId) : undefined;
+      if (picked) used.add(picked.id);
+      const pickedIsProduct = Boolean(picked && isRealProductAsset(picked));
+      const pickedIsPhoto = Boolean(picked && !pickedIsProduct);
+      const hasRealAsset = Boolean(moment && moment.screenshots.length > 0) || pickedIsProduct;
 
       const routed = routeShot({
         purpose: purposeFor(archetype, planned.generativeBrief.length > 0),
@@ -333,9 +380,14 @@ export class StoryboardEngine {
       });
 
       // The archetype's own visual type wins unless routing has vetoed it —
-      // which happens exactly when a product scene has no real capture behind it.
-      const visualType: VisualType =
-        archetype.requiresProductAsset && !hasRealAsset ? routed.visualType : archetype.visualType;
+      // which happens exactly when a product scene has no real capture behind
+      // it — and a photograph from the library is real media whatever the
+      // archetype was written for.
+      const visualType: VisualType = pickedIsPhoto
+        ? 'real_media'
+        : archetype.requiresProductAsset && !hasRealAsset
+          ? routed.visualType
+          : archetype.visualType;
 
       const typeScale =
         visualType === 'kinetic_typography' && index === 0
@@ -374,20 +426,20 @@ export class StoryboardEngine {
         narration,
         onScreenText,
         visualType,
-        assetRefs: moment?.screenshots ?? [],
+        assetRefs: picked ? [picked.id, ...(moment?.screenshots ?? [])] : (moment?.screenshots ?? []),
         momentIds: moment ? [moment.id] : [],
         motionRecipe,
         cameraRecipe: cameraFor(archetype, input.brand),
         soundCues: [],
         voiceOver: narration.length > 0,
         generativeNeeds:
-          visualType === 'generated_broll' || visualType === 'mixed_media'
+          !picked && (visualType === 'generated_broll' || visualType === 'mixed_media')
             ? [
                 {
                   kind: 'video' as const,
                   brief: planned.generativeBrief || planned.purpose,
                   mustNotContainText: true,
-                  referenceAssetIds: [],
+                  referenceAssetIds: anchor ? [anchor.id] : [],
                   durationSeconds: 4,
                   aspect: '16:9' as const,
                   resolvedProvider: null,
@@ -399,7 +451,7 @@ export class StoryboardEngine {
         threeDSceneId: null,
         status: 'draft' as const,
         claimEvidenceIds: evidenceFor(planned.claimText, input.understanding),
-        notes: routed.reason,
+        notes: picked ? `Real picture from the library: ${picked.name || picked.id}.` : routed.reason,
         estimatedCostUsd: 0,
       };
 

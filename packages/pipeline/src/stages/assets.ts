@@ -198,6 +198,12 @@ async function generateShot(
     model: finished.model,
     costUsd: estimate,
     durationSeconds: need.durationSeconds,
+    // Where the shot came from, kept: a generated clip anchored to a real
+    // still is that still's descendant, and the library shows the line.
+    source: 'generated',
+    parentAssetId: need.referenceAssetIds[0] ?? null,
+    name: `Generated shot, scene ${scene.index + 1}`,
+    description: need.brief.slice(0, 300),
   });
 
   await store.storyboards.updateScene(organizationId, scene.id, {

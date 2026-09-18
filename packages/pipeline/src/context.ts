@@ -5,7 +5,10 @@ import {
   type AssetKind,
   type AssetOrigin,
   type AssetRights,
+  type AssetSource,
+  type CategorySource,
   type JobEventInput,
+  type LibraryCategory,
   type Project,
 } from '@act-one/core';
 import type { Store } from '@act-one/db';
@@ -63,7 +66,7 @@ export async function storeAsset(
     sourceUrl?: string | null;
     costUsd?: number;
     metadata?: Record<string, unknown>;
-  },
+  } & LibraryParams,
 ): Promise<StoredAsset> {
   const assetId = newId('ast');
   const storageKey = storageKeyFor({
@@ -103,9 +106,56 @@ export async function storeAsset(
     costUsd: params.costUsd ?? 0,
     metadata: params.metadata ?? {},
     createdAt: new Date().toISOString(),
+    ...libraryFields(params),
   });
+  await attachToLibrary(context, asset.id, params);
 
   return { asset, url: stored.url ?? (await storage.signedUrl(storageKey)) };
+}
+
+/**
+ * What a stage may say about an asset's place in the library.
+ *
+ * Most of what the pipeline stores is production material and stays out of
+ * it. A page the research read, a product image it found, a shot generated
+ * from a still a person approved: those are named, categorised and attached
+ * to the project here, at the moment they are made, so the library never
+ * needs a second pass to find out what it holds.
+ */
+export type LibraryParams = {
+  library?: boolean;
+  name?: string;
+  category?: LibraryCategory;
+  categorySource?: CategorySource;
+  description?: string;
+  source?: AssetSource;
+  /** The asset this one was made from — a generated shot's reference still. */
+  parentAssetId?: string | null;
+  /** Projects to attach the asset to. A library asset attached to none is shared with every project. */
+  attachTo?: string[];
+};
+
+function libraryFields(params: LibraryParams): Partial<Asset> {
+  return {
+    library: params.library ?? false,
+    name: params.name ?? '',
+    category: params.category ?? 'other',
+    categorySource: params.categorySource ?? (params.category ? 'inferred' : 'none'),
+    description: params.description ?? '',
+    source: params.source ?? 'pipeline',
+    parentAssetId: params.parentAssetId ?? null,
+  };
+}
+
+async function attachToLibrary(context: StageContext, assetId: string, params: LibraryParams): Promise<void> {
+  if (!params.attachTo || params.attachTo.length === 0) return;
+  try {
+    await context.store.assets.attachToProjects(context.organizationId, assetId, params.attachTo);
+  } catch (error) {
+    // The asset is stored and recorded; a missing project link is the
+    // library's problem, not the film's.
+    console.error('[assets] library link not written:', (error as Error).message.slice(0, 160));
+  }
 }
 
 /** Copies a provider-hosted result into our storage before its URL expires. */
@@ -123,7 +173,7 @@ export async function ingestAsset(
     model?: string | null;
     costUsd?: number;
     durationSeconds?: number | null;
-  },
+  } & LibraryParams,
 ): Promise<StoredAsset> {
   const assetId = newId('ast');
   const storageKey = storageKeyFor({
@@ -162,7 +212,9 @@ export async function ingestAsset(
     costUsd: params.costUsd ?? 0,
     metadata: {},
     createdAt: new Date().toISOString(),
+    ...libraryFields(params),
   });
+  await attachToLibrary(context, asset.id, params);
 
   return { asset, url: stored.url ?? (await storage.signedUrl(storageKey)) };
 }

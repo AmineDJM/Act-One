@@ -9,7 +9,7 @@ import {
 } from '@act-one/core';
 import { resolveTokens, watermark as watermarkSvg, type DesignTokens } from '@act-one/design';
 import { WordReveal, KineticHeadline, EditorialHeadline, MetricReveal, QuoteScene } from './components/Type.tsx';
-import { ProductWindow, ProductZoom, SpatialCards, CursorSequence } from './components/Product.tsx';
+import { ProductWindow, ProductZoom, SpatialCards, CursorSequence, PhotoHold } from './components/Product.tsx';
 import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './components/Brand.tsx';
 
 /**
@@ -228,6 +228,38 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             easing={easing}
             delaySeconds={scene.motionRecipe.delay}
           />
+        ) : (
+          typeFallback()
+        );
+
+      case 'photo_hold':
+        // A real photograph from the library, full frame. Without the
+        // picture the scene is its words, as everywhere else.
+        return assets[0] ? (
+          <PhotoHold
+            src={assets[0]}
+            tokens={tokens}
+            camera={scene.cameraRecipe}
+            durationSeconds={scene.duration}
+            easing={easing}
+            delaySeconds={scene.motionRecipe.delay}
+          >
+            {text ? (
+              <Framed tokens={tokens} placement="lower_third">
+                <WordReveal
+                  text={text}
+                  token={tokens.type.caption}
+                  color="#ffffff"
+                  tokens={tokens}
+                  maxWidth={tokens.grid.safe.width * 0.6}
+                  maxLines={2}
+                  easing={easing}
+                  durationSeconds={scene.duration}
+                  delaySeconds={0.4}
+                />
+              </Framed>
+            ) : null}
+          </PhotoHold>
         ) : (
           typeFallback()
         );

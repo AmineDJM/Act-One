@@ -22,6 +22,7 @@ export * from './domain/org.ts';
 export * from './domain/billing.ts';
 export * from './domain/entitlement-policy.ts';
 export * from './domain/asset.ts';
+export * from './media/image-info.ts';
 export * from './domain/render.ts';
 export * from './domain/cost.ts';
 export * from './domain/operations.ts';

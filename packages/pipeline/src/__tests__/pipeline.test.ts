@@ -317,6 +317,14 @@ describe('pipeline', () => {
     const kept = await store.assets.get(org.id, sources[0]!.screenshotAssetId!);
     expect(kept).toMatchObject({ kind: 'screenshot', origin: 'captured' });
     expect(kept!.metadata).toMatchObject({ role: 'research', source: 'browser_research', pageType: 'home' });
+    // ...and in the library, named, categorised, attached to the project,
+    // tagged with where it came from — with nothing but the page's address.
+    expect(kept).toMatchObject({ library: true, category: 'screenshot', categorySource: 'inferred', source: 'browser_research' });
+    expect(kept!.name.length).toBeGreaterThan(0);
+    expect(kept!.sourceUrl).not.toMatch(/[?#]/);
+    const inLibrary = await store.assets.listLibraryForProject(org.id, project.id);
+    expect(inLibrary.map((asset) => asset.id)).toContain(kept!.id);
+    expect(inLibrary.every((asset) => asset.source === 'browser_research')).toBe(true);
 
     // The activity the customer watched: pages as they were read, then the steps.
     const events = await store.jobEvents.listForProject(org.id, project.id);

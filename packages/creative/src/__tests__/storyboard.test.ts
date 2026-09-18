@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RECIPES_FOR_VISUAL, coherentRecipe, recipeSuitsVisual, type VisualType } from '@act-one/core';
+import { RECIPES_FOR_VISUAL, coherentRecipe, recipeSuitsVisual, type Concept, type VisualType } from '@act-one/core';
 import { ScriptedLlmProvider } from '@act-one/providers';
 import { StoryboardEngine, limitWords, stagedForCapture } from '../index.ts';
 import { brandFixture, briefFixture, conceptFixture, treatmentFixture, understandingFixture } from './fixtures.ts';
@@ -102,6 +102,78 @@ describe('StoryboardEngine', () => {
     const recipes = storyboard.scenes.map((s) => s.motionRecipe.name);
     for (let i = 1; i < recipes.length; i += 1) {
       expect(recipes[i], `scenes ${i - 1} and ${i} share a treatment`).not.toBe(recipes[i - 1]);
+    }
+  });
+});
+
+describe('the library in the storyboard', () => {
+  const library = [
+    { id: 'ast_founder', name: 'Founder at desk', category: 'founder' as const, description: 'The founder at a standing desk', approved: true, favorite: false, origin: 'uploaded' as const, kind: 'user_upload' as const, contentType: 'image/jpeg', width: 3000, height: 2000 },
+    { id: 'ast_ui', name: 'Dashboard', category: 'ui' as const, description: 'The reconciliation dashboard', approved: false, favorite: true, origin: 'uploaded' as const, kind: 'user_upload' as const, contentType: 'image/png', width: 1920, height: 1080 },
+    { id: 'ast_pack', name: 'Packshot', category: 'product' as const, description: 'The device on white', approved: true, favorite: false, origin: 'uploaded' as const, kind: 'user_upload' as const, contentType: 'image/png', width: 2000, height: 2000 },
+  ];
+
+  function build(plan: ReturnType<typeof planFor>, creativeSystem: Concept['creativeSystem'] = 'kinetic_product') {
+    const llm = new ScriptedLlmProvider([{ respond: () => plan }]);
+    return new StoryboardEngine(llm).build(
+      {
+        projectId: 'prj_1',
+        concept: conceptFixture({ creativeSystem }),
+        treatment: treatmentFixture(),
+        understanding: understandingFixture({ productMoments: [] }),
+        brand: brandFixture(),
+        brief: briefFixture(),
+        version: 1,
+        libraryAssets: library,
+      },
+      context,
+    ).then((result) => ({ ...result, llm }));
+  }
+
+  it('is offered to the planner, approved pictures named as such', async () => {
+    const { llm } = await build(planFor(['word_slam', 'stack', 'metric', 'lockup']));
+    const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
+    expect(prompt).toContain('# Library');
+    expect(prompt).toContain('ast_founder — Founder at desk [Founder, approved]: The founder at a standing desk');
+    expect(prompt).toContain('ast_ui — Dashboard [UI, favourite]');
+  });
+
+  it('shows a photograph the planner picked as real media, and a picture of the interface as the product', async () => {
+    const plan = planFor(['word_slam', 'stack', 'workflow', 'metric', 'lockup']);
+    plan.scenes[1] = { ...plan.scenes[1]!, libraryAssetId: 'ast_founder' } as typeof plan.scenes[1];
+    plan.scenes[2] = { ...plan.scenes[2]!, libraryAssetId: 'ast_ui' } as typeof plan.scenes[2];
+    const { storyboard } = await build(plan);
+
+    const photo = storyboard.scenes.find((scene) => scene.assetRefs.includes('ast_founder'));
+    expect(photo).toBeDefined();
+    expect(photo!.visualType).toBe('real_media');
+    expect(photo!.generativeNeeds).toEqual([]);
+    expect(recipeSuitsVisual(photo!.motionRecipe.name, 'real_media')).toBe(true);
+    expect(photo!.notes).toContain('Founder at desk');
+
+    // A customer's own picture of their interface carries the product beat
+    // the archetype asked for, instead of falling back to typography.
+    const ui = storyboard.scenes.find((scene) => scene.assetRefs.includes('ast_ui'));
+    expect(ui).toBeDefined();
+    expect(['product_ui', 'screenshot_motion', 'product_ui_3d']).toContain(ui!.visualType);
+  });
+
+  it('uses each picture once, whatever the planner says', async () => {
+    const plan = planFor(['word_slam', 'stack', 'metric', 'stack', 'lockup']);
+    plan.scenes[1] = { ...plan.scenes[1]!, libraryAssetId: 'ast_founder' } as typeof plan.scenes[1];
+    plan.scenes[3] = { ...plan.scenes[3]!, libraryAssetId: 'ast_founder' } as typeof plan.scenes[3];
+    const { storyboard } = await build(plan);
+    expect(storyboard.scenes.filter((scene) => scene.assetRefs.includes('ast_founder'))).toHaveLength(1);
+  });
+
+  it('anchors generated shots to an approved product picture', async () => {
+    const plan = planFor(['black_hold', 'atmosphere', 'statement', 'line_and_mark']);
+    plan.scenes[1] = { ...plan.scenes[1]!, onScreenText: [], generativeBrief: 'Morning light over a quiet desk' } as typeof plan.scenes[1];
+    const { storyboard } = await build(plan, 'cinematic_black');
+    const generated = storyboard.scenes.filter((scene) => scene.generativeNeeds.length > 0);
+    expect(generated.length).toBeGreaterThan(0);
+    for (const scene of generated) {
+      expect(scene.generativeNeeds[0]!.referenceAssetIds).toEqual(['ast_pack']);
     }
   });
 });

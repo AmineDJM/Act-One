@@ -111,6 +111,7 @@ export const MotionRecipeName = z.enum([
   'feature_stack',
   'window_explosion',
   'command_bar_collapse',
+  'photo_hold',
   'hard_cut',
   'hold',
 ]);
@@ -138,7 +139,7 @@ export const RECIPES_FOR_VISUAL: Record<VisualType, readonly MotionRecipeName[]>
   product_ui: ['product_window', 'product_sequence', 'floating_ui', 'feature_stack', 'cursor_sequence'],
   product_ui_3d: ['product_window', 'spatial_cards', 'window_explosion'],
   screenshot_motion: ['product_zoom', 'product_window', 'image_wall'],
-  real_media: ['image_wall', 'spatial_cards'],
+  real_media: ['photo_hold', 'image_wall', 'spatial_cards'],
   cinematic_3d: ['depth_transition', 'spatial_cards'],
   generated_broll: ['image_wall', 'depth_transition', 'hold'],
   mixed_media: ['window_explosion', 'split_screen', 'spatial_cards'],

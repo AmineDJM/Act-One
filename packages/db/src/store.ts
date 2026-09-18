@@ -2,6 +2,9 @@ import type {
   Approval,
   ApprovalGate,
   Asset,
+  AssetInput,
+  AssetSource,
+  LibraryCategory,
   BrandSystem,
   Comment,
   CommentTarget,
@@ -242,14 +245,51 @@ export interface StoryboardRepo {
   nextVersion(organizationId: string, projectId: string): Promise<number>;
 }
 
+/**
+ * How the library is asked for.
+ *
+ * `query` matches the name, the description the classifier wrote, the tags,
+ * the category, the source and the page an asset was captured from — so
+ * "founder", "pricing page" and "office" all find what a person means.
+ * `projectId` narrows to what that project can use: assets attached to it,
+ * and assets shared with every project.
+ */
+export type LibraryFilter = {
+  query?: string;
+  category?: LibraryCategory;
+  source?: AssetSource;
+  projectId?: string;
+  favorite?: boolean;
+  approved?: boolean;
+  limit?: number;
+};
+
+/** One library asset attached to one project. No rows at all means "every project". */
+export type AssetProjectLink = { assetId: string; projectId: string; attachedAt: string };
+
 export interface AssetRepo {
-  create(asset: Asset): Promise<Asset>;
+  /** Defaults are filled in here: a caller names what it knows and the store parses the rest. */
+  create(asset: AssetInput): Promise<Asset>;
   get(organizationId: string, id: string): Promise<Asset | null>;
   getMany(organizationId: string, ids: string[]): Promise<Asset[]>;
   listForProject(organizationId: string, projectId: string, kind?: Asset['kind']): Promise<Asset[]>;
   listForScene(organizationId: string, sceneId: string): Promise<Asset[]>;
   update(organizationId: string, id: string, patch: Partial<Asset>): Promise<Asset>;
   delete(organizationId: string, id: string): Promise<void>;
+
+  // --- the library ------------------------------------------------------
+  /** Library assets, newest first, narrowed by the filter. */
+  listLibrary(organizationId: string, filter?: LibraryFilter): Promise<Asset[]>;
+  /** What a project can use: attached to it, or shared with every project. Newest first. */
+  listLibraryForProject(organizationId: string, projectId: string): Promise<Asset[]>;
+  /** Replaces an asset's project list. An empty list shares it with every project. */
+  setProjects(organizationId: string, assetId: string, projectIds: string[]): Promise<void>;
+  /** Adds projects to an asset's list without touching the rest. */
+  attachToProjects(organizationId: string, assetId: string, projectIds: string[]): Promise<void>;
+  /** The project links for these assets. */
+  listProjectLinks(organizationId: string, assetIds: string[]): Promise<AssetProjectLink[]>;
+  /** Assets made from this one, newest first. */
+  listVersions(organizationId: string, parentAssetId: string): Promise<Asset[]>;
 }
 
 export interface RenderRepo {

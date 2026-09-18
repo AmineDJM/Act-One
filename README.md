@@ -55,6 +55,29 @@ there, the screenshot as our own asset, the excerpt, the claims the brief
 took from it — and stays inspectable after the film exists, under **Research
 sources** on the project page.
 
+### The library
+
+Every picture a workspace owns lives in one place, under **Library**: what
+people drop on the page (PNG, JPG, WebP, SVG, any number, up to 25 MB
+each), what the research kept as it read the product, and what a film was
+made from. A file is what its bytes say, never what its name claims, and an
+SVG that carries script or reaches out to other places is refused rather
+than cleaned. Nothing is asked at upload: the name is the filename, the
+category — product, founder, people, team, office, UI, screenshot, logo,
+brand, illustration, reference — is inferred by looking at the picture
+after the card is already on the page, and a person's correction outlives
+every later inference.
+
+One file, any number of projects. An asset is shared with every project
+until it is attached to some, and a project's **Assets** section is a view
+over the library, never a copy. Favourites are for people; **approved** is
+for the films: the storyboard planner is handed the project's library —
+approved pictures first — before it is allowed to imagine anything, a
+photograph is staged full frame as real media, a customer's own picture of
+their interface may carry a product beat, and a generated shot is anchored
+to an approved product still and records it as its parent. Versions point
+at their original.
+
 ## The pipeline
 
 ```

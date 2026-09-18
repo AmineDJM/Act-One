@@ -29,18 +29,31 @@ export async function GET(
     if (!asset) return new Response('Not found', { status: 404 });
 
     const storage = await getStorage();
-    const bytes = await storage.get(asset.storageKey);
-    const contentType = asset.contentType || 'application/octet-stream';
-    const download = new URL(request.url).searchParams.get('download') !== null;
+    const query = new URL(request.url).searchParams;
+    const download = query.get('download') !== null;
+
+    // The library's cards ask for the small version the upload made; an asset
+    // without one (an SVG, an older capture) is served as it is.
+    const thumbnailKey = typeof asset.metadata['thumbnailKey'] === 'string' ? asset.metadata['thumbnailKey'] : null;
+    const thumbnail = query.get('thumb') !== null && thumbnailKey !== null;
+    const bytes = await storage.get(thumbnail ? thumbnailKey : asset.storageKey);
+    const contentType = thumbnail ? 'image/webp' : asset.contentType || 'application/octet-stream';
 
     const common: Record<string, string> = {
       'content-type': contentType,
       // Private, so a shared machine's browser cache does not hand the film to
-      // the next person, and no CDN in between keeps a copy.
-      'cache-control': 'private, max-age=0, must-revalidate',
+      // the next person, and no CDN in between keeps a copy. A library
+      // picture may be cached by the browser that fetched it for a while: the
+      // grid asks for dozens at once, and the bytes never change under an id.
+      'cache-control': asset.library ? 'private, max-age=3600' : 'private, max-age=0, must-revalidate',
       'accept-ranges': 'bytes',
       ...(download
         ? { 'content-disposition': `attachment; filename="${filenameFor(asset.kind, contentType, asset.id)}"` }
+        : {}),
+      // An SVG is a document. Served from our origin it could run as us, so
+      // it is served as a picture and nothing else: no script, no fetches.
+      ...(contentType.includes('svg')
+        ? { 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'", 'content-disposition': download ? `attachment; filename="${filenameFor(asset.kind, contentType, asset.id)}"` : 'inline' }
         : {}),
     };
 
@@ -79,10 +92,14 @@ function filenameFor(kind: string, contentType: string, id: string): string {
       ? 'png'
       : contentType.includes('jpeg')
         ? 'jpg'
-        : contentType.includes('wav')
-          ? 'wav'
-          : contentType.includes('mpeg')
-            ? 'mp3'
-            : 'bin';
+        : contentType.includes('webp')
+          ? 'webp'
+          : contentType.includes('svg')
+            ? 'svg'
+            : contentType.includes('wav')
+              ? 'wav'
+              : contentType.includes('mpeg')
+                ? 'mp3'
+                : 'bin';
   return `${kind}-${id}.${extension}`;
 }

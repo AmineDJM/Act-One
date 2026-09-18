@@ -25,6 +25,8 @@ import { BriefPanel } from './BriefPanel.tsx';
 import { Prompt, Status } from '@/components/ui/Prompt.tsx';
 import { AudioEditionPanel } from './AudioEditionPanel.tsx';
 import { ResearchSources } from './ResearchSources.tsx';
+import { ProjectAssets } from './ProjectAssets.tsx';
+import { loadProjectAssets } from '@/server/library.ts';
 import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
@@ -77,9 +79,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
    * campaign. Anything in flight is a reason to watch, whatever the stage says.
    */
   const cta = activeJob ? 'watch_progress' : primaryCtaFor(project.stage);
-  const [permission, revisions] = await Promise.all([
+  const [permission, revisions, library] = await Promise.all([
     renderPermission(session, project),
     revisionAllowance(session, project),
+    loadProjectAssets(session, project.id),
   ]);
 
   return (
@@ -156,6 +159,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <ResearchSources sources={sources} />
         </div>
       ) : null}
+
+      {/* What the film can use: the library, seen from this project. */}
+      <div className={styles.panels} style={{ marginBottom: 'var(--space-5)' }}>
+        <ProjectAssets projectId={project.id} cards={library.cards} total={library.total} />
+      </div>
 
       {/* Notes sit with the work, wherever the project has got to. */}
       <div className={styles.panels}>

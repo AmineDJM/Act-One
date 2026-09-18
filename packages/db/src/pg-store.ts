@@ -1,3 +1,4 @@
+import { Asset as AssetSchema } from '@act-one/core';
 import {
   AppError,
   newId,
@@ -20,6 +21,7 @@ import type {
   Approval,
   ApprovalGate,
   Asset,
+  AssetInput,
   AudioEdition,
   BrandSystem,
   BrandVoice,
@@ -53,7 +55,7 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, LibraryFilter, PlatformSettings, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -1015,24 +1017,32 @@ export class PgStore implements Store {
   // --- production ---------------------------------------------------------
 
   readonly assets = {
-    create: async (asset: Asset) =>
-      this.tenant(asset.organizationId, async (c) => {
+    create: async (input: AssetInput) => {
+      const asset = AssetSchema.parse(input);
+      return this.tenant(asset.organizationId, async (c) => {
         await c.query(
           `INSERT INTO assets
              (id, organization_id, project_id, concept_id, scene_id, kind, origin, rights,
               storage_key, content_type, bytes, width, height, duration_seconds, checksum,
-              provider, model, source_url, cost_usd, metadata, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+              provider, model, source_url, cost_usd, metadata, created_at,
+              library, name, category, category_source, description, tags, favorite, approved,
+              parent_asset_id, uploaded_by_user_id, source)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+                   $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
           [
             asset.id, asset.organizationId, asset.projectId, asset.conceptId, asset.sceneId,
             asset.kind, asset.origin, asset.rights, asset.storageKey, asset.contentType,
             asset.bytes, asset.width, asset.height, asset.durationSeconds, asset.checksum,
             asset.provider, asset.model, asset.sourceUrl, asset.costUsd, asset.metadata,
             asset.createdAt,
+            asset.library, asset.name, asset.category, asset.categorySource, asset.description,
+            JSON.stringify(asset.tags), asset.favorite, asset.approved, asset.parentAssetId,
+            asset.uploadedByUserId, asset.source,
           ],
         );
         return asset;
-      }),
+      });
+    },
 
     get: async (organizationId: string, id: string) =>
       this.tenant(organizationId, async (c) => {
@@ -1081,9 +1091,27 @@ export class PgStore implements Store {
              scene_id = COALESCE($3, scene_id),
              rights = COALESCE($4, rights),
              metadata = COALESCE($5, metadata),
-             cost_usd = COALESCE($6, cost_usd)
+             cost_usd = COALESCE($6, cost_usd),
+             library = COALESCE($7, library),
+             name = COALESCE($8, name),
+             category = COALESCE($9, category),
+             category_source = COALESCE($10, category_source),
+             description = COALESCE($11, description),
+             tags = COALESCE($12::jsonb, tags),
+             favorite = COALESCE($13, favorite),
+             approved = COALESCE($14, approved),
+             parent_asset_id = CASE WHEN $15::boolean THEN $16 ELSE parent_asset_id END,
+             source = COALESCE($17, source),
+             width = COALESCE($18, width),
+             height = COALESCE($19, height)
            WHERE id = $1 AND organization_id = $2 RETURNING *`,
-          [id, organizationId, patch.sceneId ?? null, patch.rights ?? null, patch.metadata ?? null, patch.costUsd ?? null],
+          [
+            id, organizationId, patch.sceneId ?? null, patch.rights ?? null, patch.metadata ?? null, patch.costUsd ?? null,
+            patch.library ?? null, patch.name ?? null, patch.category ?? null, patch.categorySource ?? null,
+            patch.description ?? null, patch.tags ? JSON.stringify(patch.tags) : null, patch.favorite ?? null,
+            patch.approved ?? null, 'parentAssetId' in patch, patch.parentAssetId ?? null, patch.source ?? null,
+            patch.width ?? null, patch.height ?? null,
+          ],
         );
         if (!r.rows[0]) throw notFound('Asset');
         return toAsset(r.rows[0]);
@@ -1092,6 +1120,92 @@ export class PgStore implements Store {
     delete: async (organizationId: string, id: string) =>
       this.tenant(organizationId, async (c) => {
         await c.query('DELETE FROM assets WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+      }),
+
+    listLibrary: async (organizationId: string, filter: LibraryFilter = {}) =>
+      this.tenant(organizationId, async (c) => {
+        const params: unknown[] = [organizationId];
+        const where: string[] = ['organization_id = $1', 'library'];
+        const add = (value: unknown): string => {
+          params.push(value);
+          return `$${params.length}`;
+        };
+        if (filter.category) where.push(`category = ${add(filter.category)}`);
+        if (filter.source) where.push(`source = ${add(filter.source)}`);
+        if (filter.favorite !== undefined) where.push(`favorite = ${add(filter.favorite)}`);
+        if (filter.approved !== undefined) where.push(`approved = ${add(filter.approved)}`);
+        if (filter.projectId) {
+          const project = add(filter.projectId);
+          where.push(
+            `(EXISTS (SELECT 1 FROM asset_projects ap WHERE ap.asset_id = assets.id AND ap.project_id = ${project})
+              OR NOT EXISTS (SELECT 1 FROM asset_projects ap WHERE ap.asset_id = assets.id))`,
+          );
+        }
+        const needle = filter.query?.trim();
+        if (needle) {
+          const like = add(`%${needle.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`);
+          where.push(
+            `(name ILIKE ${like} OR description ILIKE ${like} OR category ILIKE ${like} OR source ILIKE ${like}
+              OR COALESCE(source_url, '') ILIKE ${like} OR content_type ILIKE ${like}
+              OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(tags) tag WHERE tag ILIKE ${like}))`,
+          );
+        }
+        const limit = add(Math.min(Math.max(filter.limit ?? 500, 1), 2000));
+        const r = await c.query(
+          `SELECT * FROM assets WHERE ${where.join(' AND ')} ORDER BY created_at DESC, id LIMIT ${limit}`,
+          params,
+        );
+        return r.rows.map(toAsset);
+      }),
+
+    listLibraryForProject: async (organizationId: string, projectId: string) =>
+      this.assets.listLibrary(organizationId, { projectId }),
+
+    setProjects: async (organizationId: string, assetId: string, projectIds: string[]) =>
+      this.tenant(organizationId, async (c) => {
+        const owned = await c.query('SELECT 1 FROM assets WHERE id = $1 AND organization_id = $2', [assetId, organizationId]);
+        if (!owned.rows[0]) throw notFound('Asset');
+        // Every project checked before anything is removed, whatever the
+        // transaction would do: a list with a foreign id changes nothing.
+        for (const projectId of new Set(projectIds)) {
+          const project = await c.query('SELECT 1 FROM projects WHERE id = $1 AND organization_id = $2', [projectId, organizationId]);
+          if (!project.rows[0]) throw notFound('Project');
+        }
+        await c.query('DELETE FROM asset_projects WHERE asset_id = $1 AND organization_id = $2', [assetId, organizationId]);
+        await attachProjects(c, organizationId, assetId, projectIds);
+      }),
+
+    attachToProjects: async (organizationId: string, assetId: string, projectIds: string[]) =>
+      this.tenant(organizationId, async (c) => {
+        const owned = await c.query('SELECT 1 FROM assets WHERE id = $1 AND organization_id = $2', [assetId, organizationId]);
+        if (!owned.rows[0]) throw notFound('Asset');
+        await attachProjects(c, organizationId, assetId, projectIds);
+      }),
+
+    listProjectLinks: async (organizationId: string, assetIds: string[]) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT asset_id, project_id, attached_at FROM asset_projects
+           WHERE organization_id = $1 ${assetIds.length > 0 ? 'AND asset_id = ANY($2)' : ''}
+           ORDER BY attached_at, project_id`,
+          assetIds.length > 0 ? [organizationId, assetIds] : [organizationId],
+        );
+        return r.rows.map(
+          (row): AssetProjectLink => ({
+            assetId: row['asset_id'] as string,
+            projectId: row['project_id'] as string,
+            attachedAt: iso(row['attached_at']),
+          }),
+        );
+      }),
+
+    listVersions: async (organizationId: string, parentAssetId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT * FROM assets WHERE parent_asset_id = $1 AND organization_id = $2 ORDER BY created_at DESC',
+          [parentAssetId, organizationId],
+        );
+        return r.rows.map(toAsset);
       }),
   };
 
@@ -2350,7 +2464,36 @@ function toAsset(row: Row): Asset {
     costUsd: num(row['cost_usd']),
     metadata: (row['metadata'] as Record<string, unknown>) ?? {},
     createdAt: iso(row['created_at']),
+    library: Boolean(row['library']),
+    name: (row['name'] as string) ?? '',
+    category: (row['category'] as Asset['category']) ?? 'other',
+    categorySource: (row['category_source'] as Asset['categorySource']) ?? 'none',
+    description: (row['description'] as string) ?? '',
+    tags: Array.isArray(row['tags']) ? (row['tags'] as string[]) : [],
+    favorite: Boolean(row['favorite']),
+    approved: Boolean(row['approved']),
+    parentAssetId: (row['parent_asset_id'] as string) ?? null,
+    uploadedByUserId: (row['uploaded_by_user_id'] as string) ?? null,
+    source: (row['source'] as Asset['source']) ?? 'pipeline',
   };
+}
+
+/**
+ * Attaches an asset to projects it is not yet attached to. The project must
+ * be the tenant's own: the foreign key allows any project, the policy on
+ * `projects` does not, and this reads the row first so a foreign id is
+ * "not found" rather than a constraint error naming a real row.
+ */
+async function attachProjects(c: QueryClient, organizationId: string, assetId: string, projectIds: string[]): Promise<void> {
+  for (const projectId of new Set(projectIds)) {
+    const project = await c.query('SELECT 1 FROM projects WHERE id = $1 AND organization_id = $2', [projectId, organizationId]);
+    if (!project.rows[0]) throw notFound('Project');
+    await c.query(
+      `INSERT INTO asset_projects (asset_id, project_id, organization_id) VALUES ($1, $2, $3)
+       ON CONFLICT (asset_id, project_id) DO NOTHING`,
+      [assetId, projectId, organizationId],
+    );
+  }
 }
 
 function toRender(row: Row): Render {

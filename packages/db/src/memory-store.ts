@@ -1,3 +1,4 @@
+import { Asset as AssetSchema } from '@act-one/core';
 import {
   AppError,
   levelSeverity,
@@ -22,6 +23,7 @@ import type {
   Approval,
   ApprovalGate,
   Asset,
+  AssetInput,
   AudioEdition,
   BrandSystem,
   BrandVoice,
@@ -54,7 +56,7 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, LibraryFilter, PlatformSettings, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -83,6 +85,7 @@ export class MemoryStore implements Store {
     storyboards: new Map<string, Storyboard & { organizationId: string }>(),
     scenes: new Map<string, Scene & { organizationId: string }>(),
     assets: new Map<string, Asset>(),
+    assetProjects: new Map<string, AssetProjectLink & { organizationId: string }>(),
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
@@ -555,7 +558,8 @@ export class MemoryStore implements Store {
   }
 
   readonly assets = {
-    create: async (asset: Asset) => {
+    create: async (input: AssetInput) => {
+      const asset = AssetSchema.parse(input);
       this.tables.assets.set(asset.id, asset);
       return asset;
     },
@@ -577,8 +581,72 @@ export class MemoryStore implements Store {
       this.patch(this.tables.assets, organizationId, id, patch, 'Asset'),
     delete: async (organizationId: string, id: string) => {
       const found = this.tables.assets.get(id);
-      if (found && found.organizationId === organizationId) this.tables.assets.delete(id);
+      if (!found || found.organizationId !== organizationId) return;
+      this.tables.assets.delete(id);
+      for (const [key, link] of this.tables.assetProjects) {
+        if (link.assetId === id) this.tables.assetProjects.delete(key);
+      }
+      // A deleted original leaves its versions standing on their own.
+      for (const child of this.tables.assets.values()) {
+        if (child.parentAssetId === id) this.tables.assets.set(child.id, { ...child, parentAssetId: null });
+      }
     },
+
+    listLibrary: async (organizationId: string, filter: LibraryFilter = {}) => {
+      const needle = filter.query?.trim().toLowerCase() ?? '';
+      const linked = filter.projectId ? await this.assets.listProjectLinks(organizationId, []) : [];
+      const attachedTo = new Set(linked.filter((link) => link.projectId === filter.projectId).map((link) => link.assetId));
+      const withLinks = new Set(linked.map((link) => link.assetId));
+      return this.scoped(this.tables.assets, organizationId)
+        .filter((a) => a.library)
+        .filter((a) => !filter.category || a.category === filter.category)
+        .filter((a) => !filter.source || a.source === filter.source)
+        .filter((a) => filter.favorite === undefined || a.favorite === filter.favorite)
+        .filter((a) => filter.approved === undefined || a.approved === filter.approved)
+        .filter((a) => !filter.projectId || attachedTo.has(a.id) || !withLinks.has(a.id))
+        .filter((a) => !needle || haystack(a).includes(needle))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
+        .slice(0, filter.limit ?? 500);
+    },
+    listLibraryForProject: async (organizationId: string, projectId: string) =>
+      this.assets.listLibrary(organizationId, { projectId }),
+    setProjects: async (organizationId: string, assetId: string, projectIds: string[]) => {
+      const asset = this.tables.assets.get(assetId);
+      if (!asset || asset.organizationId !== organizationId) throw notFound('Asset');
+      // Every project checked before anything is removed: a list with a
+      // foreign id in it changes nothing, rather than leaving the asset
+      // attached to nobody.
+      for (const projectId of new Set(projectIds)) {
+        const project = this.tables.projects.get(projectId);
+        if (!project || project.organizationId !== organizationId) throw notFound('Project');
+      }
+      for (const [key, link] of this.tables.assetProjects) {
+        if (link.assetId === assetId) this.tables.assetProjects.delete(key);
+      }
+      await this.assets.attachToProjects(organizationId, assetId, projectIds);
+    },
+    attachToProjects: async (organizationId: string, assetId: string, projectIds: string[]) => {
+      const asset = this.tables.assets.get(assetId);
+      if (!asset || asset.organizationId !== organizationId) throw notFound('Asset');
+      for (const projectId of new Set(projectIds)) {
+        const project = this.tables.projects.get(projectId);
+        if (!project || project.organizationId !== organizationId) throw notFound('Project');
+        const key = `${assetId}:${projectId}`;
+        if (!this.tables.assetProjects.has(key)) {
+          this.tables.assetProjects.set(key, { assetId, projectId, organizationId, attachedAt: new Date().toISOString() });
+        }
+      }
+    },
+    listProjectLinks: async (organizationId: string, assetIds: string[]) => {
+      const wanted = assetIds.length > 0 ? new Set(assetIds) : null;
+      return this.scoped(this.tables.assetProjects, organizationId)
+        .filter((link) => !wanted || wanted.has(link.assetId))
+        .map(({ assetId, projectId, attachedAt }) => ({ assetId, projectId, attachedAt }));
+    },
+    listVersions: async (organizationId: string, parentAssetId: string) =>
+      this.scoped(this.tables.assets, organizationId)
+        .filter((a) => a.parentAssetId === parentAssetId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
 
   readonly renders = {
@@ -1134,4 +1202,11 @@ export class MemoryStore implements Store {
 function stripPassword<T extends { passwordHash?: string | null }>(record: T): Omit<T, 'passwordHash'> {
   const { passwordHash: _passwordHash, ...rest } = record;
   return rest;
+}
+
+/** Everything a library search may match, lower-cased. */
+function haystack(asset: Asset): string {
+  return [asset.name, asset.description, asset.category, asset.source, asset.sourceUrl ?? '', ...asset.tags, asset.contentType]
+    .join(' ')
+    .toLowerCase();
 }

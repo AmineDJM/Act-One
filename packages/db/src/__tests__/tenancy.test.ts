@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   newId,
-  type Asset,
+  type AssetInput,
   type Concept,
   type Organization,
   type Project,
@@ -114,7 +114,7 @@ function makeConcept(projectId: string, name: string): Concept {
   };
 }
 
-function makeAsset(organizationId: string, projectId: string): Asset {
+function makeAsset(organizationId: string, projectId: string): AssetInput {
   return {
     id: newId('ast'),
     organizationId,
