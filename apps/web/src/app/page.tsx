@@ -1,46 +1,59 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { DEFAULT_PLANS, PRODUCT_NAME, signUpPolicy } from '@act-one/core';
-import { getProductConfig } from '@/server/product.ts';
 import { CREATIVE_SYSTEMS } from '@act-one/creative';
 import { Nav } from '@/components/Nav.tsx';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { HeroFilm } from '@/components/HeroFilm.tsx';
+import { FilmCard } from '@/components/FilmCard.tsx';
+import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
+import { getProductConfig } from '@/server/product.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { REFERENCE_FILMS } from '@/lib/reference-films.ts';
 import styles from '@/components/marketing.module.css';
 
 export const metadata: Metadata = {
-  title: `${PRODUCT_NAME} — ${site.tagline}`,
+  title: `${PRODUCT_NAME} — Your product. Directed.`,
   description:
-    'Give us your product URL. We research the product, extract your brand, write three creative directions and produce an agency-quality launch film. Free until you render.',
+    'Act One turns a product URL into a launch film: it understands the product, measures the brand, develops three creative directions and produces the master and every cut — the way a studio would, at the pace of a launch.',
   alternates: { canonical: '/' },
   openGraph: {
-    title: `${PRODUCT_NAME} — ${site.tagline}`,
-    description:
-      'Give us your product URL. We research the product, extract your brand, and produce an agency-quality launch film.',
+    title: `${PRODUCT_NAME} — Your product. Directed.`,
+    description: 'Launch films for software companies. Give us your product; we understand it, direct it and produce the film.',
     url: absoluteUrl('/'),
   },
 };
 
-const STEPS = [
+/**
+ * The workflow as the customer lives it: five verbs, in order. Each one is
+ * a stage the product actually runs, not a marketing gloss on one.
+ */
+const WORKFLOW = [
+  { verb: 'Understand', line: 'We read your product the way a strategist would before a pitch. Every claim is traced to something you published.' },
+  { verb: 'Concept', line: 'Three creative directions that genuinely disagree: a different argument, structure and language each.' },
+  { verb: 'Direct', line: 'A storyboard you can argue with before anything expensive happens. Your brand, measured, not guessed.' },
+  { verb: 'Produce', line: 'Motion set by a type engine, your real interface filmed like an object, sound designed against the cut.' },
+  { verb: 'Launch', line: 'The master, and every cut your launch needs: the hero, the socials, the vertical, the six-second bumper.' },
+] as const;
+
+const USES = [
   {
-    title: 'We read your product',
-    body: 'A browser agent reads your site the way a strategist would before a pitch: positioning, pricing, what you actually do. Every claim we make later is traced back to something you published.',
+    title: 'Product launch films',
+    body: 'The film for launch day: the argument for the product, its real interface, and one line you will hear quoted back. Built for SaaS launches and feature launches alike.',
+    links: [{ href: '/work', label: 'See a launch film' }],
   },
   {
-    title: 'We measure your brand',
-    body: 'Colour by painted area, type by ink weight, your real corner radius and spacing rhythm — measured in the page, not guessed. It lands on your brand rather than near it.',
+    title: 'Product films',
+    body: 'The evergreen product film for your homepage hero, your demo request page and your sales deck — the one that has to be true for a year.',
+    links: [{ href: '/how-it-works', label: 'How it is made' }],
   },
   {
-    title: 'You choose a direction',
-    body: 'Three genuinely different concepts, not one idea in three fonts. Different narrative structure, different creative language, different argument. You pick one.',
+    title: 'Launch videos for startups',
+    body: 'A Product Hunt launch video, an AI startup announcing itself, a seed-stage company that needs to look like it already won. Studio quality, at the pace of a launch week.',
+    links: [{ href: '/pricing', label: 'What it costs' }],
   },
-  {
-    title: 'We produce the film',
-    body: 'Storyboard first, so you can argue with it before anything expensive happens. Then motion, product cinematography, sound design, and every cut your launch needs.',
-  },
-];
+] as const;
 
 const FAQ = [
   {
@@ -57,7 +70,7 @@ const FAQ = [
   },
   {
     q: 'What do you need from me?',
-    a: 'A URL. Optionally a Product Hunt or LinkedIn page, your docs, and — if you want the film to show the product working — demo credentials. Everything else is inferred, and you approve it before it is used.',
+    a: 'A URL. Optionally a Product Hunt or LinkedIn page, your docs, your own pictures, and — if you want the film to show the product working — demo credentials. Everything else is inferred, and you approve it before it is used.',
   },
   {
     q: 'What happens to my demo credentials?',
@@ -101,7 +114,9 @@ export default async function HomePage() {
         <section className={styles.hero}>
           <div className={`shell ${styles.heroInner}`}>
             <div className={styles.heroCopy}>
-              <p className="eyebrow">{config.landing.eyebrow}</p>
+              <p className="prompt" data-tone="accent">
+                <span className="prompt__chevron" aria-hidden="true">&gt;</span> {config.landing.eyebrow}
+              </p>
               <h1 className={styles.heroTitle}>{config.landing.headline || site.tagline}</h1>
               <p className={`lede ${styles.heroLede}`}>
                 {config.landing.subheadline ||
@@ -119,21 +134,55 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* Real work first: three films made by the engine that would make yours. */}
+        <section className={`shell ${styles.section}`} aria-labelledby="work">
+          <div className={styles.workHead}>
+            <p className="prompt" data-tone="text">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> Selected work
+            </p>
+            <h2 id="work" className="sr-only">
+              Selected work
+            </h2>
+            <span className={styles.quiet}>Built to be published.</span>
+            <hr className={styles.rule} />
+            <Link href="/work" className={styles.moreLink}>
+              All work →
+            </Link>
+          </div>
+          <div className={styles.filmGrid}>
+            {REFERENCE_FILMS.map((film) => (
+              <FilmCard key={film.slug} {...film} />
+            ))}
+          </div>
+        </section>
+
+        {/* The five verbs, in order. */}
         <section className={`shell ${styles.section}`} aria-labelledby="how">
           <div className={styles.sectionHead}>
-            <p className="eyebrow">How it works</p>
-            <h2 id="how">Infer first. Ask only when necessary. You approve.</h2>
+            <p className="prompt" data-tone="text">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> How a film is made
+            </p>
+            <h2 id="how">Understand. Concept. Direct. Produce. Launch.</h2>
             <p className="lede">
-              You should not have to fill in a creative brief to get creative work. The system does
-              the reading, the measuring and the thinking, and brings you decisions rather than forms.
+              You should not have to fill in a creative brief to get creative work. The system does the
+              reading, the measuring and the thinking, and brings you decisions rather than forms. Every
+              frame has to earn its place.
             </p>
           </div>
-          <ol className={styles.steps}>
-            {STEPS.map((step, index) => (
-              <li key={step.title} className={styles.step}>
-                <span className={styles.stepIndex}>{String(index + 1).padStart(2, '0')}</span>
-                <h3>{step.title}</h3>
-                <p>{step.body}</p>
+          <ol className={styles.rail}>
+            <div className={`dots ${styles.railDots}`} aria-hidden="true">
+              <DotMatrix seed="how-a-film-is-made" shape="wave" width={1200} height={260} cell={14} opacity={0.28} />
+            </div>
+            {WORKFLOW.map((step, index) => (
+              <li key={step.verb} className={styles.railStep}>
+                <span className={styles.railIndex}>{String(index + 1).padStart(2, '0')}</span>
+                <h3 className={styles.railVerb}>{step.verb}</h3>
+                <p>{step.line}</p>
+                {index < WORKFLOW.length - 1 ? (
+                  <span className={styles.railArrow} aria-hidden="true">
+                    →
+                  </span>
+                ) : null}
               </li>
             ))}
           </ol>
@@ -141,7 +190,9 @@ export default async function HomePage() {
 
         <section className={`shell ${styles.section}`} aria-labelledby="difference">
           <div className={styles.sectionHead}>
-            <p className="eyebrow">What this is not</p>
+            <p className="prompt" data-tone="text">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> What this is not
+            </p>
             <h2 id="difference">The difference is what we refuse to do.</h2>
           </div>
           <div className={styles.contrast}>
@@ -190,7 +241,9 @@ export default async function HomePage() {
 
         <section className={`shell ${styles.section}`} aria-labelledby="systems">
           <div className={styles.sectionHead}>
-            <p className="eyebrow">Creative systems</p>
+            <p className="prompt" data-tone="text">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> Creative systems
+            </p>
             <h2 id="systems">Modular creative languages, not templates.</h2>
             <p className="lede">
               A template gives every film the same shape, and that shape is what people recognise as
@@ -225,9 +278,41 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* What it is for, in the words people use to look for it. */}
+        <section className={`shell ${styles.section}`} aria-labelledby="uses">
+          <div className={styles.sectionHead}>
+            <p className="prompt" data-tone="text">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> What it is for
+            </p>
+            <h2 id="uses">One system for every film a software company launches with.</h2>
+            <p className="lede">
+              {PRODUCT_NAME} makes launch films, product films and launch videos for software companies:
+              SaaS launches, AI startups announcing themselves, developer tools, Product Hunt launches.
+              The same understanding of your product, directed differently for each.
+            </p>
+          </div>
+          <div className={styles.uses}>
+            {USES.map((use) => (
+              <article key={use.title} className={styles.useCard}>
+                <h3>{use.title}</h3>
+                <p>{use.body}</p>
+                <div className={styles.useLinks}>
+                  {use.links.map((link) => (
+                    <Link key={link.href} href={link.href}>
+                      {link.label} →
+                    </Link>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className={`shell ${styles.section}`} aria-labelledby="faq">
           <div className={styles.sectionHead}>
-            <p className="eyebrow">Questions</p>
+            <p className="prompt" data-tone="text">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> Questions
+            </p>
             <h2 id="faq">The things people actually ask.</h2>
           </div>
           <div className={styles.faq}>
@@ -242,7 +327,12 @@ export default async function HomePage() {
 
         <section className={`shell ${styles.section}`}>
           <div className={styles.cta}>
-            <p className="eyebrow">Start</p>
+            <div className="dots" aria-hidden="true">
+              <DotMatrix seed="see-how" shape="orbit" width={900} height={320} cell={14} opacity={0.3} />
+            </div>
+            <p className="prompt" data-tone="accent">
+              <span className="prompt__chevron" aria-hidden="true">&gt;</span> Start
+            </p>
             <h2 style={{ maxWidth: '18ch' }}>See what it understands about your product.</h2>
             <p className="lede">
               Free to research, free to see your brand, free to read three concepts.
@@ -256,26 +346,6 @@ export default async function HomePage() {
         </section>
       </main>
       <Footer />
-
-      {/*
-        FAQPage structured data. These are questions people genuinely ask us,
-        answered honestly — which is the only version of this markup that keeps
-        working after the next guideline update.
-      */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: FAQ.map((item) => ({
-              '@type': 'Question',
-              name: item.q,
-              acceptedAnswer: { '@type': 'Answer', text: item.a },
-            })),
-          }),
-        }}
-      />
     </>
   );
 }

@@ -76,7 +76,7 @@ export function StartProject({
           required
         />
         <button className="btn btn--lg" type="submit" disabled={pending}>
-          {pending ? 'Opening…' : byInvitation ? policy!.ctaLabel : cta}
+          {pending ? 'Opening…' : cta}
         </button>
       </div>
       {error ? (

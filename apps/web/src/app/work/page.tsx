@@ -5,6 +5,7 @@ import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { FilmCard } from '@/components/FilmCard.tsx';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { REFERENCE_FILMS } from '@/lib/reference-films.ts';
 import styles from '@/components/marketing.module.css';
 
 export const metadata: Metadata = {
@@ -27,35 +28,7 @@ export const metadata: Metadata = {
  * exact dishonesty this product refuses to commit on a customer's behalf, and
  * it would be strange to do it on our own site.
  */
-const DEMOS = [
-  {
-    slug: 'northwind',
-    company: 'Northwind',
-    kind: 'AI agent',
-    concept: 'One run',
-    idea: 'A week of manual reconciliation collapses into a single automated run.',
-    system: 'Cinematic Black',
-    duration: '19s',
-  },
-  {
-    slug: 'meridian',
-    company: 'Meridian',
-    kind: 'SaaS analytics',
-    concept: 'Stop asking the data team',
-    idea: 'The question you would have queued for a week, answered while you type it.',
-    system: 'Kinetic Product',
-    duration: '14s',
-  },
-  {
-    slug: 'halyard',
-    company: 'Halyard',
-    kind: 'Developer tool',
-    concept: 'Boring on purpose',
-    idea: 'Infrastructure that is uninteresting to operate, argued as a virtue.',
-    system: 'Editorial Tech',
-    duration: '18s',
-  },
-];
+const DEMOS = REFERENCE_FILMS;
 
 export default async function WorkPage() {
   return (

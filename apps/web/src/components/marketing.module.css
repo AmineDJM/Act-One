@@ -279,3 +279,99 @@
   border-bottom: 1px solid var(--line);
   background: var(--surface-raised);
 }
+
+/* --- the redrawn landing ------------------------------------------------------ */
+
+.workHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+.workHead .prompt { flex: none; }
+.rule { flex: 1; min-width: 40px; border: 0; border-top: 1px solid var(--line); margin: 0; }
+.quiet { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+.moreLink { font-size: 0.9rem; color: var(--text-secondary); }
+.moreLink:hover { color: var(--text); }
+
+.rail {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.railDots { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.railStep {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 220px;
+}
+.railIndex { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; color: var(--accent-text); }
+.railVerb { font-size: 1.15rem; letter-spacing: -0.02em; font-weight: 600; }
+.railStep p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; }
+.railArrow {
+  position: absolute;
+  right: -7px;
+  top: var(--space-6);
+  z-index: 2;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--canvas);
+  padding: 0 2px;
+  font-size: 0.8rem;
+}
+@media (max-width: 1000px) {
+  .rail { grid-template-columns: 1fr 1fr; }
+  .railArrow { display: none; }
+}
+@media (max-width: 560px) {
+  .rail { grid-template-columns: 1fr; }
+  .railStep { min-height: 0; }
+}
+
+.uses {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.useCard {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: border-color var(--duration) var(--ease);
+}
+.useCard:hover { border-color: var(--line-strong); }
+.useCard h3 { font-size: 1.05rem; letter-spacing: -0.015em; }
+.useCard p { font-size: 0.92rem; color: var(--text-secondary); line-height: 1.55; }
+.useLinks { margin-top: auto; padding-top: var(--space-2); display: flex; gap: var(--space-4); font-size: 0.88rem; }
+.useLinks a { color: var(--text-secondary); }
+.useLinks a:hover { color: var(--text); }
+
+.cta { position: relative; overflow: hidden; }
+.cta > * { position: relative; z-index: 1; }
+.cta > :global(.dots) { position: absolute; inset: 0; z-index: 0; }
+
+/* On a phone the navigation keeps the mark and the one strong button; the
+   quiet sign-in link is on the sign-up page anyway. */
+@media (max-width: 560px) {
+  .navInner :global(.btn--ghost) { display: none; }
+  .navInner :global(.btn) { height: 38px; padding: 0 var(--space-4); font-size: 0.88rem; }
+  .navInner { gap: var(--space-3); }
+}
