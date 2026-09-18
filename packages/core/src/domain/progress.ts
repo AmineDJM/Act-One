@@ -15,15 +15,15 @@ export type RunStepKey =
 
 export const RUN_STEPS: Record<RunStepKey, { label: string; kinds: readonly JobKind[] }> = {
   research: {
-    label: 'Reading your product',
+    label: 'Understanding your product',
     kinds: ['research_product', 'extract_brand', 'capture_product_moments'],
   },
-  concepts: { label: 'Writing three directions', kinds: ['generate_concepts'] },
-  storyboard: { label: 'Building the storyboard', kinds: ['build_storyboard'] },
-  revision: { label: 'Working out the change', kinds: ['repair_scene'] },
-  render: { label: 'Making the film', kinds: ['render_film', 'render_variant'] },
-  campaign: { label: 'Cutting it for every channel', kinds: ['generate_campaign'] },
-  audio: { label: 'Reading the audio version', kinds: ['produce_audio'] },
+  concepts: { label: 'Developing three directions', kinds: ['generate_concepts'] },
+  storyboard: { label: 'Preparing the storyboard', kinds: ['build_storyboard'] },
+  revision: { label: 'Directing this sequence', kinds: ['repair_scene'] },
+  render: { label: 'Composing the master', kinds: ['render_film', 'render_variant'] },
+  campaign: { label: 'Preparing your final cuts', kinds: ['generate_campaign'] },
+  audio: { label: 'Mastering sound', kinds: ['produce_audio'] },
 };
 
 /** The chains, in the order their steps run. A step may belong to several. */

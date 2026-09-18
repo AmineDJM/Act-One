@@ -5,9 +5,9 @@ import { Index } from '@/components/ui/Prompt.tsx';
 import styles from '../../app.module.css';
 
 /**
- * The generation, as nine steps.
+ * The production, as nine steps.
  *
- * `01  Product research  COMPLETE` down to `09  Final composition  WAITING`.
+ * `01  Product discovery  COMPLETE` down to `09  The master  WAITING`.
  * The step in progress carries the live lines the worker wrote — a page
  * read, a scene rendered — and a finished step opens to what it did. Only
  * curated activity, never a log line: the console has those.
@@ -16,7 +16,7 @@ export function GenerationTimeline({ timeline, message }: { timeline: Timeline; 
   return (
     <div className={styles.timeline}>
       <div className={styles.timelineHead}>
-        <span style={{ color: 'var(--accent)' }}>&gt;</span> {PRODUCT_NAME.toUpperCase()} / GENERATION
+        <span style={{ color: 'var(--accent)' }}>&gt;</span> {PRODUCT_NAME.toUpperCase()} / PRODUCTION
       </div>
       <ol className={styles.timelineSteps}>
         {timeline.steps.map((step) => {

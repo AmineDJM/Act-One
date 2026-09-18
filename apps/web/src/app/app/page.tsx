@@ -10,10 +10,10 @@ import { ProjectList, type ProjectCard } from './ProjectList.tsx';
 import styles from './app.module.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Projects · Act One' };
+export const metadata: Metadata = { title: 'Productions · Act One' };
 
 /**
- * One project, one launch.
+ * One production, one launch.
  *
  * The page is the command bar and the list. The bar takes an address and
  * nothing else it does not have to; the list shows each launch as a
@@ -46,10 +46,10 @@ export default async function ProjectsPage() {
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <Prompt tone="accent" chevron={false}>
-            / Projects
+            / Productions
           </Prompt>
           <h1 className={styles.heroTitle}>
-            One project.
+            One production.
             <span>One launch.</span>
           </h1>
           <p className={styles.heroLede}>Turn your product into a world-class launch campaign.</p>
@@ -83,14 +83,14 @@ export default async function ProjectsPage() {
           <div className="dots">
             <DotMatrix seed="no-projects" shape="wave" width={900} height={320} cell={16} opacity={0.35} />
           </div>
-          <Prompt tone="text">No projects yet</Prompt>
+          <Prompt tone="text">No productions yet</Prompt>
           <h2>Every launch starts somewhere.</h2>
           <p className="secondary" style={{ maxWidth: '44ch' }}>
-            Paste your product&rsquo;s address above. We read it, learn your brand, and come back with
-            three creative directions.
+            Paste your product&rsquo;s address above. We read it, measure your identity, and come back
+            with three creative directions.
           </p>
           <a href="#new" className="btn">
-            Start first project
+            Start the first production
           </a>
         </div>
       ) : (
@@ -115,12 +115,12 @@ function cardFor(project: Project, failed: string | null, now: number): ProjectC
       project.stage === 'failed'
         ? 'Try again ↵'
         : cta === 'choose_concept'
-          ? 'Choose a concept →'
+          ? 'Choose a direction →'
           : cta === 'render_film'
-            ? 'Render the film →'
+            ? 'Produce the film →'
             : cta === 'create_variants'
-              ? 'Open the film →'
-              : 'Open project →',
+              ? 'Open the master →'
+              : 'Open production →',
     cover: <DotMatrix seed={project.id} shape={project.stage === 'film_ready' ? 'orbit' : 'wave'} width={120} height={120} cell={10} opacity={0.7} />,
   };
 }

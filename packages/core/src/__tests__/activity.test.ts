@@ -23,8 +23,8 @@ function event(jobId: string, over: Partial<JobEvent>): JobEvent {
 describe('the generation timeline', () => {
   it('has nine steps in the order a customer sees them', () => {
     expect(GENERATION_STEPS.map((step) => step.label)).toEqual([
-      'Product research', 'Brand extraction', 'Creative strategy', 'Concepts', 'Storyboard',
-      'Product captures', 'Voice', 'Motion', 'Final composition',
+      'Product discovery', 'Identity', 'Creative direction', 'Three directions', 'Storyboard',
+      'Source material', 'Voice', 'Motion', 'The master',
     ]);
     const empty = timelineFor({ jobs: [], events: [] });
     expect(empty.steps.every((step) => step.status === 'waiting')).toBe(true);

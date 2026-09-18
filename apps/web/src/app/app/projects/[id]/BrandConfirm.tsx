@@ -18,7 +18,7 @@ export function BrandConfirm({ projectId, brand }: { projectId: string; brand: B
   const [state, confirm, pending] = useActionState<FormState, FormData>(confirmBrandAction, { error: null });
   const signals = pendingBrandSignals(brand).length;
   const candidates = brand.primaryCandidates.length > 0 ? brand.primaryCandidates : [brand.primaryColor];
-  const here = `/app/brand?project=${encodeURIComponent(projectId)}`;
+  const here = `/app/identity?project=${encodeURIComponent(projectId)}`;
 
   return (
     <form action={confirm} className={`${styles.panel} ${styles.brandCard}`}>

@@ -96,7 +96,7 @@ export async function adoptVoiceAction(_previous: VoiceFormState, formData: Form
       useCases,
       makeDefault: formData.get('makeDefault') === 'on',
     });
-    revalidatePath('/app/brand');
+    revalidatePath('/app/identity');
     return { error: null, message: `${voice.name} is now a brand voice.` };
   } catch (error) {
     return { error: reportError('adoptVoiceAction', error).publicMessage };
@@ -125,7 +125,7 @@ export async function cloneVoiceAction(_previous: VoiceFormState, formData: Form
       gender: gender(formData) ?? 'female',
       samples,
     });
-    revalidatePath('/app/brand');
+    revalidatePath('/app/identity');
     return { error: null, message: `${voice.name} was cloned under the consent you recorded.` };
   } catch (error) {
     return { error: reportError('cloneVoiceAction', error).publicMessage };
@@ -136,7 +136,7 @@ export async function removeVoiceAction(_previous: VoiceFormState, formData: For
   try {
     const session = await requireSession();
     await removeBrandVoice(session, String(formData.get('brandVoiceId') ?? ''));
-    revalidatePath('/app/brand');
+    revalidatePath('/app/identity');
     return { error: null, message: 'Removed.' };
   } catch (error) {
     return { error: reportError('removeVoiceAction', error).publicMessage };
@@ -147,7 +147,7 @@ export async function setDefaultVoiceAction(_previous: VoiceFormState, formData:
   try {
     const session = await requireSession();
     await setDefaultBrandVoice(session, String(formData.get('brandVoiceId') ?? ''));
-    revalidatePath('/app/brand');
+    revalidatePath('/app/identity');
     return { error: null, message: 'This voice now reads by default.' };
   } catch (error) {
     return { error: reportError('setDefaultVoiceAction', error).publicMessage };
@@ -158,7 +158,7 @@ export async function savePronunciationsAction(_previous: VoiceFormState, formDa
   try {
     const session = await requireSession();
     const settings = await savePronunciations(session, String(formData.get('pronunciations') ?? ''));
-    revalidatePath('/app/brand');
+    revalidatePath('/app/identity');
     return { error: null, message: `${settings.pronunciations.length} pronunciation${settings.pronunciations.length === 1 ? '' : 's'} saved.` };
   } catch (error) {
     return { error: reportError('savePronunciationsAction', error).publicMessage };

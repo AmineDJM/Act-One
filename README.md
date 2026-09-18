@@ -33,27 +33,59 @@ that.
 
 ---
 
+## The words
+
+Act One is a production house that happens to be software, and the language
+holds that everywhere a customer can read it. A project is a **production**.
+The finished file is the **master**; the other lengths are **cuts**; the
+timed storyboard you watch before any of it is the **workprint**. Pictures
+and footage are **material**, kept in the **archive**, which is a place that
+keeps things rather than a folder that holds them. What the machine reads
+about a product is **discovery**, and what it measures of a brand is the
+**identity**.
+
+Two rules keep that from becoming costume, and both are in
+`packages/core/src/domain/vocabulary.ts`. Internal names never change — the
+code says `project`, `asset`, `render`, and renaming a column to sound like
+a film studio would buy nothing. And the word has to be the accurate one:
+*mastering* is used where sound and picture are actually being finished,
+never as decoration on a progress bar, and where the plain word is the true
+one — settings, billing, sign in — the plain word stays.
+
+A film credits **An Act One Production**, or **Act One Original** when we
+made it for ourselves. Never "AI-generated". The ™ or ® after the name is
+not written into any page: the console says which mark the name has earned,
+and the footer is the one place it is claimed.
+
 ## What the customer sees while it works
 
 The interface is near-black and quiet, with one accent and a grid of dots
 for a signature. The terminal is an influence, not a costume: a prompt in
-front of a label, a two-digit index, a status in capitals — `ANALYSIS
-FAILED`, `FILM READY` — and otherwise modern type and generous space.
+front of a label, a two-digit index, a status in capitals — `DISCOVERY`,
+`MASTER READY` — and otherwise modern type and generous space.
 
-While the system works, the project page shows the generation as nine
-steps — product research, brand extraction, creative strategy, concepts,
-storyboard, product captures, voice, motion, final composition — each
-`COMPLETE`, `BUILDING` or `WAITING`, and the step in progress carries the
-curated lines the worker writes as it goes: each page read with a tick, then
-`> extracting positioning`, `> identifying target audience`, `> finding
-product moments`. Only meaningful activity, never a log line; the log is the
-console's.
+A production runs through six phases, and the page says which one it is in:
+**DISCOVERY**, **DIRECTION**, **STORYBOARD**, **PRODUCTION**, **MASTERING**,
+**READY**. The thirteen stages underneath are how the machine thinks about
+the same work, and they stay in the console — nobody outside this building
+needs to know that capturing the product and rendering the film are
+different jobs. When something stops, it is named by the phase it
+interrupted: `DISCOVERY INTERRUPTED` says what did not happen and what still
+stands, where `RENDER FAILED` told a customer about our queue.
 
-Nothing the research read is thrown away. Every page becomes a research
-source kept with the project — its address, title, type, why the agent went
-there, the screenshot as our own asset, the excerpt, the claims the brief
-took from it — and stays inspectable after the film exists, under **Research
-sources** on the project page.
+While the system works, the production page shows the work as nine steps —
+product discovery, identity, creative direction, three directions,
+storyboard, source material, voice, motion, the master — each `COMPLETE`,
+`BUILDING` or `WAITING`, and the step in progress carries the curated lines
+the worker writes as it goes: each page read with a tick, then `> extracting
+positioning`, `> identifying target audience`, `> finding product moments`.
+Only meaningful activity, never a log line; the log is the console's.
+
+Nothing discovery read is thrown away. Every page becomes a source kept with
+the production — its address, title, type, why the agent went there, the
+screenshot as our own asset, the excerpt, the claims the brief took from
+it — and stays inspectable after the film exists, under **Discovery** on the
+production page.
 
 ### The product's phase, and the door
 
@@ -84,7 +116,7 @@ shown, and the operational log entries that name it. None of it reaches
 the product: provider names, models, session ids and raw errors live here
 and nowhere a customer looks.
 
-### Brand DNA, per project
+### Brand DNA, per production
 
 A brand belongs to a project. It is measured from that project's own site —
 colours by painted area, type by use, radii and spacing by mode, icons by
@@ -104,12 +136,12 @@ person to accept or dismiss. Nothing a person edited or confirmed is
 overwritten by a measurement, and a dismissed reading is not proposed
 again.
 
-### The library
+### The archive
 
-Every picture a workspace owns lives in one place, under **Library**: what
+Every picture a workspace owns lives in one place, under **Archive**: what
 people drop on the page (PNG, JPG, WebP, SVG, any number, up to 25 MB
-each), what the research kept as it read the product, and what a film was
-made from. A file is what its bytes say, never what its name claims, and an
+each), what discovery kept as it read the product, and what a film was
+made from. A production ends; the material stays. A file is what its bytes say, never what its name claims, and an
 SVG that carries script or reaches out to other places is refused rather
 than cleaned. Nothing is asked at upload: the name is the filename, the
 category — product, founder, people, team, office, UI, screenshot, logo,
@@ -117,11 +149,12 @@ brand, illustration, reference — is inferred by looking at the picture
 after the card is already on the page, and a person's correction outlives
 every later inference.
 
-One file, any number of projects. An asset is shared with every project
-until it is attached to some, and a project's **Assets** section is a view
-over the library, never a copy. Favourites are for people; **approved** is
-for the films: the storyboard planner is handed the project's library —
-approved pictures first — before it is allowed to imagine anything, a
+One file, any number of productions. An asset is shared with every
+production until it is attached to some, and a production's **Material**
+section is a view over the archive, never a copy. Favourites are for people;
+**approved** is for the films: the storyboard planner is handed the
+production's material — approved pictures first — before it is allowed to
+imagine anything, a
 photograph is staged full frame as real media, a customer's own picture of
 their interface may carry a product beat, and a generated shot is anchored
 to an approved product still and records it as its parent. Versions point

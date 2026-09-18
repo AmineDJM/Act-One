@@ -16,7 +16,7 @@ export function ResearchSources({ sources }: { sources: ResearchSource[] }) {
     <section className={styles.panel} style={{ gridColumn: '1 / -1' }}>
       <div className={styles.panelHead}>
         <Prompt as="h3" tone="text">
-          Research sources <span className="muted">({useful.length})</span>
+          Discovery <span className="muted">({useful.length} sources)</span>
         </Prompt>
         <span className="hint">What we read to understand the product.</span>
       </div>

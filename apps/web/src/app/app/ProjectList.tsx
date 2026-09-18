@@ -38,24 +38,24 @@ export function ProjectList({ projects }: { projects: ProjectCard[] }) {
   }, [projects, query, sort]);
 
   return (
-    <section aria-label="Your projects">
+    <section aria-label="Your productions">
       <div className={styles.listHead}>
         <Prompt as="h2" tone="text">
-          Your projects <span className="muted">({projects.length})</span>
+          Your productions <span className="muted">({projects.length})</span>
         </Prompt>
         <hr className="divider" />
         <div className={styles.listTools}>
           <input
             className={`input ${styles.search}`}
             type="search"
-            placeholder="Search projects…"
-            aria-label="Search projects"
+            placeholder="Search productions…"
+            aria-label="Search productions"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <select
             className="input"
-            aria-label="Sort projects"
+            aria-label="Sort productions"
             value={sort}
             onChange={(event) => setSort(event.target.value as 'updated' | 'name')}
             style={{ width: 150 }}

@@ -65,11 +65,11 @@ export function BillingActions({
 
               <ul className={styles.planFacts}>
                 <li>
-                  {plan.limits.projectsPerMonth < 0 ? 'Unlimited' : plan.limits.projectsPerMonth} project
+                  {plan.limits.projectsPerMonth < 0 ? 'Unlimited' : plan.limits.projectsPerMonth} production
                   {plan.limits.projectsPerMonth === 1 ? '' : 's'} a month
                 </li>
                 <li>Up to {plan.limits.maxMasterDurationSeconds}s per film</li>
-                <li>{plan.limits.monthlyCredits.toLocaleString('en-US')} credits included</li>
+                <li>{plan.limits.monthlyCredits.toLocaleString('en-US')} production credits included</li>
                 <li>
                   {plan.limits.maxSeats < 0 ? 'Unlimited' : plan.limits.maxSeats} seat
                   {plan.limits.maxSeats === 1 ? '' : 's'}
@@ -94,7 +94,7 @@ export function BillingActions({
         <form action={buy}>
           <input type="hidden" name="credits" value="500" />
           <button className="btn btn--secondary" type="submit" disabled={buying}>
-            {buying ? 'Opening…' : 'Add 500 credits'}
+            {buying ? 'Opening…' : 'Add 500 production credits'}
           </button>
         </form>
         {hasBillingAccount ? (

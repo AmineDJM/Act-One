@@ -4,30 +4,30 @@ import { Prompt } from '@/components/ui/Prompt.tsx';
 import styles from '../../app.module.css';
 
 /**
- * What this project can use.
+ * What this production can use.
  *
- * A view over the library — what is attached to this project and what is
- * shared with every project — never a second copy. The pictures the
- * research kept arrive here on their own; a person adds the rest in the
- * library, with this project already ticked.
+ * A view over the archive — what is attached to this production and what is
+ * shared with every one — never a second copy. The pictures discovery kept
+ * arrive here on their own; a person adds the rest in the archive, with this
+ * production already ticked.
  */
 export function ProjectAssets({ projectId, cards, total }: { projectId: string; cards: LibraryCard[]; total: number }) {
-  const here = `/app/library?project=${encodeURIComponent(projectId)}`;
+  const here = `/app/archive?project=${encodeURIComponent(projectId)}`;
   return (
     <section className={styles.panel} style={{ gridColumn: '1 / -1' }}>
       <div className={styles.panelHead}>
         <Prompt as="h3" tone="text">
-          Assets <span className="muted">({total})</span>
+          Material <span className="muted">({total})</span>
         </Prompt>
         <span className={styles.panelLinks}>
-          <Link href={`${here}#upload`}>Add pictures</Link>
-          {total > cards.length ? <Link href={here}>All {total} →</Link> : <Link href={here}>Open library →</Link>}
+          <Link href={`${here}#upload`}>Add to the Archive</Link>
+          {total > cards.length ? <Link href={here}>All {total} →</Link> : <Link href={here}>Open the Archive →</Link>}
         </span>
       </div>
       {cards.length === 0 ? (
         <p className="secondary" style={{ maxWidth: '54ch' }}>
-          Nothing yet. Research screenshots land here as the product is read; your own pictures,
-          added in the library, appear the moment they are shared with this project.
+          Nothing yet. What discovery reads lands here as the product is read; your own pictures,
+          added to the Archive, appear the moment they are shared with this production.
         </p>
       ) : (
         <ul className={styles.assetStrip}>

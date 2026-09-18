@@ -66,15 +66,15 @@ export type JobEventInput = {
  * step that stopped says so.
  */
 export const GENERATION_STEPS: readonly { key: GenerationStepKey; label: string; kinds: readonly JobKind[] }[] = [
-  { key: 'research', label: 'Product research', kinds: ['research_product', 'extract_brand'] },
-  { key: 'brand', label: 'Brand extraction', kinds: ['research_product', 'extract_brand'] },
-  { key: 'strategy', label: 'Creative strategy', kinds: ['generate_concepts'] },
-  { key: 'concepts', label: 'Concepts', kinds: ['generate_concepts'] },
+  { key: 'research', label: 'Product discovery', kinds: ['research_product', 'extract_brand'] },
+  { key: 'brand', label: 'Identity', kinds: ['research_product', 'extract_brand'] },
+  { key: 'strategy', label: 'Creative direction', kinds: ['generate_concepts'] },
+  { key: 'concepts', label: 'Three directions', kinds: ['generate_concepts'] },
   { key: 'storyboard', label: 'Storyboard', kinds: ['build_storyboard', 'repair_scene'] },
-  { key: 'captures', label: 'Product captures', kinds: ['capture_product_moments', 'generate_scene_assets', 'render_film'] },
+  { key: 'captures', label: 'Source material', kinds: ['capture_product_moments', 'generate_scene_assets', 'render_film'] },
   { key: 'voice', label: 'Voice', kinds: ['render_film'] },
   { key: 'motion', label: 'Motion', kinds: ['render_film'] },
-  { key: 'composition', label: 'Final composition', kinds: ['render_film', 'render_variant'] },
+  { key: 'composition', label: 'The master', kinds: ['render_film', 'render_variant'] },
 ];
 
 export type GenerationStepStatus = 'complete' | 'building' | 'waiting' | 'failed' | 'skipped';

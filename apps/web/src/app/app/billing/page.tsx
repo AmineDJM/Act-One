@@ -53,17 +53,17 @@ export default async function BillingPage() {
           </div>
           <dl className={styles.kv}>
             <div className={styles.kvRow}>
-              <dt>Projects</dt>
+              <dt>Productions</dt>
               <dd>
                 {plan.limits.projectsPerMonth < 0 ? 'Unlimited' : `${plan.limits.projectsPerMonth}/month`}
               </dd>
             </div>
             <div className={styles.kvRow}>
-              <dt>Renders per project</dt>
+              <dt>Films per production</dt>
               <dd>{plan.limits.rendersPerProject < 0 ? 'Unlimited' : plan.limits.rendersPerProject}</dd>
             </div>
             <div className={styles.kvRow}>
-              <dt>Revisions per project</dt>
+              <dt>Revisions per production</dt>
               <dd>
                 {plan.entitlements.includes('revisions.unlimited') || plan.limits.revisionsPerProject < 0
                   ? 'Unlimited'
@@ -89,14 +89,14 @@ export default async function BillingPage() {
 
         <section className={styles.panel}>
           <div className={styles.panelHead}>
-            <h3>Credits</h3>
+            <h3>Production credits</h3>
             <span className="mono secondary">
               {organization.creditBalance.toLocaleString('en-US')}
             </span>
           </div>
           <p className="secondary" style={{ fontSize: '0.9rem' }}>
-            Credits cover the expensive work: generated cinematography, 3D renders, extra versions
-            and extra languages. Your plan includes{' '}
+            Production credits cover the expensive work: cinematography, 3D, extra cuts and extra
+            languages. Your plan includes{' '}
             {plan.limits.monthlyCredits.toLocaleString('en-US')} a month.
           </p>
           <p className="muted" style={{ fontSize: '0.82rem' }}>

@@ -235,7 +235,7 @@ export function BriefPanel({
           </div>
           {!editable ? (
             <p className="hint">
-              Fixed once the film is rendered. Start a new project to change them.
+              Fixed once the master exists. Start a new production to change them.
             </p>
           ) : null}
         </dl>

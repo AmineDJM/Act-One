@@ -11,19 +11,20 @@ import { LibraryUploader } from './LibraryUploader.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Library · Act One' };
+export const metadata: Metadata = { title: 'Archive · Act One' };
 
 type Search = Record<string, string | string[] | undefined>;
 
 /**
- * The library.
+ * The archive.
  *
- * One place for every picture the workspace owns. The page is the drop
- * zone and the grid: drop what you have, and it is named, sorted and ready
- * for any project. Nothing is asked at upload that can be inferred.
+ * One place for every picture the workspace owns, and it keeps them: a
+ * production ends, the material stays. The page is the drop zone and the
+ * grid — drop what you have, and it is named, sorted and available to every
+ * production. Nothing is asked at upload that can be inferred.
  */
-export default async function LibraryPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const session = await requireSessionForPage('/app/library');
+export default async function ArchivePage({ searchParams }: { searchParams: Promise<Search> }) {
+  const session = await requireSessionForPage('/app/archive');
   const params = await searchParams;
   const state = filterFrom(params);
   const view = await loadLibrary(session, toFilter(state));
@@ -35,12 +36,12 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
       <div className={styles.head}>
         <div className={styles.headCopy}>
           <Prompt tone="accent" chevron={false}>
-            / Library
+            / Archive
           </Prompt>
-          <h1>Every picture you own. One place.</h1>
+          <h1>Every picture you own. Kept.</h1>
           <p className={styles.headSub}>
             Drop what you have: product shots, your team, your office, your logo. We look at each
-            one, sort it, and put real pictures in your films before we imagine anything.
+            one, sort it, and put real material in your films before we imagine anything.
           </p>
         </div>
       </div>
@@ -51,7 +52,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
         <>
           <div className={styles.listHead} style={{ marginTop: 'var(--space-6)' }}>
             <Prompt tone="text">
-              Library ({view.total})
+              Archive ({view.total})
               {filtered ? <span className="muted"> · showing {view.cards.length}</span> : null}
             </Prompt>
             <hr />
@@ -67,8 +68,8 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
           ) : (
             <div className={styles.empty} style={{ padding: 'var(--space-7) var(--space-6)' }}>
               <Prompt tone="text">No match</Prompt>
-              <p className="secondary">Nothing in the library matches that.</p>
-              <a href="/app/library" className="btn btn--secondary">
+              <p className="secondary">Nothing in the archive matches that.</p>
+              <a href="/app/archive" className="btn btn--secondary">
                 Clear filters
               </a>
             </div>
@@ -77,13 +78,13 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
       ) : (
         <div className={styles.empty} style={{ marginTop: 'var(--space-6)' }}>
           <div className="dots">
-            <DotMatrix seed="library-empty" shape="radial" width={900} height={320} cell={16} opacity={0.35} />
+            <DotMatrix seed="archive-empty" shape="radial" width={900} height={320} cell={16} opacity={0.35} />
           </div>
-          <Prompt tone="text">Library empty</Prompt>
+          <Prompt tone="text">Archive empty</Prompt>
           <h2>Nothing here yet.</h2>
           <p className="secondary" style={{ maxWidth: '46ch' }}>
-            Your research screenshots land here on their own. Add your own pictures above and
-            every project can use them.
+            What discovery reads lands here on its own. Add your own pictures above and every
+            production can use them.
           </p>
         </div>
       )}

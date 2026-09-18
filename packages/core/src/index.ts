@@ -37,6 +37,7 @@ export * from './domain/spoken.ts';
 export * from './domain/failure.ts';
 export * from './domain/product-phase.ts';
 export * from './domain/addresses.ts';
+export * from './domain/vocabulary.ts';
 export * from './domain/collections.ts';
 export * from './domain/referral.ts';
 export * from './domain/editorial.ts';

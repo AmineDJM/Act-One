@@ -22,9 +22,9 @@ export const metadata: Metadata = {
  * quiet mono link away for the people who hold the keys.
  */
 const TABS = [
-  { href: '/app', label: 'Projects' },
-  { href: '/app/brand', label: 'Brand' },
-  { href: '/app/library', label: 'Library' },
+  { href: '/app', label: 'Productions' },
+  { href: '/app/identity', label: 'Identity' },
+  { href: '/app/archive', label: 'Archive' },
   { href: '/app/billing', label: 'Billing' },
   { href: '/app/settings', label: 'Settings' },
 ];
@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavTabs tabs={TABS} className={styles.tabs} />
           <div className={styles.spacer} />
           <WorkspaceSwitcher current={session.organizationId} workspaces={workspaces} />
-          <span className={styles.credits} data-empty={credits === 0} title="Creative credits">
+          <span className={styles.credits} data-empty={credits === 0} title="Production credits">
             {credits.toLocaleString('en-US')} credits
           </span>
           {/* The one way in to the referral page: beside the credits it earns. */}

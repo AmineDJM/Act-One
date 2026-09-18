@@ -141,7 +141,7 @@ export function ProductAccess({
       <ul className={styles.promises}>
         <li data-yes="true">We read and we film. We never click anything that changes your data.</li>
         <li data-yes="true">Billing, admin and anything destructive are refused, whatever we are pointed at.</li>
-        <li data-yes="true">The password is encrypted to this workspace and this project alone, and never shown again.</li>
+        <li data-yes="true">The password is encrypted to this workspace and this production alone, and never shown again.</li>
         <li data-yes="true">Every page we open is listed here afterwards.</li>
         <li data-yes="false">We only sign in at {productHost}. Not anywhere else, ever.</li>
         <li data-yes="false">Use a demo or read-only account if you have one.</li>

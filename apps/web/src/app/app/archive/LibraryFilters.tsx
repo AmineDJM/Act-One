@@ -37,7 +37,7 @@ export function LibraryFilters({ state, projects }: { state: FilterState; projec
     if (merged.favorite) params.set('favorite', '1');
     if (merged.approved) params.set('approved', '1');
     const query = params.toString();
-    start(() => router.replace(query ? `/app/library?${query}` : '/app/library', { scroll: false }));
+    start(() => router.replace(query ? `/app/archive?${query}` : '/app/archive', { scroll: false }));
   };
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export function LibraryFilters({ state, projects }: { state: FilterState; projec
         placeholder="> search"
         value={q}
         onChange={(event) => setQ(event.target.value)}
-        aria-label="Search the library"
+        aria-label="Search the archive"
       />
       <select className={`input ${styles.filterSelect}`} value={state.category} onChange={(event) => navigate({ category: event.target.value as FilterState['category'] })} aria-label="Category">
         <option value="">All categories</option>
@@ -71,8 +71,8 @@ export function LibraryFilters({ state, projects }: { state: FilterState; projec
         ))}
       </select>
       {projects.length > 0 ? (
-        <select className={`input ${styles.filterSelect}`} value={state.project} onChange={(event) => navigate({ project: event.target.value })} aria-label="Project">
-          <option value="">All projects</option>
+        <select className={`input ${styles.filterSelect}`} value={state.project} onChange={(event) => navigate({ project: event.target.value })} aria-label="Production">
+          <option value="">All productions</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}

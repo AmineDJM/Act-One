@@ -117,7 +117,7 @@ export function LibraryUploader({ projects, defaultProjectIds }: { projects: { i
         }}
         role="button"
         tabIndex={0}
-        aria-label="Add pictures to the library"
+        aria-label="Add pictures to the archive"
       >
         <input
           ref={input}

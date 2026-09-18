@@ -27,6 +27,7 @@ import { Prompt, Status } from '@/components/ui/Prompt.tsx';
 import { AudioEditionPanel } from './AudioEditionPanel.tsx';
 import { ResearchSources } from './ResearchSources.tsx';
 import { ProjectAssets } from './ProjectAssets.tsx';
+import { PhaseRail } from './PhaseRail.tsx';
 import { loadProjectAssets } from '@/server/library.ts';
 import { CONSENT_STATEMENT, loadSubmission } from '@/server/collections.ts';
 import { CollectionsSubmit } from './CollectionsSubmit.tsx';
@@ -34,7 +35,7 @@ import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Project · Act One' };
+export const metadata: Metadata = { title: 'Production · Act One' };
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -95,7 +96,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       <div className={styles.head}>
         <div className={styles.headCopy}>
           <Prompt tone="accent" chevron={false}>
-            {PRODUCT_NAME} / Project
+            {PRODUCT_NAME} / Production
           </Prompt>
           <h1>{project.name}</h1>
           <p className={styles.projectHost}>{safeHost(project.websiteUrl)}</p>
@@ -108,6 +109,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               : STAGE_STATUS[project.stage].label}
         </Status>
       </div>
+
+      <PhaseRail stage={project.stage} />
 
       {/*
         Exactly one primary action, derived from pipeline stage. Showing the
@@ -368,7 +371,7 @@ function headlineFor(cta: PrimaryCta, projectName: string, failure: string | nul
        * reads as a system that does not know. When we do know, the headline
        * says the state and the body carries the reason.
        */
-      return failure ? 'This project stopped.' : 'Something went wrong.';
+      return failure ? 'This production stopped.' : 'Something went wrong.';
     default:
       return 'Working on it.';
   }
@@ -386,10 +389,10 @@ function bodyFor(
     case 'render_film':
       return watermarked
         ? reason || 'Your plan renders a watermarked preview.'
-        : 'Change anything above before we render — a revision at this stage costs nothing. ' +
-          'Rendering covers scene rendering, product cinematography, sound design and the master export.';
+        : 'Change anything above before we produce it — a revision at this stage costs nothing. ' +
+          'Production covers the shots, product cinematography, sound design and the master export.';
     case 'create_variants':
-      return 'Your film is above. Cut it for every channel you are launching on, and we will write the launch copy to go with it.';
+      return 'Your master is above. Cut it for every channel you are launching on, and we will write the launch copy to go with it.';
     case 'watch_progress':
       return 'This runs in the background. You can close the tab.';
     case 'retry':

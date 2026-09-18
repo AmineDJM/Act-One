@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
-import { PRODUCT_NAME, type Storyboard } from '@act-one/core';
+import { PRODUCT_NAME, pieceLabel, type Storyboard } from '@act-one/core';
 import {
   confirmRevisionAction,
   declineRevisionAction,
@@ -308,8 +308,8 @@ export function StoryboardPanel({
             preload="metadata"
           />
           <figcaption>
-            Timing preview of version {storyboard.version} — rough resolution, no grade. The film is
-            rendered at full quality.
+            <span className="mono muted">{pieceLabel('workprint')}</span> · storyboard {storyboard.version}, timed.
+            Rough resolution, no grade: the master is produced at full quality.
           </figcaption>
         </figure>
       ) : null}

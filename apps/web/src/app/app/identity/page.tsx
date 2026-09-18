@@ -12,7 +12,7 @@ import { BrandVoicePanel } from './BrandVoicePanel.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Brand · Act One' };
+export const metadata: Metadata = { title: 'Identity · Act One' };
 
 /**
  * Brand DNA, per project.
@@ -23,7 +23,7 @@ export const metadata: Metadata = { title: 'Brand · Act One' };
  * workspace's: one narrator across every film.
  */
 export default async function BrandPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const session = await requireSessionForPage('/app/brand');
+  const session = await requireSessionForPage('/app/identity');
   const params = await searchParams;
   const requested = (Array.isArray(params['project']) ? params['project'][0] : params['project'])?.trim() || null;
   const [overview, voice] = await Promise.all([loadBrandOverview(session, requested), loadVoiceOverview(session)]);
@@ -35,20 +35,20 @@ export default async function BrandPage({ searchParams }: { searchParams: Promis
       <div className={styles.head}>
         <div className={styles.headCopy}>
           <Prompt tone="accent" chevron={false}>
-            {PRODUCT_NAME} / Brand
+            {PRODUCT_NAME} / Identity
           </Prompt>
           <h1>Brand DNA</h1>
           <p className={styles.headSub}>
-            Measured from each project&rsquo;s own site, never filled in by hand. Confirm it once; the
-            next project starts from it, and anything we read differently later is a question, not a change.
+            Measured from each production&rsquo;s own site, never filled in by hand. Confirm it once; the
+            next production starts from it, and anything we read differently later is a question, not a change.
           </p>
         </div>
       </div>
 
       {overview.projects.length > 0 ? (
-        <nav className={styles.brandProjects} aria-label="Projects">
+        <nav className={styles.brandProjects} aria-label="Productions">
           {overview.projects.map((row) => (
-            <Link key={row.id} href={`/app/brand?project=${encodeURIComponent(row.id)}`} data-active={selected?.project.id === row.id || undefined} className={styles.brandProject}>
+            <Link key={row.id} href={`/app/identity?project=${encodeURIComponent(row.id)}`} data-active={selected?.project.id === row.id || undefined} className={styles.brandProject}>
               <span className={styles.brandProjectName}>{row.name}</span>
               <span className={styles.brandProjectHost}>{row.host}</span>
               <Status tone={row.tone}>{row.status}</Status>
@@ -78,10 +78,10 @@ export default async function BrandPage({ searchParams }: { searchParams: Promis
           <Prompt tone="text">Brand not measured</Prompt>
           <h2>Nothing measured yet.</h2>
           <p className="secondary" style={{ maxWidth: '46ch' }}>
-            Start a project and we will read the site and measure the brand from what it actually paints.
+            Start a production and we will read the site and measure the brand from what it actually paints.
           </p>
           <Link href="/app" className="btn">
-            Start a project
+            Start a production
           </Link>
         </div>
       )}

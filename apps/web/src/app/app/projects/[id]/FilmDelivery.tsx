@@ -1,4 +1,4 @@
-import type { Render, Variant } from '@act-one/core';
+import { ATTRIBUTION, pieceLabel, type Render, type Variant } from '@act-one/core';
 import styles from '../../app.module.css';
 
 const VARIANT_LABELS: Record<string, string> = {
@@ -48,7 +48,11 @@ export function FilmDelivery({
     <section className={styles.panel}>
       <div className={styles.panelHead}>
         <h3>{projectName}</h3>
-        {render.watermarked ? <span className="badge badge--warn">Watermarked preview</span> : null}
+        <span className={styles.panelLinks}>
+          {/* What the piece is, in the words the credit will carry. */}
+          <span className="mono muted">{render.watermarked ? pieceLabel('workprint') : pieceLabel('master', 1)}</span>
+          {render.watermarked ? <span className="badge badge--warn">Watermarked preview</span> : null}
+        </span>
       </div>
 
       <video
@@ -65,7 +69,7 @@ export function FilmDelivery({
           Download the master
         </a>
         <span className="hint">
-          {render.aspect} · {Math.round(render.durationSeconds)}s
+          {render.aspect} · {Math.round(render.durationSeconds)}s · {ATTRIBUTION}
           {render.watermarked ? ' · upgrade to remove the watermark' : ''}
         </span>
       </div>

@@ -1137,3 +1137,61 @@
   font-size: 0.9rem;
 }
 .referList li:last-child { border-bottom: 0; }
+
+/* --- the production rail ----------------------------------------------------
+ *
+ * Six phases, always in the same order, so the eye learns the shape and the
+ * word carries the meaning. The current one is the only thing with full
+ * contrast; done is quiet, upcoming is quieter still. No bar, no percentage:
+ * a production is not 43% finished, it is in production.
+ */
+.phaseRail {
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.phase {
+  padding: var(--space-3) var(--space-4);
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+}
+.phase:first-child { border-left: 0; }
+.phaseName {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.phaseLine {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+.phase[data-state='done'] .phaseName { color: var(--text-secondary); }
+.phase[data-state='current'] { background: var(--surface-raised); }
+.phase[data-state='current'] .phaseName { color: var(--accent); }
+.phase[data-state='current'] .phaseLine { color: var(--text-secondary); opacity: 1; }
+.phase[data-state='upcoming'] .phaseName { opacity: 0.6; }
+
+@media (max-width: 900px) {
+  .phaseRail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .phase:nth-child(4) { border-left: 0; }
+  .phase:nth-child(n + 4) { border-top: 1px solid var(--line); }
+  .phaseLine { display: none; }
+}
+@media (max-width: 520px) {
+  .phaseRail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .phase:nth-child(odd) { border-left: 0; }
+  .phase:nth-child(even) { border-left: 1px solid var(--line); }
+  .phase:nth-child(n + 3) { border-top: 1px solid var(--line); }
+}

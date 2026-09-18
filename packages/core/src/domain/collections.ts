@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { nonEmpty, urlString } from '../zod-helpers.ts';
+import { ATTRIBUTION, ORIGINAL_LABEL } from './vocabulary.ts';
 
 /**
  * Act One Collections.
@@ -91,7 +92,7 @@ export type CollectionEntry = z.infer<typeof CollectionEntry>;
 
 /** The line under a public film. Never "generated": Act One is the studio behind it. */
 export function creditLine(entry: Pick<CollectionEntry, 'original'>): string {
-  return entry.original ? 'Act One Original' : 'An Act One Production';
+  return entry.original ? ORIGINAL_LABEL : ATTRIBUTION;
 }
 
 /** A slug from the company's name, made unique against the ones already taken. */

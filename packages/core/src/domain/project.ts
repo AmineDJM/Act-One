@@ -163,38 +163,45 @@ export type StatusTone = 'quiet' | 'active' | 'ready' | 'attention';
 
 export const STAGE_STATUS: Record<ProjectStage, { label: string; tone: StatusTone }> = {
   created: { label: 'NOT STARTED', tone: 'quiet' },
-  researching: { label: 'ANALYZING PRODUCT', tone: 'active' },
+  researching: { label: 'DISCOVERY', tone: 'active' },
   understanding_ready: { label: 'PRODUCT UNDERSTOOD', tone: 'active' },
-  concepting: { label: 'WRITING CONCEPTS', tone: 'active' },
-  concepts_ready: { label: 'CHOOSE A CONCEPT', tone: 'ready' },
-  storyboarding: { label: 'BUILDING STORYBOARD', tone: 'active' },
+  concepting: { label: 'DIRECTION', tone: 'active' },
+  concepts_ready: { label: 'CHOOSE A DIRECTION', tone: 'ready' },
+  storyboarding: { label: 'STORYBOARD', tone: 'active' },
   storyboard_ready: { label: 'STORYBOARD READY', tone: 'ready' },
-  capturing_product: { label: 'CAPTURING PRODUCT', tone: 'active' },
-  generating_assets: { label: 'GENERATING SHOTS', tone: 'active' },
-  rendering: { label: 'RENDERING', tone: 'active' },
-  qa: { label: 'QUALITY CHECK', tone: 'active' },
-  film_ready: { label: 'FILM READY', tone: 'ready' },
+  capturing_product: { label: 'PRODUCTION', tone: 'active' },
+  generating_assets: { label: 'PRODUCTION', tone: 'active' },
+  rendering: { label: 'PRODUCTION', tone: 'active' },
+  qa: { label: 'MASTERING', tone: 'active' },
+  film_ready: { label: 'MASTER READY', tone: 'ready' },
   failed: { label: 'NEEDS ATTENTION', tone: 'attention' },
 };
 
-/** What stopped, when we know which step did: the card says that instead of the generic line. */
+/**
+ * Where a production stopped, when we know which step did.
+ *
+ * Named by the phase it interrupted rather than by the job that threw: a
+ * customer who reads `DISCOVERY INTERRUPTED` knows what did not happen and
+ * what still stands. `RENDER FAILED` told them about our queue.
+ */
 export function failureStatus(lastFailedJob: JobKind | null | undefined): string {
   switch (lastFailedJob) {
     case 'research_product':
     case 'extract_brand':
-      return 'ANALYSIS FAILED';
+      return 'DISCOVERY INTERRUPTED';
     case 'generate_concepts':
-      return 'CONCEPTS FAILED';
+      return 'DIRECTION INTERRUPTED';
     case 'build_storyboard':
     case 'repair_scene':
-      return 'STORYBOARD FAILED';
+      return 'STORYBOARD INTERRUPTED';
     case 'capture_product_moments':
-      return 'CAPTURE FAILED';
+    case 'generate_scene_assets':
+      return 'PRODUCTION INTERRUPTED';
     case 'render_film':
     case 'render_variant':
     case 'generate_campaign':
     case 'render_animatic':
-      return 'RENDER FAILED';
+      return 'PRODUCTION INTERRUPTED';
     default:
       return STAGE_STATUS.failed.label;
   }
@@ -202,10 +209,10 @@ export function failureStatus(lastFailedJob: JobKind | null | undefined): string
 
 export const CTA_LABELS: Record<PrimaryCta, string> = {
   understand_product: 'Understand my product',
-  choose_concept: 'Choose a concept',
-  render_film: 'Render the film',
-  watch_progress: 'Working…',
-  create_variants: 'Create the launch campaign',
+  choose_concept: 'Choose a direction',
+  render_film: 'Produce the film',
+  watch_progress: 'In production…',
+  create_variants: 'Cut the launch campaign',
   retry: 'Try again',
 };
 

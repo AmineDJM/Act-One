@@ -85,7 +85,7 @@ const FAQ = [
   },
   {
     q: 'What happens to my demo credentials?',
-    a: 'They are encrypted and bound to your project, never stored in plain text, and used only inside an isolated browser session that is destroyed when the work is done. The agent is blocked in code from taking any action that changes state in your product, and every action it takes is audited. You can revoke access at any time, which destroys the stored secret.',
+    a: 'They are encrypted and bound to your production, never stored in plain text, and used only inside an isolated browser session that is destroyed when the work is done. The agent is blocked in code from taking any action that changes state in your product, and every action it takes is audited. You can revoke access at any time, which destroys the stored secret.',
   },
   {
     q: 'How long does it take?',
