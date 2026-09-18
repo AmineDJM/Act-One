@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { newId, resequence, type BrandSystem, type Scene, type Storyboard, type QaReport } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, newId, resequence, type BrandSystem, type Scene, type Storyboard, type QaReport } from '@act-one/core';
 import { neutralRamp } from '@act-one/design';
 import { runDeterministicChecks, factCheck, planRepairs, applyRepairs, selectFramesToInspect, extractProperNouns } from '../index.ts';
 
-const brand: BrandSystem = {
+const brand: BrandSystem = BrandSystemSchema.parse({
   id: 'brd_1', organizationId: 'org_1', name: 'Northwind', logo: null, logoVariants: [],
   primaryColor: '#2f6fed', secondaryColor: '#8fb2f7', accentColors: [], primaryCandidates: ['#2f6fed'],
   neutrals: neutralRamp('#2f6fed', 9, 0.05), canvasDark: '#08080c', canvasLight: '#ffffff',
   typography: [], visualStyle: 'minimal', imageTreatment: 'none', layoutDensity: 'balanced',
-  cornerStyle: 'subtle', cornerRadiusPx: 8, motionStyle: 'precise', tone: '',
+  cornerStyle: 'subtle', cornerRadiusPx: 8, motionStyle: 'precise', tone: 'Plain.',
   allowsGlow: false, allowsGradient: false, confirmedByUser: true, sources: [],
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-};
+});
 
 function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualType'>): Scene {
   return {
@@ -133,7 +133,7 @@ describe('fact check', () => {
   const understanding = {
     id: 'pun_1', projectId: 'prj_1', name: 'Northwind', oneLiner: 'x', category: 'y',
     targetAudience: [], painPoints: [], keyBenefits: [], differentiators: [], coreFeatures: [],
-    proofPoints: [], productMoments: [], strongestVisualMoments: [], tone: '', brandTraits: [],
+    proofPoints: [], productMoments: [], strongestVisualMoments: [], tone: 'Plain.', brandTraits: [],
     competitorCategory: '', productMaturity: 'growth' as const, launchContext: 'product_launch' as const,
     evidence: [
       {

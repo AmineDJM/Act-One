@@ -1,4 +1,4 @@
-import { newId, type BrandLogo, type BrandSystem, type BrandFont, type CornerStyle, type MotionStyle, type VisualStyle } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, motionPersonalityFor, newId, type BrandLogo, type BrandSystem, type BrandFont, type CornerStyle, type MotionStyle, type VisualStyle } from '@act-one/core';
 import {
   contrastRatio,
   dedupeColors,
@@ -61,7 +61,9 @@ export function extractBrandSystem(input: BrandExtractionInput): BrandSystem {
   const canvasDark = deriveDarkCanvas(colors.primary, colors.backgrounds);
   const canvasLight = colors.backgrounds.find((c) => !isDark(c)) ?? '#ffffff';
 
-  return {
+  // Parsed on the way out so every field the schema has since grown is
+  // present with its default, whatever this function was written to set.
+  return BrandSystemSchema.parse({
     id: newId('brd'),
     organizationId: input.organizationId,
     name: input.name,
@@ -77,10 +79,15 @@ export function extractBrandSystem(input: BrandExtractionInput): BrandSystem {
     typography,
     visualStyle,
     imageTreatment: hasGradients ? 'high_contrast' : 'none',
+    iconography: iconographyFor(profiles),
+    imageryStyle: imageryStyleFor(profiles),
+    imagerySubjects: imagerySubjectsFor(profiles),
+    faviconUrl: faviconFor(input.captures),
     layoutDensity: spacing.median >= 48 ? 'airy' : spacing.median <= 20 ? 'dense' : 'balanced',
     cornerStyle,
     cornerRadiusPx: radii.base,
     motionStyle: motionStyleFor(visualStyle, cornerStyle),
+    motionPersonality: motionPersonalityFor(motionStyleFor(visualStyle, cornerStyle)),
     tone: toneFor(visualStyle),
     // Only brands that already use glow get glow. Adding it is the fastest way
     // to make a film look generated.
@@ -90,7 +97,7 @@ export function extractBrandSystem(input: BrandExtractionInput): BrandSystem {
     sources: input.captures.map((c) => c.url),
     createdAt: now,
     updatedAt: now,
-  };
+  });
 }
 
 function aggregateColors(
@@ -382,7 +389,7 @@ function dedupeLogos(logos: BrandLogo[]): BrandLogo[] {
 
 function neutralFallback(input: BrandExtractionInput, now: string): BrandSystem {
   const primary = '#2f6fed';
-  return {
+  return BrandSystemSchema.parse({
     id: newId('brd'),
     organizationId: input.organizationId,
     name: input.name,
@@ -409,7 +416,7 @@ function neutralFallback(input: BrandExtractionInput, now: string): BrandSystem 
     sources: input.captures.map((c) => c.url),
     createdAt: now,
     updatedAt: now,
-  };
+  });
 }
 
 /**
@@ -436,3 +443,63 @@ export function resolveTypeColors(brand: BrandSystem): {
     },
   };
 }
+
+// --- icons, pictures, the favicon, and motion in a sentence --------------------
+
+function iconographyFor(profiles: StyleProfile[]): BrandSystem['iconography'] {
+  let outline = 0;
+  let filled = 0;
+  for (const profile of profiles) {
+    outline += profile.iconography?.outline ?? 0;
+    filled += profile.iconography?.filled ?? 0;
+  }
+  const total = outline + filled;
+  if (total < 3) return 'none';
+  if (outline / total >= 0.75) return 'outline';
+  if (filled / total >= 0.75) return 'filled';
+  return 'mixed';
+}
+
+function imageryStyleFor(profiles: StyleProfile[]): BrandSystem['imageryStyle'] {
+  let photos = 0;
+  let illustrations = 0;
+  let screenshots = 0;
+  for (const profile of profiles) {
+    photos += profile.imagery?.photos ?? 0;
+    illustrations += profile.imagery?.illustrations ?? 0;
+    screenshots += profile.imagery?.screenshots ?? 0;
+  }
+  const total = photos + illustrations + screenshots;
+  if (total === 0) return 'none';
+  const share = (count: number) => count / total;
+  if (share(screenshots) >= 0.6) return 'ui_only';
+  if (share(photos) >= 0.6) return 'photography';
+  if (share(illustrations) >= 0.6) return 'illustration';
+  return 'mixed';
+}
+
+function imagerySubjectsFor(profiles: StyleProfile[]): string[] {
+  const subjects: string[] = [];
+  for (const profile of profiles) {
+    for (const subject of profile.imagery?.subjects ?? []) {
+      const clean = subject.trim().slice(0, 80);
+      if (clean && !subjects.includes(clean)) subjects.push(clean);
+      if (subjects.length >= 12) return subjects;
+    }
+  }
+  return subjects;
+}
+
+function faviconFor(captures: PageCapture[]): string | null {
+  for (const capture of captures) {
+    const href = capture.styleProfile?.faviconUrl ?? null;
+    if (href && /^https?:\/\//.test(href)) return href;
+    const declared = capture.html.match(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*href=["']([^"']+)["']/i)?.[1];
+    if (declared) {
+      const absolute = absolutize(capture.url, declared);
+      if (absolute) return absolute;
+    }
+  }
+  return null;
+}
+

@@ -18,6 +18,7 @@ import { PolicyViolation, policyForPublicResearch, withFallback } from '@act-one
 import { expandPlan, initialPlan, type PageIntent, type PlannedPage } from './crawl-plan.ts';
 import { dedupeEvidence, extractEvidence, extractMeta } from './evidence.ts';
 import { extractBrandSystem } from './brand-extractor.ts';
+import { extractCommunication } from './brand-communication.ts';
 import { synthesiseUnderstanding, understandingConfidence } from './understanding.ts';
 import { assessCapture, cropToFold, previewForModel } from './capture-quality.ts';
 import { attachPublicCaptures, pageLabel, type CaptureCandidate } from './public-captures.ts';
@@ -206,6 +207,10 @@ export class ProductResearchAgent {
       },
       context,
     );
+
+    // How the brand speaks, read from the pages it wrote: the one part of the
+    // DNA that cannot be measured, asked for as quotation rather than opinion.
+    brand.communication = await extractCommunication(this.llm, { understanding, captures }, context);
 
     progress({ fraction: 0.9, message: 'Choosing what to show' });
 

@@ -1,5 +1,5 @@
 import { neutralRamp } from '@act-one/design';
-import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
 import type { FilmProps } from './composition.ts';
 
 /**
@@ -9,7 +9,7 @@ import type { FilmProps } from './composition.ts';
  * motion system working, and it is never rendered for a customer — the render
  * worker always supplies real input props.
  */
-const brand: BrandSystem = {
+const brand: BrandSystem = BrandSystemSchema.parse({
   id: 'brd_placeholder',
   organizationId: 'org_placeholder',
   name: 'Northwind',
@@ -36,7 +36,7 @@ const brand: BrandSystem = {
   sources: [],
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
-};
+});
 
 function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualType' | 'purpose'>): Scene {
   return {

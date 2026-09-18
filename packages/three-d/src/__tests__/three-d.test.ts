@@ -1,17 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { neutralRamp } from '@act-one/design';
+import { BrandSystem as BrandSystemSchema } from '@act-one/core';
 import type { BrandSystem, Scene } from '@act-one/core';
 import { buildBlenderScript, normaliseScene, estimateRenderSeconds, planThreeDScene, RIGS, ThreeDScene } from '../index.ts';
 
-const brand: BrandSystem = {
+const brand: BrandSystem = BrandSystemSchema.parse({
   id: 'brd_1', organizationId: 'org_1', name: 'Northwind', logo: null, logoVariants: [],
   primaryColor: '#2f6fed', secondaryColor: '#8fb2f7', accentColors: [], primaryCandidates: ['#2f6fed'],
   neutrals: neutralRamp('#2f6fed', 9, 0.05), canvasDark: '#08080c', canvasLight: '#ffffff',
   typography: [], visualStyle: 'minimal', imageTreatment: 'none', layoutDensity: 'balanced',
-  cornerStyle: 'subtle', cornerRadiusPx: 8, motionStyle: 'precise', tone: '',
+  cornerStyle: 'subtle', cornerRadiusPx: 8, motionStyle: 'precise', tone: 'Plain.',
   allowsGlow: false, allowsGradient: false, confirmedByUser: true, sources: [],
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-};
+});
 
 const scene: Scene = {
   id: 'scn_1', storyboardId: 'sbd_1', index: 2, startTime: 6, duration: 4,

@@ -195,6 +195,10 @@ const SCENE_PLAN = {
 function scriptedLlm() {
   return new ScriptedLlmProvider([
     { when: /research lead at a creative studio/i, respond: UNDERSTANDING_RESPONSE },
+    {
+      when: /how a brand speaks/i,
+      respond: { language: 'en', vocabulary: ['reconcile', 'ledger'], positioning: 'The reconciliation layer.', claims: [], naming: 'Northwind', tagline: 'Reconcile everything.', wordsToAvoid: ['cheap'] },
+    },
     { when: /creative strategist at a studio/i, respond: () => conceptResponse() },
     { when: /you are the creative director/i, respond: TREATMENT_RESPONSE },
     { when: /storyboarding an approved treatment/i, respond: SCENE_PLAN },
@@ -333,6 +337,42 @@ describe('pipeline', () => {
     expect(pages[0]).toMatchObject({ step: 'research', label: 'homepage', status: 'done', index: 0 });
     expect(events.some((event) => event.step === 'brand' && event.status === 'done')).toBe(true);
     expect(events.some((event) => event.kind === 'step' && event.label === 'extracting positioning')).toBe(true);
+
+    // The brand is the project's own, unconfirmed, with what the site says about itself.
+    expect(brands[0]).toMatchObject({ projectId: project.id, parentBrandId: null, confirmedByUser: false });
+    expect(brands[0]!.communication.tagline).toBe('Reconcile everything.');
+  });
+
+  it('starts a second project from the confirmed brand and keeps its own reading as signals', async () => {
+    await runJob(deps, await enqueued(store, org.id, project.id, 'research_product'));
+    const first = (await store.brands.list(org.id))[0]!;
+    // A person confirms the first project's brand, with a colour of their own.
+    await store.brands.update(org.id, first.id, { confirmedByUser: true, confirmedAt: new Date().toISOString(), primaryColor: '#111111', overrides: ['colors'] });
+
+    const now = new Date().toISOString();
+    const second = await store.projects.create({
+      ...project,
+      id: newId('prj'), name: 'Northwind again', brandId: null, productUnderstandingId: null, createdAt: now, updatedAt: now,
+    });
+    await runJob(deps, await enqueued(store, org.id, second.id, 'research_product'));
+
+    const updated = await store.projects.get(org.id, second.id);
+    const inherited = await store.brands.get(org.id, updated!.brandId!);
+    expect(inherited).not.toBeNull();
+    expect(inherited!.id).not.toBe(first.id);
+    expect(inherited).toMatchObject({ projectId: second.id, parentBrandId: first.id, confirmedByUser: true, primaryColor: '#111111', overrides: ['colors'] });
+    // The fresh reading measured the site's blue; it is proposed, not applied.
+    const pending = inherited!.signals.filter((signal) => signal.status === 'pending');
+    expect(pending.map((signal) => signal.field)).toContain('primaryColor');
+    expect(pending.find((signal) => signal.field === 'primaryColor')).toMatchObject({ current: '#111111', proposed: '#2f6fed', projectId: second.id });
+    // The first project's brand is untouched.
+    expect((await store.brands.get(org.id, first.id))!.signals).toEqual([]);
+
+    // Reading the second project again proposes nothing new.
+    await runJob(deps, await enqueued(store, org.id, second.id, 'research_product'));
+    const again = await store.brands.get(org.id, updated!.brandId!);
+    expect(again!.signals.filter((signal) => signal.status === 'pending')).toHaveLength(pending.length);
+    expect((await store.brands.list(org.id))).toHaveLength(2);
   });
 
   it('chains straight into concepts without waiting for another button', async () => {

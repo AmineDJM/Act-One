@@ -73,6 +73,11 @@ export type StyleProfile = {
   logoCandidates: { src: string; alt: string; width: number; height: number }[];
   maxHeadingSizePx: number;
   bodySizePx: number;
+  /** Small inline SVGs by how they are drawn. Absent from captures made before it was measured. */
+  iconography?: { outline: number; filled: number };
+  /** Large pictures by kind, with what their alt text says they show. */
+  imagery?: { photos: number; illustrations: number; screenshots: number; subjects: string[] };
+  faviconUrl?: string | null;
 };
 
 export type ElementBounds = { x: number; y: number; width: number; height: number };

@@ -20,6 +20,7 @@ export type IdPrefix =
   | 'mem'
   | 'prj'
   | 'brd'
+  | 'bsg'
   | 'pun'
   | 'cpt'
   | 'sbd'

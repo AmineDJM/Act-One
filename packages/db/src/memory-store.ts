@@ -382,6 +382,10 @@ export class MemoryStore implements Store {
     update: async (organizationId: string, id: string, patch: Partial<BrandSystem>) =>
       this.patch(this.tables.brands, organizationId, id, { ...patch, updatedAt: new Date().toISOString() }, 'Brand'),
     list: async (organizationId: string) => this.scoped(this.tables.brands, organizationId),
+    getForProject: async (organizationId: string, projectId: string) =>
+      this.scoped(this.tables.brands, organizationId)
+        .filter((brand) => brand.projectId === projectId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null,
   };
 
   readonly projects = {

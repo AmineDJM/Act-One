@@ -1,4 +1,4 @@
-import { TONE_LABELS, languageName, type ProjectBrief } from '@act-one/core';
+import { TONE_LABELS, languageName, type BrandSystem, type ProjectBrief } from '@act-one/core';
 
 /**
  * What the customer asked for, in the words every writing prompt gets.
@@ -17,4 +17,23 @@ export function briefDirectionLines(brief: Pick<ProjectBrief, 'language' | 'tone
     ? `Tone the customer asked for: ${TONE_LABELS[brief.tone]}.`
     : "Tone: take it from the brand's own writing.";
   return [language, tone];
+}
+
+/**
+ * How the brand speaks, in the words every writing prompt gets.
+ *
+ * Read from the site itself: the names it uses, the line it leads with, the
+ * words it reaches for and the ones it never says. A film that names the
+ * product the way its own site does, and never reaches for a word the brand
+ * avoids, reads as the company's; one that does not reads as ours.
+ */
+export function brandDirectionLines(brand: Pick<BrandSystem, 'communication' | 'name'>): string[] {
+  const words = brand.communication;
+  const lines: string[] = [];
+  if (words.naming) lines.push(`Naming, as the brand does it: ${words.naming}`);
+  if (words.tagline) lines.push(`The brand's own line: "${words.tagline}" — echo it, do not repeat it verbatim unless the beat asks for it.`);
+  if (words.positioning) lines.push(`How the brand positions itself: ${words.positioning}`);
+  if (words.vocabulary.length > 0) lines.push(`Words the brand uses: ${words.vocabulary.join(', ')}.`);
+  if (words.wordsToAvoid.length > 0) lines.push(`Words the brand never uses — never write them: ${words.wordsToAvoid.join(', ')}.`);
+  return lines;
 }

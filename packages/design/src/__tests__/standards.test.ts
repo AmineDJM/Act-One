@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CONTRAST_AA_NON_TEXT, THIRDS, type BrandSystem } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, CONTRAST_AA_NON_TEXT, THIRDS, type BrandSystem } from '@act-one/core';
 import { contrastRatio, createFrame, createGrid, neutralRamp, place, resolveTokens, type Placement } from '../index.ts';
 
 /**
@@ -8,15 +8,15 @@ import { contrastRatio, createFrame, createGrid, neutralRamp, place, resolveToke
  * are the promises, tried against brands that would break a naive design.
  */
 function brand(primaryColor: string): BrandSystem {
-  return {
+  return BrandSystemSchema.parse({
     id: 'brd_1', organizationId: 'org_1', name: 'Test', logo: null, logoVariants: [],
     primaryColor, secondaryColor: primaryColor, accentColors: [], primaryCandidates: [primaryColor],
     neutrals: neutralRamp(primaryColor, 9, 0.05), canvasDark: '#07080d', canvasLight: '#ffffff',
     typography: [], visualStyle: 'minimal', imageTreatment: 'none', layoutDensity: 'balanced',
-    cornerStyle: 'subtle', cornerRadiusPx: 10, motionStyle: 'precise', tone: '', allowsGlow: false,
+    cornerStyle: 'subtle', cornerRadiusPx: 10, motionStyle: 'precise', tone: 'Plain.', allowsGlow: false,
     allowsGradient: false, confirmedByUser: true, sources: [],
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-  };
+  });
 }
 
 describe('non-text contrast is designed in', () => {

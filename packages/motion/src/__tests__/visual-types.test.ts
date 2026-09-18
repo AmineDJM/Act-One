@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { neutralRamp } from '@act-one/design';
-import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
 import { readContainer } from '@act-one/qa';
 import { posterArgs, runFfmpeg } from '@act-one/sound';
 import { renderFilm, resolveBrowserExecutable } from '../render.ts';
@@ -25,7 +25,7 @@ const browser =
   resolveBrowserExecutable() ??
   (existsSync(fileURLToPath(new URL('../../../../node_modules/.remotion', import.meta.url))) ? '' : undefined);
 
-const brand: BrandSystem = {
+const brand: BrandSystem = BrandSystemSchema.parse({
   id: 'brd_1', organizationId: 'org_1', name: 'Northwind', logo: null, logoVariants: [],
   primaryColor: '#3d7bfd', secondaryColor: '#9ab8ff', accentColors: [], primaryCandidates: ['#3d7bfd'],
   neutrals: neutralRamp('#3d7bfd', 9, 0.05), canvasDark: '#07080d', canvasLight: '#ffffff',
@@ -33,7 +33,7 @@ const brand: BrandSystem = {
   cornerStyle: 'subtle', cornerRadiusPx: 10, motionStyle: 'precise', tone: 'Plain.',
   allowsGlow: false, allowsGradient: false, confirmedByUser: true, sources: [],
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-};
+});
 
 function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'visualType' | 'purpose'> & { recipe: Scene['motionRecipe']['name'] }): Scene {
   const { recipe, ...rest } = over;

@@ -1,5 +1,18 @@
 import { AppError, newId, secretContextFor } from '../shared.ts';
-import { RESEARCH_PAGE_LABELS, ResearchPageType, credentialIsUsable, stageReached, type ProductUnderstanding, type ResearchSource } from '@act-one/core';
+import {
+  RESEARCH_PAGE_LABELS,
+  ResearchPageType,
+  credentialIsUsable,
+  diffBrandSignals,
+  inheritBrand,
+  mergeBrandSignals,
+  pendingBrandSignals,
+  pickParentBrand,
+  stageReached,
+  type BrandSystem,
+  type ProductUnderstanding,
+  type ResearchSource,
+} from '@act-one/core';
 import { ProductResearchAgent, ProductExplorer } from '@act-one/research';
 import type { SecretVault } from '@act-one/providers';
 import { policyForAuthenticatedProduct } from '@act-one/providers';
@@ -213,16 +226,52 @@ export async function runResearch(
     },
   });
 
-  // One brand per organisation, reused across projects. A second project for
-  // the same company should not re-measure and land somewhere slightly
-  // different — that is how two films for one customer stop matching.
+  /*
+   * The brand belongs to the project.
+   *
+   * A first project is measured and waits for a person to confirm. A later
+   * project for a company whose brand a person already confirmed starts
+   * from that DNA — a second film must match the first — and keeps what its
+   * own reading found differently as signals to review. A project read
+   * again keeps its brand and gains signals the same way. Nothing a person
+   * confirmed or edited is overwritten by a measurement.
+   */
+  const measured: BrandSystem = { ...result.brand, projectId: project.id };
   const existingBrands = await store.brands.list(organizationId);
-  const existing = existingBrands.find((brand) => brand.confirmedByUser);
-  const brand = existing ?? (await store.brands.create(result.brand));
+  const current = project.brandId ? (existingBrands.find((candidate) => candidate.id === project.brandId) ?? null) : null;
+  let brand: BrandSystem;
+  let label: string;
+  if (current) {
+    const signals = mergeBrandSignals(
+      current.signals,
+      diffBrandSignals(current, measured, { projectId: project.id, sourceUrl: measured.sources[0] ?? null, newId: (prefix) => newId(prefix) }),
+    );
+    const fresh = signals.length - current.signals.length;
+    brand = await store.brands.update(organizationId, current.id, {
+      signals,
+      sources: measured.sources,
+      // A brand that was never confirmed keeps taking the newest reading of
+      // what nobody has touched: its words, until a person writes their own.
+      ...(!current.confirmedByUser && !current.overrides.includes('communication') ? { communication: measured.communication } : {}),
+    });
+    label = fresh > 0 ? `${fresh} new brand signal${fresh === 1 ? '' : 's'} to review` : 'brand read again, unchanged';
+  } else {
+    const parent = pickParentBrand(existingBrands, hostOf(project.websiteUrl));
+    if (parent) {
+      brand = await store.brands.create(
+        inheritBrand(parent, measured, { id: newId('brd'), projectId: project.id, newId: (prefix) => newId(prefix) }),
+      );
+      const open = pendingBrandSignals(brand).length;
+      label = `brand inherited from ${parent.name}${open > 0 ? `, ${open} new signal${open === 1 ? '' : 's'} to review` : ''}`;
+    } else {
+      brand = await store.brands.create(measured);
+      label = `brand measured from ${measured.sources.length} page${measured.sources.length === 1 ? '' : 's'}`;
+    }
+  }
   await context.activity({
     step: 'brand',
     kind: 'step',
-    label: existing ? 'brand already confirmed for this workspace' : `brand measured from ${result.brand.sources.length} pages`,
+    label,
     detail: `${brand.primaryColor} · ${brand.typography.find((font) => font.role === 'display')?.family ?? 'system type'} · ${brand.visualStyle}`,
     status: 'done',
   });

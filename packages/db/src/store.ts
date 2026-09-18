@@ -183,7 +183,10 @@ export interface BrandRepo {
   create(brand: BrandSystem): Promise<BrandSystem>;
   get(organizationId: string, id: string): Promise<BrandSystem | null>;
   update(organizationId: string, id: string, patch: Partial<BrandSystem>): Promise<BrandSystem>;
+  /** Newest first. */
   list(organizationId: string): Promise<BrandSystem[]>;
+  /** The brand measured for one project, the newest if it has several. */
+  getForProject(organizationId: string, projectId: string): Promise<BrandSystem | null>;
 }
 
 export interface ProjectRepo {

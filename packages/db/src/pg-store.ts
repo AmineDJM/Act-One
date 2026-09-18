@@ -1,4 +1,4 @@
-import { Asset as AssetSchema } from '@act-one/core';
+import { Asset as AssetSchema, BrandSystem as BrandSystemSchema } from '@act-one/core';
 import {
   AppError,
   newId,
@@ -570,7 +570,7 @@ export class PgStore implements Store {
           'SELECT data FROM brands WHERE id = $1 AND organization_id = $2',
           [id, organizationId],
         );
-        return (r.rows[0]?.['data'] as BrandSystem) ?? null;
+        return r.rows[0] ? brandFromRow(r.rows[0]['data']) : null;
       }),
 
     update: async (organizationId: string, id: string, patch: Partial<BrandSystem>) =>
@@ -581,7 +581,7 @@ export class PgStore implements Store {
         );
         if (!current.rows[0]) throw notFound('Brand');
         const next: BrandSystem = {
-          ...(current.rows[0]['data'] as BrandSystem),
+          ...brandFromRow(current.rows[0]['data']),
           ...patch,
           id,
           organizationId,
@@ -600,7 +600,17 @@ export class PgStore implements Store {
           'SELECT data FROM brands WHERE organization_id = $1 ORDER BY created_at DESC',
           [organizationId],
         );
-        return r.rows.map((row) => row['data'] as BrandSystem);
+        return r.rows.map((row) => brandFromRow(row['data']));
+      }),
+
+    getForProject: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM brands WHERE organization_id = $1 AND data->>'projectId' = $2
+           ORDER BY created_at DESC LIMIT 1`,
+          [organizationId, projectId],
+        );
+        return r.rows[0] ? brandFromRow(r.rows[0]['data']) : null;
       }),
   };
 
@@ -2439,6 +2449,17 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
     createdAt: iso(row['created_at']),
     updatedAt: iso(row['updated_at']),
   });
+}
+
+/**
+ * A brand as stored, brought up to the current shape.
+ *
+ * Brands are documents, and a document written before a field existed has
+ * no value for it. Parsing on the way out fills every default, so a brand
+ * measured last month reads exactly like one measured today.
+ */
+function brandFromRow(data: unknown): BrandSystem {
+  return BrandSystemSchema.parse(data);
 }
 
 function toAsset(row: Row): Asset {

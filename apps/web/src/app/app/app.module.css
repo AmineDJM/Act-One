@@ -429,6 +429,7 @@
 
 .swatches { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .swatch {
+  display: inline-block;
   width: 40px; height: 40px; border-radius: var(--radius-sm);
   border: 1px solid var(--line); flex: none;
 }
@@ -1004,3 +1005,102 @@
 .assetStripItem img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .assetStripName { font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .assetStripMeta { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.05em; color: var(--text-muted); }
+
+/* --- brand DNA ------------------------------------------------------------- */
+
+.brandProjects { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-5); }
+.brandProject {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-secondary);
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+.brandProject:hover { border-color: var(--line-strong); color: var(--text); }
+.brandProject[data-active] { border-color: var(--accent-line); color: var(--text); background: var(--surface-raised); }
+.brandProjectName { font-weight: 500; font-size: 0.92rem; }
+.brandProjectHost { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); grid-row: 2; }
+.brandProject .status { grid-column: 2; grid-row: 1 / span 2; }
+
+.signals { border: 1px solid color-mix(in oklab, var(--warning) 45%, var(--line)); border-radius: var(--radius-lg); background: var(--surface); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.signals[data-pending] { opacity: 0.7; }
+.signalsHead { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; align-items: baseline; }
+.signalList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.signalRow { display: grid; grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: var(--space-4); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--line); font-size: 0.88rem; }
+.signalLabel { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); }
+.signalChange { display: flex; gap: var(--space-3); align-items: center; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text); min-width: 0; flex-wrap: wrap; }
+.signalChange > span:first-child { color: var(--text-muted); }
+.signalSwatch { display: inline-flex; align-items: center; gap: 6px; }
+.signalSwatch > span { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line-strong); display: inline-block; }
+.signalReason { color: var(--text-secondary); }
+.signalReason a { color: var(--accent-text); }
+.signalTools { display: flex; gap: var(--space-2); }
+.signalTools .btn { height: 30px; font-size: 0.8rem; padding: 0 var(--space-3); }
+@media (max-width: 760px) {
+  .signalRow { grid-template-columns: 1fr; gap: var(--space-2); }
+}
+
+.dna { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.dna[data-pending] { opacity: 0.7; }
+.dnaHead { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.dnaSub { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.04em; color: var(--text-muted); margin-top: var(--space-2); text-transform: uppercase; }
+.dnaStatus { flex: none; }
+.dnaList { list-style: none; margin: 0; padding: 0; }
+.dnaRow { display: grid; grid-template-columns: 20px 28px minmax(0, 1fr) auto; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); align-items: start; transition: background var(--duration) var(--ease); }
+.dnaRow:last-child { border-bottom: 0; }
+.dnaRow:hover, .dnaRow[data-open] { background: var(--surface-raised); }
+.dnaTick { font-family: var(--font-mono); color: var(--text-muted); padding-top: 2px; }
+.dnaRow[data-state='edited'] .dnaTick, .dnaRow[data-state='confirmed'] .dnaTick { color: var(--positive); }
+.dnaBody { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.dnaTop { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+.dnaLabel { font-weight: 500; font-size: 0.95rem; letter-spacing: -0.01em; }
+.dnaState { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; color: var(--text-muted); }
+.dnaRow[data-state='edited'] .dnaState { color: var(--accent-text); }
+.dnaEdit { font: inherit; font-size: 0.82rem; color: var(--text-muted); background: none; border: 0; padding: 2px 0; cursor: pointer; transition: color var(--duration) var(--ease); }
+.dnaEdit:hover { color: var(--text); }
+.dnaText { font-size: 0.9rem; color: var(--text-secondary); }
+.dnaText strong { color: var(--text); font-weight: 500; }
+.dnaFacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2) var(--space-5); font-size: 0.88rem; }
+.dnaFacts > div { display: flex; gap: var(--space-3); min-width: 0; }
+.dnaFacts dt { color: var(--text-muted); flex: none; width: 96px; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+.dnaFacts dd { color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
+.dnaSwatch { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); }
+.dnaSwatch > span:first-child { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); }
+.dnaNote { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); align-self: center; letter-spacing: 0.04em; }
+.dnaLogos { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+.dnaLogo { display: inline-flex; align-items: center; justify-content: center; height: 56px; padding: 0 var(--space-4); border-radius: var(--radius); border: 1px solid var(--line); background: #f3f2ee; }
+.dnaLogo[data-on='dark'] { background: var(--canvas); }
+.dnaLogo img { height: 32px; width: auto; max-width: 200px; display: block; }
+.dnaLogo[data-choice] { cursor: pointer; }
+.dnaLogo[data-choice]:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.dnaFavicon { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: 0.7rem; }
+.dnaFavicon img { width: 20px; height: 20px; border-radius: 4px; }
+.dnaForm { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
+.dnaGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
+.dnaGrid[data-wide] { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.dnaChecks { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 0.86rem; color: var(--text-secondary); }
+.dnaChecks input { accent-color: var(--accent); margin-right: 6px; }
+.dnaChoice { border: 0; padding: 0; margin: 0; display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.dnaChoice legend { margin-bottom: var(--space-2); }
+.dnaFormFoot { display: flex; gap: var(--space-2); }
+.dnaFormFoot .btn { height: 32px; font-size: 0.82rem; padding: 0 var(--space-3); }
+.dnaFoot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--line); flex-wrap: wrap; }
+.dnaFoot .btn { font-family: var(--font-mono); letter-spacing: 0.02em; }
+@media (max-width: 600px) {
+  .dnaRow { grid-template-columns: 16px 24px minmax(0, 1fr); }
+  .dnaEdit { grid-column: 3; justify-self: start; }
+}
+
+.brandCard { display: flex; flex-direction: column; gap: var(--space-3); }
+.brandCardRow { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; font-size: 0.88rem; color: var(--text-secondary); }
+.brandCardLinks { display: flex; gap: var(--space-4); font-size: 0.86rem; }
+.brandCardLinks a { color: var(--text-secondary); }
+.brandCardLinks a:hover { color: var(--text); }
+.brandCardLinks a[data-tone='attention'] { color: var(--accent-text); }

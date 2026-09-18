@@ -142,9 +142,14 @@ export async function confirmBrandAction(
     const brandId = String(formData.get('brandId') ?? '');
     const primaryColor = String(formData.get('primaryColor') ?? '').trim();
 
+    const brand = await getStore().brands.get(session.organizationId, brandId);
+    if (!brand) throw new AppError('not_found', 'Brand not found.');
     await getStore().brands.update(session.organizationId, brandId, {
       confirmedByUser: true,
-      ...(primaryColor ? { primaryColor } : {}),
+      confirmedAt: new Date().toISOString(),
+      ...(primaryColor && primaryColor !== brand.primaryColor
+        ? { primaryColor, overrides: brand.overrides.includes('colors') ? brand.overrides : [...brand.overrides, 'colors'] }
+        : {}),
     });
 
     revalidatePath(`/app/projects/${projectId}`);

@@ -55,6 +55,26 @@ there, the screenshot as our own asset, the excerpt, the claims the brief
 took from it — and stays inspectable after the film exists, under **Research
 sources** on the project page.
 
+### Brand DNA, per project
+
+A brand belongs to a project. It is measured from that project's own site —
+colours by painted area, type by use, radii and spacing by mode, icons by
+how they are drawn, pictures by kind, the favicon and the mark — and read,
+by quotation only, for how the brand speaks: the words it uses, how it
+names itself and its things, the line it leads with, what it never says.
+The Brand page shows it as eight components a person can read, edit and
+tick off — **BRAND DNA — measured automatically from 14 sources … [ Confirm
+brand ]** — and every writing prompt in the pipeline gets the brand's own
+words.
+
+A later project for a company whose brand a person confirmed starts from
+that DNA, so a second film matches the first, and keeps what its own
+reading found differently as *signals*: "We found 2 new brand signals"
+lists each one — what the brand has, what was measured, where — for a
+person to accept or dismiss. Nothing a person edited or confirmed is
+overwritten by a measurement, and a dismissed reading is not proposed
+again.
+
 ### The library
 
 Every picture a workspace owns lives in one place, under **Library**: what

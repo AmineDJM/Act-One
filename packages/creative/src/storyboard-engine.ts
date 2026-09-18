@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { briefDirectionLines } from './brief-lines.ts';
+import { brandDirectionLines, briefDirectionLines } from './brief-lines.ts';
 import {
   MODE_BUDGETS,
   findMoment,
@@ -301,6 +301,7 @@ export class StoryboardEngine {
             `# Constraints`,
             `Target runtime: ${target} seconds. Plan roughly ${approximateScenes} scenes.`,
             ...briefDirectionLines(input.brief),
+            ...brandDirectionLines(input.brand),
             `CTA at the end: ${input.treatment.cta}`,
             input.brief.realMediaOnly ? 'Real media only: no generative briefs at all.' : '',
             `Hard prohibitions: ${system.prohibitions.join('; ')}`,

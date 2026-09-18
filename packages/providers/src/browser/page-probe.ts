@@ -25,6 +25,11 @@ export function probeDocument(): {
     logoCandidates: { src: string; alt: string; width: number; height: number }[];
     maxHeadingSizePx: number;
     bodySizePx: number;
+    /** Small inline SVGs by how they are drawn: stroked outlines, or filled shapes. */
+    iconography: { outline: number; filled: number };
+    /** Large pictures by kind, and what their alt text says they show. */
+    imagery: { photos: number; illustrations: number; screenshots: number; subjects: string[] };
+    faviconUrl: string | null;
   };
 } {
   // Everything probeDocument needs must be defined INSIDE it: page.evaluate
@@ -227,6 +232,52 @@ export function probeDocument(): {
   const bodySizePx =
     Array.from(bodySizes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 16;
 
+  // Icons: small inline SVGs, counted by whether they are drawn with a
+  // stroke and no fill (outline) or with filled shapes. A brand's icon style
+  // is one of the first things a designer reads and one of the last a
+  // template gets right.
+  const iconography = { outline: 0, filled: 0 };
+  for (const svg of Array.from(document.querySelectorAll<SVGElement>('svg'))) {
+    const rect = svg.getBoundingClientRect();
+    if (rect.width < 10 || rect.width > 64 || rect.height < 10 || rect.height > 64) continue;
+    const shapes = Array.from(svg.querySelectorAll('path, circle, rect, polygon, line, polyline, ellipse'));
+    if (shapes.length === 0) continue;
+    let stroked = 0;
+    let filledShapes = 0;
+    for (const shape of shapes.slice(0, 12)) {
+      const style = getComputedStyle(shape);
+      const fill = shape.getAttribute('fill') ?? style.fill;
+      const stroke = shape.getAttribute('stroke') ?? style.stroke;
+      const hasStroke = Boolean(stroke) && stroke !== 'none' && parseFloat(style.strokeWidth || '0') > 0;
+      const hasFill = Boolean(fill) && fill !== 'none' && fill !== 'transparent';
+      if (hasStroke && !hasFill) stroked += 1;
+      else if (hasFill) filledShapes += 1;
+    }
+    if (stroked > filledShapes) iconography.outline += 1;
+    else if (filledShapes > 0) iconography.filled += 1;
+  }
+
+  // Pictures: what the page shows at size. Raster images are photographs
+  // unless their name says otherwise; large SVGs are illustrations; a wide
+  // raster with an app-like name is a screenshot of the product.
+  const imagery = { photos: 0, illustrations: 0, screenshots: 0, subjects: [] as string[] };
+  for (const node of Array.from(document.querySelectorAll<HTMLImageElement | SVGElement>('img, picture img, svg'))) {
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 240 || rect.height < 160) continue;
+    const isSvg = node.tagName.toLowerCase() === 'svg';
+    const src = (isSvg ? '' : (node as HTMLImageElement).currentSrc || node.getAttribute('src') || '').toLowerCase();
+    const alt = (node.getAttribute('alt') ?? node.getAttribute('aria-label') ?? '').trim();
+    const name = `${src} ${alt} ${node.getAttribute('class') ?? ''}`.toLowerCase();
+    if (isSvg || src.endsWith('.svg') || /illustration|illus|vector|drawing/.test(name)) imagery.illustrations += 1;
+    else if (/screenshot|screen|dashboard|app|ui|interface|product-?shot|mockup/.test(name) && rect.width / rect.height > 1.2) imagery.screenshots += 1;
+    else imagery.photos += 1;
+    if (alt.length >= 4 && alt.length <= 80 && imagery.subjects.length < 8 && !imagery.subjects.includes(alt)) imagery.subjects.push(alt);
+  }
+
+  const faviconLink =
+    document.querySelector<HTMLLinkElement>('link[rel~="icon"][href], link[rel="apple-touch-icon"][href]') ?? null;
+  const faviconUrl = faviconLink ? faviconLink.href : null;
+
   const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
     .slice(0, 400)
     .map((anchor) => ({
@@ -255,6 +306,9 @@ export function probeDocument(): {
       logoCandidates,
       maxHeadingSizePx,
       bodySizePx,
+      iconography,
+      imagery,
+      faviconUrl,
     },
   };
 }

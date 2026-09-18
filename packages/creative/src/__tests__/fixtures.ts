@@ -1,8 +1,8 @@
-import { newId, type BrandSystem, type Concept, type CreativeTreatment, type ProductUnderstanding, type ProjectBrief, type Scene, type Storyboard } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, newId, type BrandSystem, type Concept, type CreativeTreatment, type ProductUnderstanding, type ProjectBrief, type Scene, type Storyboard } from '@act-one/core';
 
 export function brandFixture(over: Partial<BrandSystem> = {}): BrandSystem {
   const now = '2026-01-01T00:00:00.000Z';
-  return {
+  return BrandSystemSchema.parse({
     id: 'brd_1',
     organizationId: 'org_1',
     name: 'Northwind',
@@ -30,7 +30,7 @@ export function brandFixture(over: Partial<BrandSystem> = {}): BrandSystem {
     createdAt: now,
     updatedAt: now,
     ...over,
-  };
+  });
 }
 
 export function understandingFixture(over: Partial<ProductUnderstanding> = {}): ProductUnderstanding {

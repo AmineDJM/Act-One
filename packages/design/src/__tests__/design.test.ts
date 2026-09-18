@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SAFE_AREAS, type AspectRatio } from '@act-one/core';
+import { BrandSystem as BrandSystemSchema, SAFE_AREAS, type AspectRatio, type BrandSystem } from '@act-one/core';
 import {
   contrastRatio, lightness, ensureContrast, readableOn, neutralRamp, dedupeColors,
   perceptualDistance, isNeutral, mix, withLightness, hexToRgb, rgbToHex,
@@ -8,7 +8,7 @@ import {
   resolveTokens, applyCase, textBlock, document as svgDocument, barChart, watermark,
 } from '../index.ts';
 
-const brand = {
+const brand: BrandSystem = BrandSystemSchema.parse({
   id: 'brd_1',
   organizationId: 'org_1',
   name: 'Northwind',
@@ -28,14 +28,14 @@ const brand = {
   cornerStyle: 'subtle' as const,
   cornerRadiusPx: 8,
   motionStyle: 'precise' as const,
-  tone: '',
+  tone: 'Plain.',
   allowsGlow: false,
   allowsGradient: false,
   confirmedByUser: true,
   sources: [],
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
-};
+});
 
 describe('colour', () => {
   it('round-trips hex and rgb', () => {

@@ -1,99 +1,83 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
-import type { BrandSystem } from '@act-one/core';
+import { fontFor, pendingBrandSignals, type BrandSystem } from '@act-one/core';
+import { Status } from '@/components/ui/Prompt.tsx';
 import { confirmBrandAction, type FormState } from '../../actions.ts';
 import styles from '../../app.module.css';
 
 /**
- * "We found your brand. Looks good / Edit."
+ * The project's brand, on the project page.
  *
- * Deliberately not a settings panel. Almost everything here was measured from
- * the customer's own site and will be right; the one thing that is genuinely
- * ambiguous is which colour is *the* brand colour, because some brands really
- * do have two. So that is the one thing we ask about, as one click.
+ * A card, not a settings panel: the state of the DNA, the one ambiguity
+ * worth a click here — which colour is *the* brand colour — and the way to
+ * the Brand page where every component is read, edited and confirmed.
  */
 export function BrandConfirm({ projectId, brand }: { projectId: string; brand: BrandSystem }) {
-  const [state, confirm, pending] = useActionState<FormState, FormData>(confirmBrandAction, {
-    error: null,
-  });
-
+  const [state, confirm, pending] = useActionState<FormState, FormData>(confirmBrandAction, { error: null });
+  const signals = pendingBrandSignals(brand).length;
   const candidates = brand.primaryCandidates.length > 0 ? brand.primaryCandidates : [brand.primaryColor];
+  const here = `/app/brand?project=${encodeURIComponent(projectId)}`;
 
   return (
-    <form action={confirm} className={styles.panel}>
+    <form action={confirm} className={`${styles.panel} ${styles.brandCard}`}>
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="brandId" value={brand.id} />
 
       <div className={styles.panelHead}>
-        <h3>We found your brand</h3>
-        {brand.confirmedByUser ? <span className="badge badge--ok">Confirmed</span> : null}
+        <h3>Brand DNA</h3>
+        <Status tone={signals > 0 ? 'attention' : brand.confirmedByUser ? 'ready' : 'active'}>
+          {signals > 0 ? 'NEEDS REVIEW' : brand.confirmedByUser ? 'CONFIRMED' : 'MEASURED'}
+        </Status>
       </div>
 
-      <div className={styles.swatches}>
-        {candidates.map((color, index) => (
-          <label key={color} title={color} style={{ cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="primaryColor"
-              value={color}
-              defaultChecked={color === brand.primaryColor || (index === 0 && !brand.primaryColor)}
-              className="sr-only"
-            />
-            <span
-              className={styles.swatch}
-              style={{
-                background: color,
-                outline: color === brand.primaryColor ? '2px solid var(--accent)' : undefined,
-                outlineOffset: 2,
-              }}
-              aria-label={`Use ${color} as the brand colour`}
-            />
-          </label>
-        ))}
+      <div className={styles.brandCardRow}>
+        <span className={styles.swatches}>
+          {candidates.map((color, index) => (
+            <label key={color} title={color} style={{ cursor: candidates.length > 1 ? 'pointer' : 'default' }}>
+              <input
+                type="radio"
+                name="primaryColor"
+                value={color}
+                defaultChecked={color === brand.primaryColor || (index === 0 && !brand.primaryColor)}
+                className="sr-only"
+              />
+              <span
+                className={styles.swatch}
+                style={{ background: color, outline: color === brand.primaryColor ? '2px solid var(--accent)' : undefined, outlineOffset: 2 }}
+                aria-label={`Use ${color} as the brand colour`}
+              />
+            </label>
+          ))}
+        </span>
+        <span>
+          {fontFor(brand, 'display').family} · {brand.cornerRadiusPx}px {brand.cornerStyle} · {brand.visualStyle} · {brand.motionStyle}
+        </span>
       </div>
-      {candidates.length > 1 ? (
-        <p className="hint">
-          Your site uses more than one colour prominently. Pick the one that is actually the brand.
-        </p>
+      {candidates.length > 1 && !brand.confirmedByUser ? (
+        <p className="hint">Your site uses more than one colour prominently. Pick the one that is actually the brand.</p>
       ) : null}
+      <p className="secondary" style={{ fontSize: '0.86rem' }}>
+        Measured from {brand.sources.length} source{brand.sources.length === 1 ? '' : 's'}
+        {brand.parentBrandId ? ', started from a brand you confirmed before' : ''}
+        {brand.communication.tagline ? ` · “${brand.communication.tagline}”` : ''}.
+      </p>
 
-      <dl className={styles.kv}>
-        <div className={styles.kvRow}>
-          <dt>Type</dt>
-          <dd>
-            {brand.typography.find((font) => font.role === 'display')?.family ?? 'System'}
-            {brand.typography.some((font) => font.source === 'substituted') ? ' (matched)' : ''}
-          </dd>
-        </div>
-        <div className={styles.kvRow}>
-          <dt>Corner radius</dt>
-          <dd>
-            {brand.cornerRadiusPx}px · {brand.cornerStyle}
-          </dd>
-        </div>
-        <div className={styles.kvRow}>
-          <dt>Visual language</dt>
-          <dd>
-            {brand.visualStyle} · {brand.layoutDensity}
-          </dd>
-        </div>
-        <div className={styles.kvRow}>
-          <dt>Motion</dt>
-          <dd>{brand.motionStyle}</dd>
-        </div>
-        <div className={styles.kvRow}>
-          <dt>Gradients / glow</dt>
-          <dd>
-            {brand.allowsGradient ? 'yes' : 'no'} / {brand.allowsGlow ? 'yes' : 'no'}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="row" style={{ gap: 'var(--space-3)' }}>
-        <button className="btn" type="submit" disabled={pending}>
-          {pending ? 'Saving…' : brand.confirmedByUser ? 'Update' : 'Looks good'}
-        </button>
+      <div className="row" style={{ gap: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
+        {!brand.confirmedByUser ? (
+          <button className="btn" type="submit" disabled={pending}>
+            {pending ? 'Saving…' : 'Looks good'}
+          </button>
+        ) : null}
+        <span className={styles.brandCardLinks}>
+          {signals > 0 ? (
+            <Link href={here} data-tone="attention">
+              Review {signals} signal{signals === 1 ? '' : 's'} →
+            </Link>
+          ) : null}
+          <Link href={here}>{brand.confirmedByUser ? 'Every component →' : 'Read every component →'}</Link>
+        </span>
         {state.message ? (
           <span className="secondary" style={{ fontSize: '0.86rem' }} role="status">
             {state.message}

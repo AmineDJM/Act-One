@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { brandDirectionLines } from './brief-lines.ts';
 import {
   VoiceStrategy,
   newId,
@@ -121,6 +122,7 @@ export class CreativeDirector {
             `Gradients: ${input.brand.allowsGradient ? 'used by the brand' : 'NOT used — do not introduce them'}.`,
             `Glow: ${input.brand.allowsGlow ? 'used by the brand' : 'NOT used — do not introduce it'}.`,
             `Tone: ${input.brand.tone}`,
+            ...brandDirectionLines(input.brand),
             ``,
             `# Constraints`,
             `Runtime: about ${input.brief.durationSeconds ?? input.concept.estimatedDurationSeconds} seconds.`,
