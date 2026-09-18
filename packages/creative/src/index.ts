@@ -10,3 +10,4 @@ export * from './copy-writer.ts';
 export { briefDirectionLines } from './brief-lines.ts';
 export { detectLanguage } from './language.ts';
 export * from './narration/index.ts';
+export * from './composer.ts';

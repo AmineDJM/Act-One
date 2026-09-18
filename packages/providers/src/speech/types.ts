@@ -273,3 +273,82 @@ export function hasVoiceLibrary(provider: unknown): provider is SpeechProvider &
     typeof (provider as VoiceLibrary).cloneVoice === 'function'
   );
 }
+
+/**
+ * Composing music for one film, rather than choosing music that exists.
+ *
+ * The engine takes a plan: a sequence of movements, each with its own length
+ * and its own direction. That is the whole reason to do this — a plan is how
+ * the score learns where the film turns. A single prompt gets a track; a plan
+ * gets a score.
+ */
+export type MusicMovement = {
+  /** What plays here. The section name goes first in square brackets. */
+  text: string;
+  /** Between 3,000 and 120,000. The engine refuses anything shorter. */
+  durationMs: number;
+  positiveStyles: string[];
+  negativeStyles: string[];
+  /** How closely this follows its neighbours. */
+  adherence: 'low' | 'medium' | 'high';
+};
+
+export type MusicPlan = {
+  movements: MusicMovement[];
+  /** Always true for a launch film: a sung track is an advertisement for itself. */
+  instrumental: boolean;
+  /** The same seed and plan compose the same score, so a re-run is not a surprise. */
+  seed?: number | null;
+};
+
+export type ComposedMusic = {
+  audio: Uint8Array;
+  contentType: string;
+  /** What was asked for; the engine is accurate to within a few hundred ms. */
+  durationSeconds: number;
+  model: string;
+  costUsd: number;
+};
+
+export interface MusicComposer extends Provider {
+  readonly kind: 'speech';
+  compose(plan: MusicPlan, context: CallContext): Promise<ComposedMusic>;
+}
+
+/**
+ * One sound, written from what the shot does.
+ *
+ * A library search asks which whoosh; this asks for the sound of this
+ * particular thing happening, which is what a sound designer would build.
+ */
+export type EffectRequest = {
+  brief: string;
+  /** Null lets the engine choose; otherwise 0.5–22 seconds. */
+  seconds: number | null;
+  /** 0–1. High follows the brief exactly, low lets the engine be musical. */
+  influence: number;
+  /** A texture that has to run under a whole scene has to loop cleanly. */
+  loop: boolean;
+};
+
+export type GeneratedEffect = { audio: Uint8Array; contentType: string; seconds: number; costUsd: number; model: string };
+
+export interface SoundEffectEngine extends Provider {
+  readonly kind: 'speech';
+  effect(request: EffectRequest, context: CallContext): Promise<GeneratedEffect>;
+}
+
+/**
+ * Where each word actually falls in a recording.
+ *
+ * Estimated timings drift within a few seconds and read as sloppy: a caption
+ * that lands half a word late, a cut that misses the emphasis it was built
+ * for. Alignment reads the audio and says when each word was spoken.
+ */
+export type AlignedWord = { word: string; start: number; end: number; confidence?: number };
+export type Alignment = { words: AlignedWord[]; seconds: number; costUsd: number };
+
+export interface SpeechAligner extends Provider {
+  readonly kind: 'speech';
+  align(audio: Uint8Array, text: string, context: CallContext): Promise<Alignment>;
+}

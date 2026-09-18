@@ -213,6 +213,32 @@ class FakeVendors {
       response.end(PCM);
       return;
     }
+    // The score, the built sound, and where every word fell.
+    if (url.pathname === '/v1/music') {
+      response.writeHead(200, { 'content-type': 'audio/mpeg' });
+      response.end(Buffer.from('ID3-score'));
+      return;
+    }
+    if (url.pathname === '/v1/sound-generation') {
+      response.writeHead(200, { 'content-type': 'audio/mpeg' });
+      response.end(Buffer.from('ID3-sfx'));
+      return;
+    }
+    if (url.pathname === '/v1/forced-alignment') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          words: [
+            { text: 'A', start: 0, end: 0.2, loss: 0.02 },
+            { text: 'week', start: 0.2, end: 0.6, loss: 0.05 },
+            { text: '', start: 0.6, end: 0.6, loss: 0 },
+            { text: 'later.', start: 0.6, end: 1.4, loss: 0.9 },
+          ],
+          loss: 0.1,
+        }),
+      );
+      return;
+    }
     response.writeHead(404, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ detail: 'not found' }));
   }
@@ -612,5 +638,115 @@ describe('the registry', () => {
     expect(keyless.speech.name).toBe('openai-speech');
     expect(keyless.speechPreview).toBeUndefined();
     expect(keyless.recognizer.name).toBe('openai-speech');
+  });
+
+  it('hands the scoring engines the key the console stored, not the environment', async () => {
+    /*
+     * The bug this exists to prevent: a registry that builds its own
+     * ElevenLabs from `process.env` finds nothing in a real deployment, where
+     * the key lives encrypted in the console, and quietly plays the library
+     * instead of the score. The film still comes out, which is why nobody
+     * would notice.
+     */
+    const openai = new OpenAiSpeechProvider({ apiKey: 'sk-test', baseUrl: vendors.url });
+    const stored = new ElevenLabsProvider({ apiKey: 'el_test_key', baseUrl: vendors.url });
+    const config = {
+      primary: 'elevenlabs' as const,
+      preview: 'same' as const,
+      recognizer: 'openai-speech' as const,
+      enabled: true,
+      cloning: false,
+      takes: 1,
+      maxRegenerations: 1,
+      maxCostPerProjectUsd: 0,
+      curated: {},
+    };
+
+    const overrides = speechOverrides(config, { openai: () => openai, elevenlabs: () => stored });
+    expect(overrides.composer).toBe(stored);
+    expect(overrides.soundEffects).toBe(stored);
+    expect(overrides.aligner).toBe(stored);
+
+    const registry = new ProviderRegistry({ overrides });
+    expect(registry.composerOrNull()).toBe(stored);
+    expect(registry.alignerOrNull()).toBe(stored);
+
+    // No key stored: nothing to score with, and the library plays.
+    const none = speechOverrides(config, { openai: () => openai, elevenlabs: null });
+    expect(none.composer).toBeUndefined();
+    expect(new ProviderRegistry({ overrides: none }).composerOrNull()).toBeNull();
+  });
+});
+
+/**
+ * The score, the built sounds, and where every word actually fell.
+ *
+ * What is proved here is the contract, because the whole value of the score is
+ * that the engine is told the film's own turns: a plan whose movements do not
+ * carry the right lengths produces a track, not a score, and the difference
+ * is invisible until somebody watches the film.
+ */
+describe('scoring a film', () => {
+  const engine = () => new ElevenLabsProvider({ apiKey: 'el_test_key', baseUrl: vendors.url, costSink: new NullCostSink() });
+
+  it('sends the film’s turns as the plan, instrumental and to length', async () => {
+    const composed = await engine().compose(
+      {
+        movements: [
+          { text: '[Open] Hold one idea.', durationMs: 6000, positiveStyles: ['low sustained synth'], negativeStyles: ['vocals'], adherence: 'high' },
+          { text: '[Resolve] Land it.', durationMs: 7400, positiveStyles: ['piano'], negativeStyles: ['drums'], adherence: 'medium' },
+        ],
+        instrumental: true,
+        seed: 42,
+      },
+      call,
+    );
+    expect(composed.contentType).toBe('audio/mpeg');
+    expect(composed.durationSeconds).toBeCloseTo(13.4, 2);
+
+    const request = vendors.calls.find((entry) => entry.path.startsWith('/v1/music'));
+    const body = request?.body as Record<string, unknown>;
+    expect(body['force_instrumental']).toBe(true);
+    // Without this the music drifts off the picture within a few seconds.
+    expect(body['respect_sections_durations']).toBe(true);
+    expect(body['seed']).toBe(42);
+    const chunks = (body['composition_plan'] as { chunks: Record<string, unknown>[] }).chunks;
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toMatchObject({ duration_ms: 6000, context_adherence: 'high' });
+    expect(chunks[1]).toMatchObject({ duration_ms: 7400, context_adherence: 'medium' });
+  });
+
+  it('refuses a movement the engine cannot compose, rather than sending it', async () => {
+    await expect(
+      engine().compose(
+        { movements: [{ text: 'too short', durationMs: 900, positiveStyles: ['piano'], negativeStyles: [], adherence: 'high' }], instrumental: true },
+        call,
+      ),
+    ).rejects.toThrow(/between 3 and 120 seconds/);
+    expect(vendors.calls.find((entry) => entry.path.startsWith('/v1/music'))).toBeUndefined();
+  });
+
+  it('builds one sound from a brief, clamped to what the engine accepts', async () => {
+    const built = await engine().effect({ brief: 'A short dry wooden knock, close-miked, almost no tail.', seconds: 40, influence: 0.8, loop: false }, call);
+    expect(built.contentType).toBe('audio/mpeg');
+    const body = vendors.calls.find((entry) => entry.path.startsWith('/v1/sound-generation'))?.body as Record<string, unknown>;
+    expect(body['duration_seconds']).toBe(22);
+    expect(body['prompt_influence']).toBe(0.8);
+    expect(body['loop']).toBeUndefined();
+  });
+
+  it('says where each word fell, and drops what is not a word', async () => {
+    const alignment = await engine().align(new Uint8Array([1, 2, 3]), 'A week later.', call);
+    expect(alignment.words.map((word) => word.word)).toEqual(['A', 'week', 'later.']);
+    expect(alignment.seconds).toBeCloseTo(1.4, 2);
+    // A doubtful stretch is reported as doubtful rather than shipped as fact.
+    expect(alignment.words.at(-1)?.confidence).toBeCloseTo(0.1, 2);
+    const request = vendors.calls.find((entry) => entry.path === '/v1/forced-alignment');
+    expect(request?.fields).toContain('text');
+  });
+
+  it('will not align nothing', async () => {
+    await expect(engine().align(new Uint8Array(), 'words', call)).rejects.toThrow(/both the recording and the words/);
+    await expect(engine().align(new Uint8Array([1]), '  ', call)).rejects.toThrow(/both the recording and the words/);
   });
 });

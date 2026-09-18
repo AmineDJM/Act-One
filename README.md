@@ -210,6 +210,40 @@ their interface may carry a product beat, and a generated shot is anchored
 to an approved product still and records it as its parent. Versions point
 at their original.
 
+### The score
+
+A track chosen from a library is the same track whatever happens on screen: it
+arrives at its own climax, fades where it always fades, and the cut has to
+survive it. So when a composer is configured, the film gets a score written for
+it.
+
+The film's turns are read off the storyboard — where the picture changes is a
+fact, not something to ask a model to guess — and merged until each movement
+earns the three seconds the engine needs. A composer agent writes what each
+movement is and what it sounds like, briefed the way a composer would be: the
+film's argument, what is on screen, what the brand sounds like, and the two
+things that are not negotiable. The voice has to stay intelligible, so the
+arrangement thins where it speaks rather than merely turning down. And the
+mix will be normalised to a measured target, so nothing is written that only
+works when it is loud.
+
+The plan goes to the engine with the movement lengths held, because without
+that the music drifts off the picture within seconds. Sounds are built the same
+way — from what the shot does, not from a folder — and each one carries how
+literally the engine should take the brief: an impact wants to be exactly one
+thing, a room tone does not.
+
+All of it is optional by construction. A deployment with no composer plays the
+sound library and makes the same film it made yesterday, and any failure along
+the way falls back to the library rather than failing the render: a film with
+library music is a film, and a film that did not finish is not. The composed
+score is substituted into the same mix, ducking, metering and mastering the
+library already goes through, so the measured parts stay measured.
+
+Where each word actually falls comes from the recording rather than from an
+average speaking rate, which is the difference between captions that are
+correct and captions that are close.
+
 ### Collections
 
 The public gallery of launch films made here, at `/collections`, with a page
@@ -594,6 +628,17 @@ approved storyboard and the published facts (a draft that invents a figure is
 refused and the narration itself is read), segmented at sentences, read by
 the brand voice, stitched with the pauses the paragraphs ask for, mastered to
 −16 LUFS and delivered as its own file beside the film.
+
+**What the same key also does.** The engine that reads a film also composes
+its score, builds a sound from a brief and says where each word fell, and all
+three go through the one credential the console already holds. The rest of
+that vendor's surface is deliberately not wired: a voice changer and a voice
+isolator have nothing to act on in a pipeline where every recording is made
+here and clean; dubbing is a product decision about launching in several
+languages rather than a missing integration, and the narration engine already
+speaks each one natively; multi-voice dialogue waits for a film that has two
+voices in it, which none of the creative systems currently call for. Each of
+those is one contract away when a film needs it.
 
 **For staff**, the console's Voice page chooses the engines for finals,
 previews and listening back; curates which voice reads each language and

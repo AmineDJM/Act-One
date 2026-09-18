@@ -6,7 +6,15 @@ import { estimateNarrationSeconds } from './openai.ts';
 import {
   consentCovers,
   defaultGender,
+  type Alignment,
+  type ComposedMusic,
+  type EffectRequest,
+  type GeneratedEffect,
   type LibraryVoice,
+  type MusicComposer,
+  type MusicPlan,
+  type SoundEffectEngine,
+  type SpeechAligner,
   type SpeechProvider,
   type SpeechRecognizer,
   type SpeechRequest,
@@ -155,8 +163,35 @@ const NARRATION_USE_CASES = new Set([
 const COST_PER_MILLION_CHARS = 150;
 /** The flash model is billed at half a character per character. */
 const PREVIEW_COST_MULTIPLIER = 0.5;
-/** USD per minute of audio transcribed by Scribe. */
+/** USD per minute of audio transcribed by Scribe, and by forced alignment. */
 const COST_PER_TRANSCRIBED_MINUTE = 0.4 / 60;
+/**
+ * USD per minute of composed music, and per second of a built sound effect.
+ *
+ * Both are estimates from the vendor's published credit costs at studio
+ * volume. They exist so the ledger and the customer's credits are charged
+ * something honest before the invoice arrives, not because the number is
+ * exact — the console's Costs page compares them with what is actually billed.
+ */
+const COST_PER_COMPOSED_MINUTE = 2.5;
+const COST_PER_EFFECT_SECOND = 0.02;
+
+/** The engines. Music takes a plan; sound takes a sentence. */
+const MUSIC_MODEL = 'music_v2_5';
+const EFFECT_MODEL = 'eleven_text_to_sound_v2';
+
+/**
+ * What forced alignment answers with.
+ *
+ * `loss` is the engine's own uncertainty for a word: low is confident. Kept
+ * as a confidence so a caption built from a doubtful stretch can be flagged
+ * rather than shipped as fact.
+ */
+const Aligned = z.object({
+  characters: z.array(z.object({ text: z.string(), start: z.number(), end: z.number() })).optional(),
+  words: z.array(z.object({ text: z.string(), start: z.number(), end: z.number(), loss: z.number().optional() })),
+  loss: z.number().optional(),
+});
 
 const CATALOGUE_TTL_MS = 60 * 60_000;
 
@@ -183,7 +218,7 @@ export type ElevenLabsConfig = {
   costSink?: CostSink;
 };
 
-export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, VoiceLibrary {
+export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, VoiceLibrary, MusicComposer, SoundEffectEngine, SpeechAligner {
   readonly name = 'elevenlabs';
   readonly kind = 'speech' as const;
 
@@ -584,6 +619,201 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
       words,
       model: 'scribe_v1',
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Scoring, sound design and alignment
+  // -------------------------------------------------------------------------
+
+  /**
+   * Composes a score for one film from a plan.
+   *
+   * The plan is what makes this worth doing. A prompt produces a track, which
+   * arrives at its own climax and leaves the cut to survive it; a plan gives
+   * the engine the film's own turns, so the music changes where the picture
+   * does. `respect_sections_durations` is what holds a movement to the length
+   * it was written for, and without it the score drifts off the picture within
+   * a few seconds.
+   *
+   * Instrumental is not a preference. A sung track over a launch film is an
+   * advertisement for the song, and the vendor may otherwise decide to sing.
+   */
+  async compose(plan: MusicPlan, context: CallContext): Promise<ComposedMusic> {
+    if (!this.isConfigured()) {
+      throw new ProviderError(this.name, 'ElevenLabs is not configured.', { retryable: false });
+    }
+    const movements = plan.movements.slice(0, 30);
+    if (movements.length === 0) {
+      throw new ProviderError(this.name, 'Refusing to compose a score with no movements.', { retryable: false });
+    }
+    for (const movement of movements) {
+      if (movement.durationMs < 3000 || movement.durationMs > 120_000) {
+        throw new ProviderError(
+          this.name,
+          `A movement must run between 3 and 120 seconds; this one asks for ${Math.round(movement.durationMs / 1000)}.`,
+          { retryable: false },
+        );
+      }
+    }
+
+    const model = MUSIC_MODEL;
+    let audio: Uint8Array;
+    try {
+      audio = await httpRequest<Uint8Array>(this.name, `${this.baseUrl}/v1/music?output_format=mp3_44100_192`, {
+        method: 'POST',
+        headers: { 'xi-api-key': this.apiKey, accept: 'audio/mpeg' },
+        body: {
+          model_id: model,
+          force_instrumental: plan.instrumental !== false,
+          respect_sections_durations: true,
+          ...(typeof plan.seed === 'number' ? { seed: Math.abs(Math.floor(plan.seed)) % 4_294_967_295 } : {}),
+          composition_plan: {
+            chunks: movements.map((movement) => ({
+              text: movement.text.slice(0, 900),
+              duration_ms: Math.round(movement.durationMs),
+              positive_styles: movement.positiveStyles.slice(0, 12),
+              negative_styles: movement.negativeStyles.slice(0, 12),
+              context_adherence: movement.adherence,
+            })),
+          },
+        },
+        expect: 'buffer',
+        // Composing a minute of music takes longer than anything else here.
+        timeoutMs: 300_000,
+        signal: context.signal,
+      });
+    } catch (error) {
+      throw this.describe(error);
+    }
+
+    const seconds = movements.reduce((total, movement) => total + movement.durationMs, 0) / 1000;
+    const costUsd = (seconds / 60) * COST_PER_COMPOSED_MINUTE;
+    await this.costSink?.record({
+      provider: this.name,
+      model,
+      operation: 'media.edit',
+      estimatedCostUsd: costUsd,
+      actualCostUsd: costUsd,
+      quantity: seconds,
+      unit: 'second',
+      metadata: { projectId: context.projectId, movements: movements.length, instrumental: plan.instrumental !== false },
+    });
+
+    return { audio, contentType: 'audio/mpeg', durationSeconds: seconds, model, costUsd };
+  }
+
+  /**
+   * One sound, built from what the shot does.
+   *
+   * `prompt_influence` is the dial that matters: high follows the brief
+   * literally and comes back thin, low invents something musical that may not
+   * be the sound asked for. The director sets it per cue, because an impact
+   * and a room tone want opposite ends of it.
+   */
+  async effect(request: EffectRequest, context: CallContext): Promise<GeneratedEffect> {
+    if (!this.isConfigured()) {
+      throw new ProviderError(this.name, 'ElevenLabs is not configured.', { retryable: false });
+    }
+    const brief = request.brief.trim();
+    if (!brief) throw new ProviderError(this.name, 'Refusing to build a sound from an empty brief.', { retryable: false });
+    const seconds = request.seconds === null ? null : Math.min(22, Math.max(0.5, request.seconds));
+
+    let audio: Uint8Array;
+    try {
+      audio = await httpRequest<Uint8Array>(this.name, `${this.baseUrl}/v1/sound-generation?output_format=mp3_44100_192`, {
+        method: 'POST',
+        headers: { 'xi-api-key': this.apiKey, accept: 'audio/mpeg' },
+        body: {
+          text: brief.slice(0, 500),
+          model_id: EFFECT_MODEL,
+          ...(seconds === null ? {} : { duration_seconds: seconds }),
+          prompt_influence: Math.min(1, Math.max(0, request.influence)),
+          ...(request.loop ? { loop: true } : {}),
+        },
+        expect: 'buffer',
+        timeoutMs: 120_000,
+        attempts: 2,
+        signal: context.signal,
+      });
+    } catch (error) {
+      throw this.describe(error);
+    }
+
+    const billed = seconds ?? 4;
+    const costUsd = billed * COST_PER_EFFECT_SECOND;
+    await this.costSink?.record({
+      provider: this.name,
+      model: EFFECT_MODEL,
+      operation: 'media.edit',
+      estimatedCostUsd: costUsd,
+      actualCostUsd: costUsd,
+      quantity: billed,
+      unit: 'second',
+      metadata: { projectId: context.projectId, sceneId: context.sceneId, loop: request.loop },
+    });
+
+    return { audio, contentType: 'audio/mpeg', seconds: billed, costUsd, model: EFFECT_MODEL };
+  }
+
+  /**
+   * Where each word actually falls in a recording.
+   *
+   * Transcription answers what was said; alignment answers when, against text
+   * we already have. It is the difference between captions that are correct
+   * and captions that are close, and between a cut built on the emphasis and
+   * one built on an average speaking rate.
+   */
+  async align(audio: Uint8Array, text: string, context: CallContext): Promise<Alignment> {
+    if (!this.isConfigured()) {
+      throw new ProviderError(this.name, 'ElevenLabs is not configured.', { retryable: false });
+    }
+    if (audio.byteLength === 0 || !text.trim()) {
+      throw new ProviderError(this.name, 'Alignment needs both the recording and the words.', { retryable: false });
+    }
+    const form = new FormData();
+    form.set('file', new Blob([audio as BlobPart], { type: 'audio/mpeg' }), 'audio.mp3');
+    form.set('text', text.trim());
+
+    let raw: unknown;
+    try {
+      raw = await httpRequest<unknown>(this.name, `${this.baseUrl}/v1/forced-alignment`, {
+        method: 'POST',
+        headers: { 'xi-api-key': this.apiKey, accept: 'application/json' },
+        body: form,
+        timeoutMs: 120_000,
+        attempts: 2,
+        signal: context.signal,
+      });
+    } catch (error) {
+      throw this.describe(error);
+    }
+
+    const parsed = Aligned.safeParse(raw);
+    if (!parsed.success) {
+      throw new ProviderError(this.name, 'ElevenLabs answered the alignment with something unexpected.', { retryable: true });
+    }
+    const words = parsed.data.words
+      .map((word) => ({
+        word: word.text.trim(),
+        start: word.start,
+        end: word.end,
+        ...(typeof word.loss === 'number' ? { confidence: Math.max(0, 1 - word.loss) } : {}),
+      }))
+      .filter((word) => word.word.length > 0);
+    const seconds = words.length > 0 ? Math.max(...words.map((word) => word.end)) : 0;
+    const costUsd = (seconds / 60) * COST_PER_TRANSCRIBED_MINUTE;
+    await this.costSink?.record({
+      provider: this.name,
+      model: 'forced_alignment',
+      operation: 'speech.stt',
+      estimatedCostUsd: costUsd,
+      actualCostUsd: costUsd,
+      quantity: seconds,
+      unit: 'second',
+      metadata: { projectId: context.projectId, sceneId: context.sceneId, words: words.length },
+    });
+
+    return { words, seconds, costUsd };
   }
 
   // -------------------------------------------------------------------------

@@ -62,6 +62,7 @@ import {
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
 import { narrate } from '../narration.ts';
+import { scoreFilm } from './score.ts';
 
 /**
  * The render stage.
@@ -529,6 +530,62 @@ async function renderOnce(
   // A film with no whoosh is still a film, so a missing asset never fails the
   // render — but it is reported, and the caller turns it into a QA finding.
   const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
+
+  /*
+   * A score written for this film, and sounds built for these shots.
+   *
+   * Substituted into the same resolution table the library fills, so the mix,
+   * the ducking, the metering and the master are the code that was already
+   * measured rather than a second path that has to be trusted. With no
+   * composer configured this changes nothing at all.
+   */
+  const scored = await scoreFilm(context, {
+    storyboard,
+    design,
+    brand,
+    understanding: params.understanding,
+    creativeSystem: system.id,
+    workDir: params.workDir,
+    aspect: params.aspect,
+    hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
+  });
+  if (scored.musicPath && design.music) {
+    const key = `composed:${params.attempt}`;
+    resolvedPaths[key] = scored.musicPath;
+    design.music.storageKey = key;
+    /*
+     * A composed score starts where the film starts and resolves on the mark.
+     * The entry point and the fade exist for a library track, which has to be
+     * cut into; this one was written to the picture, and fading its ending
+     * would undo the resolution it was written to land.
+     */
+    design.music.startOffsetSeconds = 0;
+    design.music.enterAtSeconds = 0;
+    design.music.fadeInSeconds = 0;
+    design.music.fadeOutSeconds = 0.15;
+  }
+  for (const cue of design.cues) {
+    const built = scored.effectPaths[cue.id];
+    if (!built) continue;
+    const key = `built:${cue.id}`;
+    resolvedPaths[key] = built;
+    cue.storageKey = key;
+  }
+  /*
+   * What is still missing, after the substitutions.
+   *
+   * Recomputed from what the design now points at rather than filtered from
+   * the first pass: a cue whose library sample was missing and whose sound was
+   * then built is not missing anything, and reporting it would send an
+   * operator to provision a file nobody is going to play.
+   */
+  const stillMissing = [
+    ...new Set(
+      [design.music?.storageKey, ...design.cues.map((cue) => cue.storageKey)]
+        .filter((key): key is string => typeof key === 'string')
+        .filter((key) => resolvedPaths[key] === undefined),
+    ),
+  ].sort();
   const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
   const voiceTracks = narration.tracks;
   await context.activity({
@@ -599,7 +656,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio, soundIssues };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -629,10 +686,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, missingAudio)), soundIssues };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, missingAudio)), soundIssues };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues };
 }
 
 /**

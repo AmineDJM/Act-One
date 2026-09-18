@@ -11,7 +11,7 @@ import { HiggsfieldProvider } from './media/higgsfield.ts';
 import type { GenerativeMediaProvider } from './media/types.ts';
 import { OpenAiSpeechProvider } from './speech/openai.ts';
 import { ElevenLabsProvider } from './speech/elevenlabs.ts';
-import type { SpeechProvider, SpeechRecognizer } from './speech/types.ts';
+import type { MusicComposer, SoundEffectEngine, SpeechAligner, SpeechProvider, SpeechRecognizer } from './speech/types.ts';
 import { LocalFsStorageProvider } from './storage/local.ts';
 import { SupabaseStorageProvider } from './storage/supabase.ts';
 import type { StorageProvider } from './storage/types.ts';
@@ -119,6 +119,10 @@ export type RegistryOptions = {
     /** The engine for previews; finals' engine when absent. */
     speechPreview: SpeechProvider;
     recognizer: SpeechRecognizer;
+    /** Scores a film, builds a sound, says where each word fell. */
+    composer: MusicComposer;
+    soundEffects: SoundEffectEngine;
+    aligner: SpeechAligner;
     storage: StorageProvider;
   }>;
 };
@@ -229,6 +233,39 @@ export class ProviderRegistry {
     });
   }
 
+  /**
+   * The engine that scores a film, builds a sound and says where each word
+   * fell — or nothing, when no key is configured.
+   *
+   * Null rather than a fallback on purpose. A film without a composed score
+   * plays the library and is still a film; a film with a silently substituted
+   * score is a different film from the one that was directed. The pipeline
+   * asks, and falls back to the library where the answer is no.
+   */
+  composerOrNull(): MusicComposer | null {
+    if (this.overrides?.composer) return this.overrides.composer;
+    return this.memo('composer', () => {
+      const elevenlabs = new ElevenLabsProvider({ costSink: this.costSink });
+      return elevenlabs.isConfigured() ? elevenlabs : null;
+    });
+  }
+
+  soundEffectsOrNull(): SoundEffectEngine | null {
+    if (this.overrides?.soundEffects) return this.overrides.soundEffects;
+    return this.memo('sound-effects', () => {
+      const elevenlabs = new ElevenLabsProvider({ costSink: this.costSink });
+      return elevenlabs.isConfigured() ? elevenlabs : null;
+    });
+  }
+
+  alignerOrNull(): SpeechAligner | null {
+    if (this.overrides?.aligner) return this.overrides.aligner;
+    return this.memo('aligner', () => {
+      const elevenlabs = new ElevenLabsProvider({ costSink: this.costSink });
+      return elevenlabs.isConfigured() ? elevenlabs : null;
+    });
+  }
+
   private buildSpeech(engine: SpeechEngine): SpeechProvider {
     if (engine === 'elevenlabs') {
       const elevenlabs = new ElevenLabsProvider({
@@ -325,7 +362,23 @@ export function speechOverrides(
     /** Null when no ElevenLabs key is stored. */
     elevenlabs: ((options: Record<string, never>) => ElevenLabsProvider) | null;
   },
-): { speech: SpeechProvider; speechPreview?: SpeechProvider; recognizer: SpeechRecognizer } {
+): {
+  speech: SpeechProvider;
+  speechPreview?: SpeechProvider;
+  recognizer: SpeechRecognizer;
+  /*
+   * The same instance, wearing its other hats.
+   *
+   * The key that scores a film is the key that speaks it, and in a real
+   * deployment it is stored in the console rather than in the environment. A
+   * registry that built its own ElevenLabs from `process.env` would find
+   * nothing there and quietly play the library instead of the score — which
+   * is the worst kind of bug, because the film still comes out.
+   */
+  composer?: MusicComposer;
+  soundEffects?: SoundEffectEngine;
+  aligner?: SpeechAligner;
+} {
   let openai: OpenAiSpeechProvider | null = null;
   let elevenlabs: ElevenLabsProvider | null = null;
   const engine = (name: SpeechEngine): SpeechProvider & SpeechRecognizer => {
@@ -338,10 +391,14 @@ export function speechOverrides(
   };
   const speech = engine(config.primary);
   const preview = config.preview === 'same' ? null : engine(config.preview);
+  const recognizer = engine(config.recognizer);
+  // Whichever role built it, one ElevenLabs is enough to score, build and align.
+  const scoring = elevenlabs ?? (build.elevenlabs ? build.elevenlabs({}) : null);
   return {
     speech,
     ...(preview && preview !== speech ? { speechPreview: preview } : {}),
-    recognizer: engine(config.recognizer),
+    recognizer,
+    ...(scoring ? { composer: scoring, soundEffects: scoring, aligner: scoring } : {}),
   };
 }
 
