@@ -22,7 +22,13 @@ export const GenerationStepKey = z.enum([
 ]);
 export type GenerationStepKey = z.infer<typeof GenerationStepKey>;
 
-export const JobEventKind = z.enum(['page', 'step', 'note', 'capture', 'shot', 'scene', 'passage']);
+/**
+ * `refine` is the one kind that is not a record of progress: it says quality
+ * rejected a shot and it is being directed again. The page needs to tell that
+ * apart from a technical failure, because one is the system working and the
+ * other is the system stopping.
+ */
+export const JobEventKind = z.enum(['page', 'step', 'note', 'capture', 'shot', 'scene', 'passage', 'refine']);
 export type JobEventKind = z.infer<typeof JobEventKind>;
 
 export const JobEventStatus = z.enum(['active', 'done', 'failed', 'skipped']);

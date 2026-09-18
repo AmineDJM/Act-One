@@ -1195,3 +1195,21 @@
   .phase:nth-child(even) { border-left: 1px solid var(--line); }
   .phase:nth-child(n + 3) { border-top: 1px solid var(--line); }
 }
+
+/* A notice inside the call to action: the shot being remade, or the sentence
+ * the pipeline wrote for the customer about what stopped. Quiet either way —
+ * the headline is already carrying the news. */
+.ctaNotice {
+  margin-top: var(--space-3);
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+.ctaNotice strong { color: var(--text-primary); font-weight: 500; }
+.ctaDetail {
+  margin-top: var(--space-2);
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  border-left: 1px solid var(--line);
+  padding-left: var(--space-3);
+}
+.cta[data-stopped='true'] { border-color: color-mix(in oklab, var(--danger) 35%, var(--line)); }

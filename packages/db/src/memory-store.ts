@@ -985,13 +985,14 @@ export class MemoryStore implements Store {
       this.tables.jobs.set(id, next);
       return next;
     },
-    fail: async (id: string, error: string, retryAt: string | null) => {
+    fail: async (id: string, error: string, retryAt: string | null, code: string | null = null) => {
       const existing = this.require(this.tables.jobs.get(id), 'Job');
       const exhausted = retryAt === null || existing.attempts >= existing.maxAttempts;
       const next: Job = {
         ...existing,
         state: exhausted ? 'failed' : 'queued',
         lastError: error,
+        lastErrorCode: code,
         lockedBy: null,
         lockedAt: null,
         runAfter: retryAt ?? existing.runAfter,

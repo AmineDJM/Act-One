@@ -253,10 +253,27 @@ export async function runRender(
       const plan = planRepairs(report, attempt, maxAttempts);
       if (plan.shippable || plan.deadEnd) {
         await store.renders.update(organizationId, render.id, { qaReportId: report.id });
+        // Whatever was being refined is finished, one way or the other.
+        if (attempt > 0) {
+          await context.activity({ step: 'motion', kind: 'refine', label: 'shots refined', status: 'done' });
+        }
         break;
       }
 
-      await context.progress(0.8, `Repairing ${plan.scenes.length} scene(s)`);
+      /*
+       * Not a failure: the film was inspected, some shots did not meet the
+       * standard, and they are being directed again. The customer is told
+       * exactly that — "Refining this shot" — rather than nothing, and never
+       * an error.
+       */
+      await context.progress(0.8, `Refining ${plan.scenes.length} shot${plan.scenes.length === 1 ? '' : 's'}`);
+      await context.activity({
+        step: 'motion',
+        kind: 'refine',
+        label: `refining ${plan.scenes.length} shot${plan.scenes.length === 1 ? '' : 's'}`,
+        detail: 'The shot did not meet the standard, so it is being directed again.',
+        status: 'active',
+      });
       // Only what broke. Re-rendering everything would change scenes the
       // customer already approved.
       const applied = applyRepairs(current, plan);
@@ -446,11 +463,11 @@ async function renderOnce(
 ): Promise<{ path: string; missingAudio: string[]; soundIssues: QaIssue[] }> {
   const { storyboard, brand, system } = params;
 
-  await context.progress(0.15, params.attempt === 0 ? 'Rendering the film' : 'Re-rendering repaired scenes');
+  await context.progress(0.15, params.attempt === 0 ? 'Composing the master' : 'Directing the refined shots again');
   await context.activity({
     step: 'motion',
     kind: 'step',
-    label: params.attempt === 0 ? `rendering ${storyboard.scenes.length} scenes` : 're-rendering the repaired scenes',
+    label: params.attempt === 0 ? `rendering ${storyboard.scenes.length} scenes` : 'directing the refined shots again',
     status: 'active',
   });
 

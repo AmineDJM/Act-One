@@ -51,6 +51,11 @@ export const Job = z.object({
   attempts: z.number().int().min(0).default(0),
   maxAttempts: z.number().int().min(1).default(3),
   lastError: z.string().nullable().default(null),
+  /**
+   * The category the failure belonged to, for deciding what a customer is
+   * told. The message is for an operator; this is for the copy.
+   */
+  lastErrorCode: z.string().max(60).nullable().default(null),
   runAfter: z.string(),
   lockedBy: z.string().nullable().default(null),
   lockedAt: z.string().nullable().default(null),

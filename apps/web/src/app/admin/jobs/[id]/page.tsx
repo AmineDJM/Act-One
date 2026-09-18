@@ -8,6 +8,22 @@ import styles from '../../admin.module.css';
 
 export const dynamic = 'force-dynamic';
 
+/*
+ * What a customer would have read for this code, so an operator answering
+ * "what did they see?" does not have to go and look.
+ */
+const NOTICE_FOR_OPERATOR: Record<string, string> = {
+  provider_unavailable: 'Production paused',
+  rate_limited: 'Production paused',
+  timeout: 'Production paused',
+  upstream_error: 'Production paused',
+  unavailable: 'Production paused',
+  entitlement_required: 'Payment requires attention',
+  payment_required: 'Payment requires attention',
+  insufficient_credits: 'Payment requires attention',
+  plan_limit: 'Payment requires attention',
+};
+
 /**
  * One job, all the way down.
  *
@@ -74,6 +90,12 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       {job.lastError ? (
         <section className={styles.section}>
           <h2>Last error</h2>
+          {/* The category decides what the customer was told; the prose is for you. */}
+          {job.lastErrorCode ? (
+            <p className="mono muted" style={{ fontSize: '0.8rem' }}>
+              {job.lastErrorCode} · the production page showed {NOTICE_FOR_OPERATOR[job.lastErrorCode] ?? 'Production interrupted'}
+            </p>
+          ) : null}
           <pre className={styles.raw}>{job.lastError}</pre>
         </section>
       ) : null}

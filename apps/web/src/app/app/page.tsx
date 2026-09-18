@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { PRODUCT_NAME, STAGE_STATUS, failureStatus, primaryCtaFor, type Project } from '@act-one/core';
+import { NOTICE_STATUS, PRODUCT_NAME, STAGE_STATUS, failureNotice, primaryCtaFor, productionPhaseOfJob, type Project } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { entitlementsFor } from '@/server/platform.ts';
@@ -31,12 +31,23 @@ export default async function ProjectsPage() {
     ? (await entitlementsFor(organization)).plan.limits.maxMasterDurationSeconds
     : 60;
 
-  // The step that stopped, for the cards that need attention: one query, not one per card.
+  /*
+   * What stopped, for the cards that need attention.
+   *
+   * The same notice the production page shows, so a card and the page it
+   * opens cannot disagree: a provider being briefly down reads PRODUCTION
+   * PAUSED in both places, not INTERRUPTED in one of them.
+   */
   const failedKinds = new Map<string, string>();
   for (const project of projects.filter((candidate) => candidate.stage === 'failed')) {
     const jobs = await store.jobs.listForProject(session.organizationId, project.id);
     const failed = jobs.find((job) => job.state === 'failed');
-    failedKinds.set(project.id, failureStatus(failed?.kind ?? null));
+    const notice = failureNotice({
+      code: failed?.lastErrorCode ?? null,
+      phase: productionPhaseOfJob(failed?.kind),
+      hadRender: jobs.some((job) => job.kind === 'render_film' && job.state !== 'queued'),
+    });
+    failedKinds.set(project.id, NOTICE_STATUS[notice.kind].label);
   }
   const now = Date.now();
   const cards: ProjectCard[] = projects.map((project) => cardFor(project, failedKinds.get(project.id) ?? null, now));

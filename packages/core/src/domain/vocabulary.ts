@@ -1,3 +1,4 @@
+import type { JobKind } from './job.ts';
 import type { ProjectStage } from './project.ts';
 
 /**
@@ -104,6 +105,35 @@ export function productionPhase(stage: ProjectStage): ProductionPhase | null {
       return 'mastering';
     case 'film_ready':
       return 'ready';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Which phase a job belongs to, for naming what stopped.
+ *
+ * The stage says where the production is; the job says where it was when it
+ * fell over, which is not always the same thing — a render that dies leaves
+ * the stage at `failed` and only the job remembers it was the film.
+ */
+export function productionPhaseOfJob(kind: JobKind | null | undefined): ProductionPhase | null {
+  switch (kind) {
+    case 'research_product':
+    case 'extract_brand':
+      return 'discovery';
+    case 'generate_concepts':
+      return 'direction';
+    case 'build_storyboard':
+    case 'repair_scene':
+      return 'storyboard';
+    case 'capture_product_moments':
+    case 'generate_scene_assets':
+    case 'render_film':
+    case 'render_variant':
+    case 'render_animatic':
+    case 'generate_campaign':
+      return 'production';
     default:
       return null;
   }

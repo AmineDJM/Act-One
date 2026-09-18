@@ -177,36 +177,6 @@ export const STAGE_STATUS: Record<ProjectStage, { label: string; tone: StatusTon
   failed: { label: 'NEEDS ATTENTION', tone: 'attention' },
 };
 
-/**
- * Where a production stopped, when we know which step did.
- *
- * Named by the phase it interrupted rather than by the job that threw: a
- * customer who reads `DISCOVERY INTERRUPTED` knows what did not happen and
- * what still stands. `RENDER FAILED` told them about our queue.
- */
-export function failureStatus(lastFailedJob: JobKind | null | undefined): string {
-  switch (lastFailedJob) {
-    case 'research_product':
-    case 'extract_brand':
-      return 'DISCOVERY INTERRUPTED';
-    case 'generate_concepts':
-      return 'DIRECTION INTERRUPTED';
-    case 'build_storyboard':
-    case 'repair_scene':
-      return 'STORYBOARD INTERRUPTED';
-    case 'capture_product_moments':
-    case 'generate_scene_assets':
-      return 'PRODUCTION INTERRUPTED';
-    case 'render_film':
-    case 'render_variant':
-    case 'generate_campaign':
-    case 'render_animatic':
-      return 'PRODUCTION INTERRUPTED';
-    default:
-      return STAGE_STATUS.failed.label;
-  }
-}
-
 export const CTA_LABELS: Record<PrimaryCta, string> = {
   understand_product: 'Understand my product',
   choose_concept: 'Choose a direction',

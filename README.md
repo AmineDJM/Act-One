@@ -87,6 +87,44 @@ screenshot as our own asset, the excerpt, the claims the brief took from
 it — and stays inspectable after the film exists, under **Discovery** on the
 production page.
 
+### When something does not go to plan
+
+Three different things wear the word "error" in most software, and only one of
+them is an error here.
+
+A shot that comes back wrong is remade, and the page says **Rebuilding this
+shot**. A shot that fails the standards is directed again, and the page says
+**Refining this shot**. Neither is a failure, and neither offers a button:
+telling somebody their production broke while it is quietly being remade is
+the worst thing this system could say, so work in progress beats every other
+reading.
+
+When a production really does stop, it is named by the phase it interrupted —
+**Discovery paused**, **Master not completed**, **Production interrupted** —
+and it carries exactly one way on, whose words say what pressing it does:
+*Continue discovery*, *Resume mastering*, *Resume production*. A provider
+being briefly unavailable is **Production paused**, which does not blame the
+customer for our supplier. An account that needs attention is **Payment
+requires attention**, which is not a production problem at all. The status
+beside the title and the status on the card come from the same notice, so a
+card and the page it opens can never disagree about what happened.
+
+Nothing in any of it names a provider, a model, a status code or a stack. The
+only raw text that can reach a customer is a sentence the pipeline deliberately
+wrote for them — "We could not read anything at that address." — and a filter
+decides whether what it is handed is one of those. A test feeds the notices
+every kind of infrastructure noise we have actually produced and asserts none
+of it comes out the other side.
+
+Underneath, the promise the copy makes is real. A failed job re-queues the
+stage that failed and keeps everything before it: the discovery, the identity,
+the concepts, the storyboard, the material and every shot already made. The
+retries are bounded and invisible, the backoff is exponential, and a failure
+that will fail identically forever — a validation error, a refusal — is not
+retried at all. The media allowance belongs to the production rather than to
+the attempt, so three automatic retries cannot spend three times what the
+customer agreed to.
+
 ### The product's phase, and the door
 
 Where the product is in its life is one setting in the console, under

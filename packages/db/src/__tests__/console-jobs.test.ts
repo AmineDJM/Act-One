@@ -41,7 +41,7 @@ function job(organizationId: string, projectId: string, kind: Job['kind'], state
   const at = new Date(Date.UTC(2026, 0, 1, 0, 0, tick)).toISOString();
   return {
     id: newId('job'), organizationId, projectId, kind, state, payload: {}, progress: 0, statusMessage: '', attempts: 0, maxAttempts: 3,
-    lastError: null, runAfter: at, lockedBy: null, lockedAt: null, startedAt: null, priority: 0, createdAt: at, updatedAt: at,
+    lastError: null, lastErrorCode: null, runAfter: at, lockedBy: null, lockedAt: null, startedAt: null, priority: 0, createdAt: at, updatedAt: at,
   };
 }
 

@@ -19,7 +19,7 @@ function job(over: Partial<Job> & { kind: Job['kind'] }): Job {
     statusMessage: '',
     attempts: 1,
     maxAttempts: 3,
-    lastError: null,
+    lastError: null, lastErrorCode: null,
     runAfter: at,
     lockedBy: null,
     lockedAt: null,

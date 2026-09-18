@@ -1473,16 +1473,17 @@ export class PgStore implements Store {
         return toJob(r.rows[0]);
       }),
 
-    fail: async (id: string, error: string, retryAt: string | null) =>
+    fail: async (id: string, error: string, retryAt: string | null, code: string | null = null) =>
       this.asPlatform(async (c) => {
         const r = await c.query(
           `UPDATE jobs SET
              state = CASE WHEN $3::timestamptz IS NULL OR attempts >= max_attempts THEN 'failed' ELSE 'queued' END,
              last_error = $2,
+             last_error_code = $4,
              run_after = COALESCE($3::timestamptz, run_after),
              locked_by = NULL, locked_at = NULL, updated_at = now()
            WHERE id = $1 RETURNING *`,
-          [id, error.slice(0, 4000), retryAt],
+          [id, error.slice(0, 4000), retryAt, code?.slice(0, 60) ?? null],
         );
         if (!r.rows[0]) throw notFound('Job');
         return toJob(r.rows[0]);
@@ -3122,6 +3123,7 @@ function toJob(row: Row): Job {
     attempts: num(row['attempts']),
     maxAttempts: num(row['max_attempts']),
     lastError: (row['last_error'] as string) ?? null,
+    lastErrorCode: (row['last_error_code'] as string) ?? null,
     runAfter: iso(row['run_after']),
     lockedBy: (row['locked_by'] as string) ?? null,
     lockedAt: isoOrNull(row['locked_at']),

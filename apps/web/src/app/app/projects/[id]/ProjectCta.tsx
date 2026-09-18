@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { GenerationTimeline as Timeline, PrimaryCta, RunView } from '@act-one/core';
+import type { FailureNotice, GenerationTimeline as Timeline, PrimaryCta, RunView } from '@act-one/core';
 import { GenerationTimeline } from './GenerationTimeline.tsx';
 import {
   createCampaignAction,
@@ -34,6 +34,13 @@ export function ProjectCta(props: {
   disabled: boolean;
   /** What to do about it when the action is blocked by the plan. */
   remedy?: 'none' | 'upgrade' | 'wait' | 'billing' | 'contact';
+  /**
+   * What to say when the production is not going to plan. A notice that is
+   * still work — a shot being rebuilt or refined — sits quietly under the
+   * progress; one that needs a person takes over the headline, because that
+   * is the only thing on this page worth reading at that moment.
+   */
+  notice?: FailureNotice | null;
 }) {
   const router = useRouter();
   const working = props.cta === 'watch_progress';
@@ -77,15 +84,41 @@ export function ProjectCta(props: {
   const pending = rendering || cutting || retrying;
   const result = renderState.error ?? campaignState.error ?? retryState.error;
 
+  /*
+   * Where the notice goes depends on whether anything is running, not on how
+   * serious it is. With work in flight it sits quietly under the progress;
+   * with nothing running it is the only thing on the page worth reading, so
+   * it takes the headline — including a production paused on somebody else's
+   * outage, which used to have nowhere to appear at all.
+   */
+  const showingProgress = working && props.run !== null;
+  const stopped = !showingProgress ? (props.notice ?? null) : null;
+  const inFlight = showingProgress ? (props.notice ?? null) : null;
+  const headline = stopped?.title ?? props.headline;
+  const body = stopped?.body ?? props.body;
+  // The primary action is the notice's own when there is one: "Continue
+  // discovery" and "Resume mastering" say what pressing it does, where
+  // "Try again" says only that something went wrong.
+  const primary = stopped?.action ?? null;
+  const label = primary && primary.action !== 'billing' ? primary.label : props.label;
+
   return (
-    <section className={styles.cta}>
+    <section className={styles.cta} data-stopped={stopped?.tone === 'attention' ? 'true' : undefined}>
       <div className={styles.ctaCopy}>
-        <h2>{props.headline}</h2>
+        <h2>{headline}</h2>
         {working && props.run ? (
-          <RunProgress run={props.run} timeline={props.timeline} />
+          <>
+            <RunProgress run={props.run} timeline={props.timeline} />
+            {inFlight ? (
+              <p className={styles.ctaNotice}>
+                <strong>{inFlight.title}.</strong> {inFlight.body}
+              </p>
+            ) : null}
+          </>
         ) : (
-          <p>{props.body}</p>
+          <p>{body}</p>
         )}
+        {stopped?.detail ? <p className={styles.ctaDetail}>{stopped.detail}</p> : null}
         {result ? (
           <p role="alert" style={{ color: 'var(--danger)', fontSize: '0.88rem' }}>
             {result}
@@ -109,11 +142,15 @@ export function ProjectCta(props: {
         <a href={`mailto:${site.supportEmail}`} className="btn btn--lg btn--secondary">
           Talk to us
         </a>
-      ) : action && props.disabled && props.remedy === 'contact' ? null : action ? (
+      ) : action && props.disabled && props.remedy === 'contact' ? null : primary?.action === 'billing' ? (
+        <Link href="/app/billing" className="btn btn--lg">
+          {primary.label}
+        </Link>
+      ) : action ? (
         <form action={action}>
           <input type="hidden" name="projectId" value={props.projectId} />
           <button className="btn btn--lg" type="submit" disabled={pending || props.disabled}>
-            {pending ? 'Starting…' : props.label}
+            {pending ? 'Starting…' : label}
           </button>
         </form>
       ) : working ? (

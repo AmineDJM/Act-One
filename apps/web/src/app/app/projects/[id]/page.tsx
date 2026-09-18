@@ -10,7 +10,7 @@ import {
   type PrimaryCta,
   PRODUCT_NAME,
   STAGE_STATUS,
-  failureStatus,
+  NOTICE_STATUS,
 } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { loadProjectView, renderPermission, revisionAllowance } from '@/server/projects.ts';
@@ -70,7 +70,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     copyKit,
     access,
     notes,
-    failure,
+    notice,
     plan,
     entitlements,
     jobs,
@@ -101,12 +101,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <h1>{project.name}</h1>
           <p className={styles.projectHost}>{safeHost(project.websiteUrl)}</p>
         </div>
-        <Status tone={STAGE_STATUS[project.stage].tone} live={Boolean(activeJob) || STAGE_STATUS[project.stage].tone === 'active'}>
-          {project.stage === 'failed'
-            ? failureStatus(jobs.find((job) => job.state === 'failed')?.kind ?? null)
-            : activeJob
-              ? STAGE_STATUS[project.stage].label
-              : STAGE_STATUS[project.stage].label}
+        {/*
+          One source for the word. The pill used to read the failed job's kind
+          while the panel below read its code, so a production could say
+          PRODUCTION INTERRUPTED over a panel explaining that somebody else's
+          system was briefly down.
+        */}
+        <Status
+          tone={notice ? NOTICE_STATUS[notice.kind].tone : STAGE_STATUS[project.stage].tone}
+          live={Boolean(activeJob) || STAGE_STATUS[project.stage].tone === 'active'}
+        >
+          {notice ? NOTICE_STATUS[notice.kind].label : STAGE_STATUS[project.stage].label}
         </Status>
       </div>
 
@@ -121,10 +126,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         projectId={project.id}
         cta={cta}
         label={CTA_LABELS[cta]}
-        headline={headlineFor(cta, project.name, failure)}
-        body={bodyFor(cta, permission.watermarked, permission.reason, failure)}
+        headline={headlineFor(cta, project.name)}
+        body={bodyFor(cta, permission.watermarked, permission.reason)}
         run={run}
         timeline={timeline}
+        notice={notice}
         disabled={!permission.allowed && cta === 'render_film'}
         remedy={permission.remedy}
       />
@@ -355,7 +361,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   );
 }
 
-function headlineFor(cta: PrimaryCta, projectName: string, failure: string | null): string {
+/*
+ * What the panel says when the production is going to plan.
+ *
+ * A production that stopped is not handled here at all: the notice owns that
+ * copy, so there is one place deciding what a customer is told about a
+ * failure rather than two that can drift apart.
+ */
+function headlineFor(cta: PrimaryCta, projectName: string): string {
   switch (cta) {
     case 'understand_product':
       return 'Let us read your product.';
@@ -366,23 +379,13 @@ function headlineFor(cta: PrimaryCta, projectName: string, failure: string | nul
     case 'create_variants':
       return `${projectName} is finished.`;
     case 'retry':
-      /*
-       * "Something went wrong" over a body that says exactly what went wrong
-       * reads as a system that does not know. When we do know, the headline
-       * says the state and the body carries the reason.
-       */
-      return failure ? 'This production stopped.' : 'Something went wrong.';
+      return 'This production stopped.';
     default:
       return 'Working on it.';
   }
 }
 
-function bodyFor(
-  cta: PrimaryCta,
-  watermarked: boolean,
-  reason: string,
-  failure: string | null,
-): string {
+function bodyFor(cta: PrimaryCta, watermarked: boolean, reason: string): string {
   switch (cta) {
     case 'choose_concept':
       return 'Pick one, combine two, or ask for three new directions. Nothing is charged yet.';
@@ -396,14 +399,7 @@ function bodyFor(
     case 'watch_progress':
       return 'This runs in the background. You can close the tab.';
     case 'retry':
-      /*
-       * What actually failed, when the worker wrote down something a customer
-       * can act on. A founder whose domain had a typo was told "Something went
-       * wrong" and offered a retry that would fail identically forever.
-       */
-      return failure
-        ? `${failure} We kept everything else. Fix the address or try again.`
-        : 'We kept everything we had. Retrying picks up where it stopped.';
+      return 'We kept everything we had. Picking this up resumes from where it stopped.';
     default:
       return 'Free until you render.';
   }

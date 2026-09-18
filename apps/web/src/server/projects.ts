@@ -22,6 +22,10 @@ import {
   type Entitlement,
   timelineFor,
   customerFacingFailure,
+  failureNotice,
+  productionPhaseOfJob,
+  type FailureNotice,
+  type JobEvent,
 } from '@act-one/core';
 import { getStore } from './store.ts';
 import { loadProductAccess } from './credentials.ts';
@@ -124,6 +128,7 @@ export async function enqueue(
     attempts: 0,
     maxAttempts: 3,
     lastError: null,
+    lastErrorCode: null,
     runAfter: now,
     lockedBy: null,
     lockedAt: null,
@@ -324,6 +329,16 @@ export async function loadProjectView(session: Session, projectId: string) {
      * caused by what the customer typed is not internal.
      */
     failure: customerFacingFailure(jobs.find((job) => job.state === 'failed' && job.lastError)?.lastError),
+    /*
+     * And the same thing said properly: a title, a body, and what to press.
+     *
+     * Three states wear the word "error" and only one of them is one. A job
+     * queued again after an error is being retried and the customer is told
+     * the shot is being rebuilt; a running job whose last word was `refine`
+     * had a shot rejected by quality and is directing it again; only a job
+     * that has exhausted its attempts is a production that stopped.
+     */
+    notice: noticeFor(project, jobs, events),
     jobs,
     organization,
     plan,
@@ -448,4 +463,36 @@ export async function revisionAllowance(
   ).length;
   const decision = canRevise({ plan, organization, revisionsUsed: used });
   return { ...decision, used };
+}
+
+/**
+ * What to tell a customer about a production that is not going to plan.
+ *
+ * Reads the three cases off the jobs rather than off a status field, because
+ * the queue is the truth: a job that failed and was re-queued is being
+ * retried, whatever the project's stage says, and saying "interrupted" over
+ * a retry in flight is the worst thing this page could do.
+ */
+function noticeFor(project: Project, jobs: readonly Job[], events: readonly JobEvent[]): FailureNotice | null {
+  // "Running" is not one state here: a job wears the name of what it is doing.
+  const running = jobs.find((job) => !jobIsTerminal(job.state) && job.state !== 'queued' && jobAdvancesProject(job.kind)) ?? null;
+  const refining =
+    running !== null &&
+    [...events].reverse().find((event) => event.jobId === running.id && event.kind === 'refine')?.status === 'active';
+  if (refining) return failureNotice({ refining: true });
+
+  // Queued again, with an error behind it: another attempt is coming.
+  const retrying = jobs.find(
+    (job) => job.state === 'queued' && job.attempts > 0 && job.lastError !== null && jobAdvancesProject(job.kind),
+  );
+  if (retrying) return failureNotice({ retryScheduled: true });
+
+  if (project.stage !== 'failed') return null;
+  const failed = jobs.find((job) => job.state === 'failed' && job.lastError) ?? null;
+  return failureNotice({
+    code: failed?.lastErrorCode ?? null,
+    phase: productionPhaseOfJob(failed?.kind),
+    hadRender: jobs.some((job) => job.kind === 'render_film' && job.state !== 'queued'),
+    rawError: failed?.lastError ?? null,
+  });
 }

@@ -44,10 +44,25 @@ export async function runSceneAssets(
 
   const result: AssetResult = { generated: 0, skipped: 0, failed: 0, costUsd: 0, notes: [] };
 
-  // Spend is capped against the film's own length, so a long storyboard cannot
-  // quietly authorise a proportionally enormous bill.
+  /*
+   * Spend is capped against the film's own length, so a long storyboard cannot
+   * quietly authorise a proportionally enormous bill.
+   *
+   * And the allowance belongs to the production, not to this attempt. A job
+   * that fails after generating half its shots is retried automatically — with
+   * a fresh budget, three attempts could spend three times what the customer
+   * agreed to. What this production has already spent on generated media comes
+   * off the top.
+   */
   const budget = MODE_BUDGETS[project.brief.creativeMode];
-  let remaining = budget.maxCostPerSecondUsd * storyboard.scenes.reduce((sum, s) => sum + s.duration, 0);
+  const allowance = budget.maxCostPerSecondUsd * storyboard.scenes.reduce((sum, s) => sum + s.duration, 0);
+  const spent = (await store.costs.listForProject(organizationId, project.id))
+    .filter((cost) => cost.operation.startsWith('media.') && cost.succeeded)
+    .reduce((sum, cost) => sum + (cost.actualCostUsd || cost.estimatedCostUsd), 0);
+  let remaining = Math.max(0, allowance - spent);
+  if (spent > 0) {
+    result.notes.push(`$${spent.toFixed(2)} of the $${allowance.toFixed(2)} media allowance was already spent on this production.`);
+  }
 
   const organization = await store.organizations.get(organizationId);
   const blenderReady = await isBlenderAvailable();

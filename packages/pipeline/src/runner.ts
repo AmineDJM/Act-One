@@ -138,7 +138,7 @@ export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): 
         ? new Date(Date.now() + retryDelayMs(job.attempts)).toISOString()
         : null;
 
-    await store.jobs.fail(job.id, appError.message, retryAt);
+    await store.jobs.fail(job.id, appError.message, retryAt, appError.code);
 
     if (!retryAt) {
       // The customer needs to see that it stopped, not an eternal spinner.
@@ -256,6 +256,7 @@ async function enqueueNext(
     attempts: 0,
     maxAttempts: 3,
     lastError: null,
+    lastErrorCode: null,
     runAfter: now,
     lockedBy: null,
     lockedAt: null,

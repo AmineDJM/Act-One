@@ -8,7 +8,7 @@ import { GENERATION_STEPS, newId, timelineFor, type Job, type JobEvent } from '.
 function job(kind: Job['kind'], state: Job['state'], createdAt: string): Job {
   return {
     id: newId('job'), organizationId: 'org_1', projectId: 'prj_1', kind, state, payload: {}, progress: state === 'completed' ? 1 : 0.4,
-    statusMessage: '', attempts: 1, maxAttempts: 3, lastError: null, runAfter: createdAt, lockedBy: null, lockedAt: null,
+    statusMessage: '', attempts: 1, maxAttempts: 3, lastError: null, lastErrorCode: null, runAfter: createdAt, lockedBy: null, lockedAt: null,
     startedAt: createdAt, priority: 0, createdAt, updatedAt: createdAt,
   };
 }

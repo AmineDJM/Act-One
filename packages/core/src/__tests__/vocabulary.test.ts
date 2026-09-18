@@ -7,7 +7,8 @@ import {
   PRODUCTION_PHASE_LINES,
   ProjectStage,
   STAGE_STATUS,
-  failureStatus,
+  NOTICE_STATUS,
+  productionPhaseOfJob,
   phaseIndex,
   pieceLabel,
   productionPhase,
@@ -65,15 +66,22 @@ describe('the production vocabulary', () => {
     }
   });
 
-  it('names an interruption by the phase it interrupted, never by the job', () => {
-    expect(failureStatus('research_product')).toBe('DISCOVERY INTERRUPTED');
-    expect(failureStatus('generate_concepts')).toBe('DIRECTION INTERRUPTED');
-    expect(failureStatus('render_film')).toBe('PRODUCTION INTERRUPTED');
-    expect(failureStatus(null)).toBe('NEEDS ATTENTION');
-    // Nothing a customer reads may name our machinery.
-    for (const kind of ['research_product', 'generate_concepts', 'build_storyboard', 'render_film'] as const) {
-      expect(failureStatus(kind)).not.toMatch(/render|api|job|worker/i);
+  it('places a failed job in the phase it interrupted', () => {
+    expect(productionPhaseOfJob('research_product')).toBe('discovery');
+    expect(productionPhaseOfJob('generate_concepts')).toBe('direction');
+    expect(productionPhaseOfJob('build_storyboard')).toBe('storyboard');
+    expect(productionPhaseOfJob('render_film')).toBe('production');
+    expect(productionPhaseOfJob(null)).toBeNull();
+  });
+
+  it("says the status in the phase's words, never in ours", () => {
+    for (const status of Object.values(NOTICE_STATUS)) {
+      expect(status.label).toBe(status.label.toUpperCase());
+      // Nothing a customer reads may name our machinery.
+      expect(status.label).not.toMatch(/render|api|job|worker|queue/i);
     }
+    expect(NOTICE_STATUS.discovery_paused.label).toBe('DISCOVERY PAUSED');
+    expect(NOTICE_STATUS.refining.tone).toBe('active');
   });
 
   it('credits a film to the studio, never to a machine', () => {

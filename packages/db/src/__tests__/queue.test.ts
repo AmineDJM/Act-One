@@ -16,7 +16,7 @@ function job(organizationId: string, over: Partial<Job> = {}): Job {
     statusMessage: '',
     attempts: 0,
     maxAttempts: 3,
-    lastError: null,
+    lastError: null, lastErrorCode: null,
     runAfter: now,
     lockedBy: null,
     lockedAt: null,

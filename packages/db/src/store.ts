@@ -356,7 +356,7 @@ export interface JobRepo {
   claim(workerId: string, kinds?: JobKind[]): Promise<Job | null>;
   update(id: string, patch: Partial<Job>): Promise<Job>;
   complete(id: string, state: JobState, message?: string): Promise<Job>;
-  fail(id: string, error: string, retryAt: string | null): Promise<Job>;
+  fail(id: string, error: string, retryAt: string | null, code?: string | null): Promise<Job>;
   listForProject(organizationId: string, projectId: string): Promise<Job[]>;
   /** Releases jobs whose worker died holding the lock. */
   reapStale(olderThanMs: number): Promise<number>;
