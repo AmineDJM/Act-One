@@ -5,6 +5,24 @@ import { z } from 'zod';
  * whatever is in their address bar, and LLM output is not to be trusted to be
  * well-formed. We normalise rather than reject wherever it is safe to do so.
  */
+/**
+ * The bare host of a URL, for putting on screen.
+ *
+ * A launch film's end card is the company's address, without the scheme and
+ * without the `www.` — which is how a company writes its own domain everywhere
+ * else, and the only call to action we can put on screen without inventing a
+ * claim about a product we did not write.
+ */
+export function displayHost(input: string): string {
+  const normalized = normalizeUrl(input);
+  if (!normalized) return '';
+  try {
+    return new URL(normalized).hostname.replace(/^www\./i, '');
+  } catch {
+    return '';
+  }
+}
+
 export function normalizeUrl(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;

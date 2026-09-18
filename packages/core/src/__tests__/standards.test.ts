@@ -19,6 +19,9 @@ import {
   contrastFloorInFrame,
   ctaIsVague,
   derivedId,
+  displayHost,
+  endsDangling,
+  firstClause,
   indexStandards,
   isId,
   isLargeText,
@@ -250,5 +253,57 @@ describe('stable ids', () => {
   it('produces ids the rest of the system recognises', () => {
     expect(isId(derivedId('evt', 'page_text', 'https://x.example/', 'Something'), 'evt')).toBe(true);
     expect(isId(derivedId('mom', 'https://x.example/', 'Connect a bank'), 'mom')).toBe(true);
+  });
+});
+
+describe('the end card', () => {
+  it('reduces a URL to how a company writes its own domain', () => {
+    expect(displayHost('https://www.linear.app/')).toBe('linear.app');
+    expect(displayHost('linear.app')).toBe('linear.app');
+    expect(displayHost('https://app.northwind.example/pricing?a=1')).toBe('app.northwind.example');
+  });
+
+  it('gives nothing back for something that is not an address', () => {
+    // Better an end card with no line than one carrying a broken string.
+    expect(displayHost('')).toBe('');
+    expect(displayHost('not a url')).toBe('');
+    expect(displayHost('javascript:alert(1)')).toBe('');
+  });
+});
+
+describe('fitting a line where only one fits', () => {
+  it('leaves a line that already fits alone', () => {
+    expect(firstClause('Close the books without a week of manual matching.')).toBe(
+      'Close the books without a week of manual matching.',
+    );
+  });
+
+  it('cuts at a sentence end when there is one', () => {
+    expect(
+      firstClause('Reconciliation, automated. Built for controllers at mid-market companies.'),
+    ).toBe('Reconciliation, automated.');
+  });
+
+  it('cuts at a comma rather than mid-phrase', () => {
+    const result = firstClause(
+      'The product development system for teams and agents, purpose-built for planning and building products',
+    );
+    expect(result).toBe('The product development system for teams and agents');
+  });
+
+  it('never ends on a dangling word', () => {
+    // The defect this exists to stop: a film ending on "purpose-built for".
+    const result = firstClause(
+      'A single place for every document your finance team has ever needed to reconcile',
+      40,
+    );
+    expect(endsDangling(result)).toBe(false);
+  });
+
+  it('never cuts mid-word', () => {
+    const source = 'Reconciliation automation for mid-market finance teams everywhere';
+    const result = firstClause(source, 30);
+    expect(source.startsWith(result)).toBe(true);
+    expect(result.split(' ').every((word) => source.includes(word))).toBe(true);
   });
 });

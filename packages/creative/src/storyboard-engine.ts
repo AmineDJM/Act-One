@@ -6,6 +6,7 @@ import {
   coherentRecipe,
   resequence,
   round3,
+  sceneShowsSomething,
   storyboardDuration,
   type BrandSystem,
   type CameraRecipe,
@@ -71,7 +72,8 @@ Rules:
 - Only set "momentId" when the scene genuinely films that product moment.
 - Only write "generativeBrief" for atmospheric, metaphorical or environmental scenes. Never describe a product interface in a generative brief — generated footage must never stand in for the real product.
 - "claimText" must be copied verbatim from the supported claims you are given, or left empty. Never invent a claim.
-- The first scene is the hook. The last scene is the ending. Earn everything in between.
+- Every line of on-screen text is a complete thought on its own. Never end a line expecting the next thing to finish it — the end card is composed separately and will not complete your sentence.
+- The first scene is the hook. Do not write the ending: the film closes on its own end card, with the company's name and address. Earn everything in between.
 
 Return JSON only.`;
 
@@ -118,6 +120,86 @@ export class StoryboardEngine {
       storyboard: finalBoard,
       violations: checkBudget(finalBoard, input.understanding, input.brief.creativeMode),
       copyAdjustments: built.copyAdjustments,
+    };
+  }
+
+  /**
+   * The end card, when the film does not already have one.
+   *
+   * Returns null when the model's own last beat is already an ending — a
+   * storyboard that closes on a logo reveal does not need a second one.
+   */
+  private closingScene(
+    system: CreativeSystem,
+    storyboardId: string,
+    scenes: readonly Scene[],
+  ): Scene | null {
+    const last = scenes[scenes.length - 1];
+    if (!last) return null;
+    if (last.visualType === 'logo_reveal') return null;
+
+    /*
+     * Prefer the ending that carries the call to action.
+     *
+     * The alternative in every system is a pure sign-off — the mark alone, no
+     * address. It is a beautiful last frame and it tells a viewer who has just
+     * decided they want this nowhere to go, which is the one job the last three
+     * seconds of a launch film has.
+     */
+    const ending =
+      system.endings.find((option) => option.motion === 'cta_end_card') ?? system.endings[0];
+    if (!ending) return null;
+
+    const duration = round3((ending.durationRange[0] + ending.durationRange[1]) / 2);
+
+    return {
+      id: newId('scn'),
+      storyboardId,
+      index: scenes.length,
+      startTime: 0,
+      duration,
+      purpose: 'Close on the brand and the address.',
+      narration: '',
+      // Deliberately empty: the renderer composes the lockup, the tagline and
+      // the company's own domain. Copy here would compete with all three.
+      onScreenText: [],
+      visualType: 'logo_reveal',
+      assetRefs: [],
+      momentIds: [],
+      motionRecipe: {
+        name: coherentRecipe('logo_reveal', ending.motion, null),
+        easing: system.pacing.defaultEasing,
+        delay: 0,
+        stagger: 0.06,
+        intensity: 0.5,
+        params: {},
+      },
+      cameraRecipe: {
+        move: 'static',
+        fromScale: 1,
+        toScale: 1,
+        fromX: 0,
+        toX: 0,
+        fromY: 0,
+        toY: 0,
+        motionBlur: 0.1,
+        depthOfField: 0,
+        easing: 'in_out_quart',
+      },
+      soundCues: ending.soundCues.map((type) => ({
+        time: 0,
+        type,
+        assetId: null,
+        intensity: 0.6,
+        durationSeconds: null,
+      })),
+      voiceOver: false,
+      generativeNeeds: [],
+      threeDSceneId: null,
+      status: 'draft',
+      claimEvidenceIds: [],
+      notes: `Ending: ${ending.name}`,
+      estimatedCostUsd: 0,
     };
   }
 
@@ -232,7 +314,7 @@ export class StoryboardEngine {
      */
     let previousRecipe: MotionRecipeName | null = null;
 
-    const scenes: Scene[] = plan.scenes.map((planned, index) => {
+    const drafted = plan.scenes.map((planned, index): { scene: Scene; planned: typeof planned } => {
       const archetype = this.resolveArchetype(system, planned.archetypeId, index, plan.scenes.length);
       const moment = planned.momentId ? findMoment(input.understanding, planned.momentId) : undefined;
       const hasRealAsset = Boolean(moment && moment.screenshots.length > 0);
@@ -271,7 +353,7 @@ export class StoryboardEngine {
       const motionRecipe = motionFor(archetype, input.brand, system, visualType, previousRecipe);
       previousRecipe = motionRecipe.name;
 
-      return {
+      const scene: Scene = {
         id: sceneId,
         storyboardId,
         index,
@@ -309,12 +391,42 @@ export class StoryboardEngine {
         notes: routed.reason,
         estimatedCostUsd: 0,
       };
+
+      return { scene, planned };
     });
+
+    /*
+     * Drop any scene that would put nothing on screen.
+     *
+     * The model sometimes returns a beat with no copy — intending a pause, or
+     * simply having nothing to say there — and a `kinetic_typography` scene
+     * with no typography renders as pure black for its whole duration. Three of
+     * those in a twenty-four second film is six seconds of nothing, and it
+     * passed every check the system had.
+     *
+     * Dropped rather than converted to a hold: a deliberate pause is something
+     * a director asks for, and the plan did not ask for one. The time goes back
+     * to the scenes that do have something to say when the timing is solved.
+     */
+    const kept = drafted.filter((entry) => sceneShowsSomething(entry.scene));
+    const scenes: Scene[] = kept.map((entry, index) => ({ ...entry.scene, index }));
+
+    /*
+     * Close the film on the brand.
+     *
+     * Every creative system has always declared its `endings` — a CTA card and
+     * a mark, with durations and sound cues — and nothing ever read them. So
+     * films ended wherever the model's last beat happened to land, which is how
+     * one came to end on the words "See the difference at": copy written to be
+     * completed by a call to action that no scene was ever going to draw.
+     */
+    const ending = this.closingScene(system, storyboardId, scenes);
+    if (ending) scenes.push(ending);
 
     const constraints: TimingConstraint[] = scenes.map((scene, index) => {
       const archetype = this.resolveArchetype(
         system,
-        plan.scenes[index]?.archetypeId ?? '',
+        kept[index]?.planned.archetypeId ?? '',
         index,
         scenes.length,
       );

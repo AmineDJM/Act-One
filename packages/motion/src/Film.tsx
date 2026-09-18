@@ -54,7 +54,14 @@ export const Film: React.FC<FilmProps> = ({
             tokens={tokens}
             brand={brand}
             assetUrls={assetUrls}
-            cta={cta ?? 'Start free'}
+            /*
+              * No invented fallback. This used to default to "Start free",
+              * which is a promise about a product nobody checked has a free
+              * tier — made on the customer's behalf, on their launch day.
+              * An end card with no line is a design problem; one with a claim
+              * we made up is somebody else's problem.
+              */
+            cta={cta ?? ''}
             tagline={tagline ?? ''}
           />
         </Sequence>
@@ -151,7 +158,13 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
           <Framed tokens={tokens} placement="center_left">
             <MetricReveal
               value={value ?? ''}
-              caption={rest.join(' ') || scene.purpose}
+              /*
+                * No fallback to `purpose`. That field is the storyboard's note
+                * to itself about what the beat is for — "Show scale: real
+                * customer impact" — and it was being set in type under the
+                * number, on screen, in the customer's film.
+                */
+              caption={rest.join(' ')}
               tokens={tokens}
               durationSeconds={scene.duration}
               easing={easing}

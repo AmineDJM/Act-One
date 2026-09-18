@@ -25,6 +25,42 @@ export const REAL_PRODUCT_VISUAL_TYPES: readonly VisualType[] = [
   'screenshot_motion',
 ] as const;
 
+/**
+ * Visual types that draw themselves and need nothing handed to them.
+ *
+ * A logo reveal composes the brand lockup, and a transition is a deliberate
+ * pause. Every other type is a container for something — words, a capture, a
+ * generated shot — and is an empty frame without it.
+ */
+export const SELF_CONTAINED_VISUAL_TYPES: readonly VisualType[] = [
+  'logo_reveal',
+  'transition',
+] as const;
+
+/**
+ * Does this scene put anything on screen?
+ *
+ * The question sounds too obvious to need asking, which is exactly why nothing
+ * asked it: three scenes of a twenty-four second film rendered as pure black
+ * and the film passed every check it had. A typographic scene with no type is
+ * not a minimal scene, it is a hole in the edit.
+ *
+ * The repair loop makes this worse rather than better — `rewrite_copy` strips
+ * a scene's text to remove an unsupported claim, which fixes the claim and
+ * leaves a blank frame behind it.
+ */
+export function sceneShowsSomething(scene: {
+  visualType: VisualType;
+  onScreenText: readonly string[];
+  assetRefs: readonly string[];
+  generativeNeeds?: readonly unknown[];
+}): boolean {
+  if (SELF_CONTAINED_VISUAL_TYPES.includes(scene.visualType)) return true;
+  if (scene.onScreenText.some((line) => line.trim().length > 0)) return true;
+  if (scene.assetRefs.length > 0) return true;
+  return (scene.generativeNeeds?.length ?? 0) > 0;
+}
+
 export const MotionRecipeName = z.enum([
   'word_reveal',
   'editorial_headline',

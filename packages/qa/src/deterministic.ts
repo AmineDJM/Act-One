@@ -17,11 +17,13 @@ import {
   withinInset,
   ctaIsVague,
   containsStatistic,
+  endsDangling,
   longestRun,
   newId,
   opensOnSubject,
   readingSecondsFor,
   rhythmVariation,
+  sceneShowsSomething,
   superlativesIn,
   visualMix,
   weaselPhrasesIn,
@@ -54,6 +56,8 @@ import {
  * occasionally wrong, so anything decidable in arithmetic is decided here.
  */
 export type DeterministicInput = {
+  /** What the end card says. Checked so it is a next step, not a filler word. */
+  cta?: string;
   storyboard: Storyboard;
   brand: BrandSystem;
   aspect: '16:9' | '9:16' | '1:1' | '4:5';
@@ -73,6 +77,24 @@ export function runDeterministicChecks(input: DeterministicInput): QaIssue[] {
   }
 
   issues.push(...checkFilm(input.storyboard, tokens));
+
+  if (input.cta !== undefined && ctaIsVague(input.cta)) {
+    issues.push({
+      id: newId('evt'),
+      sceneId: null,
+      atSeconds: null,
+      detectedBy: 'deterministic',
+      evidenceAssetId: null,
+      check: 'composition',
+      severity: 'major',
+      message:
+        `"${input.cta}" names no action (${cite(CONVERSION_STANDARDS.singleCta)}). ` +
+        'It is what you write when nobody decided what the viewer should do.',
+      confidence: 1,
+      repair: 'rewrite_copy',
+    });
+  }
+
   return issues;
 }
 
@@ -161,6 +183,21 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
       });
     }
 
+    // A held frame is read once, whole: a line that stops mid-thought reads as
+    // a caption whose second half was lost.
+    for (const line of scene.onScreenText) {
+      if (!endsDangling(line)) continue;
+      add({
+        check: 'text_overflow',
+        severity: 'major',
+        message:
+          `"${line}" ends mid-thought. On-screen copy is read once and nothing follows it ` +
+          `on the frame (${cite(EDITORIAL_STANDARDS.plainLanguage)}).`,
+        confidence: 0.95,
+        repair: 'rewrite_copy',
+      });
+    }
+
     for (const phrase of weaselPhrasesIn(text)) {
       add({
         check: 'unsupported_claim',
@@ -230,6 +267,23 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
       message: 'Narration is longer than the scene it sits in and will be cut off mid-word.',
       confidence: 1,
       repair: 'rewrite_copy',
+    });
+  }
+
+  /*
+   * A scene that puts nothing on screen. Rendered, this is pure black for the
+   * scene's whole duration — and it shipped: three of them in one twenty-four
+   * second film, which passed every other check the system had.
+   */
+  if (!sceneShowsSomething(scene)) {
+    add({
+      check: 'composition',
+      severity: 'blocker',
+      message:
+        `A ${scene.visualType.replace(/_/g, ' ')} scene with no text, no capture and no shot ` +
+        `behind it. It renders as ${scene.duration.toFixed(1)}s of black.`,
+      confidence: 1,
+      repair: 'remove_scene',
     });
   }
 

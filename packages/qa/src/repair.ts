@@ -1,5 +1,6 @@
 import {
   qaVerdict,
+  sceneShowsSomething,
   type QaIssue,
   type QaReport,
   type RepairAction,
@@ -106,8 +107,23 @@ export function applyRepairs(
             status: 'draft',
           };
 
-        case 'rewrite_copy':
-          return { ...scene, onScreenText: [], narration: '', voiceOver: false, status: 'draft' };
+        case 'rewrite_copy': {
+          /*
+           * Taking the words off a typographic scene leaves a black frame for
+           * its whole duration — the repair loop was manufacturing exactly the
+           * defect everything else here exists to catch. If the scene has
+           * nothing else to show, it goes; if it has a capture or a generated
+           * shot behind it, it stays and plays without the copy.
+           */
+          const stripped: Scene = {
+            ...scene,
+            onScreenText: [],
+            narration: '',
+            voiceOver: false,
+            status: 'draft',
+          };
+          return sceneShowsSomething(stripped) ? stripped : null;
+        }
 
         case 'remove_scene':
           return null;

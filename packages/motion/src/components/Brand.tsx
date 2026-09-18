@@ -1,7 +1,7 @@
 import React from 'react';
 import { Img, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { DesignTokens } from '@act-one/design';
-import { applyCase, breakLines } from '@act-one/design';
+import { applyCase, breakLines, fitTextToBox } from '@act-one/design';
 import type { EasingName } from '@act-one/core';
 import { ease, exitProgress, interpolate, progress, staggered } from '../easing.ts';
 
@@ -89,14 +89,28 @@ export const CtaEndCard: React.FC<{
   const exit = exitProgress(frame, fps, durationSeconds, 0.4);
   const { grid } = tokens;
 
-  const lines = breakLines(headline, {
-    family: tokens.type.statement.family,
-    fontSizePx: tokens.type.statement.sizePx,
-    tracking: tokens.type.statement.tracking,
-    weight: tokens.type.statement.weight,
-    maxWidthPx: grid.safe.width * 0.8,
-    maxLines: 2,
-  });
+  /*
+   * Fitted, not clipped.
+   *
+   * `breakLines` with a line cap silently drops whatever does not fit, so a
+   * tagline one word too long ended a film on "purpose-built for". Binary
+   * searching the size instead means a slightly long line arrives slightly
+   * smaller, which is what a designer would do with it.
+   */
+  const fitted = fitTextToBox(
+    headline,
+    { widthPx: grid.safe.width * 0.8, heightPx: tokens.type.statement.sizePx * 2.6 },
+    {
+      family: tokens.type.statement.family,
+      tracking: tokens.type.statement.tracking,
+      weight: tokens.type.statement.weight,
+      lineHeight: tokens.type.statement.lineHeight,
+      maxLines: 2,
+      maxFontSizePx: tokens.type.statement.sizePx,
+      minFontSizePx: tokens.type.statement.sizePx * 0.62,
+    },
+  );
+  const lines = fitted.lines;
 
   const headlineT = ease(easing ?? 'out_quint', staggered(0, frame, fps, { durationSeconds: 0.8, staggerSeconds: 0 }));
   const ctaT = ease(easing ?? 'out_quint', staggered(1, frame, fps, { durationSeconds: 0.7, staggerSeconds: 0.22 }));
@@ -119,7 +133,7 @@ export const CtaEndCard: React.FC<{
       <div
         style={{
           fontFamily: `${tokens.type.statement.family}, system-ui, sans-serif`,
-          fontSize: tokens.type.statement.sizePx,
+          fontSize: fitted.fontSizePx,
           fontWeight: tokens.type.statement.weight,
           lineHeight: tokens.type.statement.lineHeight,
           letterSpacing: `${tokens.type.statement.tracking}em`,
@@ -133,18 +147,22 @@ export const CtaEndCard: React.FC<{
         ))}
       </div>
 
-      <div
-        style={{
-          marginTop: tokens.space(3),
-          fontFamily: `${tokens.type.caption.family}, monospace`,
-          fontSize: tokens.type.caption.sizePx,
-          letterSpacing: `${tokens.type.caption.tracking}em`,
-          color: tokens.accent,
-          opacity: ctaT,
-        }}
-      >
-        {applyCase(cta, tokens.type.caption)}
-      </div>
+      {/* An empty line takes no space: the lockup closes up around it rather
+          than leaving a gap where a call to action was supposed to be. */}
+      {cta.trim() ? (
+        <div
+          style={{
+            marginTop: tokens.space(3),
+            fontFamily: `${tokens.type.caption.family}, monospace`,
+            fontSize: tokens.type.caption.sizePx,
+            letterSpacing: `${tokens.type.caption.tracking}em`,
+            color: tokens.accent,
+            opacity: ctaT,
+          }}
+        >
+          {applyCase(cta, tokens.type.caption)}
+        </div>
+      ) : null}
 
       <div style={{ marginTop: tokens.space(4), opacity: markT, display: 'flex', alignItems: 'center' }}>
         {logoUrl ? (

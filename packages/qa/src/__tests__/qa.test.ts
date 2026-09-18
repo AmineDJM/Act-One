@@ -470,3 +470,151 @@ describe('professional standards', () => {
     expect(issues.some((i) => /muted playback/.test(i.message))).toBe(true);
   });
 });
+
+describe('the end card', () => {
+  const board1 = () =>
+    board([scene({ id: 'a', duration: 4, visualType: 'logo_reveal', onScreenText: ['Northwind'] })]);
+
+  it('accepts the company\u2019s own address', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board1(),
+      brand,
+      aspect: '16:9',
+      cta: 'northwind.example',
+    });
+    expect(issues.some((i) => /names no action/.test(i.message))).toBe(false);
+  });
+
+  it('rejects a call to action that names no action', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board1(),
+      brand,
+      aspect: '16:9',
+      cta: 'Learn more',
+    });
+    const issue = issues.find((i) => /names no action/.test(i.message));
+    expect(issue).toBeDefined();
+    expect(issue!.severity).toBe('major');
+  });
+
+  it('has no opinion when no end card was asked for', () => {
+    const issues = runDeterministicChecks({ storyboard: board1(), brand, aspect: '16:9' });
+    expect(issues.some((i) => /names no action/.test(i.message))).toBe(false);
+  });
+});
+
+describe('scenes that show nothing', () => {
+  it('blocks a typographic scene with no type', () => {
+    // Three of these shipped in one film: six seconds of black in twenty-four,
+    // past every check the system had.
+    const issues = runDeterministicChecks({
+      storyboard: board([scene({ id: 'a', duration: 2.2, visualType: 'kinetic_typography' })]),
+      brand,
+      aspect: '16:9',
+    });
+
+    const issue = issues.find((i) => /renders as .* of black/.test(i.message));
+    expect(issue).toBeDefined();
+    expect(issue!.severity).toBe('blocker');
+    expect(issue!.repair).toBe('remove_scene');
+  });
+
+  it('accepts a logo reveal, which composes itself', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([scene({ id: 'a', duration: 3, visualType: 'logo_reveal' })]),
+      brand,
+      aspect: '16:9',
+    });
+    expect(issues.some((i) => /of black/.test(i.message))).toBe(false);
+  });
+
+  it('accepts a scene carried by a capture rather than by words', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 3, visualType: 'screenshot_motion', assetRefs: ['ast_1'] }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+    expect(issues.some((i) => /of black/.test(i.message))).toBe(false);
+  });
+
+  it('removes a scene rather than emptying it when repairing copy', () => {
+    /*
+     * `rewrite_copy` strips a scene's text to take out an unsupported claim.
+     * Applied to a typographic scene that was carrying nothing else, it used to
+     * leave a black frame — the repair loop manufacturing the defect the rest
+     * of QA exists to catch.
+     */
+    const storyboard = board([
+      scene({ id: 'a', duration: 3, visualType: 'kinetic_typography', onScreenText: ['400% faster'] }),
+      scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Second scene'] }),
+    ]);
+
+    const repaired = applyRepairs(storyboard, {
+      scenes: [{ sceneId: 'a', action: 'rewrite_copy', reason: 'unsupported claim' }],
+      manual: [],
+      shippable: false,
+      deadEnd: false,
+    });
+
+    expect(repaired.storyboard.scenes.map((s) => s.id)).toEqual(['b']);
+  });
+
+  it('keeps a repaired scene that still has a capture to show', () => {
+    const storyboard = board([
+      scene({
+        id: 'a',
+        duration: 3,
+        visualType: 'screenshot_motion',
+        onScreenText: ['400% faster'],
+        assetRefs: ['ast_1'],
+      }),
+    ]);
+
+    const repaired = applyRepairs(storyboard, {
+      scenes: [{ sceneId: 'a', action: 'rewrite_copy', reason: 'unsupported claim' }],
+      manual: [],
+      shippable: false,
+      deadEnd: false,
+    });
+
+    expect(repaired.storyboard.scenes).toHaveLength(1);
+    expect(repaired.storyboard.scenes[0]!.onScreenText).toEqual([]);
+  });
+});
+
+describe('copy that stops mid-thought', () => {
+  it('catches a line ending on a preposition', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({
+          id: 'a',
+          duration: 4,
+          visualType: 'kinetic_typography',
+          onScreenText: ['See the difference at'],
+        }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+    expect(issues.some((i) => /ends mid-thought/.test(i.message))).toBe(true);
+  });
+
+  it('leaves a complete line alone', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({
+          id: 'a',
+          duration: 4,
+          visualType: 'kinetic_typography',
+          onScreenText: ['See the difference.'],
+        }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+    expect(issues.some((i) => /ends mid-thought/.test(i.message))).toBe(false);
+  });
+});
+

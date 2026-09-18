@@ -4,11 +4,14 @@ import path from 'node:path';
 import {
   AppError,
   DEFAULT_FPS,
+  displayHost,
+  firstClause,
   isRealProductAsset,
   newId,
   REAL_PRODUCT_VISUAL_TYPES,
   storyboardDuration,
   type AspectRatio,
+  type ProductUnderstanding,
   type QaIssue,
   type Render,
   type RenderKind,
@@ -27,7 +30,18 @@ import {
   runFfmpeg,
   DEFAULT_LIBRARY,
 } from '@act-one/sound';
-import { factCheck, planRepairs, applyRepairs, runDeterministicChecks, selectFramesToInspect, inspectFrame } from '@act-one/qa';
+import {
+  applyRepairs,
+  factCheck,
+  flashIssues,
+  inspectFrame,
+  isFullRange,
+  parseYAvg,
+  planRepairs,
+  relativeLuminance,
+  runDeterministicChecks,
+  selectFramesToInspect,
+} from '@act-one/qa';
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planFor } from '../entitlements.ts';
 
@@ -102,6 +116,12 @@ export async function runRender(
 
   await assertProductIsReal(context, storyboard);
 
+  // Loaded once: the end card needs the customer's own line about themselves,
+  // and the fact check needs the evidence behind every claim on screen.
+  const understanding = project.productUnderstandingId
+    ? await store.understandings.get(organizationId, project.productUnderstandingId)
+    : null;
+
   const render = await store.renders.create({
     id: newId('rnd'),
     projectId: project.id,
@@ -146,6 +166,7 @@ export async function runRender(
         watermarked,
         workDir,
         attempt,
+        understanding,
       });
       masterPath = rendered.path;
 
@@ -156,6 +177,7 @@ export async function runRender(
         masterPath,
         workDir,
         skipVision: options.skipVisionQa ?? false,
+        understanding,
       });
 
       /*
@@ -343,6 +365,7 @@ async function renderOnce(
     workDir: string;
     attempt: number;
     system: ReturnType<typeof getSystem>;
+    understanding: ProductUnderstanding | null;
   },
 ): Promise<{ path: string; missingAudio: string[] }> {
   const { storyboard, brand, system } = params;
@@ -368,8 +391,17 @@ async function renderOnce(
       },
       theme: system.palette.canvas === 'light' ? 'light' : system.palette.canvas === 'dark' ? 'dark' : 'auto',
       watermarkLabel: params.watermarked ? 'Preview' : null,
-      cta: 'Start free',
-      tagline: '',
+      /*
+       * The end card is the company's own address and the company's own line
+       * about itself. It used to say "Start free" on every film ever rendered —
+       * a promise about a product nobody had checked has a free tier, made on
+       * the customer's behalf, on their launch day. By our own editorial rule
+       * that is a claim, and we had no evidence for it.
+       */
+      cta: displayHost(context.project.websiteUrl),
+      // One clause, not the whole one-liner: the lockup holds a single line,
+      // and handing it a paragraph is how a film ends mid-phrase.
+      tagline: params.understanding ? firstClause(params.understanding.oneLiner) : '',
     },
     aspect: params.aspect,
     quality: params.quality,
@@ -441,6 +473,72 @@ async function renderOnce(
   return await mux(context, silentPath, audioPath, params, missingAudio);
 }
 
+/**
+ * Runs the photosensitivity check over the finished film.
+ *
+ * The only check here that is about harm rather than quality, so it runs on
+ * every render including the ones that skip vision QA: an animatic nobody pays
+ * for can still hurt somebody watching it.
+ *
+ * Analysed at 160px wide, because whole-frame average luminance is what the
+ * threshold is defined against and a downscale computes the same average
+ * roughly a hundred times faster. The per-frame data goes to a file rather than
+ * through stderr: a minute of film is tens of thousands of lines, and the
+ * process buffer is deliberately bounded.
+ */
+async function checkFlashRate(
+  context: StageContext,
+  masterPath: string,
+  workDir: string,
+): Promise<QaIssue[]> {
+  const metadataPath = path.join(workDir, `luma-${newId('evt')}.txt`);
+
+  try {
+    const probe = await runFfmpeg(['-i', masterPath, '-frames:v', '1', '-f', 'null', '-'], {
+      signal: context.signal,
+      timeoutMs: 60_000,
+    });
+
+    const analysed = await runFfmpeg(
+      [
+        '-i', masterPath,
+        '-vf', `scale=160:-2,signalstats,metadata=print:file=${metadataPath}`,
+        '-an',
+        '-f', 'null',
+        '-',
+      ],
+      { signal: context.signal, timeoutMs: 180_000 },
+    );
+    if (!analysed.ok) {
+      // Never silently pass: a check for harm that fails open is worse than no
+      // check, because everyone downstream believes it ran.
+      console.error('[render] flash analysis failed:', analysed.stderr.slice(-300));
+      return [
+        {
+          id: newId('evt'),
+          sceneId: null,
+          atSeconds: null,
+          detectedBy: 'deterministic',
+          evidenceAssetId: null,
+          check: 'flicker',
+          severity: 'major',
+          message:
+            'The photosensitivity check could not run on this film, so it has not been ' +
+            'cleared for flashing content.',
+          confidence: 1,
+          repair: 'manual_review',
+        },
+      ];
+    }
+
+    const raw = await readFile(metadataPath, 'utf8').catch(() => '');
+    const luminance = parseYAvg(raw).map((value) => relativeLuminance(value, isFullRange(probe.stderr)));
+    return flashIssues(luminance, DEFAULT_FPS);
+  } finally {
+    await rm(metadataPath, { force: true }).catch(() => undefined);
+  }
+}
+
 /** Puts the picture and the mix together, falling back to the silent cut. */
 async function mux(
   context: StageContext,
@@ -467,20 +565,21 @@ async function inspect(
     masterPath: string;
     workDir: string;
     skipVision: boolean;
+    understanding: ProductUnderstanding | null;
   },
 ): Promise<QaIssue[]> {
-  const { store, registry, project, organizationId } = context;
+  const { registry, project, organizationId } = context;
   await context.progress(0.78, 'Checking the film');
 
-  const understanding = project.productUnderstandingId
-    ? await store.understandings.get(organizationId, project.productUnderstandingId)
-    : null;
+  const { understanding } = params;
 
   const issues: QaIssue[] = [
+    ...(await checkFlashRate(context, params.masterPath, params.workDir)),
     ...runDeterministicChecks({
       storyboard: params.storyboard,
       brand: params.brand,
       aspect: params.aspect,
+      cta: displayHost(project.websiteUrl),
       ...(understanding
         ? { knownEvidenceIds: new Set(understanding.evidence.map((evidence) => evidence.id)) }
         : {}),

@@ -148,3 +148,55 @@ export function superlativesIn(text: string): string[] {
     return match ? [match[0]] : [];
   });
 }
+
+/**
+ * Words that cannot end a line of on-screen copy.
+ *
+ * A held frame is read once, whole. A line ending on a preposition or a
+ * conjunction is not a sentence, it is half of one — it reads as a caption
+ * whose second half was lost, which is exactly what happened when a film ended
+ * on the words "See the difference at" and nothing ever drew the address.
+ */
+export const DANGLING_WORDS: readonly string[] = [
+  'at', 'to', 'for', 'with', 'from', 'by', 'on', 'in', 'of', 'into', 'onto',
+  'and', 'or', 'but', 'so', 'because', 'the', 'a', 'an', 'your', 'our', 'their',
+];
+
+/** True when a line ends mid-thought. */
+export function endsDangling(text: string): boolean {
+  const cleaned = text.trim().replace(/[.!?…:;,"'\u2019\u201d)\]]+$/, '');
+  const last = cleaned.split(/\s+/).pop()?.toLowerCase() ?? '';
+  return DANGLING_WORDS.includes(last);
+}
+
+/**
+ * The first complete clause of a line, for places that can only hold one.
+ *
+ * An end card carries a single line under a lockup. Handing it a product's
+ * whole one-liner and letting the layout drop what does not fit produces
+ * exactly the defect EDITORIAL_STANDARDS.plainLanguage exists to prevent — a
+ * film ending on the words "purpose-built for", clipped mid-phrase by our own
+ * line breaking rather than by anybody's decision.
+ *
+ * Cuts at a sentence end where there is one, then at a comma, then at a word,
+ * and never mid-word. Returns the whole thing when it already fits.
+ */
+export function firstClause(text: string, maxChars = 72): string {
+  const trimmed = text.trim().replace(/\s+/g, ' ');
+  if (trimmed.length <= maxChars) return trimmed;
+
+  const sentence = /^(.{20,}?[.!?])\s/.exec(trimmed);
+  if (sentence && sentence[1]!.length <= maxChars) return sentence[1]!.trim();
+
+  const window = trimmed.slice(0, maxChars + 1);
+  const comma = window.lastIndexOf(',');
+  if (comma >= 20) return window.slice(0, comma).trim();
+
+  const space = window.lastIndexOf(' ');
+  const cut = space > 0 ? window.slice(0, space) : window.slice(0, maxChars);
+  // A clause that would end mid-thought is worse than a shorter one, so the
+  // dangling word comes off too.
+  const words = cut.trim().split(' ');
+  while (words.length > 3 && endsDangling(words.join(' '))) words.pop();
+  return words.join(' ').replace(/[,;:]$/, '');
+}
