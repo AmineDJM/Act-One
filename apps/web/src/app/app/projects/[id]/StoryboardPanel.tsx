@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
-import type { Storyboard } from '@act-one/core';
+import { PRODUCT_NAME, type Storyboard } from '@act-one/core';
 import {
   confirmRevisionAction,
   declineRevisionAction,
@@ -144,7 +144,7 @@ export function StoryboardPanel({
                 </p>
                 {exchange.reply ? (
                   <p className={styles.answered}>
-                    <strong>Act One</strong>
+                    <strong>{PRODUCT_NAME}</strong>
                     {exchange.reply}
                   </p>
                 ) : null}

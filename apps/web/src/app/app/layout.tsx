@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { PRODUCT_NAME } from '@act-one/core';
 import { getSession } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { Wordmark } from '@/components/ui/Wordmark.tsx';
+import { NavTabs } from '@/components/ui/NavTabs.tsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.tsx';
 import styles from './app.module.css';
 
@@ -12,10 +14,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * Navigation is five items and never grows.
+ * Navigation is a handful of words and never grows.
  *
  * The brief is explicit that customers must not see providers, models, queues
- * or render nodes. Everything operational lives in the staff console.
+ * or render nodes. Everything operational lives in the staff console, one
+ * quiet mono link away for the people who hold the keys.
  */
 const TABS = [
   { href: '/app', label: 'Projects' },
@@ -40,38 +43,50 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
     .map((candidate) => ({ id: candidate.id, name: candidate.name }));
 
+  const credits = organization?.creditBalance ?? 0;
+
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
         <div className={`shell ${styles.topbarInner}`}>
-          <Link href="/app" className={styles.brand}>
-            <span className={styles.mark} aria-hidden="true" />
-            {PRODUCT_NAME}
-          </Link>
-          <nav className={styles.tabs} aria-label="Workspace">
-            {TABS.map((tab) => (
-              <Link key={tab.href} href={tab.href}>
-                {tab.label}
-              </Link>
-            ))}
-          </nav>
+          <Wordmark href="/app" />
+          <NavTabs tabs={TABS} className={styles.tabs} />
           <div className={styles.spacer} />
           <WorkspaceSwitcher current={session.organizationId} workspaces={workspaces} />
-          {organization ? (
-            <span className={styles.credits} title="Creative credits">
-              {organization.creditBalance.toLocaleString('en-US')} credits
-            </span>
-          ) : null}
+          <span className={styles.credits} data-empty={credits === 0} title="Creative credits">
+            {credits.toLocaleString('en-US')} credits
+          </span>
           {session.user.isSuperAdmin ? (
-            <Link href="/admin" className="btn btn--ghost" style={{ height: 34, fontSize: '0.85rem' }}>
+            <Link href="/admin" className={styles.console}>
               Console
             </Link>
           ) : null}
+          <Link href="/app/settings" className={styles.account} title={session.user.email} aria-label="Account">
+            {initials(session.user.name || session.user.email)}
+          </Link>
         </div>
+        <NavTabs tabs={TABS} className={styles.tabsPhone} />
       </header>
       <main id="main" className={`shell ${styles.main}`}>
         {children}
       </main>
+      <footer className={styles.foot}>
+        <div className={`shell ${styles.footInner}`}>
+          <span>
+            <span style={{ color: 'var(--accent)' }}>&gt;</span> Great products don&rsquo;t just exist. They have an{' '}
+            {PRODUCT_NAME}.
+          </span>
+          <span className={styles.systems} data-ok={organization !== null}>
+            {organization !== null ? 'All systems operational' : 'Reconnecting'}
+          </span>
+        </div>
+      </footer>
     </div>
   );
+}
+
+function initials(name: string): string {
+  const parts = name.replace(/@.*$/, '').split(/[\s._-]+/).filter(Boolean);
+  const letters = parts.length >= 2 ? `${parts[0]![0]}${parts[1]![0]}` : (parts[0] ?? '?').slice(0, 2);
+  return letters.toUpperCase();
 }

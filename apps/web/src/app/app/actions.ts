@@ -40,10 +40,14 @@ export async function createProjectAction(
     const website = normalizeUrl(String(formData.get('website') ?? ''));
     if (!website) return { error: 'That does not look like a website address.' };
 
-    const supplemental = String(formData.get('supplemental') ?? '')
-      .split(/[\s,]+/)
+    // The sources the customer pointed us at: one field per source on the
+    // command bar, and the older free-text field, both honoured.
+    const supplemental = [
+      ...formData.getAll('source').map(String),
+      ...String(formData.get('supplemental') ?? '').split(/[\s,]+/),
+    ]
       .map((value) => normalizeUrl(value))
-      .filter((value): value is string => value !== null);
+      .filter((value): value is string => value !== null && value !== website);
 
     const project = await createProject(session, {
       websiteUrl: website,

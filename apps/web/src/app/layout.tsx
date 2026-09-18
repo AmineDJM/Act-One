@@ -1,30 +1,16 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import { site, absoluteUrl } from '@/lib/site.ts';
 import './globals.css';
 
-/**
- * Fonts are self-hosted by next/font at build time.
- *
- * No request to Google at runtime: it costs a DNS lookup plus a round trip on
- * the critical path, it leaks visitor IPs to a third party, and `display: swap`
- * with a matched fallback is what keeps CLS at zero.
+/*
+ * Fonts ship with the app — Geist for the interface, Geist Mono for the
+ * terminal details — and are served from our own origin by next/font. No
+ * request to a font service at runtime: it costs a round trip on the critical
+ * path, it leaks visitor IPs to a third party, and a build that reaches out
+ * for its fonts is a build that fails without a network.
  */
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-  // Metric-matched fallback: the reflow when the real face arrives is what
-  // produces layout shift, and adjusting the fallback removes it.
-  adjustFontFallback: true,
-});
-
-const mono = JetBrains_Mono({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-jetbrains',
-  weight: ['400', '500'],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -68,7 +54,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#07070b',
+  themeColor: '#050609',
   colorScheme: 'dark',
   width: 'device-width',
   initialScale: 1,
@@ -76,7 +62,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
         {/* Organisation and product structured data, once, at the root. */}
         <script

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { JobKind } from './job.ts';
 import { urlString, nonEmpty } from '../zod-helpers.ts';
 import { CreativeMode, Channel, VoiceStrategy } from './creative.ts';
 import { AspectRatio } from './render.ts';
@@ -152,6 +153,52 @@ export const ACTIONABLE_CTAS: readonly PrimaryCta[] = [
   'create_variants',
   'retry',
 ];
+
+/**
+ * A project's state in the words a card wears: terminal in form, human in
+ * meaning. "failed" is a log line; "NEEDS ATTENTION" tells the customer what
+ * to do about it. The tone decides the colour, never the text.
+ */
+export type StatusTone = 'quiet' | 'active' | 'ready' | 'attention';
+
+export const STAGE_STATUS: Record<ProjectStage, { label: string; tone: StatusTone }> = {
+  created: { label: 'NOT STARTED', tone: 'quiet' },
+  researching: { label: 'ANALYZING PRODUCT', tone: 'active' },
+  understanding_ready: { label: 'PRODUCT UNDERSTOOD', tone: 'active' },
+  concepting: { label: 'WRITING CONCEPTS', tone: 'active' },
+  concepts_ready: { label: 'CHOOSE A CONCEPT', tone: 'ready' },
+  storyboarding: { label: 'BUILDING STORYBOARD', tone: 'active' },
+  storyboard_ready: { label: 'STORYBOARD READY', tone: 'ready' },
+  capturing_product: { label: 'CAPTURING PRODUCT', tone: 'active' },
+  generating_assets: { label: 'GENERATING SHOTS', tone: 'active' },
+  rendering: { label: 'RENDERING', tone: 'active' },
+  qa: { label: 'QUALITY CHECK', tone: 'active' },
+  film_ready: { label: 'FILM READY', tone: 'ready' },
+  failed: { label: 'NEEDS ATTENTION', tone: 'attention' },
+};
+
+/** What stopped, when we know which step did: the card says that instead of the generic line. */
+export function failureStatus(lastFailedJob: JobKind | null | undefined): string {
+  switch (lastFailedJob) {
+    case 'research_product':
+    case 'extract_brand':
+      return 'ANALYSIS FAILED';
+    case 'generate_concepts':
+      return 'CONCEPTS FAILED';
+    case 'build_storyboard':
+    case 'repair_scene':
+      return 'STORYBOARD FAILED';
+    case 'capture_product_moments':
+      return 'CAPTURE FAILED';
+    case 'render_film':
+    case 'render_variant':
+    case 'generate_campaign':
+    case 'render_animatic':
+      return 'RENDER FAILED';
+    default:
+      return STAGE_STATUS.failed.label;
+  }
+}
 
 export const CTA_LABELS: Record<PrimaryCta, string> = {
   understand_product: 'Understand my product',

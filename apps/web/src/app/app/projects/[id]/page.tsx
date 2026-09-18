@@ -7,6 +7,9 @@ import {
   storyboardDuration,
   toAppError,
   type PrimaryCta,
+  PRODUCT_NAME,
+  STAGE_STATUS,
+  failureStatus,
 } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { loadProjectView, renderPermission, revisionAllowance } from '@/server/projects.ts';
@@ -19,6 +22,7 @@ import { CopyKitPanel } from './CopyKit.tsx';
 import { ProductAccess } from './ProductAccess.tsx';
 import { Notes } from './Notes.tsx';
 import { BriefPanel } from './BriefPanel.tsx';
+import { Prompt, Status } from '@/components/ui/Prompt.tsx';
 import { AudioEditionPanel } from './AudioEditionPanel.tsx';
 import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
@@ -59,6 +63,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     failure,
     plan,
     entitlements,
+    jobs,
   } = view;
 
   /*
@@ -77,13 +82,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <div className={styles.head}>
-        <div>
+        <div className={styles.headCopy}>
+          <Prompt tone="accent" chevron={false}>
+            {PRODUCT_NAME} / Project
+          </Prompt>
           <h1>{project.name}</h1>
-          <p className={styles.projectHost} style={{ marginTop: 'var(--space-2)' }}>
-            {safeHost(project.websiteUrl)}
-          </p>
+          <p className={styles.projectHost}>{safeHost(project.websiteUrl)}</p>
         </div>
-        <span className="badge">{project.stage.replace(/_/g, ' ')}</span>
+        <Status tone={STAGE_STATUS[project.stage].tone} live={Boolean(activeJob) || STAGE_STATUS[project.stage].tone === 'active'}>
+          {project.stage === 'failed'
+            ? failureStatus(jobs.find((job) => job.state === 'failed')?.kind ?? null)
+            : activeJob
+              ? STAGE_STATUS[project.stage].label
+              : STAGE_STATUS[project.stage].label}
+        </Status>
       </div>
 
       {/*

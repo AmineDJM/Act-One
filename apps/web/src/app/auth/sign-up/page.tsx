@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PRODUCT_NAME, normalizeUrl } from '@act-one/core';
+import { normalizeUrl } from '@act-one/core';
 import { getSession } from '@/server/auth.ts';
 import { SignUpForm } from './SignUpForm.tsx';
+import { Wordmark } from '@/components/ui/Wordmark.tsx';
 import styles from '../auth.module.css';
 
 export const metadata: Metadata = {
@@ -30,10 +31,7 @@ export default async function SignUpPage({
   return (
     <div className={styles.wrap}>
       <div className={styles.panel}>
-        <Link href="/" className={styles.brand}>
-          <span className={styles.mark} aria-hidden="true" />
-          {PRODUCT_NAME}
-        </Link>
+        <Wordmark />
         <SignUpForm website={website} next={next} />
         <p className={styles.foot}>
           Already have an account?{' '}

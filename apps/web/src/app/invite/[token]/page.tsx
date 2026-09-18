@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PRODUCT_NAME, inviteRefusal } from '@act-one/core';
+import { inviteRefusal } from '@act-one/core';
 import { getCurrentUser, hashToken } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { AcceptInvite } from './AcceptInvite.tsx';
+import { Wordmark } from '@/components/ui/Wordmark.tsx';
 import styles from '../../auth/auth.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -35,10 +36,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <div className={styles.wrap}>
       <div className={styles.panel}>
-        <Link href="/" className={styles.brand}>
-          <span className={styles.mark} aria-hidden="true" />
-          {PRODUCT_NAME}
-        </Link>
+        <Wordmark />
 
         <div className={styles.card}>
           {refusal ? (

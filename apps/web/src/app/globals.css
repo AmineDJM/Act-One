@@ -1,9 +1,12 @@
 /*
- * Act One — application design system.
+ * Act One — the interface.
  *
- * Deliberately small. The product's job is to look like it was made by people
- * with taste, and the fastest way to fail that is a dozen competing surfaces
- * and six shades of grey. One scale, one radius family, one motion curve.
+ * Near-black, quiet, precise. One accent, one motion curve, one grid of
+ * dots for a signature. Modern type for what is said; monospace for what
+ * the system is doing — statuses, counters, addresses, metadata — never for
+ * the headline. The terminal is an influence, not a costume: a prompt in
+ * front of a label, a two-digit index, a status in capitals, and otherwise
+ * the restraint of a studio that has nothing to prove.
  */
 
 @layer reset, tokens, base, components, utilities;
@@ -48,30 +51,36 @@
 
 @layer tokens {
   :root {
-    --canvas: #07070b;
-    --surface: #0d0d13;
-    --surface-raised: #14141c;
-    --surface-hover: #1a1a24;
-    --line: #23232e;
-    --line-strong: #32323f;
+    /* Surfaces: almost black, and only one step lighter where a surface must read as one. */
+    --canvas: #050609;
+    --surface: #08090e;
+    --surface-raised: #0c0e14;
+    --surface-hover: #10121a;
+    --line: #171a23;
+    --line-strong: #232735;
+    --line-soft: rgb(255 255 255 / 0.05);
 
-    --text: #f4f5f8;
-    --text-secondary: #a8abb8;
-    --text-muted: #70737f;
+    --text: #eef0f5;
+    --text-secondary: #9ba1b3;
+    --text-muted: #5f6577;
+    --text-faint: #3c4152;
 
-    --accent: #5b7cfa;
-    --accent-hover: #6f8cfb;
-    --accent-quiet: #1a2040;
-    --accent-text: #9fb3ff;
+    /* The one strong colour. */
+    --accent: #5b6cff;
+    --accent-hover: #6f7eff;
+    --accent-quiet: #0f1330;
+    --accent-text: #93a0ff;
+    --accent-glow: rgb(91 108 255 / 0.28);
+    --accent-line: rgb(91 108 255 / 0.45);
 
-    --positive: #3fbf7f;
-    --warning: #e0a33c;
-    --danger: #e35d5d;
+    --positive: #2fd48a;
+    --warning: #e5b04a;
+    --danger: #ff5f5f;
 
-    --radius-sm: 6px;
-    --radius: 10px;
-    --radius-lg: 16px;
-    --radius-xl: 24px;
+    --radius-sm: 4px;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
 
     --space-1: 4px;
     --space-2: 8px;
@@ -84,18 +93,20 @@
     --space-9: 96px;
     --space-10: 128px;
 
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    --font-sans: var(--font-geist-sans), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: var(--font-geist-mono), 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    /* One motion curve for the whole product. */
+    /* One motion curve, and the two speeds a quiet interface needs. */
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --duration: 220ms;
+    --duration: 160ms;
+    --duration-slow: 320ms;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
-    --shadow-lg: 0 32px 80px rgb(0 0 0 / 0.55);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+    --shadow: 0 12px 32px rgb(0 0 0 / 0.55);
+    --shadow-lg: 0 32px 80px rgb(0 0 0 / 0.65);
+    --focus: 0 0 0 3px var(--accent-glow);
 
-    --max-width: 1180px;
+    --max-width: 1240px;
     color-scheme: dark;
   }
 }
@@ -105,10 +116,10 @@
     background: var(--canvas);
     color: var(--text);
     font-family: var(--font-sans);
-    font-size: 16px;
+    font-size: 15.5px;
     line-height: 1.55;
-    letter-spacing: -0.011em;
-    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    letter-spacing: -0.006em;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1, 'ss01' 1;
     -webkit-font-smoothing: antialiased;
     min-height: 100dvh;
   }
@@ -118,34 +129,40 @@
   h3,
   h4 {
     letter-spacing: -0.03em;
-    line-height: 1.08;
+    line-height: 1.06;
     font-weight: 600;
     text-wrap: balance;
   }
   h1 {
-    font-size: clamp(2.6rem, 6.2vw, 4.6rem);
-    letter-spacing: -0.04em;
+    font-size: clamp(2.4rem, 5.6vw, 4.2rem);
+    letter-spacing: -0.045em;
+    font-weight: 600;
   }
   h2 {
-    font-size: clamp(1.75rem, 3.4vw, 2.6rem);
+    font-size: clamp(1.6rem, 3vw, 2.3rem);
   }
   h3 {
-    font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
     letter-spacing: -0.02em;
   }
   p {
     text-wrap: pretty;
   }
-
   a {
     color: inherit;
     text-decoration: none;
   }
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+  }
 
   /* Visible focus is an accessibility requirement, not a style choice. */
   :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus);
     border-radius: var(--radius-sm);
   }
 
@@ -175,45 +192,165 @@
     margin-inline: auto;
     padding-inline: var(--space-5);
   }
+  @media (max-width: 720px) {
+    .shell { padding-inline: var(--space-4); }
+  }
 
-  .eyebrow {
+  /* --- terminal details ---------------------------------------------------- */
+
+  .eyebrow,
+  .prompt {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--text-muted);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.6em;
+    font-weight: 500;
+  }
+  .prompt[data-tone='accent'] { color: var(--accent-text); }
+  .prompt[data-tone='text'] { color: var(--text); }
+  .prompt__chevron { color: var(--accent); font-weight: 500; }
+
+  .index {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
   }
 
-  .lede {
-    font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55em;
+    height: 26px;
+    padding-inline: 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     color: var(--text-secondary);
-    max-width: 62ch;
-    letter-spacing: -0.014em;
+    white-space: nowrap;
+    font-weight: 500;
   }
+  .status[data-tone='active'] { color: var(--accent-text); border-color: var(--accent-line); }
+  .status[data-tone='ready'] { color: var(--positive); border-color: color-mix(in oklab, var(--positive) 45%, var(--line)); }
+  .status[data-tone='attention'] { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 45%, var(--line)); }
+  .status__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.8s var(--ease) infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+    line-height: 1.4;
+  }
+
+  /* --- the mark ------------------------------------------------------------ */
+
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    flex: none;
+  }
+  .wordmark__mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    border: 1px solid var(--line-strong);
+    background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--accent-text);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+    transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+  }
+  .wordmark:hover .wordmark__mark { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .wordmark__name { font-size: 1.02rem; }
+  .wordmark__tag {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--warning);
+    border: 1px solid color-mix(in oklab, var(--warning) 40%, var(--line));
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    margin-left: var(--space-1);
+  }
+
+  /* --- copy ---------------------------------------------------------------- */
+
+  .lede {
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
+    color: var(--text-secondary);
+    max-width: 60ch;
+    letter-spacing: -0.012em;
+  }
+  .hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .hint a { color: var(--accent-text); }
+  .error {
+    font-size: 0.85rem;
+    color: var(--danger);
+  }
+
+  /* --- controls ------------------------------------------------------------ */
 
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    height: 44px;
-    padding-inline: var(--space-5);
+    height: 40px;
+    padding-inline: var(--space-4);
     border-radius: var(--radius);
     border: 1px solid transparent;
     background: var(--accent);
     color: #fff;
     font-weight: 500;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     letter-spacing: -0.01em;
     cursor: pointer;
     transition:
       background var(--duration) var(--ease),
-      transform var(--duration) var(--ease),
-      border-color var(--duration) var(--ease);
+      border-color var(--duration) var(--ease),
+      box-shadow var(--duration) var(--ease),
+      color var(--duration) var(--ease),
+      transform var(--duration) var(--ease);
     white-space: nowrap;
   }
   .btn:hover:not(:disabled) {
     background: var(--accent-hover);
+    box-shadow: 0 0 0 3px var(--accent-glow);
   }
   .btn:active:not(:disabled) {
     transform: translateY(1px);
@@ -223,34 +360,43 @@
     cursor: not-allowed;
   }
   .btn--secondary {
-    background: var(--surface-raised);
-    border-color: var(--line);
+    background: transparent;
+    border-color: var(--line-strong);
     color: var(--text);
   }
   .btn--secondary:hover:not(:disabled) {
     background: var(--surface-hover);
     border-color: var(--line-strong);
+    box-shadow: none;
   }
   .btn--ghost {
     background: transparent;
     color: var(--text-secondary);
   }
   .btn--ghost:hover:not(:disabled) {
-    background: var(--surface);
+    background: var(--surface-hover);
     color: var(--text);
+    box-shadow: none;
   }
   .btn--lg {
-    height: 52px;
+    height: 48px;
     padding-inline: var(--space-6);
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   .btn--danger {
     background: transparent;
-    border-color: var(--line);
+    border-color: var(--line-strong);
     color: var(--danger);
   }
   .btn--danger:hover:not(:disabled) {
     background: color-mix(in oklab, var(--danger) 12%, transparent);
+    box-shadow: none;
+  }
+  .btn__key {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    opacity: 0.75;
+    margin-left: 2px;
   }
 
   .card {
@@ -266,37 +412,49 @@
     gap: var(--space-2);
   }
   .field label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
     font-weight: 500;
   }
-  .field .hint {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-  }
   .input {
-    height: 44px;
-    padding-inline: var(--space-4);
+    height: 40px;
+    padding-inline: var(--space-3);
     background: var(--surface-raised);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-strong);
     border-radius: var(--radius);
     color: var(--text);
     width: 100%;
-    transition: border-color var(--duration) var(--ease);
+    font-size: 0.9rem;
+    transition:
+      border-color var(--duration) var(--ease),
+      box-shadow var(--duration) var(--ease);
   }
   .input::placeholder {
     color: var(--text-muted);
   }
   .input:focus {
     border-color: var(--accent);
+    box-shadow: var(--focus);
     outline: none;
+  }
+  select.input {
+    appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%239ba1b3' stroke-width='1.4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
   }
   textarea.input {
     height: auto;
     min-height: 96px;
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-3);
     resize: vertical;
     line-height: 1.5;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--accent);
   }
 
   .badge {
@@ -304,26 +462,28 @@
     align-items: center;
     gap: var(--space-2);
     height: 24px;
-    padding-inline: var(--space-3);
-    border-radius: 99px;
-    background: var(--surface-raised);
-    border: 1px solid var(--line);
-    font-size: 0.75rem;
+    padding-inline: 9px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    font-size: 0.68rem;
     color: var(--text-secondary);
     font-family: var(--font-mono);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
   .badge--ok {
     color: var(--positive);
-    border-color: color-mix(in oklab, var(--positive) 30%, var(--line));
+    border-color: color-mix(in oklab, var(--positive) 40%, var(--line));
   }
   .badge--warn {
     color: var(--warning);
-    border-color: color-mix(in oklab, var(--warning) 30%, var(--line));
+    border-color: color-mix(in oklab, var(--warning) 40%, var(--line));
   }
   .badge--bad {
     color: var(--danger);
-    border-color: color-mix(in oklab, var(--danger) 30%, var(--line));
+    border-color: color-mix(in oklab, var(--danger) 40%, var(--line));
   }
 
   .divider {
@@ -340,6 +500,31 @@
     display: flex;
     align-items: center;
   }
+
+  /* --- the dot matrix, as a surface --------------------------------------- */
+
+  .dots {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.9), transparent 90%);
+  }
+  .dots svg { width: 100%; height: 100%; }
+
+  /* --- skeletons ------------------------------------------------------------ */
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-raised) 0%, var(--surface-hover) 50%, var(--surface-raised) 100%);
+    background-size: 200% 100%;
+    border-radius: var(--radius-sm);
+    animation: shimmer 1.6s linear infinite;
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
 }
 
 @layer utilities {
@@ -347,6 +532,7 @@
   .secondary { color: var(--text-secondary); }
   .mono { font-family: var(--font-mono); }
   .center { text-align: center; }
+  .tabular { font-variant-numeric: tabular-nums; }
   .sr-only {
     position: absolute;
     width: 1px;

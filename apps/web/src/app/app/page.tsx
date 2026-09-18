@@ -1,13 +1,22 @@
-import Link from 'next/link';
-import { CTA_LABELS, primaryCtaFor } from '@act-one/core';
+import { PRODUCT_NAME, STAGE_STATUS, failureStatus, primaryCtaFor, type Project } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { entitlementsFor } from '@/server/platform.ts';
+import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
+import { Prompt } from '@/components/ui/Prompt.tsx';
 import { NewProjectForm } from './NewProjectForm.tsx';
+import { ProjectList, type ProjectCard } from './ProjectList.tsx';
 import styles from './app.module.css';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * One project, one launch.
+ *
+ * The page is the command bar and the list. The bar takes an address and
+ * nothing else it does not have to; the list shows each launch as a
+ * production with a status in capitals and the one thing to do next.
+ */
 export default async function ProjectsPage() {
   const session = await requireSessionForPage('/app');
   const store = getStore();
@@ -20,58 +29,98 @@ export default async function ProjectsPage() {
     ? (await entitlementsFor(organization)).plan.limits.maxMasterDurationSeconds
     : 60;
 
+  // The step that stopped, for the cards that need attention: one query, not one per card.
+  const failedKinds = new Map<string, string>();
+  for (const project of projects.filter((candidate) => candidate.stage === 'failed')) {
+    const jobs = await store.jobs.listForProject(session.organizationId, project.id);
+    const failed = jobs.find((job) => job.state === 'failed');
+    failedKinds.set(project.id, failureStatus(failed?.kind ?? null));
+  }
+  const now = Date.now();
+  const cards: ProjectCard[] = projects.map((project) => cardFor(project, failedKinds.get(project.id) ?? null, now));
+
   return (
     <>
-      <div className={styles.head}>
-        <div>
-          <h1>Projects</h1>
-          <p className="secondary" style={{ marginTop: 'var(--space-2)' }}>
-            One project is one launch. Every cut for that launch lives inside it.
-          </p>
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <Prompt tone="accent" chevron={false}>
+            / Projects
+          </Prompt>
+          <h1 className={styles.heroTitle}>
+            One project.
+            <span>One launch.</span>
+          </h1>
+          <p className={styles.heroLede}>Turn your product into a world-class launch campaign.</p>
+          <NewProjectForm maxDurationSeconds={maxDurationSeconds} autoFocus={projects.length === 0} />
         </div>
-      </div>
+        <aside className={styles.heroAside} aria-label={`About ${PRODUCT_NAME}`}>
+          <div className="dots">
+            <DotMatrix seed="act-one-hero" shape="orbit" width={420} height={300} cell={12} opacity={0.5} />
+          </div>
+          <div className={styles.heroAsideHead}>
+            <span>
+              <span style={{ color: 'var(--accent)' }}>&gt;</span> {PRODUCT_NAME.toUpperCase()}
+            </span>
+            <span>v0.1</span>
+          </div>
+          <blockquote>&ldquo;Ideas become extraordinary when they find their {PRODUCT_NAME}.&rdquo;</blockquote>
+          <div className={styles.heroAsideFoot}>
+            <span>BUILD. LAUNCH. GROW.</span>
+            <ul className={styles.heroAsideList}>
+              <li>IDEAS</li>
+              <li>STORY</li>
+              <li>VISUALS</li>
+              <li>IMPACT</li>
+            </ul>
+          </div>
+        </aside>
+      </section>
 
       {projects.length === 0 ? (
         <div className={styles.empty}>
-          <h2 style={{ fontSize: '1.3rem' }}>Start with a URL.</h2>
-          <p className="secondary" style={{ maxWidth: '48ch' }}>
-            Paste your product website. We will read it, learn your brand, and come back with three
-            creative directions.
-          </p>
-          <div style={{ width: '100%', maxWidth: 520, marginTop: 'var(--space-3)' }}>
-            <NewProjectForm maxDurationSeconds={maxDurationSeconds} />
+          <div className="dots">
+            <DotMatrix seed="no-projects" shape="wave" width={900} height={320} cell={16} opacity={0.35} />
           </div>
+          <Prompt tone="text">No projects yet</Prompt>
+          <h2>Every launch starts somewhere.</h2>
+          <p className="secondary" style={{ maxWidth: '44ch' }}>
+            Paste your product&rsquo;s address above. We read it, learn your brand, and come back with
+            three creative directions.
+          </p>
+          <a href="#new" className="btn">
+            Start first project
+          </a>
         </div>
       ) : (
-        <>
-          <div style={{ maxWidth: 620, marginBottom: 'var(--space-7)' }}>
-            <NewProjectForm maxDurationSeconds={maxDurationSeconds} />
-          </div>
-          <div className={styles.projects}>
-            {projects.map((project) => {
-              const cta = primaryCtaFor(project.stage);
-              return (
-                <Link key={project.id} href={`/app/projects/${project.id}`} className={styles.project}>
-                  <div>
-                    <div className={styles.projectName}>{project.name}</div>
-                    <div className={styles.projectHost}>
-                      {safeHost(project.websiteUrl)}
-                    </div>
-                  </div>
-                  <div className={styles.projectFoot}>
-                    <span className="badge">{project.stage.replace(/_/g, ' ')}</span>
-                    <span className="muted" style={{ fontSize: '0.82rem' }}>
-                      {CTA_LABELS[cta]}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </>
+        <ProjectList projects={cards} />
       )}
     </>
   );
+}
+
+function cardFor(project: Project, failed: string | null, now: number): ProjectCard {
+  const status = STAGE_STATUS[project.stage];
+  const cta = primaryCtaFor(project.stage);
+  return {
+    id: project.id,
+    name: project.name,
+    host: safeHost(project.websiteUrl),
+    status: { label: failed ?? status.label, tone: status.tone },
+    live: status.tone === 'active',
+    updatedLabel: relative(project.updatedAt, now),
+    updatedAt: project.updatedAt,
+    action:
+      project.stage === 'failed'
+        ? 'Try again ↵'
+        : cta === 'choose_concept'
+          ? 'Choose a concept →'
+          : cta === 'render_film'
+            ? 'Render the film →'
+            : cta === 'create_variants'
+              ? 'Open the film →'
+              : 'Open project →',
+    cover: <DotMatrix seed={project.id} shape={project.stage === 'film_ready' ? 'orbit' : 'wave'} width={120} height={120} cell={10} opacity={0.7} />,
+  };
 }
 
 function safeHost(url: string): string {
@@ -80,4 +129,17 @@ function safeHost(url: string): string {
   } catch {
     return url;
   }
+}
+
+/** "just now", "2m ago", "3h ago", "4d ago", then the date: computed once, on the server. */
+function relative(iso: string, now: number): string {
+  const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (seconds < 45) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 14) return `${days}d ago`;
+  return iso.slice(0, 10);
 }

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PRODUCT_NAME } from '@act-one/core';
 import { getCurrentUser } from '@/server/auth.ts';
+import { Wordmark } from '@/components/ui/Wordmark.tsx';
 import styles from './admin.module.css';
 
 /**
@@ -40,10 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
-        <Link href="/admin" className={styles.brand}>
-          {PRODUCT_NAME}
-          <span className={styles.staffTag}>staff</span>
-        </Link>
+        <Wordmark href="/admin" tag="staff" />
         <nav className={styles.navList} aria-label="Console">
           {NAV.map((item) => (
             <Link key={item.href} href={item.href}>
