@@ -147,12 +147,20 @@ export async function confirmBrandAction(
   }
 }
 
+/**
+ * A revision is a conversation. The customer writes a sentence; we answer
+ * with what we understood and exactly what we would do; nothing is touched
+ * until they confirm. This is the first half: the proposal.
+ */
 export async function reviseStoryboardAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
   try {
     const session = await requireSession();
+    if (!can(session.actor, 'storyboard:edit')) {
+      throw new AppError('forbidden', 'Your role cannot change the storyboard.');
+    }
     const projectId = String(formData.get('projectId') ?? '');
     const instruction = String(formData.get('instruction') ?? '').trim();
     if (!instruction) return { error: 'Tell us what to change.' };
@@ -160,22 +168,58 @@ export async function reviseStoryboardAction(
     const project = await getProjectOr404(session, projectId);
     if (!project.activeStoryboardId) return { error: 'There is no storyboard to revise yet.' };
 
-    // Plans include a number of revisions per project. The decision is the
-    // same pure function the page uses to show what is left.
-    const { revisionAllowance } = await import('@/server/projects.ts');
-    const allowance = await revisionAllowance(session, project);
-    if (!allowance.allowed) return { error: allowance.reason };
-
-    await enqueue(project, 'repair_scene', {
-      storyboardId: project.activeStoryboardId,
-      instruction,
-      authorUserId: session.user.id,
-    }, 6);
-
+    const { proposeRevision } = await import('@/server/revisions.ts');
+    const proposal = await proposeRevision(session, project, instruction);
     revalidatePath(`/app/projects/${projectId}`);
-    return { error: null, message: 'Applying that now.' };
+    return { error: null, message: proposal.reply };
   } catch (error) {
     return { error: reportError('reviseStoryboardAction', error).publicMessage };
+  }
+}
+
+/** The second half: the customer said go. */
+export async function confirmRevisionAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    if (!can(session.actor, 'storyboard:edit')) {
+      throw new AppError('forbidden', 'Your role cannot change the storyboard.');
+    }
+    const projectId = String(formData.get('projectId') ?? '');
+    const requestId = String(formData.get('requestId') ?? '');
+    const project = await getProjectOr404(session, projectId);
+
+    const { confirmRevision } = await import('@/server/revisions.ts');
+    const outcome = await confirmRevision(session, project, requestId);
+    revalidatePath(`/app/projects/${projectId}`);
+    return { error: null, message: outcome.message };
+  } catch (error) {
+    return { error: reportError('confirmRevisionAction', error).publicMessage };
+  }
+}
+
+/** Not that. The proposal is set aside and the customer writes again. */
+export async function declineRevisionAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    if (!can(session.actor, 'storyboard:edit')) {
+      throw new AppError('forbidden', 'Your role cannot change the storyboard.');
+    }
+    const projectId = String(formData.get('projectId') ?? '');
+    const requestId = String(formData.get('requestId') ?? '');
+    const project = await getProjectOr404(session, projectId);
+
+    const { declineRevision } = await import('@/server/revisions.ts');
+    await declineRevision(session, project, requestId);
+    revalidatePath(`/app/projects/${projectId}`);
+    return { error: null, message: 'Set aside. Tell us again, differently.' };
+  } catch (error) {
+    return { error: reportError('declineRevisionAction', error).publicMessage };
   }
 }
 
@@ -490,6 +534,14 @@ function briefFromForm(formData: FormData): Partial<ProjectBrief> {
   if (Tone.options.includes(tone as Tone)) brief.tone = tone as Tone;
   const language = String(formData.get('language') ?? '').trim().toLowerCase();
   if (FILM_LANGUAGES.some((candidate) => candidate.code === language)) brief.language = language;
+  const voice = String(formData.get('voice') ?? '');
+  if (voice === 'none') {
+    brief.voiceStrategy = 'none';
+    brief.voiceGender = null;
+  } else if (voice === 'female' || voice === 'male') {
+    brief.voiceStrategy = null;
+    brief.voiceGender = voice;
+  }
   return brief;
 }
 
@@ -509,6 +561,8 @@ export async function updateBriefAction(_previous: FormState, formData: FormData
       durationSeconds: null,
       tone: null,
       language: null,
+      voiceStrategy: null,
+      voiceGender: null,
       ...briefFromForm(formData),
     });
     revalidatePath(`/app/projects/${projectId}`);

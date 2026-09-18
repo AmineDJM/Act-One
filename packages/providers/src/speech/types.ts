@@ -10,7 +10,43 @@ export type SpeechRequest = {
   /** 0.7 slow and considered, 1.15 urgent. */
   rate?: number;
   format?: 'mp3' | 'wav' | 'opus';
+  /** ISO 639-1. The voice is chosen for it and told to speak it natively. */
+  language?: string | null;
+  /** Who narrates, when the customer said. */
+  gender?: 'female' | 'male' | null;
+  /** The register the customer asked for, in words the voice can be directed with. */
+  tone?: string | null;
 };
+
+/** Who reads when the customer did not say: the register decides. */
+export function defaultGender(persona: VoicePersona): 'female' | 'male' {
+  return persona === 'narrator_low' ? 'male' : 'female';
+}
+
+/** The voice's register, in a sentence a voice model can be directed with. */
+export function voiceDirection(
+  request: Pick<SpeechRequest, 'persona' | 'language' | 'tone'>,
+): string {
+  const register =
+    request.persona === 'narrator_warm'
+      ? 'Warm, close and human, as if speaking to one person.'
+      : request.persona === 'narrator_low'
+        ? 'Low, measured and unhurried, with weight on the nouns.'
+        : 'Clear, assured and even, without theatrical emphasis.';
+  const language = request.language
+    ? `Speak as a native speaker of the language of the text (${request.language}), with the natural accent of that language and never a foreign one.`
+    : 'Speak as a native speaker of the language the text is written in, with its natural accent.';
+  const tone = request.tone ? `The customer asked for this tone: ${request.tone}.` : '';
+  return [
+    'You are the voice-over of a premium product film for a studio.',
+    language,
+    register,
+    tone,
+    'Clean diction, natural pauses at punctuation, no smile in the voice unless the words call for it, no filler.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 export type SpeechResult = {
   audio: Uint8Array;

@@ -23,6 +23,7 @@ import {
   type RenderKind,
   type RenderQuality,
   type Storyboard,
+  TONE_LABELS,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
@@ -801,6 +802,7 @@ async function speakNarration(
 
   for (const scene of spoken) {
     try {
+      const brief = context.project.brief;
       const result = await speech.synthesize(
         {
           text: scene.narration.trim(),
@@ -809,6 +811,11 @@ async function speakNarration(
           // line written for 2.4 seconds must not run 3.
           rate: speakingRateFor(scene.narration, scene.duration),
           format: 'wav',
+          // The voice follows the language the film was written in and the
+          // customer's word on who reads it and how.
+          language: storyboard.language ?? brief.language ?? null,
+          gender: brief.voiceGender ?? null,
+          tone: brief.tone ? TONE_LABELS[brief.tone] : null,
         },
         { organizationId: context.organizationId, projectId: context.project.id },
       );

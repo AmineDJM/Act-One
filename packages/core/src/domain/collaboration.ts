@@ -55,6 +55,30 @@ export const RevisionIntent = z.enum([
 ]);
 export type RevisionIntent = z.infer<typeof RevisionIntent>;
 
+/**
+ * What we understood and what we would do, written back to the customer
+ * before anything is touched. Nothing is applied until they say so.
+ */
+export const RevisionProposal = z.object({
+  intent: RevisionIntent,
+  affectedSceneIds: z.array(z.string()).default([]),
+  requestedSubject: z.string().default(''),
+  direction: z.enum(['faster', 'slower', 'more', 'less', 'none']).default('none'),
+  needsRecapture: z.boolean().default(false),
+  summary: z.string().default(''),
+  /** True when a film already exists, so confirming re-renders it. */
+  rerender: z.boolean().default(false),
+});
+export type RevisionProposal = z.infer<typeof RevisionProposal>;
+
+/**
+ * Proposed: written back, waiting for the customer. Confirmed: they said go,
+ * the work is queued. Applied: the storyboard changed. Declined: they said
+ * not that, and wrote something else.
+ */
+export const RevisionStatus = z.enum(['proposed', 'confirmed', 'applied', 'declined']);
+export type RevisionStatus = z.infer<typeof RevisionStatus>;
+
 export const RevisionRequest = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -66,6 +90,11 @@ export const RevisionRequest = z.object({
   affectedSceneIds: z.array(z.string()).default([]),
   applied: z.boolean().default(false),
   appliedAt: z.string().nullable().default(null),
+  status: RevisionStatus.default('applied'),
+  proposal: RevisionProposal.nullable().default(null),
+  /** Our reply, in words: what we understood and what it will cost them. */
+  reply: z.string().default(''),
+  decidedAt: z.string().nullable().default(null),
   createdAt: z.string(),
 });
 export type RevisionRequest = z.infer<typeof RevisionRequest>;

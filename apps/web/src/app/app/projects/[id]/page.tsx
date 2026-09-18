@@ -44,6 +44,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     storyboard,
     activeJob,
     run,
+    exchanges,
     latestRender,
     animatic,
     animaticJob,
@@ -143,6 +144,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             durationSeconds: project.brief.durationSeconds ?? null,
             language: project.brief.language ?? null,
             tone: project.brief.tone ?? null,
+            voice:
+              project.brief.voiceStrategy === 'none'
+                ? 'none'
+                : (project.brief.voiceGender ?? null),
           }}
           maxDurationSeconds={permission.maxDurationSeconds}
           editable={can(session.actor, 'project:update') && !stageReached(project.stage, 'rendering')}
@@ -270,6 +275,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             animaticPosterAssetId={animatic?.posterAssetId ?? null}
             animaticProgress={animaticJob ? animaticJob.progress : null}
             revisions={{ used: revisions.used, limit: revisions.limit, reason: revisions.reason }}
+            exchanges={exchanges}
           />
         </section>
       ) : null}

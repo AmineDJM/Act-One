@@ -27,7 +27,7 @@ export {
 
 export * from './speech/types.ts';
 export { OpenAiSpeechProvider, estimateNarrationSeconds } from './speech/openai.ts';
-export { ElevenLabsProvider } from './speech/elevenlabs.ts';
+export { ElevenLabsProvider, pcmToWav } from './speech/elevenlabs.ts';
 
 export * from './storage/types.ts';
 export { LocalFsStorageProvider } from './storage/local.ts';

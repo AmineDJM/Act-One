@@ -881,8 +881,8 @@ export class PgStore implements Store {
         await c.query(
           `INSERT INTO storyboards
              (id, organization_id, project_id, concept_id, treatment_id, version, status,
-              voice_strategy, music_direction, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+              voice_strategy, music_direction, created_at, updated_at, language)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [
             storyboard.id,
             organizationId,
@@ -895,6 +895,7 @@ export class PgStore implements Store {
             storyboard.musicDirection,
             storyboard.createdAt,
             storyboard.updatedAt,
+            storyboard.language ?? null,
           ],
         );
         await insertScenes(c, organizationId, storyboard.id, storyboard.scenes);
@@ -985,9 +986,10 @@ export class PgStore implements Store {
              status = COALESCE($3, status),
              voice_strategy = COALESCE($4, voice_strategy),
              music_direction = COALESCE($5, music_direction),
+             language = COALESCE($6, language),
              updated_at = now()
            WHERE id = $1 AND organization_id = $2 RETURNING *`,
-          [id, organizationId, patch.status ?? null, patch.voiceStrategy ?? null, patch.musicDirection ?? null],
+          [id, organizationId, patch.status ?? null, patch.voiceStrategy ?? null, patch.musicDirection ?? null, patch.language ?? null],
         );
         if (!r.rows[0]) throw notFound('Storyboard');
         const scenes = patch.scenes ?? (await loadScenes(c, organizationId, id));
@@ -1716,11 +1718,52 @@ export class PgStore implements Store {
       this.tenant(organizationId, async (c) => {
         await c.query(
           `INSERT INTO revision_requests
-             (id, organization_id, project_id, storyboard_id, author_user_id, instruction, intent, affected_scene_ids, applied, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-          [revision.id, organizationId, revision.projectId, revision.storyboardId, revision.authorUserId, revision.instruction, revision.intent, JSON.stringify(revision.affectedSceneIds), revision.applied, revision.createdAt],
+             (id, organization_id, project_id, storyboard_id, author_user_id, instruction, intent,
+              affected_scene_ids, applied, created_at, status, proposal, reply, decided_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          [
+            revision.id, organizationId, revision.projectId, revision.storyboardId, revision.authorUserId,
+            revision.instruction, revision.intent, JSON.stringify(revision.affectedSceneIds), revision.applied,
+            revision.createdAt, revision.status, revision.proposal ? JSON.stringify(revision.proposal) : null,
+            revision.reply, revision.decidedAt,
+          ],
         );
         return revision;
+      }),
+
+    get: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT * FROM revision_requests WHERE id = $1 AND organization_id = $2',
+          [id, organizationId],
+        );
+        return r.rows[0] ? toRevision(r.rows[0]) : null;
+      }),
+
+    update: async (
+      organizationId: string,
+      id: string,
+      patch: Partial<Pick<RevisionRequest, 'status' | 'proposal' | 'reply' | 'decidedAt' | 'intent' | 'affectedSceneIds'>>,
+    ) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `UPDATE revision_requests SET
+             status = COALESCE($3, status),
+             proposal = COALESCE($4, proposal),
+             reply = COALESCE($5, reply),
+             decided_at = COALESCE($6, decided_at),
+             intent = COALESCE($7, intent),
+             affected_scene_ids = COALESCE($8, affected_scene_ids)
+           WHERE id = $1 AND organization_id = $2 RETURNING *`,
+          [
+            id, organizationId, patch.status ?? null,
+            patch.proposal ? JSON.stringify(patch.proposal) : null, patch.reply ?? null,
+            patch.decidedAt ?? null, patch.intent ?? null,
+            patch.affectedSceneIds ? JSON.stringify(patch.affectedSceneIds) : null,
+          ],
+        );
+        if (!r.rows[0]) throw notFound('Revision request');
+        return toRevision(r.rows[0]);
       }),
 
     listForStoryboard: async (organizationId: string, storyboardId: string) =>
@@ -2040,6 +2083,7 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
     version: num(row['version']),
     scenes,
     voiceStrategy: row['voice_strategy'] as Storyboard['voiceStrategy'],
+    language: (row['language'] as string | null) ?? null,
     musicDirection: (row['music_direction'] as string) ?? '',
     status: row['status'] as Storyboard['status'],
     createdAt: iso(row['created_at']),
@@ -2242,6 +2286,10 @@ function toRevision(row: Row): RevisionRequest {
     affectedSceneIds: (row['affected_scene_ids'] as string[]) ?? [],
     applied: Boolean(row['applied']),
     appliedAt: isoOrNull(row['applied_at']),
+    status: (row['status'] as RevisionRequest['status']) ?? (row['applied'] ? 'applied' : 'confirmed'),
+    proposal: (row['proposal'] as RevisionRequest['proposal']) ?? null,
+    reply: (row['reply'] as string) ?? '',
+    decidedAt: isoOrNull(row['decided_at']),
     createdAt: iso(row['created_at']),
   };
 }

@@ -105,6 +105,7 @@ const storyboard: Storyboard = resequence({
     }),
   ],
   voiceStrategy: 'none',
+  language: null,
   musicDirection: 'Sparse, sub-heavy.',
   status: 'draft',
   createdAt: '2026-01-01T00:00:00.000Z',

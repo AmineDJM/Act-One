@@ -60,6 +60,15 @@ export function NewProjectForm({ maxDurationSeconds }: { maxDurationSeconds: num
               </select>
             </div>
             <div className="field" style={{ flex: 1, minWidth: 160 }}>
+              <label htmlFor="voice">Voice</label>
+              <select id="voice" name="voice" className="input" defaultValue="">
+                <option value="">Let the concept decide</option>
+                <option value="female">A woman&rsquo;s voice</option>
+                <option value="male">A man&rsquo;s voice</option>
+                <option value="none">No voice-over</option>
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 160 }}>
               <label htmlFor="language">Language</label>
               <select id="language" name="language" className="input" defaultValue="">
                 <option value="">The language of your site</option>

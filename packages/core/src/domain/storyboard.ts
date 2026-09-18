@@ -313,6 +313,8 @@ export const Storyboard = z.object({
   version: z.number().int().min(1).default(1),
   scenes: z.array(Scene).default([]),
   voiceStrategy: VoiceStrategy.default('none'),
+  /** ISO 639-1 code the copy and narration were written in; the voice follows it. */
+  language: z.string().min(2).max(12).nullable().default(null),
   musicDirection: z.string().max(600).default(''),
   status: StoryboardStatus.default('draft'),
   createdAt: z.string(),

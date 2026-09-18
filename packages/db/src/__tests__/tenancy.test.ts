@@ -74,6 +74,7 @@ function makeProject(organizationId: string, userId: string, name: string): Proj
       realMediaOnly: false,
       language: null,
       tone: null,
+    voiceGender: null,
     },
     productCredentialId: null,
     costUsd: 0,

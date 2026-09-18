@@ -56,7 +56,10 @@ export async function createProject(session: Session, input: CreateProjectInput)
   const monthStart = new Date();
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
-  const used = await store.projects.countTowardQuotaSince(organization.id, monthStart.toISOString());
+  const used = await store.projects.countTowardQuotaSince(
+    organization.id,
+    monthStart.toISOString(),
+  );
 
   // The decision itself is a pure function in @act-one/core, so the worker and
   // the app cannot drift into answering the same question differently.
@@ -204,10 +207,9 @@ export async function loadProjectView(session: Session, projectId: string) {
    * from the list showed a frame from an older cut of the film beside the
    * current one — the same mistake as scanning the render list for a master.
    */
-  const poster =
-    latestRender?.posterAssetId
-      ? await store.assets.get(session.organizationId, latestRender.posterAssetId)
-      : null;
+  const poster = latestRender?.posterAssetId
+    ? await store.assets.get(session.organizationId, latestRender.posterAssetId)
+    : null;
   const copyKit = await store.copy.getLatestForProject(session.organizationId, project.id);
   const access = await loadProductAccess(session, project.id);
   const notes = await loadComments(session, project.id);
@@ -221,6 +223,34 @@ export async function loadProjectView(session: Session, projectId: string) {
   const activeJob =
     jobs.find((job) => !jobIsTerminal(job.state) && jobAdvancesProject(job.kind)) ?? null;
   const run = activeJob ? await runViewFor(jobs, activeJob) : null;
+
+  // The revision conversation on the storyboard in play, with names.
+  const activeBoard =
+    storyboards.find((board) => board.id === project.activeStoryboardId) ?? storyboards[0] ?? null;
+  const requests = activeBoard
+    ? await store.revisions.listForStoryboard(session.organizationId, activeBoard.id)
+    : [];
+  const authorIds = [...new Set(requests.map((request) => request.authorUserId))];
+  const authors = new Map(
+    await Promise.all(
+      authorIds.map(async (id) => {
+        const user = await store.users.get(id);
+        return [id, user?.name || user?.email || 'Someone'] as const;
+      }),
+    ),
+  );
+  const exchanges = requests.slice(-8).map((request) => ({
+    id: request.id,
+    instruction: request.instruction,
+    reply: request.reply,
+    status: request.status,
+    rerender: request.proposal?.rerender ?? false,
+    authorName:
+      request.authorUserId === session.user.id
+        ? 'You'
+        : (authors.get(request.authorUserId) ?? 'Someone'),
+    createdAt: request.createdAt,
+  }));
 
   return {
     access,
@@ -240,10 +270,13 @@ export async function loadProjectView(session: Session, projectId: string) {
      * six-second bumper's five scenes as though it were their film.
      */
     storyboard:
-      storyboards.find((board) => board.id === project.activeStoryboardId) ?? storyboards[0] ?? null,
+      storyboards.find((board) => board.id === project.activeStoryboardId) ??
+      storyboards[0] ??
+      null,
     renders,
     activeJob,
     run,
+    exchanges,
     /** The timing preview being built right now, reported where it was asked for. */
     animaticJob:
       jobs.find((job) => job.kind === 'render_animatic' && !jobIsTerminal(job.state)) ?? null,
@@ -365,7 +398,10 @@ export type RevisionAllowance = {
  * How many revisions this project has had against how many the plan
  * includes. A revision that failed or was canceled did not happen.
  */
-export async function revisionAllowance(session: Session, project: Project): Promise<RevisionAllowance> {
+export async function revisionAllowance(
+  session: Session,
+  project: Project,
+): Promise<RevisionAllowance> {
   const store = getStore();
   const [organization, jobs] = await Promise.all([
     store.organizations.get(session.organizationId),

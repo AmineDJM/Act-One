@@ -63,7 +63,7 @@ export async function buildRegistry(
   const parsed = ProviderConfig.safeParse(settings.providerConfig);
   const providerConfig = parsed.success ? parsed.data : DEFAULT_PROVIDER_CONFIG;
 
-  const credentials = await readAll(config, ['openai', 'browserbase', 'higgsfield', 'supabase']);
+  const credentials = await readAll(config, ['openai', 'browserbase', 'higgsfield', 'supabase', 'elevenlabs']);
   const costSink = new DbCostSink(config.store, scope);
 
   const {
@@ -72,6 +72,7 @@ export async function buildRegistry(
     LocalChromiumProvider,
     HiggsfieldProvider,
     OpenAiSpeechProvider,
+    ElevenLabsProvider,
     SupabaseStorageProvider,
     LocalFsStorageProvider,
   } = await import('@act-one/providers');
@@ -80,6 +81,7 @@ export async function buildRegistry(
   const higgsfield = credentials['higgsfield'] ?? {};
   const supabase = credentials['supabase'] ?? {};
   const openai = credentials['openai'] ?? {};
+  const elevenlabs = credentials['elevenlabs'] ?? {};
 
   return new ProviderRegistry({
     config: providerConfig,
@@ -110,7 +112,11 @@ export async function buildRegistry(
             }),
           }
         : {}),
-      speech: new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink }),
+      // The voice the console chose, when it has a key; OpenAI's otherwise.
+      speech:
+        providerConfig.speech.primary === 'elevenlabs' && elevenlabs['apiKey']
+          ? new ElevenLabsProvider({ apiKey: elevenlabs['apiKey'], costSink })
+          : new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink }),
       storage:
         supabase['url'] && supabase['serviceKey']
           ? new SupabaseStorageProvider({
@@ -166,6 +172,8 @@ function fromEnv(provider: string): Record<string, string> {
         serviceKey: pick('SUPABASE_SERVICE_ROLE_KEY'),
         bucket: pick('SUPABASE_STORAGE_BUCKET'),
       });
+    case 'elevenlabs':
+      return clean({ apiKey: pick('ELEVENLABS_API_KEY') });
     default:
       return {};
   }

@@ -250,6 +250,28 @@ four are replaceable infrastructure; the moat is product understanding, creative
 strategy, art direction, premium motion systems, real product cinematography,
 Brand DNA, automated QA and the revision system.
 
+One optional fifth: **ElevenLabs**, for the voice. Narration comes from OpenAI's
+voices by default, directed for the film's language and the customer's choice of
+who reads. With an ElevenLabs key saved and chosen under Routing, the voice is
+picked from its library for that language instead, which is the difference
+between a voice reading French and a French voice.
+
+### The voice
+
+The customer chooses, on the brief: a woman's voice, a man's, or none. The
+storyboard records the language it was written in, and the voice follows it: a
+native voice on ElevenLabs, or OpenAI's voice told to speak as a native. Founder
+and brand voices are cloned only against a recorded consent.
+
+### Revisions are a conversation
+
+A change is a sentence: "the opening holds too long". We answer with what we
+understood and exactly what we would do — which scenes, whether the product has
+to be captured again, and whether the film will be re-rendered — and nothing is
+touched until the customer says so. Confirming applies the change and, once a
+film exists, regenerates it. Each plan includes a number of revisions per
+project; the rest is upgrade.
+
 ### Browserbase
 
 Paste the API key in **Integrations**; the project is found from the key, and

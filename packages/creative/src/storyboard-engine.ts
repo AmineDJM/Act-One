@@ -470,6 +470,8 @@ export class StoryboardEngine {
       version: input.version,
       scenes: timed,
       voiceStrategy: input.treatment.voiceStrategy,
+      // The brief's word; the storyboard stage asks the copy when there is none.
+      language: input.brief.language ?? null,
       musicDirection: input.treatment.soundStyle,
       status: 'draft',
       createdAt: new Date().toISOString(),

@@ -71,6 +71,32 @@
   gap: var(--space-3);
   max-width: 720px;
 }
+.ask { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* The conversation: what was asked, what we answered, what they decided. */
+.thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.exchange { display: flex; flex-direction: column; gap: var(--space-2); }
+.said,
+.answered {
+  margin: 0;
+  max-width: 64ch;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.said { align-self: flex-end; background: color-mix(in oklab, var(--accent) 14%, var(--surface)); }
+.answered { align-self: flex-start; background: var(--surface-raised); border: 1px solid var(--line); }
+.said strong,
+.answered strong { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+.decide { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.outcome { font-size: 0.8rem; color: var(--text-secondary); }
+.exchange[data-status='declined'] .said,
+.exchange[data-status='declined'] .answered { opacity: 0.55; }
+
 .suggestions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .suggestion {
   border: 1px solid var(--line);

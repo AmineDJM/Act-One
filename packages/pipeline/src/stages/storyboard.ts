@@ -1,6 +1,6 @@
 import { AppError, storyboardEstimatedCost } from '@act-one/core';
 import { planFor } from '../entitlements.ts';
-import { CreativeDirector, StoryboardEngine } from '@act-one/creative';
+import { CreativeDirector, StoryboardEngine, detectLanguage } from '@act-one/creative';
 import { runDeterministicChecks } from '@act-one/qa';
 import type { StageContext } from '../context.ts';
 
@@ -94,9 +94,20 @@ export async function runStoryboard(
   });
   const blockers = issues.filter((issue) => issue.severity === 'blocker');
 
+  // The language the film was written in, so the voice can be chosen for
+  // it. The brief's word when it gave one; otherwise asked of the copy.
+  const language =
+    project.brief.language ??
+    (await detectLanguage(
+      registry.llm(),
+      built.storyboard.scenes.flatMap((scene) => [scene.narration, ...scene.onScreenText]),
+      { organizationId, projectId: project.id },
+    ));
+
   const storyboard = await store.storyboards.create(
     {
       ...built.storyboard,
+      language,
       status: blockers.length > 0 ? 'draft' : 'awaiting_approval',
     },
     organizationId,

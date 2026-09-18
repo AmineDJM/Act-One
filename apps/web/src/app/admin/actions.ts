@@ -155,6 +155,10 @@ export async function saveRoutingAction(
       primary: String(formData.get('browser.primary') ?? current.providers.browser.primary),
       fallback: String(formData.get('browser.fallback') ?? current.providers.browser.fallback),
     },
+    speech: {
+      ...current.providers.speech,
+      primary: String(formData.get('speech.primary') ?? current.providers.speech.primary),
+    },
     media: {
       ...current.providers.media,
       enabled: formData.get('media.enabled') === 'on',

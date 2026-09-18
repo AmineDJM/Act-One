@@ -31,12 +31,23 @@ const RESOLUTION_RULES: {
 }[] = [
   {
     intent: 'retime_scene',
-    patterns: [/\b(too )?slow\b/i, /\bspeed (it )?up\b/i, /\bdrags?\b/i, /\btighten\b/i, /\bfaster\b/i],
+    patterns: [
+      /\b(too )?slow\b/i,
+      /\bspeed (it )?up\b/i,
+      /\bdrags?\b/i,
+      /\btighten\b/i,
+      /\bfaster\b/i,
+    ],
     scope: 'slowest',
   },
   {
     intent: 'retime_scene',
-    patterns: [/\btoo (fast|quick|rushed)\b/i, /\bslow (it )?down\b/i, /\blinger\b/i, /\bhold longer\b/i],
+    patterns: [
+      /\btoo (fast|quick|rushed)\b/i,
+      /\bslow (it )?down\b/i,
+      /\blinger\b/i,
+      /\bhold longer\b/i,
+    ],
     scope: 'slowest',
   },
   {
@@ -65,7 +76,13 @@ const RESOLUTION_RULES: {
   },
   {
     intent: 'change_tone',
-    patterns: [/\bmore cinematic\b/i, /\bmore premium\b/i, /\bmore energy\b/i, /\bmore serious\b/i, /\bpunchier\b/i],
+    patterns: [
+      /\bmore cinematic\b/i,
+      /\bmore premium\b/i,
+      /\bmore energy\b/i,
+      /\bmore serious\b/i,
+      /\bpunchier\b/i,
+    ],
     scope: 'all',
   },
   {
@@ -75,7 +92,12 @@ const RESOLUTION_RULES: {
   },
   {
     intent: 'replace_visual',
-    patterns: [/\bshow .* instead\b/i, /\bswap .* for\b/i, /\buse .* instead\b/i, /\bdifferent (shot|visual|screen)\b/i],
+    patterns: [
+      /\bshow .* instead\b/i,
+      /\bswap .* for\b/i,
+      /\buse .* instead\b/i,
+      /\bdifferent (shot|visual|screen)\b/i,
+    ],
     scope: 'mentioned',
   },
   {
@@ -146,13 +168,20 @@ export class RevisionCompiler {
             ...storyboard.scenes.map(
               (scene, i) =>
                 `${i + 1}. [${scene.visualType}, ${scene.duration}s] ${scene.purpose}` +
-                (scene.onScreenText.length > 0 ? ` — text: "${scene.onScreenText.join(' / ')}"` : '') +
+                (scene.onScreenText.length > 0
+                  ? ` — text: "${scene.onScreenText.join(' / ')}"`
+                  : '') +
                 (scene.narration ? ` — vo: "${scene.narration.slice(0, 80)}"` : ''),
             ),
           ].join('\n'),
         },
       ],
-      { schema: ClassifiedRevision, schemaName: 'ClassifiedRevision', tier: 'fast', temperature: 0.1 },
+      {
+        schema: ClassifiedRevision,
+        schemaName: 'ClassifiedRevision',
+        tier: 'fast',
+        temperature: 0.1,
+      },
       context,
     );
 
@@ -185,26 +214,33 @@ export class RevisionCompiler {
     for (const rule of RESOLUTION_RULES) {
       if (!rule.patterns.some((pattern) => pattern.test(instruction))) continue;
       // "Show our analytics instead" needs a subject the rules cannot supply.
-      if (rule.scope === 'mentioned' && explicitScenes.length === 0 && rule.intent !== 'remove_scene') {
+      if (
+        rule.scope === 'mentioned' &&
+        explicitScenes.length === 0 &&
+        rule.intent !== 'remove_scene'
+      ) {
         return null;
       }
 
+      // "The opening is too slow" is about the opening, whichever scenes are
+      // longest. A place the customer names outranks the rule's own scope.
       const affected =
         explicitScenes.length > 0
-          ? explicitScenes.map((n) => storyboard.scenes[n - 1]?.id).filter((id): id is string => Boolean(id))
-          : scopeToScenes(rule.intent, storyboard, rule.scope);
+          ? explicitScenes
+              .map((n) => storyboard.scenes[n - 1]?.id)
+              .filter((id): id is string => Boolean(id))
+          : scopeToScenes(rule.intent, storyboard, placeNamed(instruction) ?? rule.scope);
 
-      const direction: ResolvedRevision['direction'] = /\b(too )?slow|drags?|speed up|faster|tighten\b/i.test(
-        instruction,
-      )
-        ? 'faster'
-        : /\btoo (fast|quick|rushed)|slow (it )?down|linger|hold longer\b/i.test(instruction)
-          ? 'slower'
-          : /\b(less|fewer|too much)\b/i.test(instruction)
-            ? 'less'
-            : /\bmore\b/i.test(instruction)
-              ? 'more'
-              : 'none';
+      const direction: ResolvedRevision['direction'] =
+        /\b(too )?slow|drags?|speed up|faster|tighten\b/i.test(instruction)
+          ? 'faster'
+          : /\btoo (fast|quick|rushed)|slow (it )?down|linger|hold longer\b/i.test(instruction)
+            ? 'slower'
+            : /\b(less|fewer|too much)\b/i.test(instruction)
+              ? 'less'
+              : /\bmore\b/i.test(instruction)
+                ? 'more'
+                : 'none';
 
       return {
         intent: rule.intent,
@@ -270,6 +306,23 @@ function scopeToScenes(
   }
 }
 
+/** The part of the film the customer pointed at, when they did. */
+export function placeNamed(instruction: string): 'opening' | 'ending' | null {
+  if (
+    /\b(opening|intro|introduction|start|beginning|first (scene|shot|few seconds))\b/i.test(
+      instruction,
+    )
+  ) {
+    return 'opening';
+  }
+  if (
+    /\b(ending|outro|the end|closing|last (scene|shot|few seconds)|finale)\b/i.test(instruction)
+  ) {
+    return 'ending';
+  }
+  return null;
+}
+
 function wordCount(scene: Scene): number {
   return scene.onScreenText.join(' ').split(/\s+/).filter(Boolean).length;
 }
@@ -292,7 +345,9 @@ function describe(intent: z.infer<typeof RevisionIntent>, count: number, subject
     case 'remove_scene':
       return `Removing ${scenes} and re-timing what is left.`;
     case 'replace_visual':
-      return subject ? `Replacing the visual with ${subject}.` : `Replacing the visual on ${scenes}.`;
+      return subject
+        ? `Replacing the visual with ${subject}.`
+        : `Replacing the visual on ${scenes}.`;
     case 'recapture_product':
       return subject
         ? `Going back into the product to capture ${subject}.`
@@ -354,7 +409,13 @@ export function applyRevision(
           voiceOver: true,
           soundCues: [
             ...scene.soundCues,
-            { time: scene.startTime, type: 'music_duck', assetId: null, intensity: 0.4, durationSeconds: scene.duration },
+            {
+              time: scene.startTime,
+              type: 'music_duck',
+              assetId: null,
+              intensity: 0.4,
+              durationSeconds: scene.duration,
+            },
           ],
           status: 'draft',
         };
@@ -369,7 +430,8 @@ export function applyRevision(
       }
 
       case 'restrict_to_real_media': {
-        if (scene.visualType !== 'generated_broll' && scene.visualType !== 'mixed_media') return scene;
+        if (scene.visualType !== 'generated_broll' && scene.visualType !== 'mixed_media')
+          return scene;
         changed.add(scene.id);
         return {
           ...scene,
@@ -398,11 +460,17 @@ export function applyRevision(
           motionRecipe: {
             ...scene.motionRecipe,
             easing,
-            intensity: Math.min(1, Math.max(0.2, scene.motionRecipe.intensity + (faster ? 0.15 : -0.15))),
+            intensity: Math.min(
+              1,
+              Math.max(0.2, scene.motionRecipe.intensity + (faster ? 0.15 : -0.15)),
+            ),
           },
           cameraRecipe: {
             ...scene.cameraRecipe,
-            motionBlur: Math.min(0.24, Math.max(0.04, scene.cameraRecipe.motionBlur + (faster ? 0.04 : -0.02))),
+            motionBlur: Math.min(
+              0.24,
+              Math.max(0.04, scene.cameraRecipe.motionBlur + (faster ? 0.04 : -0.02)),
+            ),
           },
           status: 'draft',
         };
@@ -451,7 +519,10 @@ export function applyRevision(
     // the new floors rather than leaving scenes padded for words nobody speaks.
     scenes = scenes.map((scene) =>
       changed.has(scene.id)
-        ? { ...scene, duration: round3(Math.max(minimumLegibleDuration(scene), scene.duration * 0.88)) }
+        ? {
+            ...scene,
+            duration: round3(Math.max(minimumLegibleDuration(scene), scene.duration * 0.88)),
+          }
         : scene,
     );
   }
@@ -489,6 +560,11 @@ export function toRevisionRequest(params: {
     affectedSceneIds: params.resolved.affectedSceneIds,
     applied: false,
     appliedAt: null,
+    // Direct from a job, with no conversation before it: confirmed by arrival.
+    status: 'confirmed',
+    proposal: { ...params.resolved, rerender: false },
+    reply: params.resolved.summary,
+    decidedAt: null,
     createdAt: new Date().toISOString(),
   };
 }

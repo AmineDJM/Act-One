@@ -275,7 +275,7 @@ describe('pipeline', () => {
       latestRenderId: null, stage: 'created',
       brief: {
         targetAudience: null, goal: null, keyMessage: null, durationSeconds: 45, channels: [],
-        creativeMode: 'studio', voiceStrategy: null, formats: [], excludedClaims: [], realMediaOnly: false, language: null, tone: null,
+        creativeMode: 'studio', voiceStrategy: null, formats: [], excludedClaims: [], realMediaOnly: false, language: null, tone: null, voiceGender: null,
       },
       productCredentialId: null, costUsd: 0, creditsSpent: 0, archivedAt: null,
       createdAt: now, updatedAt: now,
@@ -393,6 +393,71 @@ describe('pipeline', () => {
     expect(revisions).toHaveLength(1);
     expect(revisions[0]!.applied).toBe(true);
     expect(revisions[0]!.intent).toBe('retime_scene');
+  });
+
+  it('applies the proposal the customer confirmed, as proposed, and regenerates the film', async () => {
+    await runJob(deps, await enqueued(store, org.id, project.id, 'research_product'));
+    await runJob(deps, await enqueued(store, org.id, project.id, 'generate_concepts'));
+    const concepts = await store.concepts.listForProject(org.id, project.id);
+    await store.projects.update(org.id, project.id, { selectedConceptId: concepts[0]!.id });
+    await runJob(deps, await enqueued(store, org.id, project.id, 'build_storyboard', { conceptId: concepts[0]!.id }));
+    const board = (await store.storyboards.listForProject(org.id, project.id))[0]!;
+    const first = board.scenes[0]!;
+
+    // What was written back and confirmed: one scene, faster. The sentence
+    // itself is vague on purpose — it is the proposal that must be applied.
+    const now = new Date().toISOString();
+    await store.revisions.create(
+      {
+        id: 'cmt_confirmed',
+        projectId: project.id,
+        storyboardId: board.id,
+        authorUserId: user.id,
+        instruction: 'Hmm, the start.',
+        intent: 'retime_scene',
+        affectedSceneIds: [first.id],
+        applied: false,
+        appliedAt: null,
+        status: 'confirmed',
+        proposal: {
+          intent: 'retime_scene',
+          affectedSceneIds: [first.id],
+          requestedSubject: '',
+          direction: 'faster',
+          needsRecapture: false,
+          summary: 'Retiming 1 scene.',
+          rerender: true,
+        },
+        reply: 'Retiming 1 scene. It touches scene 1. The film will be re-rendered with the change. Shall I go ahead?',
+        decidedAt: now,
+        createdAt: now,
+      },
+      org.id,
+    );
+
+    const outcome = await runJob(
+      deps,
+      await enqueued(store, org.id, project.id, 'repair_scene', {
+        storyboardId: board.id,
+        instruction: 'Hmm, the start.',
+        authorUserId: user.id,
+        revisionRequestId: 'cmt_confirmed',
+        rerender: true,
+      }),
+    );
+    expect(outcome.status).toBe('completed');
+
+    const after = (await store.storyboards.get(org.id, board.id))!;
+    const changed = after.scenes.filter((scene, index) => scene.duration !== board.scenes[index]!.duration);
+    expect(changed.map((scene) => scene.id)).toEqual([first.id]);
+
+    const revisions = await store.revisions.listForStoryboard(org.id, board.id);
+    expect(revisions).toHaveLength(1);
+    expect(revisions[0]).toMatchObject({ id: 'cmt_confirmed', status: 'applied', applied: true });
+
+    // Regenerating is the point of confirming once a film exists.
+    const jobs = await store.jobs.listForProject(org.id, project.id);
+    expect(jobs.some((job) => job.kind === 'render_film' && job.state === 'queued')).toBe(true);
   });
 
   it('refuses to render invented software as somebody\u2019s product', async () => {

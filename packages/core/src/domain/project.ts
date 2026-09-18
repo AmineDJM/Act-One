@@ -225,6 +225,8 @@ export const ProjectBrief = z.object({
   language: z.string().min(2).max(12).nullable().default(null),
   /** Null: read from the brand's own writing. */
   tone: Tone.nullable().default(null),
+  /** Who narrates. Null: chosen from the tone. Voice strategy 'none' means nobody. */
+  voiceGender: z.enum(['female', 'male']).nullable().default(null),
   channels: z.array(Channel).default([]),
   creativeMode: CreativeMode.default('studio'),
   voiceStrategy: VoiceStrategy.nullable().default(null),

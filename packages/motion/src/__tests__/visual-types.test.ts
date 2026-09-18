@@ -81,6 +81,7 @@ describe.skipIf(browser === undefined)('every deterministic visual type', () => 
         scene({ id: 'end', visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Close the books.'], recipe: 'cta_end_card' }),
       ],
       voiceStrategy: 'none', musicDirection: '', status: 'draft',
+      language: null,
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     });
 

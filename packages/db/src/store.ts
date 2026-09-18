@@ -356,8 +356,15 @@ export interface ApprovalRepo {
 
 export interface RevisionRepo {
   create(revision: RevisionRequest, organizationId: string): Promise<RevisionRequest>;
+  get(organizationId: string, id: string): Promise<RevisionRequest | null>;
   listForStoryboard(organizationId: string, storyboardId: string): Promise<RevisionRequest[]>;
   markApplied(organizationId: string, id: string, affectedSceneIds: string[]): Promise<RevisionRequest>;
+  /** The conversation's state: proposed, confirmed, declined. */
+  update(
+    organizationId: string,
+    id: string,
+    patch: Partial<Pick<RevisionRequest, 'status' | 'proposal' | 'reply' | 'decidedAt' | 'intent' | 'affectedSceneIds'>>,
+  ): Promise<RevisionRequest>;
 }
 
 export interface CredentialRepo {

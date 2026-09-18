@@ -8,3 +8,4 @@ export * from './revision-compiler.ts';
 export * from './variant-planner.ts';
 export * from './copy-writer.ts';
 export { briefDirectionLines } from './brief-lines.ts';
+export { detectLanguage } from './language.ts';

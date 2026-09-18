@@ -905,10 +905,17 @@ export class MemoryStore implements Store {
       this.tables.revisions.set(revision.id, { ...revision, organizationId });
       return revision;
     },
+    get: async (organizationId: string, id: string) =>
+      this.scoped(this.tables.revisions, organizationId).find((r) => r.id === id) ?? null,
     listForStoryboard: async (organizationId: string, storyboardId: string) =>
       this.scoped(this.tables.revisions, organizationId)
         .filter((r) => r.storyboardId === storyboardId)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    update: async (
+      organizationId: string,
+      id: string,
+      patch: Partial<Pick<RevisionRequest, 'status' | 'proposal' | 'reply' | 'decidedAt' | 'intent' | 'affectedSceneIds'>>,
+    ) => this.patch(this.tables.revisions, organizationId, id, patch, 'Revision request'),
     markApplied: async (organizationId: string, id: string, affectedSceneIds: string[]) =>
       this.patch(
         this.tables.revisions,

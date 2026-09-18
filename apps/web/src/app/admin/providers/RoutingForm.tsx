@@ -18,6 +18,7 @@ export function RoutingForm({
   routing: {
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
+    speech: { primary: string };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -83,6 +84,17 @@ export function RoutingForm({
                 <option value="none">None</option>
               </select>
               <span className="hint">Research is idempotent, so retrying elsewhere is safe.</span>
+            </div>
+            <div className="field">
+              <label htmlFor="speech-primary">Voice</label>
+              <select id="speech-primary" name="speech.primary" className="input" defaultValue={routing.speech.primary}>
+                <option value="openai-speech">OpenAI (directed voices)</option>
+                <option value="elevenlabs">ElevenLabs (needs its key under Integrations)</option>
+              </select>
+              <span className="hint">
+                Both follow the film&rsquo;s language and the customer&rsquo;s choice of who reads. ElevenLabs
+                picks a native voice from its library; OpenAI directs one of its own.
+              </span>
             </div>
             <div className="field">
               <label htmlFor="media-cost">Max spend per generated shot</label>

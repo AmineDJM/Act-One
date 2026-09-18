@@ -81,6 +81,18 @@ export const PROVIDER_SLOTS = [
     docsUrl: 'https://console.higgsfield.ai',
   },
   {
+    id: 'elevenlabs',
+    label: 'ElevenLabs',
+    purpose:
+      'Voice-over that does not sound synthesised: a voice chosen for the language of the film and for who the customer asked to hear. Optional; without it narration comes from OpenAI.',
+    required: false,
+    fields: [
+      { key: 'apiKey', label: 'API key', placeholder: 'sk_…', secret: true, envVar: 'ELEVENLABS_API_KEY' },
+    ],
+    envFallback: 'ELEVENLABS_API_KEY',
+    docsUrl: 'https://elevenlabs.io/app/settings/api-keys',
+  },
+  {
     id: 'stripe',
     label: 'Stripe',
     purpose: 'Subscriptions, credits and the customer billing portal.',
@@ -259,8 +271,13 @@ export async function testProvider(id: ProviderSlotId): Promise<ProviderHealth> 
   // a healthy key as broken, or a broken one as healthy.
   await installProxyFromEnvironment();
   const credentials = await readProviderCredentials(id);
-  const { OpenAiLlmProvider, BrowserbaseProvider, HiggsfieldProvider, SupabaseStorageProvider } =
-    await import('@act-one/providers');
+  const {
+    OpenAiLlmProvider,
+    BrowserbaseProvider,
+    HiggsfieldProvider,
+    ElevenLabsProvider,
+    SupabaseStorageProvider,
+  } = await import('@act-one/providers');
 
   switch (id) {
     case 'openai':
@@ -283,6 +300,8 @@ export async function testProvider(id: ProviderSlotId): Promise<ProviderHealth> 
         serviceKey: credentials['serviceKey'],
         bucket: credentials['bucket'],
       }).health();
+    case 'elevenlabs':
+      return new ElevenLabsProvider({ apiKey: credentials['apiKey'] }).health();
     case 'stripe': {
       const { testStripe } = await import('./stripe.ts');
       return testStripe(credentials['secretKey']);
@@ -382,11 +401,12 @@ export async function buildRegistry(scope: {
   await installProxyFromEnvironment();
 
   const config = await getPlatformConfig();
-  const [openai, browserbase, higgsfield, supabase] = await Promise.all([
+  const [openai, browserbase, higgsfield, supabase, elevenlabs] = await Promise.all([
     readProviderCredentials('openai'),
     readProviderCredentials('browserbase'),
     readProviderCredentials('higgsfield'),
     readProviderCredentials('supabase'),
+    readProviderCredentials('elevenlabs'),
   ]);
 
   const costSink = new DbCostSink(getStore(), scope);
@@ -396,6 +416,7 @@ export async function buildRegistry(scope: {
     LocalChromiumProvider,
     HiggsfieldProvider,
     OpenAiSpeechProvider,
+    ElevenLabsProvider,
     SupabaseStorageProvider,
     LocalFsStorageProvider,
   } = await import('@act-one/providers');
@@ -429,7 +450,11 @@ export async function buildRegistry(scope: {
             }),
           }
         : {}),
-      speech: new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink }),
+      // The voice the console chose, when it has a key; OpenAI's otherwise.
+      speech:
+        config.providers.speech.primary === 'elevenlabs' && elevenlabs['apiKey']
+          ? new ElevenLabsProvider({ apiKey: elevenlabs['apiKey'], costSink })
+          : new OpenAiSpeechProvider({ apiKey: openai['apiKey'], costSink }),
       storage:
         supabase['url'] && supabase['serviceKey']
           ? new SupabaseStorageProvider({

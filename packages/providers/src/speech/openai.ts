@@ -3,6 +3,8 @@ import { httpRequest } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import {
   consentCovers,
+  defaultGender,
+  voiceDirection,
   type SpeechProvider,
   type SpeechRequest,
   type SpeechResult,
@@ -10,11 +12,23 @@ import {
   type VoicePersona,
 } from './types.ts';
 
-const PERSONA_VOICES: Record<VoicePersona, string> = {
-  narrator_neutral: 'alloy',
-  narrator_warm: 'nova',
-  narrator_low: 'onyx',
-  brand_custom: 'alloy',
+/**
+ * OpenAI's built-in voices, by who is asked for and the register the film
+ * needs. Marin and cedar are the two OpenAI recommends for quality; the
+ * older `tts-1` models do not have them and get the nearest of the nine
+ * they do.
+ */
+const VOICES: Record<'female' | 'male', Record<Exclude<VoicePersona, 'brand_custom'>, string>> = {
+  female: { narrator_neutral: 'marin', narrator_warm: 'coral', narrator_low: 'sage' },
+  male: { narrator_neutral: 'cedar', narrator_warm: 'ash', narrator_low: 'onyx' },
+};
+
+const LEGACY_VOICES: Record<string, string> = {
+  marin: 'nova',
+  cedar: 'alloy',
+  coral: 'shimmer',
+  ash: 'echo',
+  sage: 'nova',
 };
 
 /** USD per 1M characters. */
@@ -38,8 +52,11 @@ export class OpenAiSpeechProvider implements SpeechProvider {
 
   constructor(config: OpenAiSpeechConfig = {}) {
     this.apiKey = config.apiKey ?? process.env.OPENAI_API_KEY ?? '';
-    this.baseUrl = (config.baseUrl ?? process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1')
-      .replace(/\/$/, '');
+    this.baseUrl = (
+      config.baseUrl ??
+      process.env.OPENAI_BASE_URL ??
+      'https://api.openai.com/v1'
+    ).replace(/\/$/, '');
     this.model = config.model ?? 'gpt-4o-mini-tts';
     this.costSink = config.costSink;
   }
@@ -54,7 +71,7 @@ export class OpenAiSpeechProvider implements SpeechProvider {
   }
 
   async synthesize(request: SpeechRequest, context: CallContext): Promise<SpeechResult> {
-    return this.call(request, PERSONA_VOICES[request.persona], context);
+    return this.call(request, this.voiceFor(request), context);
   }
 
   async synthesizeWithVoice(
@@ -62,17 +79,30 @@ export class OpenAiSpeechProvider implements SpeechProvider {
     consent: VoiceConsent,
     context: CallContext,
   ): Promise<SpeechResult> {
-    if (!consentCovers(consent, {
-      organizationId: context.organizationId,
-      projectId: context.projectId ?? '',
-    })) {
-      throw new AppError(
-        'forbidden',
-        'No valid voice consent on record for this project.',
-        { publicMessage: 'We need recorded consent before using that voice.' },
-      );
+    if (
+      !consentCovers(consent, {
+        organizationId: context.organizationId,
+        projectId: context.projectId ?? '',
+      })
+    ) {
+      throw new AppError('forbidden', 'No valid voice consent on record for this project.', {
+        publicMessage: 'We need recorded consent before using that voice.',
+      });
     }
     return this.call(request, request.voiceId, context);
+  }
+
+  /** The voice for who was asked for, or for the register when nobody was. */
+  voiceFor(request: SpeechRequest): string {
+    const persona = request.persona === 'brand_custom' ? 'narrator_neutral' : request.persona;
+    const gender = request.gender ?? defaultGender(persona);
+    const voice = VOICES[gender][persona];
+    return this.directable() ? voice : (LEGACY_VOICES[voice] ?? voice);
+  }
+
+  /** Only the instructable model takes a direction; the older ones ignore it. */
+  private directable(): boolean {
+    return this.model.startsWith('gpt-');
   }
 
   private async call(
@@ -93,6 +123,9 @@ export class OpenAiSpeechProvider implements SpeechProvider {
         input: text,
         response_format: format,
         speed: request.rate ?? 1,
+        // Language, accent and register, said to the model: this is what
+        // stops a French line being read with an American accent.
+        ...(this.directable() ? { instructions: voiceDirection(request) } : {}),
       },
       expect: 'buffer',
       timeoutMs: 120_000,
@@ -109,7 +142,7 @@ export class OpenAiSpeechProvider implements SpeechProvider {
       actualCostUsd: costUsd,
       quantity: text.length,
       unit: 'character',
-      metadata: { projectId: context.projectId, sceneId: context.sceneId },
+      metadata: { projectId: context.projectId, sceneId: context.sceneId, voice },
     });
 
     return {

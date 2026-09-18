@@ -10,7 +10,12 @@ function board() {
   return resequence(
     storyboardFixture(
       [
-        sceneFixture({ id: 's1', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Forty rows.'] }),
+        sceneFixture({
+          id: 's1',
+          duration: 3,
+          visualType: 'kinetic_typography',
+          onScreenText: ['Forty rows.'],
+        }),
         sceneFixture({
           id: 's2',
           duration: 6,
@@ -18,9 +23,16 @@ function board() {
           onScreenText: ['One run', 'clears the ledger', 'every single night'],
           narration: 'One run clears the ledger.',
           voiceOver: true,
-          soundCues: [{ time: 3, type: 'music_duck', assetId: null, intensity: 0.4, durationSeconds: 6 }],
+          soundCues: [
+            { time: 3, type: 'music_duck', assetId: null, intensity: 0.4, durationSeconds: 6 },
+          ],
         }),
-        sceneFixture({ id: 's3', duration: 5, visualType: 'generated_broll', purpose: 'A city at dawn' }),
+        sceneFixture({
+          id: 's3',
+          duration: 5,
+          visualType: 'generated_broll',
+          purpose: 'A city at dawn',
+        }),
         sceneFixture({ id: 's4', duration: 2, visualType: 'logo_reveal' }),
       ],
       { voiceStrategy: 'narrator' },
@@ -45,6 +57,17 @@ describe('RevisionCompiler local resolution', () => {
       const resolved = compiler.resolveLocally(instruction, board());
       expect(resolved?.intent, instruction).toBe(expected);
     }
+  });
+
+  it('scopes "the opening is too slow" to the opening, whichever scenes are longest', () => {
+    const storyboard = board();
+    const resolved = compiler.resolveLocally('The opening is too slow', storyboard)!;
+    expect(resolved.intent).toBe('retime_scene');
+    expect(resolved.affectedSceneIds).toEqual(
+      storyboard.scenes.slice(0, 2).map((scene) => scene.id),
+    );
+    const ending = compiler.resolveLocally('Tighten the ending', storyboard)!;
+    expect(ending.affectedSceneIds).toEqual(storyboard.scenes.slice(-2).map((scene) => scene.id));
   });
 
   it('scopes "too slow" to the longest scenes, not the first one', () => {

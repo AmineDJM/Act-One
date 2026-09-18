@@ -99,6 +99,7 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
       ...spec,
     })) as Scene[],
     voiceStrategy: 'none',
+    language: null,
     musicDirection,
     status: 'draft',
     createdAt: '2026-01-01T00:00:00.000Z',

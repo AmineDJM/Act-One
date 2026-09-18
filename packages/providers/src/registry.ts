@@ -165,11 +165,15 @@ export class ProviderRegistry {
     if (!this.config.speech.enabled) {
       throw new AppError('provider_unavailable', 'Speech synthesis is disabled.');
     }
-    return this.memo(`speech:${this.config.speech.primary}`, () =>
-      this.config.speech.primary === 'elevenlabs'
-        ? new ElevenLabsProvider({ costSink: this.costSink })
-        : new OpenAiSpeechProvider({ costSink: this.costSink }),
-    );
+    return this.memo(`speech:${this.config.speech.primary}`, () => {
+      if (this.config.speech.primary === 'elevenlabs') {
+        const elevenlabs = new ElevenLabsProvider({ costSink: this.costSink });
+        // Chosen but without a key: the film still gets a voice, from OpenAI,
+        // rather than no voice and an error at the last stage of a render.
+        if (elevenlabs.isConfigured()) return elevenlabs;
+      }
+      return new OpenAiSpeechProvider({ costSink: this.costSink });
+    });
   }
 
   storage(): StorageProvider {

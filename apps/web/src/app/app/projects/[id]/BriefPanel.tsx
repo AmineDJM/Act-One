@@ -20,7 +20,12 @@ export function BriefPanel({
   editable,
 }: {
   projectId: string;
-  brief: { durationSeconds: number | null; language: string | null; tone: Tone | null };
+  brief: {
+    durationSeconds: number | null;
+    language: string | null;
+    tone: Tone | null;
+    voice: 'female' | 'male' | 'none' | null;
+  };
   maxDurationSeconds: number;
   editable: boolean;
 }) {
@@ -78,6 +83,23 @@ export function BriefPanel({
             </select>
           </div>
           <div className="field">
+            <label htmlFor="brief-voice">Voice</label>
+            <select
+              id="brief-voice"
+              name="voice"
+              className="input"
+              defaultValue={brief.voice ?? ''}
+            >
+              <option value="">Let the concept decide</option>
+              <option value="female">A woman&rsquo;s voice</option>
+              <option value="male">A man&rsquo;s voice</option>
+              <option value="none">No voice-over</option>
+            </select>
+            <span className="hint">
+              The voice speaks the film&rsquo;s language natively, whoever reads.
+            </span>
+          </div>
+          <div className="field">
             <label htmlFor="brief-language">Language</label>
             <select
               id="brief-language"
@@ -126,6 +148,18 @@ export function BriefPanel({
               {brief.tone
                 ? TONE_LABELS[brief.tone].split(' — ')[0]
                 : 'From your brand’s own writing'}
+            </dd>
+          </div>
+          <div className={styles.kvRow}>
+            <dt>Voice</dt>
+            <dd>
+              {brief.voice === 'none'
+                ? 'No voice-over'
+                : brief.voice === 'female'
+                  ? 'A woman’s voice'
+                  : brief.voice === 'male'
+                    ? 'A man’s voice'
+                    : 'Decided by the concept'}
             </dd>
           </div>
           <div className={styles.kvRow}>

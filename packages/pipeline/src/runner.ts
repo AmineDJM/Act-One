@@ -173,6 +173,10 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
         storyboardId: String(payload['storyboardId'] ?? ''),
         instruction: String(payload['instruction'] ?? ''),
         authorUserId: String(payload['authorUserId'] ?? ''),
+        ...(typeof payload['revisionRequestId'] === 'string'
+          ? { revisionRequestId: payload['revisionRequestId'] }
+          : {}),
+        rerender: payload['rerender'] === true,
       });
 
     case 'capture_product_moments':
