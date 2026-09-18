@@ -5,6 +5,7 @@ import {
   policyForPublicResearch,
   policyForAuthenticatedProduct,
   registrableDomain,
+  isPrivateAddress,
 } from '../index.ts';
 
 describe('public research policy', () => {
@@ -31,6 +32,36 @@ describe('public research policy', () => {
     ]) {
       const verdict = checkNavigation(policy, url);
       expect(verdict.allowed, url).toBe(false);
+    }
+  });
+
+  it('blocks every spelling of this machine and this network', () => {
+    // The guard blocked 127.0.0.1 by name and nothing else in 127/8. A URL
+    // parser accepts far more than dotted decimal, and so does Chromium.
+    for (const url of [
+      'http://127.0.0.2/',
+      'http://127.1/',
+      'http://2130706433/',
+      'http://0x7f000001/',
+      'http://0177.0.0.1/',
+      'http://0.0.0.0/',
+      'http://[::1]/',
+      'http://[::ffff:127.0.0.1]/',
+      'http://[fe80::1]/',
+      'http://[fd00::1]/',
+      'http://100.64.0.1/',
+      'http://app.localhost/',
+      'http://printer.home.arpa/',
+    ]) {
+      const verdict = checkNavigation(policy, url);
+      expect(verdict.allowed, url).toBe(false);
+    }
+  });
+
+  it('still allows the public internet', () => {
+    // A guard that also refuses real customers is a different bug.
+    for (const host of ['8.8.8.8', '104.18.2.1', '[2606:4700::6812:201]']) {
+      expect(isPrivateAddress(host), host).toBe(false);
     }
   });
 

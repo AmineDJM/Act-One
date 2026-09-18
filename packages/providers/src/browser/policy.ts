@@ -229,12 +229,85 @@ export function registrableDomain(hostname: string): string {
   return lastTwo;
 }
 
-function isPrivateAddress(hostname: string): boolean {
-  if (/^10\./.test(hostname)) return true;
-  if (/^192\.168\./.test(hostname)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true;
-  if (/^169\.254\./.test(hostname)) return true;
-  if (hostname.endsWith('.internal') || hostname.endsWith('.local')) return true;
+/**
+ * Addresses that are this machine, this network, or the cloud's metadata
+ * service, in every spelling a URL parser accepts.
+ *
+ * The list of names above catches the obvious; this catches the rest. It used
+ * to block 127.0.0.1 alone, which left 127.0.0.2 and the whole 127/8 block,
+ * IPv6 loopback in its mapped and bracketed forms, and a decimal or octal
+ * address that Chromium happily resolves. An SSRF guard with one hole is a
+ * door.
+ */
+export function isPrivateAddress(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host.endsWith('.internal') || host.endsWith('.local') || host.endsWith('.home.arpa')) {
+    return true;
+  }
+
+  const v4 = parseIPv4(host);
+  if (v4 !== null) return isPrivateIPv4(v4);
+
+  if (host.includes(':')) {
+    // IPv6. Mapped IPv4 (::ffff:a.b.c.d) is judged as the IPv4 it wraps.
+    const mapped = host.match(/^(?:0*:)*ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped?.[1]) {
+      const inner = parseIPv4(mapped[1]);
+      return inner === null ? true : isPrivateIPv4(inner);
+    }
+    const compact = host.replace(/^0*:(0*:)*/, '::');
+    if (compact === '::' || compact === '::1') return true;
+    // Link-local (fe80::/10), unique local (fc00::/7), and 6to4/Teredo
+    // wrappers are all "not the public internet".
+    if (/^fe[89ab]/.test(host) || /^f[cd]/.test(host) || /^2002:/.test(host) || /^2001:0*:/.test(host)) {
+      return true;
+    }
+    return false;
+  }
+
+  // A bare number is an IPv4 address in disguise (http://2130706433/ is
+  // http://127.0.0.1/). Anything numeric that did not parse above is refused.
+  if (/^[0-9a-fx.]+$/.test(host) && /^\d/.test(host)) return true;
+  return false;
+}
+
+/** IPv4 in dotted, short, octal or hex form, as browsers accept it. */
+function parseIPv4(host: string): number | null {
+  if (!/^[0-9a-fx.]+$/i.test(host) || !/^\d/.test(host)) return null;
+  const parts = host.split('.');
+  if (parts.length < 1 || parts.length > 4 || parts.some((part) => part.length === 0)) return null;
+  const numbers: number[] = [];
+  for (const part of parts) {
+    let value: number;
+    if (/^0x[0-9a-f]+$/i.test(part)) value = parseInt(part.slice(2), 16);
+    else if (/^0[0-7]+$/.test(part)) value = parseInt(part, 8);
+    else if (/^\d+$/.test(part)) value = parseInt(part, 10);
+    else return null;
+    if (!Number.isFinite(value)) return null;
+    numbers.push(value);
+  }
+  // The last part fills the remaining bytes, as in the classic parsers.
+  const last = numbers[numbers.length - 1]!;
+  const head = numbers.slice(0, -1);
+  if (head.some((value) => value > 255)) return null;
+  if (last >= 2 ** (8 * (5 - numbers.length))) return null;
+  let address = 0;
+  for (const value of head) address = address * 256 + value;
+  address = address * 256 ** (5 - numbers.length) + last;
+  return address >>> 0;
+}
+
+function isPrivateIPv4(address: number): boolean {
+  const a = (address >>> 24) & 255;
+  const b = (address >>> 16) & 255;
+  if (a === 0 || a === 10 || a === 127) return true; // this network, private, loopback
+  if (a === 169 && b === 254) return true; // link-local, and the metadata service
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // carrier-grade NAT
+  if (a === 192 && b === 0 && ((address >>> 8) & 255) === 0) return true; // 192.0.0.0/24
+  if (a >= 224) return true; // multicast and reserved
   return false;
 }
 
