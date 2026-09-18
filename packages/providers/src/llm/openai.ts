@@ -22,19 +22,76 @@ export type OpenAiConfig = {
   organization?: string;
 };
 
+/*
+ * Chosen by measurement, not by version number.
+ *
+ * Every creative decision in this system goes through here, so the default
+ * matters more than any other constant in the codebase. The three below were
+ * picked by running the hardest real task this platform has — writing a film
+ * into German, where a line has the seconds its shot runs and not one more —
+ * and scoring the result with the system's own checks: how many lines came
+ * back unfittable, and how far the worst one overran.
+ *
+ * The outcome was not the one the version numbers suggest. The newest and
+ * largest models were slower by an order of magnitude and no better, and two
+ * of them were worse: a constrained task with a hard budget is not what deep
+ * reasoning buys you, and the extra thinking shows up as latency and tokens
+ * on every single call. The family below scored clean and ran fastest.
+ *
+ * This is a default, not a verdict. It is editable per deployment from the
+ * console, and should be re-measured when a new family ships rather than
+ * assumed.
+ */
 const DEFAULT_ROUTING: OpenAiModelRouting = {
-  fast: 'gpt-4.1-mini',
-  balanced: 'gpt-4.1',
-  deep: 'gpt-4.1',
+  fast: 'gpt-5.4-mini',
+  balanced: 'gpt-5.4',
+  deep: 'gpt-5.5',
 };
 
-/** USD per 1M tokens. Used for the cost ledger; refreshed from Super Admin config. */
+/**
+ * USD per 1M tokens, for the cost ledger.
+ *
+ * These are the rates we have been told; nothing here refreshes them, so an
+ * operator should check them against their own billing page before quoting a
+ * margin off this ledger. A model missing from the table is the case that
+ * matters, and it used to be handled by quietly charging it at another model's
+ * rate — which produces a dashboard that is confidently wrong. It is now
+ * charged at the dearest rate we know and says so once, because a cost report
+ * that overstates is a report somebody double-checks and one that understates
+ * is one they act on.
+ */
 const PRICING: Record<string, { input: number; output: number }> = {
   'gpt-4.1': { input: 2.0, output: 8.0 },
   'gpt-4.1-mini': { input: 0.4, output: 1.6 },
   'gpt-4o': { input: 2.5, output: 10.0 },
   'gpt-4o-mini': { input: 0.15, output: 0.6 },
 };
+
+/** The dearest rate in the table, for a model nobody has priced. */
+const UNPRICED = Object.values(PRICING).reduce(
+  (dearest, rate) => ({ input: Math.max(dearest.input, rate.input), output: Math.max(dearest.output, rate.output) }),
+  { input: 0, output: 0 },
+);
+
+const warned = new Set<string>();
+
+/** Models the ledger is guessing about, for a console that wants to say so. */
+export function unpricedModels(): string[] {
+  return [...warned].sort();
+}
+
+/**
+ * Models that answered 400 to a temperature we chose.
+ *
+ * Learned rather than declared, and per process: a worker discovers it once on
+ * its first call and never pays for it again.
+ */
+const FIXED_TEMPERATURE = new Set<string>();
+
+function refusedTemperature(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /temperature/i.test(message) && /unsupported|does not support|not supported/i.test(message);
+}
 
 const ChatResponse = z.object({
   model: z.string().optional(),
@@ -191,9 +248,18 @@ export class OpenAiLlmProvider implements LlmProvider {
     const body: Record<string, unknown> = {
       model,
       messages: this.buildMessages(messages, options),
-      temperature: options.temperature ?? 0.7,
       max_completion_tokens: options.maxOutputTokens ?? 4096,
     };
+    /*
+     * Temperature, where the model still has one.
+     *
+     * Newer models refuse any value but their default and answer 400. A table
+     * of which ones would be wrong within a month — this is exactly the kind of
+     * fact that changes under you — so the first refusal is remembered for the
+     * process and the request is sent again without it. One wasted call per
+     * model per worker, and nothing to keep up to date.
+     */
+    if (!FIXED_TEMPERATURE.has(model)) body['temperature'] = options.temperature ?? 0.7;
     if (mode?.strict) {
       body['response_format'] = {
         type: 'json_schema',
@@ -203,14 +269,25 @@ export class OpenAiLlmProvider implements LlmProvider {
       body['response_format'] = { type: 'json_object' };
     }
 
-    const response = await httpRequest<unknown>(this.name, `${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: this.headers(),
-      body,
-      timeoutMs: 180_000,
-      attempts: 3,
-      signal: context.signal,
-    });
+    const send = () =>
+      httpRequest<unknown>(this.name, `${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.headers(),
+        body,
+        timeoutMs: 180_000,
+        attempts: 3,
+        signal: context.signal,
+      });
+
+    let response: unknown;
+    try {
+      response = await send();
+    } catch (error) {
+      if (!refusedTemperature(error) || FIXED_TEMPERATURE.has(model)) throw error;
+      FIXED_TEMPERATURE.add(model);
+      delete body['temperature'];
+      response = await send();
+    }
 
     const parsed = ChatResponse.safeParse(response);
     if (!parsed.success) {
@@ -276,9 +353,21 @@ function lastUserIndex(messages: LlmMessage[]): number {
 }
 
 export function priceFor(model: string, inputTokens: number, outputTokens: number): number {
-  const pricing = PRICING[model] ?? PRICING['gpt-4.1']!;
+  const known = PRICING[model];
+  if (!known && !warned.has(model)) {
+    warned.add(model);
+    console.warn(`[openai] no price on record for ${model}; the ledger is charging it at the dearest rate we know.`);
+  }
+  const pricing = known ?? UNPRICED;
   return (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
 }
+
+/** What the table holds, for a test and for the console. */
+export function pricedModels(): string[] {
+  return Object.keys(PRICING).sort();
+}
+
+export { DEFAULT_ROUTING };
 
 function estimateTokens(messages: LlmMessage[]): number {
   return Math.ceil(messages.reduce((sum, m) => sum + m.content.length, 0) / 4);

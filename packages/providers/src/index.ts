@@ -5,7 +5,7 @@ export * from './secrets.ts';
 export * from './registry.ts';
 
 export * from './llm/types.ts';
-export { OpenAiLlmProvider, tryParseJson, priceFor } from './llm/openai.ts';
+export { OpenAiLlmProvider, tryParseJson, priceFor, pricedModels, unpricedModels, DEFAULT_ROUTING } from './llm/openai.ts';
 export { toStrictJsonSchema, supportsStrictMode } from './llm/json-schema.ts';
 export { ScriptedLlmProvider, type ScriptedResponse } from './llm/scripted.ts';
 

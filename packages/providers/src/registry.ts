@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AppError, type SpeechQuality } from '@act-one/core';
 import { NullCostSink, ProviderError, type CostSink, type ProviderHealth } from './types.ts';
-import { OpenAiLlmProvider } from './llm/openai.ts';
+import { DEFAULT_ROUTING, OpenAiLlmProvider } from './llm/openai.ts';
 import type { LlmProvider } from './llm/types.ts';
 import { BrowserbaseProvider } from './browser/browserbase.ts';
 import { LocalChromiumProvider } from './browser/local.ts';
@@ -23,16 +23,25 @@ import type { StorageProvider } from './storage/types.ts';
  * capability; the registry decides which vendor serves it, whether it is
  * enabled, and what happens when it fails.
  */
+/*
+ * One source for which model each tier talks to.
+ *
+ * These defaults used to be written out a second time here, beside the ones in
+ * the OpenAI provider, and the two drifted apart the moment either was
+ * touched — a deployment that had never opened the console got one set and a
+ * deployment that had got the other, with no way to tell which from the
+ * outside. The provider owns the answer; this asks it.
+ */
 const LlmConfig = z.object({
   primary: z.enum(['openai']).default('openai'),
   enabled: z.boolean().default(true),
   routing: z
     .object({
-      fast: z.string().default('gpt-4.1-mini'),
-      balanced: z.string().default('gpt-4.1'),
-      deep: z.string().default('gpt-4.1'),
+      fast: z.string().default(DEFAULT_ROUTING.fast),
+      balanced: z.string().default(DEFAULT_ROUTING.balanced),
+      deep: z.string().default(DEFAULT_ROUTING.deep),
     })
-    .default(() => ({ fast: 'gpt-4.1-mini', balanced: 'gpt-4.1', deep: 'gpt-4.1' })),
+    .default(() => ({ ...DEFAULT_ROUTING })),
 });
 
 const BrowserConfig = z.object({
