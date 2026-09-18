@@ -1,7 +1,9 @@
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
 import { installProxyFromEnvironment } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
-import { resolveFfmpeg } from '@act-one/sound';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { DEFAULT_LIBRARY, resolveFfmpeg, validateLibrary } from '@act-one/sound';
 import { buildRegistry, loadConfig, type WorkerConfig } from './config.ts';
 
 /**
@@ -163,6 +165,41 @@ async function preflight(): Promise<void> {
     // worker that can do two thirds of the work beats one that does none.
     log(`motion bundle unavailable, render jobs will fail: ${(error as Error).message}`);
   }
+
+  await checkSoundLibrary();
+}
+
+/**
+ * Says out loud whether this worker can make sound.
+ *
+ * The library manifest has always described files in object storage, and
+ * nothing ever checked that they were there. A worker with no library still
+ * builds a completely correct mix — of nothing — and every film it renders
+ * comes out silent, with no error anywhere to explain it. The manifest's own
+ * comment promised this check; this is it.
+ *
+ * Not fatal, because a silent film is still a film and refusing to start would
+ * take down a worker that can do everything else. Loud, because the failure is
+ * otherwise invisible until somebody plays a master.
+ */
+async function checkSoundLibrary(): Promise<void> {
+  const storage = process.env['ACT_ONE_STORAGE_DIR'];
+  if (!storage) {
+    log('sound library: storage is not local, skipping the check');
+    return;
+  }
+
+  const result = validateLibrary(DEFAULT_LIBRARY, (key) => existsSync(path.join(storage, key)));
+  if (result.ok) {
+    const count = DEFAULT_LIBRARY.music.length + DEFAULT_LIBRARY.sfx.length;
+    log(`sound library: ${count} files present`);
+    return;
+  }
+
+  log(
+    `sound library: ${result.missing.length} file(s) missing — films will render SILENT. ` +
+      `Run \`npm run sound-library\`. First missing: ${result.missing[0]}`,
+  );
 }
 
 /**

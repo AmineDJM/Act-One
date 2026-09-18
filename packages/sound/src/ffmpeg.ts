@@ -60,7 +60,16 @@ function onPath(command: string): Promise<boolean> {
   });
 }
 
-export type FfmpegResult = { ok: true } | { ok: false; code: number | null; stderr: string };
+/**
+ * FFmpeg's output, kept on success as well as on failure.
+ *
+ * Some filters report through stderr rather than through the file they write —
+ * `loudnorm` prints its measurement there, and a two-pass normalisation is
+ * impossible without reading it back.
+ */
+export type FfmpegResult =
+  | { ok: true; stderr: string }
+  | { ok: false; code: number | null; stderr: string };
 
 /**
  * Runs FFmpeg with an argv array.
@@ -98,7 +107,7 @@ export async function runFfmpeg(
 
     child.on('exit', (code) => {
       cleanup();
-      resolve(code === 0 ? { ok: true } : { ok: false, code, stderr });
+      resolve(code === 0 ? { ok: true, stderr } : { ok: false, code, stderr });
     });
 
     function cleanup() {

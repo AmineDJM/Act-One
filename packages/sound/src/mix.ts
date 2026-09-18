@@ -1,4 +1,3 @@
-import { TRUE_PEAK_CEILING } from '@act-one/core';
 import type { SoundDesign, PlacedCue } from './sound-director.ts';
 
 /**
@@ -174,16 +173,18 @@ function buildFilterGraph(inputs: AudioInput[], design: SoundDesign, duration: n
 
   // Two-stage master: a gentle limiter to catch impact transients, then
   // loudness normalisation to the channel target.
-  parts.push(`[premaster]alimiter=limit=0.95:attack=5:release=120[limited]`);
   /*
-   * True peak is held at −1.5 dBTP, half a decibel inside the −1 dBTP ceiling
-   * in EBU R 128. The margin is for the encoder: inter-sample peaks rise on the
-   * way into AAC, and a master that only just clears the ceiling as a WAV can
-   * be over it as the file anybody actually plays.
+   * A gentle limiter to catch impact transients, and then nothing.
+   *
+   * Loudness is deliberately not normalised inside this graph. It used to be,
+   * in one pass, which lands a decibel or two from the target — most of the
+   * tolerance EBU R 128 allows for a whole programme, spent here. The mix now
+   * produces a premaster and `masterLoudness` does the two-pass normalisation
+   * afterwards, using the same code that masters the sound library.
    */
+  parts.push(`[premaster]alimiter=limit=0.95:attack=5:release=120[limited]`);
   parts.push(
-    `[limited]loudnorm=I=${fixed(design.targetLufs)}:TP=${fixed(TRUE_PEAK_CEILING - 0.5)}:LRA=11,` +
-      `atrim=duration=${fixed(duration)},` +
+    `[limited]atrim=duration=${fixed(duration)},` +
       `afade=t=out:st=${fixed(Math.max(0, duration - 0.35))}:d=0.35[mixout]`,
   );
 

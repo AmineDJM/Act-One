@@ -33,6 +33,7 @@ export const MusicTrack = z.object({
   storageKey: z.string(),
   /** Integrated loudness of the source, so the mix starts from a known level. */
   lufs: z.number().default(-16),
+  // (Music is long enough for BS.1770 to have an opinion; see SfxSample.)
   license: z.literal('owned').default('owned'),
 });
 export type MusicTrack = z.infer<typeof MusicTrack>;
@@ -49,6 +50,14 @@ export const SfxSample = z.object({
   kind: SfxKind,
   durationSeconds: z.number().min(0.05).max(8),
   storageKey: z.string(),
+  /**
+   * The level this sample sits at, as dBFS RMS rather than LUFS.
+   *
+   * BS.1770 integrates over gated 400ms blocks, so an 0.18s click has no
+   * integrated loudness: measuring one reports the silence floor for a file
+   * that peaks near 0. RMS is defined at any length and close enough to
+   * loudness for broadband material, which is all of these.
+   */
   lufs: z.number().default(-18),
   /** Seconds before the nominal hit point. Impacts need pre-roll to land on the cut. */
   preRoll: z.number().min(0).max(1).default(0),

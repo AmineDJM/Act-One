@@ -17,7 +17,16 @@ import {
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
-import { buildMix, directSound, mixArgs, muxArgs, posterArgs, runFfmpeg, DEFAULT_LIBRARY } from '@act-one/sound';
+import {
+  buildMix,
+  directSound,
+  masterLoudness,
+  mixArgs,
+  muxArgs,
+  posterArgs,
+  runFfmpeg,
+  DEFAULT_LIBRARY,
+} from '@act-one/sound';
 import { factCheck, planRepairs, applyRepairs, runDeterministicChecks, selectFramesToInspect, inspectFrame } from '@act-one/qa';
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planFor } from '../entitlements.ts';
@@ -127,7 +136,7 @@ export async function runRender(
     const maxAttempts = options.maxRepairAttempts ?? 2;
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
-      masterPath = await renderOnce(context, {
+      const rendered = await renderOnce(context, {
         render,
         storyboard: current,
         brand,
@@ -138,6 +147,7 @@ export async function runRender(
         workDir,
         attempt,
       });
+      masterPath = rendered.path;
 
       issues = await inspect(context, {
         storyboard: current,
@@ -147,6 +157,34 @@ export async function runRender(
         workDir,
         skipVision: options.skipVisionQa ?? false,
       });
+
+      /*
+       * A film that was scored and came out silent. Reported rather than
+       * repaired, because no change to the storyboard fixes it: the library is
+       * not provisioned, and that is an operator's job. A major rather than a
+       * blocker, because the picture is finished and withholding it helps
+       * nobody — but it never ships unremarked.
+       */
+      if (rendered.missingAudio.length > 0) {
+        issues = [
+          ...issues,
+          {
+            id: newId('evt'),
+            sceneId: null,
+            atSeconds: null,
+            detectedBy: 'deterministic',
+            evidenceAssetId: null,
+            check: 'missing_audio',
+            severity: 'major',
+            message:
+              `The sound library is missing ${rendered.missingAudio.length} file(s), so this film ` +
+              `is silent where it was scored. Run \`npm run sound-library\`. ` +
+              `First missing: ${rendered.missingAudio[0]}`,
+            confidence: 1,
+            repair: 'manual_review',
+          },
+        ];
+      }
 
       const report = await store.qaReports.create(
         {
@@ -306,7 +344,7 @@ async function renderOnce(
     attempt: number;
     system: ReturnType<typeof getSystem>;
   },
-): Promise<string> {
+): Promise<{ path: string; missingAudio: string[] }> {
   const { storyboard, brand, system } = params;
 
   await context.progress(0.15, params.attempt === 0 ? 'Rendering the film' : 'Re-rendering repaired scenes');
@@ -349,10 +387,9 @@ async function renderOnce(
     hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
   });
 
-  // Resolve library assets to local paths. Anything missing is simply absent
-  // from the mix rather than failing the render — a film with no whoosh is
-  // still a film.
-  const resolvedPaths = await resolveLibraryPaths(context, design);
+  // A film with no whoosh is still a film, so a missing asset never fails the
+  // render — but it is reported, and the caller turns it into a QA finding.
+  const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
   const voiceTracks = await speakNarration(context, storyboard, params.workDir, params.attempt);
   const plan = buildMix({
     design,
@@ -361,8 +398,8 @@ async function renderOnce(
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
 
-  const audioPath = path.join(params.workDir, `mix-${params.attempt}.m4a`);
-  const mixed = await runFfmpeg(mixArgs(plan, audioPath), {
+  const premasterPath = path.join(params.workDir, `premix-${params.attempt}.m4a`);
+  const mixed = await runFfmpeg(mixArgs(plan, premasterPath), {
     signal: context.signal,
     timeoutMs: 300_000,
   });
@@ -370,18 +407,55 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return silentPath;
+    return { path: silentPath, missingAudio };
   }
 
   await context.progress(0.72, 'Mixing');
 
+  /*
+   * The master, in two passes, by the same code that masters the sound library.
+   *
+   * The mix used to normalise itself in one pass inside its own filter graph,
+   * which lands a decibel or two from the target — most of the tolerance
+   * EBU R 128 allows for a whole programme, spent before the film is even
+   * muxed. A measured pass costs seconds against a render that costs minutes.
+   */
+  const audioPath = path.join(params.workDir, `mix-${params.attempt}.m4a`);
+  try {
+    await masterLoudness({
+      source: premasterPath,
+      target: audioPath,
+      lufs: design.targetLufs,
+      outputArgs: ['-c:a', 'aac', '-b:a', '192k'],
+      ...(context.signal ? { signal: context.signal } : {}),
+      timeoutMs: 300_000,
+    });
+  } catch (error) {
+    // The premaster is a finished mix at the wrong level, which is a far better
+    // film than no sound at all.
+    console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
+    await rm(audioPath, { force: true });
+    return await mux(context, silentPath, premasterPath, params, missingAudio);
+  }
+
+  return await mux(context, silentPath, audioPath, params, missingAudio);
+}
+
+/** Puts the picture and the mix together, falling back to the silent cut. */
+async function mux(
+  context: StageContext,
+  silentPath: string,
+  audioPath: string,
+  params: { workDir: string; attempt: number },
+  missingAudio: string[],
+): Promise<{ path: string; missingAudio: string[] }> {
   const masterPath = path.join(params.workDir, `master-${params.attempt}.mp4`);
   const muxed = await runFfmpeg(muxArgs(silentPath, audioPath, masterPath), {
     signal: context.signal,
     timeoutMs: 300_000,
   });
 
-  return muxed.ok ? masterPath : silentPath;
+  return { path: muxed.ok ? masterPath : silentPath, missingAudio };
 }
 
 async function inspect(
@@ -542,10 +616,18 @@ export function speakingRateFor(narration: string, seconds: number): number {
   return Math.min(1.15, Math.max(0.85, needed / seconds));
 }
 
+/**
+ * Resolves the library assets this sound design asks for.
+ *
+ * Anything missing is reported rather than only skipped. A mix that quietly
+ * drops every track it cannot find still produces a perfectly valid, entirely
+ * silent film — which is how an unprovisioned library goes unnoticed until
+ * somebody plays a master and wonders why a launch film has no sound.
+ */
 async function resolveLibraryPaths(
   context: StageContext,
   design: ReturnType<typeof directSound>,
-): Promise<Record<string, string>> {
+): Promise<{ resolved: Record<string, string>; missing: string[] }> {
   const keys = [
     ...(design.music ? [design.music.storageKey] : []),
     ...design.cues.map((cue) => cue.storageKey).filter((key): key is string => key !== null),
@@ -553,16 +635,19 @@ async function resolveLibraryPaths(
 
   const storage = context.registry.storage();
   const resolved: Record<string, string> = {};
+  const missing: string[] = [];
 
   await Promise.all(
     [...new Set(keys)].map(async (key) => {
       if (await storage.exists(key)) {
         resolved[key] = await storage.signedUrl(key, 3600);
+      } else {
+        missing.push(key);
       }
     }),
   );
 
-  return resolved;
+  return { resolved, missing: missing.sort() };
 }
 
 export { DEFAULT_LIBRARY };

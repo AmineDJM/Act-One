@@ -69,7 +69,7 @@ packages/
   design/           Deterministic design engine: colour, type metrics, grid, SVG
   motion/           Remotion components and the film composition
   three-d/          Blender rigs, driven by structured parameters
-  sound/            Sound Director, licensed library, FFmpeg mix graph
+  sound/            Sound Director, synthesised library, FFmpeg mix graph
   qa/               Deterministic checks, fact check, vision QA, repair planning
   pipeline/         Stages and the job runner
 ```
@@ -98,13 +98,28 @@ With a database:
 
 ```bash
 npm run migrate          # schema + row-level security
+npm run sound-library    # ~2 min, once — see below
 npm run worker           # in a second terminal
 ```
+
+### The sound library
+
+Act One scores its own films. Nothing in the library is licensed, sampled or
+bought: the seven tracks and twelve effects are synthesised from scores in
+`packages/sound/src/scores.ts`, rendered by `npm run sound-library`, and
+mastered to the loudness each one declares. They stay out of the repository
+because they are output, not source — a couple of hundred megabytes that the
+scores reproduce byte for byte on any machine.
+
+Until it has run, the manifest describes files that are not there. The mix is
+still built correctly, out of nothing, and every film comes out silent. The
+worker says so at startup, and any film rendered without it carries a QA
+finding rather than shipping quietly.
 
 ### Verify
 
 ```bash
-npm run verify           # typecheck + 258 tests
+npm run verify           # typecheck + tests
 ```
 
 ---
