@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ReferralProgram } from './referral.ts';
 
 /**
  * Where the product is in its life, decided in one place.
@@ -58,6 +59,8 @@ export const ProductConfig = z.object({
   trademarkStatus: TrademarkStatus.default('none'),
   landing: LandingConfig.default(() => LandingConfig.parse({})),
   invites: InviteConfig.default(() => InviteConfig.parse({})),
+  /** The referral programme's rules; see domain/referral.ts. */
+  referrals: ReferralProgram.default(() => ReferralProgram.parse({})),
 });
 export type ProductConfig = z.infer<typeof ProductConfig>;
 export const DEFAULT_PRODUCT_CONFIG: ProductConfig = ProductConfig.parse({});

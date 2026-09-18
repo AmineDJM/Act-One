@@ -149,6 +149,28 @@ once and closes the staff door until they submit again. The public film route
 and the sitemap, the landing page's *Selected work* and the structured data
 (`VideoObject`, `BreadcrumbList`) read the same list.
 
+### Referrals
+
+A customer who brings another founder is paid in credits, and the programme
+is deliberately hard to game. Everyone gets a durable link with their name in
+it — `/invite/AMINE` — which is the same address a workspace invitation uses,
+resolved to whichever it is. Somebody who signs up through it is recorded
+once, against their account, and **nothing is paid at that moment**: an
+account that merely exists is worth nothing, so the reward lands only when
+the person they brought produces their first film or starts paying, whichever
+the programme asks for.
+
+The rules live in the console under *Referrals*: what each side receives, the
+bonus when an invited workspace first pays, one-off tier bonuses, and the
+ceiling on how many referrals one person may ever be rewarded for. A
+self-referral, a referral into a workspace the inviter is already in, a second
+referral of the same person, and anything over the ceiling are all recorded as
+refused *with the reason*, so an operator asking "why did this earn nothing?"
+finds an answer rather than an absence. The payout decision itself lives in
+`packages/db/src/referrals.ts`, because a film becomes ready inside the worker
+while a payment clears inside the app, and the two must never answer
+differently.
+
 ## The pipeline
 
 ```

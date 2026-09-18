@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { inviteRefusal } from '@act-one/core';
 import { getCurrentUser, hashToken } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { referralCodeByCode } from '@/server/referrals.ts';
 import { AcceptInvite } from './AcceptInvite.tsx';
 import { Wordmark } from '@/components/ui/Wordmark.tsx';
 import styles from '../../auth/auth.module.css';
@@ -23,6 +24,20 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const store = getStore();
 
   const invitation = await store.invitations.findByTokenHash(hashToken(token));
+
+  /*
+   * The same address serves two invitations.
+   *
+   * A workspace invitation is a long random token; a referral code is a
+   * person's name. When the token is not a workspace invitation but is
+   * somebody's live referral code, this is /invite/AMINE — the public link a
+   * customer shares — and it belongs on the sign-up page with the code
+   * already filled in.
+   */
+  if (!invitation) {
+    const referral = await referralCodeByCode(token);
+    if (referral) redirect(`/auth/sign-up?code=${encodeURIComponent(referral.code.code)}&from=${encodeURIComponent(referral.inviterName)}`);
+  }
   const refusal = inviteRefusal(invitation);
   const organization = invitation ? await store.organizations.get(invitation.organizationId) : null;
   const user = await getCurrentUser();

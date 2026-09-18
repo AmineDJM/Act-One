@@ -204,6 +204,8 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
       if (session.metadata?.['kind'] === 'credits') {
         const credits = Number(session.metadata['credits'] ?? 0);
         if (credits > 0) await store.organizations.adjustCredits(organizationId, credits);
+        // Money is the strongest signal a referral was real.
+        await rewardReferralFor(organizationId);
         return { handled: true, note: `Added ${credits} credits.` };
       }
       return { handled: true, note: 'Checkout completed; subscription event will follow.' };
@@ -239,6 +241,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
       if (event.type === 'customer.subscription.created' && plan.limits.monthlyCredits > 0) {
         await store.organizations.adjustCredits(organizationId, plan.limits.monthlyCredits);
       }
+      if (event.type === 'customer.subscription.created') await rewardReferralFor(organizationId);
 
       return { handled: true, note: `Subscription ${subscription.status}.` };
     }
@@ -294,5 +297,20 @@ function mapStatus(status: Stripe.Subscription.Status) {
       return 'canceled' as const;
     default:
       return 'incomplete' as const;
+  }
+}
+
+/**
+ * Pays the referral that brought this workspace, if any.
+ *
+ * Kept out of the webhook's own control flow: a referral programme must
+ * never be the reason a payment fails to record.
+ */
+async function rewardReferralFor(organizationId: string): Promise<void> {
+  try {
+    const { advanceReferral } = await import('./referrals.ts');
+    await advanceReferral(organizationId, 'paid');
+  } catch (error) {
+    console.error('[stripe] referral reward failed', error);
   }
 }

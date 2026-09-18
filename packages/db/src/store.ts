@@ -9,6 +9,8 @@ import type {
   CollectionCategory,
   CollectionEntry,
   CollectionStatus,
+  Referral,
+  ReferralStage,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -90,6 +92,7 @@ export interface Store {
   readonly invites: InviteRepo;
   readonly applications: BetaApplicationRepo;
   readonly collections: CollectionRepo;
+  readonly referrals: ReferralRepo;
   readonly brandVoices: BrandVoiceRepo;
   readonly voiceConsents: VoiceConsentRepo;
   readonly voiceSettings: VoiceSettingsRepo;
@@ -545,6 +548,24 @@ export interface CollectionRepo {
   list(query?: CollectionQuery): Promise<CollectionEntry[]>;
   update(id: string, patch: Partial<CollectionEntry>): Promise<CollectionEntry>;
   countByStatus(): Promise<Record<string, number>>;
+}
+
+/** Who brought whom, and what it paid. */
+export type ReferralQuery = { inviterUserId?: string; stage?: ReferralStage; limit?: number };
+
+export interface ReferralRepo {
+  /** One referral per invited person, ever: a second attempt is a conflict. */
+  create(referral: Referral): Promise<Referral>;
+  get(id: string): Promise<Referral | null>;
+  /** The referral that brought this person, if any. */
+  getForInvitedUser(invitedUserId: string): Promise<Referral | null>;
+  /** The referral whose invited workspace this is, so a payment can find it. */
+  getForInvitedOrganization(organizationId: string): Promise<Referral | null>;
+  list(query?: ReferralQuery): Promise<Referral[]>;
+  update(id: string, patch: Partial<Referral>): Promise<Referral>;
+  /** How many of this person's referrals have ever been rewarded. */
+  countRewardedFor(inviterUserId: string): Promise<number>;
+  countByStage(): Promise<Record<string, number>>;
 }
 
 /** Requests for access while the product is by invitation. */

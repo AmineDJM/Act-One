@@ -27,6 +27,7 @@ import type {
   BetaApplication,
   BetaApplicationStatus,
   CollectionEntry,
+  Referral,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -62,7 +63,7 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -96,6 +97,7 @@ export class MemoryStore implements Store {
     redemptions: new Map<string, InviteRedemption>(),
     applications: new Map<string, BetaApplication>(),
     collections: new Map<string, CollectionEntry>(),
+    referrals: new Map<string, Referral>(),
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
@@ -197,6 +199,43 @@ export class MemoryStore implements Store {
     countByStatus: async () => {
       const counts: Record<string, number> = {};
       for (const entry of this.tables.collections.values()) counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+      return counts;
+    },
+  };
+
+  readonly referrals = {
+    create: async (referral: Referral) => {
+      // One referral per invited person, ever.
+      for (const existing of this.tables.referrals.values()) {
+        if (existing.invitedUserId === referral.invitedUserId) throw new AppError('conflict', 'This person was already referred.');
+      }
+      this.tables.referrals.set(referral.id, referral);
+      return referral;
+    },
+    get: async (id: string) => this.tables.referrals.get(id) ?? null,
+    getForInvitedUser: async (invitedUserId: string) =>
+      [...this.tables.referrals.values()].find((referral) => referral.invitedUserId === invitedUserId) ?? null,
+    getForInvitedOrganization: async (organizationId: string) =>
+      [...this.tables.referrals.values()]
+        .filter((referral) => referral.invitedOrganizationId === organizationId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0] ?? null,
+    list: async (query: ReferralQuery = {}) =>
+      [...this.tables.referrals.values()]
+        .filter((referral) => !query.inviterUserId || referral.inviterUserId === query.inviterUserId)
+        .filter((referral) => !query.stage || referral.stage === query.stage)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, query.limit ?? 200),
+    update: async (id: string, patch: Partial<Referral>) => {
+      const existing = this.require(this.tables.referrals.get(id), 'Referral');
+      const next = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
+      this.tables.referrals.set(id, next);
+      return next;
+    },
+    countRewardedFor: async (inviterUserId: string) =>
+      [...this.tables.referrals.values()].filter((referral) => referral.inviterUserId === inviterUserId && referral.rewardedAt !== null).length,
+    countByStage: async () => {
+      const counts: Record<string, number> = {};
+      for (const referral of this.tables.referrals.values()) counts[referral.stage] = (counts[referral.stage] ?? 0) + 1;
       return counts;
     },
   };

@@ -1109,3 +1109,31 @@
 .submitForm { display: grid; gap: var(--space-4); }
 .submitGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 @media (max-width: 640px) { .submitGrid { grid-template-columns: 1fr; } }
+
+/* --- invitations ------------------------------------------------------------------ */
+.referPanel { margin-bottom: var(--space-5); }
+.referLink { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.referLink code {
+  flex: 1;
+  min-width: 260px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.referList { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.referList li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.referList li:last-child { border-bottom: 0; }

@@ -46,6 +46,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .map((candidate) => ({ id: candidate.id, name: candidate.name }));
 
   const credits = organization?.creditBalance ?? 0;
+  // The invitation link appears only while the programme is running.
+  const { getReferralProgram } = await import('@/server/referrals.ts');
+  const referrals = (await getReferralProgram().catch(() => null))?.enabled ?? false;
   const policy = await getSignUpPolicy();
 
   return (
@@ -59,6 +62,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className={styles.credits} data-empty={credits === 0} title="Creative credits">
             {credits.toLocaleString('en-US')} credits
           </span>
+          {/* The one way in to the referral page: beside the credits it earns. */}
+          {referrals ? (
+            <Link href="/app/refer" className={styles.console} title="Invite a founder">
+              Invite
+            </Link>
+          ) : null}
           {session.user.isSuperAdmin ? (
             <Link href="/admin" className={styles.console}>
               Console

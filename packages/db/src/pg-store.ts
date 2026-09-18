@@ -1,4 +1,4 @@
-import { Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema } from '@act-one/core';
+import { Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, Referral as ReferralSchema } from '@act-one/core';
 import {
   AppError,
   newId,
@@ -25,6 +25,7 @@ import type {
   BetaApplication,
   BetaApplicationStatus,
   CollectionEntry,
+  Referral,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -61,7 +62,7 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -2440,6 +2441,92 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly referrals = {
+    create: async (referral: Referral) =>
+      this.asPlatform(async (c) => {
+        try {
+          await c.query(
+            `INSERT INTO referrals
+               (id, code, invite_code_id, inviter_user_id, invited_user_id, invited_organization_id, stage,
+                inviter_credits_granted, invited_credits_granted, rewarded_at, created_at, updated_at, data)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [
+              referral.id, referral.code, referral.inviteCodeId, referral.inviterUserId, referral.invitedUserId,
+              referral.invitedOrganizationId, referral.stage, referral.inviterCreditsGranted, referral.invitedCreditsGranted,
+              referral.rewardedAt, referral.createdAt, referral.updatedAt, referral,
+            ],
+          );
+        } catch (error) {
+          // One referral per invited person, ever: the constraint is the rule.
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'This person was already referred.');
+          throw error;
+        }
+        return referral;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM referrals WHERE id = $1', [id]);
+        return r.rows[0] ? referralFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getForInvitedUser: async (invitedUserId: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM referrals WHERE invited_user_id = $1', [invitedUserId]);
+        return r.rows[0] ? referralFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getForInvitedOrganization: async (organizationId: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM referrals WHERE invited_organization_id = $1 ORDER BY created_at LIMIT 1', [organizationId]);
+        return r.rows[0] ? referralFromRow(r.rows[0]['data']) : null;
+      }),
+
+    list: async (query: ReferralQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const where: string[] = [];
+        const params: unknown[] = [];
+        const bind = (value: unknown) => `$${params.push(value)}`;
+        if (query.inviterUserId) where.push(`inviter_user_id = ${bind(query.inviterUserId)}`);
+        if (query.stage) where.push(`stage = ${bind(query.stage)}`);
+        const r = await c.query(
+          `SELECT data FROM referrals ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+           ORDER BY created_at DESC LIMIT ${Math.min(Math.max(query.limit ?? 200, 1), 1000)}`,
+          params,
+        );
+        return r.rows.map((row) => referralFromRow(row['data']));
+      }),
+
+    update: async (id: string, patch: Partial<Referral>) =>
+      this.asPlatform(async (c) => {
+        const current = await c.query('SELECT data FROM referrals WHERE id = $1 FOR UPDATE', [id]);
+        if (!current.rows[0]) throw notFound('Referral');
+        const next: Referral = { ...referralFromRow(current.rows[0]['data']), ...patch, id, updatedAt: new Date().toISOString() };
+        await c.query(
+          `UPDATE referrals SET stage = $2, inviter_credits_granted = $3, invited_credits_granted = $4,
+             rewarded_at = $5, data = $6, updated_at = now()
+           WHERE id = $1`,
+          [id, next.stage, next.inviterCreditsGranted, next.invitedCreditsGranted, next.rewardedAt, next],
+        );
+        return next;
+      }),
+
+    countRewardedFor: async (inviterUserId: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ count: number }>(
+          'SELECT COUNT(*)::int AS count FROM referrals WHERE inviter_user_id = $1 AND rewarded_at IS NOT NULL',
+          [inviterUserId],
+        );
+        return num(r.rows[0]?.count ?? 0);
+      }),
+
+    countByStage: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ stage: string; count: number }>('SELECT stage, COUNT(*)::int AS count FROM referrals GROUP BY stage');
+        return Object.fromEntries(r.rows.map((row) => [row.stage, num(row.count)]));
+      }),
+  };
+
   readonly applications = {
     create: async (application: BetaApplication) =>
       this.asPlatform(async (c) => {
@@ -2725,6 +2812,10 @@ function brandFromRow(data: unknown): BrandSystem {
 }
 
 /** An entry as stored, brought up to the current shape. */
+function referralFromRow(data: unknown): Referral {
+  return ReferralSchema.parse(data);
+}
+
 function collectionFromRow(data: unknown): CollectionEntry {
   return CollectionEntrySchema.parse(data);
 }

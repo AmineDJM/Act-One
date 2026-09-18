@@ -6,6 +6,7 @@ import { signIn, signUp } from '@/server/auth.ts';
 import { createProject } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
 import { applyForAccess, redeemInvite, signUpGate } from '@/server/product.ts';
+import { recordReferral } from '@/server/referrals.ts';
 
 export type AuthState = { error: string | null };
 
@@ -31,6 +32,8 @@ export async function signUpAction(_previous: AuthState, formData: FormData): Pr
       name: String(formData.get('name') ?? '') || undefined,
     });
     await redeemInvite(gate.code, session.user.id);
+    // Who brought them, recorded once. Nothing is paid until they produce.
+    await recordReferral(gate.code, session);
 
     const website = normalizeUrl(String(formData.get('website') ?? ''));
     if (website) {

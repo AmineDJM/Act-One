@@ -355,6 +355,17 @@ export async function runRender(
           {},
     );
 
+    // A finished film is what a referral was waiting for. Never allowed to
+    // fail the render: the customer's film is delivered either way.
+    if (kind === 'film' && passed) {
+      try {
+        const { advanceReferral } = await import('@act-one/db');
+        await advanceReferral(store, organizationId, 'film_ready');
+      } catch (error) {
+        console.error('[render] referral reward failed', error);
+      }
+    }
+
     await context.activity({
       step: 'composition',
       kind: 'step',

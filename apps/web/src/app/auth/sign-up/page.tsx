@@ -31,11 +31,14 @@ export default async function SignUpPage({
 
   const policy = await getSignUpPolicy();
   const code = normalizeInviteCode(typeof params['code'] === 'string' ? params['code'] : '');
+  // Somebody arrived on a customer's link: their name, as they wrote it.
+  const from = typeof params['from'] === 'string' ? params['from'].slice(0, 60) : '';
 
   return (
     <div className={styles.wrap}>
       <div className={styles.panel}>
         <Wordmark tag={policy.tag ?? undefined} />
+        {from ? <p className={styles.foot}>{from} invited you to {'\u00A0'}Act One.</p> : null}
         <SignUpForm website={website} next={next} policy={policy} code={code} />
         <p className={styles.foot}>
           Already have an account?{' '}
