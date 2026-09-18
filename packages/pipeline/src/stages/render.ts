@@ -22,6 +22,8 @@ import {
   type Render,
   type RenderKind,
   type RenderQuality,
+  weakestDimensions,
+  type DirectorsVerdict,
   type Storyboard,
   type SpeechQuality,
   directVoice,
@@ -55,8 +57,12 @@ import {
   rangeIssues,
   redFlashIssues,
   redness,
+  buildContactSheet,
+  redirectFor,
+  reviewCut,
   runDeterministicChecks,
   selectFramesToInspect,
+  verdictIssues,
   verifyMaster,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
@@ -224,6 +230,7 @@ export async function runRender(
         workDir,
         skipVision: options.skipVisionQa ?? false,
         understanding,
+        attempt,
       });
 
       /*
@@ -921,6 +928,8 @@ async function inspect(
     workDir: string;
     skipVision: boolean;
     understanding: ProductUnderstanding | null;
+    /** Which pass this is. The director only sends a shot back on the first. */
+    attempt: number;
   },
 ): Promise<QaIssue[]> {
   const { registry, project, organizationId } = context;
@@ -988,7 +997,144 @@ async function inspect(
     }
   }
 
+  const verdict = await askTheDirector(context, params);
+  if (verdict) {
+    issues.push(...verdictIssues(verdict));
+
+    /*
+     * One shot back, on the first pass only.
+     *
+     * A director who does not change anything is a critic, and the whole
+     * complaint about a generated film is that nothing sends it back. So the
+     * weakest shot becomes an ordinary repairable finding and goes through the
+     * machinery that already re-directs shots and re-renders — no second loop,
+     * no second set of bounds.
+     *
+     * First pass only, and one shot, because taste is not convergent: a
+     * reviewer asked again about a film it has already sent back will find
+     * something else to send back, for ever, on the customer's money.
+     */
+    const back = params.attempt === 0 ? redirectFor(verdict, params.storyboard.scenes) : null;
+    if (back) {
+      issues.push({
+        id: newId('evt'),
+        check: 'direction',
+        // Major rather than blocker: it earns a second attempt at one shot,
+        // and it can never be the reason a finished film is withheld.
+        severity: 'major',
+        sceneId: back.sceneId,
+        atSeconds: null,
+        message: `The weakest shot in the cut: ${back.reason}`,
+        evidenceAssetId: null,
+        confidence: 0.7,
+        repair: 'regenerate_shot',
+        detectedBy: 'vision',
+      });
+    }
+  }
+
   return issues;
+}
+
+/**
+ * The cut, watched as a cut.
+ *
+ * Every check above this line asks whether something is wrong, and by the time
+ * they have all passed the film may still be one nobody remembers — which is
+ * the normal outcome of generating one and the only failure none of them can
+ * see. The director is shown the whole film at once, as a contact sheet, with
+ * the shot list and the script, and grades it on a scale where "nothing wrong
+ * with it" is a failing grade.
+ *
+ * It never blocks. A film the customer paid for is not withheld over taste,
+ * and a model's opinion is not a reason to stop a delivery. What it earns is
+ * one shot sent back where a shot can be sent back, and otherwise a note that
+ * says plainly what it thought — which is worth more to the person deciding
+ * whether to ship than a silent pass.
+ */
+async function askTheDirector(
+  context: StageContext,
+  params: {
+    storyboard: Storyboard;
+    masterPath: string;
+    workDir: string;
+    understanding: ProductUnderstanding | null;
+    brand: NonNullable<Awaited<ReturnType<StageContext['store']['brands']['get']>>>;
+  },
+): Promise<DirectorsVerdict | null> {
+  const scenes = params.storyboard.scenes;
+  if (scenes.length === 0) return null;
+
+  await context.progress(0.9, 'Watching it back');
+  await context.activity({ step: 'composition', kind: 'step', label: 'watching the cut back', status: 'active' });
+
+  const frames: { sceneId: string; atSeconds: number; data: Uint8Array }[] = [];
+  for (const scene of scenes) {
+    // Six tenths in: the motion has settled and the shot is not yet leaving.
+    const atSeconds = scene.startTime + scene.duration * 0.6;
+    const framePath = path.join(params.workDir, `cut-${scene.id}.jpg`);
+    const extracted = await runFfmpeg(posterArgs(params.masterPath, atSeconds, framePath), {
+      signal: context.signal,
+      timeoutMs: 60_000,
+    });
+    if (!extracted.ok) continue;
+    frames.push({ sceneId: scene.id, atSeconds, data: new Uint8Array(await readFile(framePath)) });
+  }
+  if (frames.length === 0) return null;
+
+  try {
+    const sheet = await buildContactSheet(frames);
+    const verdict = await reviewCut(
+      context.registry.llm(),
+      {
+        storyboard: params.storyboard,
+        contactSheet: {
+          url: `data:image/png;base64,${Buffer.from(sheet.png).toString('base64')}`,
+          shots: sheet.shots,
+        },
+        brief: params.understanding
+          ? `${params.understanding.name}: ${params.understanding.oneLiner}`
+          : context.project.name,
+        tone: params.brand.tone,
+      },
+      { organizationId: context.organizationId, projectId: context.project.id, signal: context.signal },
+    );
+
+    /*
+     * The whole verdict on the job's own timeline, which the console already
+     * renders. An operator asking why a shot was sent back, or why a film that
+     * passed every check still reads flat, gets the reasoning where they are
+     * already looking rather than in a report nothing displays.
+     */
+    await context.activity({
+      step: 'composition',
+      kind: 'note',
+      label: `the director says: ${verdict.grade}`,
+      detail: verdict.summary,
+      status: 'done',
+    });
+    for (const note of weakestDimensions(verdict)) {
+      await context.activity({
+        step: 'composition',
+        kind: 'note',
+        label: `${note.dimension}: ${note.grade}`,
+        detail: note.atSeconds === null ? note.note : `${note.atSeconds.toFixed(1)}s — ${note.note}`,
+        status: 'done',
+      });
+    }
+    await context.activity({
+      step: 'composition',
+      kind: 'note',
+      label: 'one change would lift it',
+      detail: verdict.oneChange,
+      status: 'done',
+    });
+    return verdict;
+  } catch (error) {
+    // An opinion nobody could obtain is not a reason to fail a finished film.
+    console.error('[render] the director could not watch it:', (error as Error).message.slice(0, 200));
+    return null;
+  }
 }
 
 /**

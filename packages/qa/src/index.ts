@@ -5,3 +5,4 @@ export * from './repair.ts';
 export * from './flash.ts';
 export * from './container.ts';
 export * from './palette.ts';
+export * from './director.ts';

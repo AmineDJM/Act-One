@@ -36,6 +36,8 @@ export const QaCheck = z.enum([
   /* The captions, read back at the speed a viewer reads. */
   'caption_readability',
   'captions_missing',
+  /* Not a defect. The one judgement here with no arithmetic behind it. */
+  'direction',
 ]);
 export type QaCheck = z.infer<typeof QaCheck>;
 
