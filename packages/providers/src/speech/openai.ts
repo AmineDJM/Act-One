@@ -1,4 +1,4 @@
-import { AppError, NARRATION_WORDS_PER_SECOND, type VoiceDirection } from '@act-one/core';
+import { AppError, estimateNarrationSeconds, type VoiceDirection } from '@act-one/core';
 import { httpRequest } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import {
@@ -285,16 +285,5 @@ export function languageCode(heard: string | null | undefined): string | null {
   return ISO_BY_ENGLISH_NAME[key] ?? null;
 }
 
-/**
- * Timing estimate used by the storyboard engine before any audio exists, so
- * scene durations can be set against real narration length rather than guessed
- * and then corrected after an expensive render.
- */
-export function estimateNarrationSeconds(text: string, rate = 1): number {
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  const base = words / NARRATION_WORDS_PER_SECOND;
-  // Sentence breaks carry real pauses; a naive words-per-second estimate runs
-  // consistently short and pushes narration past the cut.
-  const sentences = (text.match(/[.!?]+/g) ?? []).length;
-  return Math.round(((base + sentences * 0.32) / rate) * 100) / 100;
-}
+/** The estimate lives in the domain now; kept here for the callers that import it from the provider. */
+export { estimateNarrationSeconds };

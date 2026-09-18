@@ -23,6 +23,16 @@ export const Entitlement = z.enum([
   'variants.basic',
   'variants.campaign',
   'voice.synthetic',
+  /** Finals read by the premium engine; without it, the preview voice reads everything. */
+  'voice.premium',
+  /** Alternative reads of each passage, chosen by QA and offered to the customer. */
+  'voice.takes',
+  /** A brand voice: one narrator kept across every film and cut. */
+  'voice.brand',
+  /** Cloning a person's voice, under recorded consent. */
+  'voice.clone',
+  /** Audio editions: a written piece adapted, read and mastered for listening. */
+  'audio.editions',
   'formats.vertical',
   'formats.all',
   'team.members',
@@ -124,6 +134,7 @@ export const DEFAULT_PLANS: Plan[] = [
       'variants.basic',
       'formats.vertical',
       'voice.synthetic',
+      'voice.premium',
       'product.credentials',
     ],
     limits: {
@@ -163,6 +174,10 @@ export const DEFAULT_PLANS: Plan[] = [
       'formats.all',
       'formats.vertical',
       'voice.synthetic',
+      'voice.premium',
+      'voice.takes',
+      'voice.brand',
+      'audio.editions',
       'product.credentials',
       'revisions.unlimited',
       'team.members',

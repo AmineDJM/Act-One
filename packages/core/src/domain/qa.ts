@@ -26,6 +26,13 @@ export const QaCheck = z.enum([
   'missing_audio',
   'fake_product_ui',
   'legible_generated_text',
+  /* The voice, listened back to. */
+  'narration_language',
+  'narration_accuracy',
+  'narration_timing',
+  'narration_pause',
+  'narration_truncated',
+  'narration_loudness',
 ]);
 export type QaCheck = z.infer<typeof QaCheck>;
 
@@ -42,6 +49,7 @@ export const RepairAction = z.enum([
   'swap_asset',
   'adjust_contrast',
   'remix_audio',
+  'regenerate_voice',
   'remove_scene',
   'manual_review',
 ]);

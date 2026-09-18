@@ -1,3 +1,4 @@
+import { NARRATION_WORDS_PER_SECOND } from '../standards/typography.ts';
 import type { PronunciationRule } from './voice.ts';
 
 /**
@@ -420,4 +421,25 @@ function spokenPunctuation(text: string): string {
 
 function escape(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+
+// ---------------------------------------------------------------------------
+// Timing
+// ---------------------------------------------------------------------------
+
+/**
+ * How long a line takes to say, before any audio exists.
+ *
+ * Used by the storyboard engine to set scene durations against real
+ * narration length, and by the narration engine to decide whether a line
+ * fits its room or has to be rewritten shorter. Sentence breaks carry real
+ * pauses; a naive words-per-second estimate runs consistently short and
+ * pushes narration past the cut.
+ */
+export function estimateNarrationSeconds(text: string, rate = 1): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const base = words / NARRATION_WORDS_PER_SECOND;
+  const sentences = (text.match(/[.!?]+/g) ?? []).length;
+  return Math.round(((base + sentences * 0.32) / rate) * 100) / 100;
 }

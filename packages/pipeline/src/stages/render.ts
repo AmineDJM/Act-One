@@ -23,8 +23,7 @@ import {
   type RenderKind,
   type RenderQuality,
   type Storyboard,
-  TONE_LABELS,
-  adaptForSpeech,
+  type SpeechQuality,
   directVoice,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
@@ -61,7 +60,8 @@ import {
   verifyMaster,
 } from '@act-one/qa';
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
-import { masterTermsFor, planFor } from '../entitlements.ts';
+import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
+import { narrate } from '../narration.ts';
 
 /**
  * The render stage.
@@ -115,9 +115,17 @@ export async function runRender(
    * Cuts inherit the film's terms. An animatic is neither: it is a preview at
    * preview resolution whatever anybody is paying.
    */
-  const terms = masterTermsFor(await planFor(store, organizationId));
+  const plan = await planFor(store, organizationId);
+  const terms = masterTermsFor(plan);
   const quality = options.quality ?? (kind === 'animatic' ? 'preview' : terms.quality);
   const watermarked = kind === 'animatic' ? false : terms.watermarked;
+  // The voice, by entitlement and never by plan name: the premium engine for
+  // finals, alternative takes where the plan carries them.
+  const voice: VoiceTerms = {
+    premium: planAllows(plan, 'voice.premium'),
+    takes: planAllows(plan, 'voice.takes') ? registry.config.speech.takes : 1,
+    regenerations: registry.config.speech.maxRegenerations,
+  };
 
   const storyboard = await store.storyboards.get(organizationId, options.storyboardId);
   if (!storyboard) throw new AppError('not_found', 'Storyboard not found.');
@@ -185,6 +193,7 @@ export async function runRender(
         workDir,
         attempt,
         understanding,
+        voice,
       });
       masterPath = rendered.path;
 
@@ -415,6 +424,7 @@ async function renderOnce(
     attempt: number;
     system: ReturnType<typeof getSystem>;
     understanding: ProductUnderstanding | null;
+    voice: VoiceTerms;
   },
 ): Promise<{ path: string; missingAudio: string[]; soundIssues: QaIssue[] }> {
   const { storyboard, brand, system } = params;
@@ -471,7 +481,8 @@ async function renderOnce(
   // A film with no whoosh is still a film, so a missing asset never fails the
   // render — but it is reported, and the caller turns it into a QA finding.
   const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
-  const voiceTracks = await speakNarration(context, storyboard, params.workDir, params.attempt, params.quality);
+  const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
+  const voiceTracks = narration.tracks;
 
   /*
    * The voice has to lead the bed by the standard's four LU, measured, not
@@ -487,7 +498,7 @@ async function renderOnce(
     durationSeconds: storyboardDuration(storyboard),
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
-  const soundIssues: QaIssue[] = [];
+  const soundIssues: QaIssue[] = [...narration.issues];
   if (voiceTracks.length > 0 && design.music) {
     let lead = await measureDialogueLead(plan, voiceTracks, { ...(context.signal ? { signal: context.signal } : {}) });
     const reduction = lead ? bedReductionDb(lead) : 0;
@@ -775,9 +786,15 @@ async function inspect(
  *
  * The storyboard panel shows narration in quotes and the customer approves it,
  * so a film that never says any of it is a film that does not match what they
- * signed off. Written per scene rather than as one long take, because each line
+ * signed off. Read per scene rather than as one long take, because each line
  * has to land inside its own scene — a single file drifts against the cut the
- * moment any scene's duration changes.
+ * moment any scene's duration changes — and read as one performance all the
+ * same, each line told the lines around it.
+ *
+ * The narration engine does the work: the spoken adaptation, the fit to the
+ * scene (rewritten shorter before it is ever hurried), the takes, the listen
+ * back, the regeneration and the levelling. Previews and plans without the
+ * premium voice read on the preview tier; everything else is the studio voice.
  *
  * A stock persona, never a cloned voice: cloning needs a recorded consent grant
  * naming the person, and nothing here has one. The provider refuses without it
@@ -791,19 +808,16 @@ async function speakNarration(
   context: StageContext,
   storyboard: Storyboard,
   workDir: string,
-  attempt: number,
   quality: RenderQuality,
-): Promise<{ path: string; atSeconds: number; durationSeconds: number }[]> {
+  voice: VoiceTerms,
+): Promise<{ tracks: { path: string; atSeconds: number; durationSeconds: number }[]; issues: QaIssue[] }> {
   const spoken = storyboard.scenes.filter(
     (scene) => scene.voiceOver && scene.narration.trim().length > 0,
   );
-  if (storyboard.voiceStrategy === 'none' || spoken.length === 0) return [];
+  if (storyboard.voiceStrategy === 'none' || spoken.length === 0) return { tracks: [], issues: [] };
 
-  // A preview is for timing; the studio voice is for the film.
-  const tier = quality === 'preview' ? 'preview' : 'final';
-  const speech = context.registry.speech(tier);
-  const persona = PERSONA_FOR_STRATEGY[storyboard.voiceStrategy] ?? 'narrator_neutral';
-  const tracks: { path: string; atSeconds: number; durationSeconds: number }[] = [];
+  // A preview is for timing; the studio voice is for the film, on plans that carry it.
+  const tier: SpeechQuality = quality === 'preview' || !voice.premium ? 'preview' : 'final';
   const brief = context.project.brief;
   const language = storyboard.language ?? brief.language ?? null;
   // The direction: the kind of film, the language it was written in, and the
@@ -818,47 +832,49 @@ async function speakNarration(
     tone: brief.tone ?? null,
   });
 
-  for (const [position, scene] of spoken.entries()) {
-    try {
-      const result = await speech.synthesize(
-        {
-          text: adaptForSpeech(scene.narration.trim(), { language: direction.language }),
-          persona,
-          // Rate is set from the room the line has to fit in, not from taste: a
-          // line written for 2.4 seconds must not run 3.
-          rate: speakingRateFor(scene.narration, scene.duration),
-          format: 'wav',
-          language,
-          gender: direction.gender,
-          tone: brief.tone ? TONE_LABELS[brief.tone] : null,
-          direction,
-          quality: tier,
-          // The lines around this one, so the film is one read and not a list of lines.
-          continuity: {
-            previousText: spoken[position - 1]?.narration.trim() ?? null,
-            nextText: spoken[position + 1]?.narration.trim() ?? null,
-          },
-        },
-        { organizationId: context.organizationId, projectId: context.project.id, sceneId: scene.id },
-      );
-
-      const file = path.join(workDir, `vo-${attempt}-${scene.index}.wav`);
-      await writeFile(file, result.audio);
-      tracks.push({
-        path: file,
+  try {
+    const result = await narrate(context, {
+      passages: spoken.map((scene) => ({
+        id: `scene-${scene.index}`,
+        text: scene.narration.trim(),
+        sceneId: scene.id,
+        roomSeconds: scene.duration,
         atSeconds: scene.startTime,
-        durationSeconds: Math.min(result.durationSecondsEstimate, scene.duration),
-      });
-    } catch (error) {
-      console.error(
-        `[render] narration for scene ${scene.index} failed:`,
-        (error as Error).message.slice(0, 200),
+      })),
+      direction,
+      quality: tier,
+      context: 'launch_film',
+      workDir,
+      takes: tier === 'final' ? voice.takes : 1,
+      regenerations: voice.regenerations,
+      // Previews are not listened back to: the ear costs as much as the voice there.
+      listenBack: tier === 'final',
+      keepTakes: tier === 'final' && voice.takes > 1,
+      persona: PERSONA_FOR_STRATEGY[storyboard.voiceStrategy] ?? 'narrator_neutral',
+      label: 'render',
+    });
+    if (result.usage.calls > 0) {
+      console.log(
+        `[render] narration: ${result.tracks.length}/${spoken.length} scenes read by ${result.usage.provider ?? 'nobody'}` +
+          ` (${result.usage.model ?? '-'}), ${result.usage.characters} characters, $${result.usage.costUsd.toFixed(3)}`,
       );
     }
+    return {
+      tracks: result.tracks.map((track) => ({
+        path: track.path,
+        atSeconds: track.atSeconds,
+        durationSeconds: track.durationSeconds,
+      })),
+      issues: result.issues,
+    };
+  } catch (error) {
+    console.error('[render] narration failed:', (error as Error).message.slice(0, 200));
+    return { tracks: [], issues: [] };
   }
-
-  return tracks;
 }
+
+/** What the plan says about the voice. Resolved once per render, from the live subscription. */
+type VoiceTerms = { premium: boolean; takes: number; regenerations: number };
 
 /** Each voice strategy has a register; none of them is a cloned person. */
 const PERSONA_FOR_STRATEGY: Record<string, 'narrator_neutral' | 'narrator_warm' | 'narrator_low'> = {
@@ -866,22 +882,6 @@ const PERSONA_FOR_STRATEGY: Record<string, 'narrator_neutral' | 'narrator_warm' 
   narrator: 'narrator_neutral',
   documentary: 'narrator_low',
 };
-
-/**
- * How fast to read so the line fits its scene.
- *
- * Clamped hard at both ends: a line rushed past 1.15 sounds panicked, and one
- * slowed below 0.85 sounds drugged. Outside that range the honest answer is
- * that the copy is wrong for the cut, which the timing engine already fixes
- * upstream.
- */
-export function speakingRateFor(narration: string, seconds: number): number {
-  const words = narration.trim().split(/\s+/).length;
-  // Around 2.6 words a second is an unhurried read.
-  const needed = words / 2.6;
-  if (seconds <= 0) return 1;
-  return Math.min(1.15, Math.max(0.85, needed / seconds));
-}
 
 /**
  * Resolves the library assets this sound design asks for.
