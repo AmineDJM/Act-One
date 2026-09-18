@@ -40,6 +40,7 @@ export * from './domain/addresses.ts';
 export * from './domain/vocabulary.ts';
 export * from './domain/score.ts';
 export * from './domain/caption.ts';
+export * from './domain/localization.ts';
 export * from './domain/collections.ts';
 export * from './domain/referral.ts';
 export * from './domain/editorial.ts';

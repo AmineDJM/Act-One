@@ -33,6 +33,8 @@ export const Entitlement = z.enum([
   'voice.clone',
   /** Audio editions: a written piece adapted, read and mastered for listening. */
   'audio.editions',
+  /** The same film produced again in another language, written and read natively. */
+  'film.languages',
   'formats.vertical',
   'formats.all',
   'team.members',
@@ -178,6 +180,7 @@ export const DEFAULT_PLANS: Plan[] = [
       'voice.takes',
       'voice.brand',
       'audio.editions',
+      'film.languages',
       'product.credentials',
       'revisions.unlimited',
       'team.members',

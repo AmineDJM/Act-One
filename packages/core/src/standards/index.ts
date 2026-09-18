@@ -5,6 +5,7 @@ export * from './layout.ts';
 export * from './motion.ts';
 export * from './audio.ts';
 export * from './caption.ts';
+export * from './localization.ts';
 export * from './editorial.ts';
 export * from './conversion.ts';
 export * from './brief.ts';

@@ -24,6 +24,7 @@ import { ProductAccess } from './ProductAccess.tsx';
 import { Notes } from './Notes.tsx';
 import { BriefPanel } from './BriefPanel.tsx';
 import { Prompt, Status } from '@/components/ui/Prompt.tsx';
+import { LanguagesPanel } from './LanguagesPanel.tsx';
 import { AudioEditionPanel } from './AudioEditionPanel.tsx';
 import { ResearchSources } from './ResearchSources.tsx';
 import { ProjectAssets } from './ProjectAssets.tsx';
@@ -63,6 +64,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     animaticJob,
     audioEdition,
     audioJob,
+    localised,
+    localisedLanguages,
+    localisingLanguage,
     sources,
     timeline,
     variants,
@@ -154,6 +158,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             posterAssetId={poster?.id ?? null}
             projectName={project.name}
             language={storyboard?.language ?? project.brief.language ?? null}
+          />
+          <LanguagesPanel
+            projectId={project.id}
+            sourceLanguage={storyboard?.language ?? project.brief.language ?? null}
+            masters={localised.map((render) => ({ render, language: localisedLanguages.get(render.id) ?? null }))}
+            working={localisingLanguage}
+            may={entitlements.has('film.languages')}
+            planName={plan?.name ?? 'your plan'}
           />
           {copyKit && copyKit.lines.length > 0 ? <CopyKitPanel lines={copyKit.lines} /> : null}
           <AudioEditionPanel

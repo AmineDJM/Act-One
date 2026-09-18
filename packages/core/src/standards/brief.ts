@@ -4,6 +4,7 @@ import { COLOR_STANDARDS } from './color.ts';
 import { CONVERSION_STANDARDS } from './conversion.ts';
 import { EDITORIAL_STANDARDS } from './editorial.ts';
 import { LAYOUT_STANDARDS } from './layout.ts';
+import { LOCALIZATION_STANDARDS } from './localization.ts';
 import { MOTION_STANDARDS } from './motion.ts';
 import { TYPE_STANDARDS } from './typography.ts';
 import { cite, type Standard } from './standard.ts';
@@ -40,7 +41,9 @@ export type Craft =
   /** The score and the sound design. */
   | 'sound'
   /** The cut. */
-  | 'editing';
+  | 'editing'
+  /** The same film, written again in another language. */
+  | 'localization';
 
 const CRAFTS: Record<Craft, Standard[]> = {
   direction: [
@@ -95,6 +98,21 @@ const CRAFTS: Record<Craft, Standard[]> = {
     AUDIO_STANDARDS.webTarget,
     AUDIO_STANDARDS.truePeak,
     AUDIO_STANDARDS.dialogueLead,
+  ],
+  localization: [
+    LOCALIZATION_STANDARDS.sameClock,
+    LOCALIZATION_STANDARDS.textExpansion,
+    LOCALIZATION_STANDARDS.doNotTranslate,
+    LOCALIZATION_STANDARDS.register,
+    LOCALIZATION_STANDARDS.nativeWriter,
+    // The editorial rules do not stop applying because the language changed.
+    // A superlative invented in translation is a superlative the customer did
+    // not make, and the fact checker never saw the French.
+    EDITORIAL_STANDARDS.noInvention,
+    EDITORIAL_STANDARDS.numbers,
+    EDITORIAL_STANDARDS.superlatives,
+    TYPE_STANDARDS.measure,
+    CAPTION_STANDARDS.readingRate,
   ],
   editing: [
     MOTION_STANDARDS.minimumShot,

@@ -35,6 +35,7 @@ export const JobKind = z.enum([
   'generate_campaign',
   'generate_copy',
   'produce_audio',
+  'localise_film',
 ]);
 export type JobKind = z.infer<typeof JobKind>;
 
@@ -82,8 +83,13 @@ export function jobIsTerminal(state: JobState): boolean {
  * it must not take over the page. Previewing the timing of a storyboard should
  * not put "Working on it" over the whole project and take away the button that
  * renders the film — previewing and then rendering is the point of previewing.
+ *
+ * The same test decides whether a failure is the project's failure. A film that
+ * is finished and delivered has not failed because the German master did not
+ * come out, and saying so over the top of a page showing the finished film is
+ * the worst thing this system can tell somebody.
  */
-export const SIDE_ERRAND_JOBS: readonly JobKind[] = ['render_animatic', 'generate_copy'];
+export const SIDE_ERRAND_JOBS: readonly JobKind[] = ['render_animatic', 'generate_copy', 'localise_film'];
 
 export function jobAdvancesProject(kind: JobKind): boolean {
   return !SIDE_ERRAND_JOBS.includes(kind);

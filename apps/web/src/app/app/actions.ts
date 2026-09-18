@@ -24,6 +24,7 @@ import { requireSession, switchWorkspace } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { createProject, enqueue, getProjectOr404, hostLabel } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
+import { entitlementsFor } from '@/server/platform.ts';
 import { authorizeProductAccess, revokeProductAccess } from '@/server/credentials.ts';
 import { postComment, resolveComment } from '@/server/collaboration.ts';
 
@@ -304,6 +305,43 @@ export async function createCampaignAction(
     return { error: null, message: 'Cutting your campaign and writing the launch copy.' };
   } catch (error) {
     return { error: reportError('createCampaignAction', error).publicMessage };
+  }
+}
+
+/**
+ * The same film, in another language.
+ *
+ * A separate job from the campaign on purpose: the languages a company
+ * launches in are a different decision from the channels it launches on, they
+ * are chosen one at a time, and each one is a master in its own right rather
+ * than a format of the first.
+ */
+export async function localiseFilmAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const project = await getProjectOr404(session, String(formData.get('projectId') ?? ''));
+    if (!project.latestRenderId) return { error: 'Produce the film first.' };
+
+    const language = String(formData.get('language') ?? '');
+    const chosen = FILM_LANGUAGES.find((option) => option.code === language);
+    if (!chosen) return { error: 'Choose a language.' };
+
+    const organization = await getStore().organizations.get(session.organizationId);
+    if (!organization) return { error: 'Workspace not found.' };
+    const { plan, entitlements } = await entitlementsFor(organization);
+    if (!entitlements.has('film.languages')) {
+      return { error: `Producing in another language is not included in ${plan.name}.` };
+    }
+
+    await enqueue(project, 'localise_film', { renderId: project.latestRenderId, language }, 4);
+
+    revalidatePath(`/app/projects/${project.id}`);
+    return { error: null, message: `Producing your film in ${chosen.name}.` };
+  } catch (error) {
+    return { error: reportError('localiseFilmAction', error).publicMessage };
   }
 }
 

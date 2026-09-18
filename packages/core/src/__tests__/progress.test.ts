@@ -13,9 +13,13 @@ import {
  * on, and how far has it got.
  */
 describe('what the customer is waiting on', () => {
-  it('treats a timing preview and the launch copy as side errands', () => {
+  it('treats a timing preview, the launch copy and another language as side errands', () => {
     expect(jobAdvancesProject('render_animatic')).toBe(false);
     expect(jobAdvancesProject('generate_copy')).toBe(false);
+    // A master in another language runs beside a film that is already
+    // finished and delivered. It must not take over the page while it runs,
+    // and its failure is not the project's failure.
+    expect(jobAdvancesProject('localise_film')).toBe(false);
   });
 
   it('treats everything that changes the project as work to wait on', () => {

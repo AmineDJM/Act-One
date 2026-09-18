@@ -573,6 +573,23 @@ describe('pipeline', () => {
     expect((await store.projects.get(org.id, project.id))!.stage).toBe('failed');
   });
 
+  it('never fails the project over a side errand beside a finished film', async () => {
+    /*
+     * The film is delivered. A master in another language fails — the render
+     * it was asked to translate does not exist — and the project must still
+     * say it has a film, because it does. Putting a red status over the top of
+     * a page showing somebody their finished film is the worst thing this can
+     * say to them.
+     */
+    await store.projects.setStage(org.id, project.id, 'film_ready');
+    const outcome = await runJob(
+      deps,
+      await enqueued(store, org.id, project.id, 'localise_film', { renderId: 'rnd_gone', language: 'de' }),
+    );
+    expect(outcome.status).toBe('failed');
+    expect((await store.projects.get(org.id, project.id))!.stage).toBe('film_ready');
+  });
+
   it('cancels rather than failing when the project was deleted mid-queue', async () => {
     const orphan = await enqueued(store, org.id, 'prj_gone', 'research_product');
     const outcome = await runJob(deps, orphan);

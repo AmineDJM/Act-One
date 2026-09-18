@@ -1,6 +1,7 @@
 import {
   AUDIO_STANDARDS,
   CAPTION_STANDARDS,
+  LOCALIZATION_STANDARDS,
   COLOR_STANDARDS,
   CONVERSION_STANDARDS,
   EDITORIAL_STANDARDS,
@@ -72,6 +73,11 @@ const GROUPS: { title: string; blurb: string; standards: Record<string, Standard
     standards: CAPTION_STANDARDS,
   },
   {
+    title: 'Another language',
+    blurb: 'Mostly a problem of time and room, and only incidentally one of words.',
+    standards: LOCALIZATION_STANDARDS,
+  },
+  {
     title: 'Editorial',
     blurb: 'A launch film makes claims in the customer’s name. That is publishing.',
     standards: EDITORIAL_STANDARDS,
@@ -109,6 +115,7 @@ const CRAFT_LABEL: Record<Craft, string> = {
   narration: 'the narration',
   sound: 'the composer',
   editing: 'the edit',
+  localization: 'the localiser',
 };
 
 /**

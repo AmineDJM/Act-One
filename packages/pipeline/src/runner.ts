@@ -1,4 +1,5 @@
 import {
+  jobAdvancesProject,
   newId,
   jobIsTerminal,
   retryDelayMs,
@@ -16,6 +17,7 @@ import { runConcepts } from './stages/concepts.ts';
 import { runStoryboard } from './stages/storyboard.ts';
 import { runRender } from './stages/render.ts';
 import { runCampaign } from './stages/campaign.ts';
+import { runLocalisation } from './stages/localize.ts';
 import { runCopy } from './stages/copy.ts';
 import { runAnimatic } from './stages/animatic.ts';
 import { runAudioEdition } from './stages/audio-edition.ts';
@@ -61,6 +63,7 @@ const RUNNING_STATE: Record<JobKind, JobState> = {
   generate_campaign: 'rendering_motion',
   generate_copy: 'writing_copy',
   produce_audio: 'sound',
+  localise_film: 'rendering_motion',
 };
 
 export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): Promise<JobOutcome> {
@@ -140,8 +143,17 @@ export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): 
 
     await store.jobs.fail(job.id, appError.message, retryAt, appError.code);
 
-    if (!retryAt) {
-      // The customer needs to see that it stopped, not an eternal spinner.
+    /*
+     * A failure fails the project only if the job was moving the project along.
+     *
+     * The customer needs to see that it stopped rather than an eternal spinner
+     * — but a side errand is not the project. A campaign cut, an audio version
+     * or a master in another language all run beside a film that is already
+     * finished and delivered, and marking that project failed puts a red
+     * status over the top of a page showing the customer their finished film.
+     * The errand's own panel says what happened to the errand.
+     */
+    if (!retryAt && jobAdvancesProject(job.kind)) {
       await store.projects.setStage(job.organizationId, project.id, 'failed');
     }
 
@@ -189,6 +201,12 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
 
     case 'generate_campaign':
       return runCampaign(context, { renderId: String(payload['renderId'] ?? '') });
+
+    case 'localise_film':
+      return runLocalisation(context, {
+        renderId: String(payload['renderId'] ?? ''),
+        language: String(payload['language'] ?? ''),
+      });
 
     case 'repair_scene':
       return runRevision(context, {

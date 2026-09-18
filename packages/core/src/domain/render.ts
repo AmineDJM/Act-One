@@ -46,7 +46,16 @@ export type AudioStem = z.infer<typeof AudioStem>;
  * the project's master, its version numbers and the plan's render allowance all
  * count films.
  */
-export const RenderKind = z.enum(['film', 'cut', 'animatic']);
+/**
+ * What a render is.
+ *
+ * Only a film is the project's master. A cut is a re-edit for a channel, an
+ * animatic is a timing preview, and a localised master is the same film in
+ * another language — a deliverable the customer keeps, which must not replace
+ * the film on the page, must not be what the next campaign is cut from, and
+ * must not spend a render from a plan that sells renders of the film.
+ */
+export const RenderKind = z.enum(['film', 'cut', 'animatic', 'localised']);
 export type RenderKind = z.infer<typeof RenderKind>;
 
 export const Render = z.object({

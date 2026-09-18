@@ -213,6 +213,24 @@ export async function loadProjectView(session: Session, projectId: string) {
     ? await store.variants.listForRender(session.organizationId, latestRender.id)
     : [];
   /*
+   * The same film in other languages.
+   *
+   * Masters in their own right, so they carry their own storyboard and their
+   * own caption track; kept beside the film rather than in the list of cuts,
+   * because a French master is not a format, it is the film.
+   */
+  const localised = renders
+    .filter((render) => render.kind === 'localised' && render.status === 'completed' && render.masterAssetId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const localisedLanguages = new Map(
+    await Promise.all(
+      localised.map(
+        async (render) =>
+          [render.id, (await store.storyboards.get(session.organizationId, render.storyboardId))?.language ?? null] as const,
+      ),
+    ),
+  );
+  /*
    * The poster belonging to this render, not whichever one the project happens
    * to hold. A project accumulates a poster per render, so taking the first
    * from the list showed a frame from an older cut of the film beside the
@@ -292,6 +310,8 @@ export async function loadProjectView(session: Session, projectId: string) {
     latestRender,
     animatic,
     variants,
+    localised,
+    localisedLanguages,
     poster,
     project,
     understanding,
@@ -319,6 +339,11 @@ export async function loadProjectView(session: Session, projectId: string) {
     /** The newest audio version, and the job reading one right now. */
     audioEdition: editions[0] ?? null,
     audioJob: jobs.find((job) => job.kind === 'produce_audio' && !jobIsTerminal(job.state)) ?? null,
+    /** The language currently being produced, straight off the job's own payload. */
+    localisingLanguage:
+      (jobs.find((job) => job.kind === 'localise_film' && !jobIsTerminal(job.state))?.payload['language'] as
+        | string
+        | undefined) ?? null,
     /*
      * Why the project stopped, in the words the worker recorded.
      *
