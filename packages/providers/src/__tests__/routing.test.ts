@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_ROUTING, priceFor, pricedModels, unpricedModels } from '../index.ts';
+import {
+  DEFAULT_ROUTING,
+  IMAGE_RESOLUTION,
+  MIN_VIDEO_RESOLUTION,
+  VIDEO_RESOLUTION,
+  priceFor,
+  pricedModels,
+  unpricedModels,
+} from '../index.ts';
 
 /**
  * What every agent in this platform talks to.
@@ -33,5 +41,29 @@ describe('the model every agent is routed to', () => {
   it('prices a model it knows from its own table', () => {
     expect(priceFor('gpt-4.1', 1_000_000, 0)).toBeCloseTo(2, 5);
     expect(priceFor('gpt-4.1', 0, 1_000_000)).toBeCloseTo(8, 5);
+  });
+});
+
+/**
+ * The floor under a generated shot.
+ *
+ * A shot from the engine is cut into a master rendered at 1080p or 4K, where
+ * it is already the softest thing on the screen. Below 720p it stops reading
+ * as a choice and starts reading as a mistake, and the saving is a rounding
+ * error against what the shot itself costs.
+ */
+describe('how small a generated shot is allowed to be', () => {
+  it('never asks for a shot below 720p, on any tier', () => {
+    for (const tier of ['authentic', 'studio', 'cinematic'] as const) {
+      expect(VIDEO_RESOLUTION[tier], tier).toBe(MIN_VIDEO_RESOLUTION);
+      expect(VIDEO_RESOLUTION[tier], tier).not.toBe('480p');
+    }
+  });
+
+  it('never gives a still less than a moving shot gets', () => {
+    const rank = { '480p': 0, '720p': 1, '1080p': 2 } as const;
+    for (const tier of ['authentic', 'studio', 'cinematic'] as const) {
+      expect(rank[IMAGE_RESOLUTION[tier]], tier).toBeGreaterThanOrEqual(rank[VIDEO_RESOLUTION[tier]]);
+    }
   });
 });

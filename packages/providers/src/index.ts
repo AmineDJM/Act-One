@@ -21,6 +21,9 @@ export * from './media/types.ts';
 export {
   HiggsfieldProvider,
   DEFAULT_HIGGSFIELD_ROUTING,
+  IMAGE_RESOLUTION,
+  MIN_VIDEO_RESOLUTION,
+  VIDEO_RESOLUTION,
   type HiggsfieldConfig,
   type HiggsfieldRouting,
 } from './media/higgsfield.ts';

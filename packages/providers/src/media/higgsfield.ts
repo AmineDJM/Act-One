@@ -64,15 +64,25 @@ export const DEFAULT_HIGGSFIELD_ROUTING: HiggsfieldRouting = {
   },
 };
 
-/** Seedance 2.5 renders at 480p or 720p. Nothing cut into a 4K master wants 480p. */
-const VIDEO_RESOLUTION: Record<MediaTier, '480p' | '720p'> = {
+/**
+ * The floor, made unexpressible rather than merely respected.
+ *
+ * The engine offers 480p and every tier already asked for 720p, which is the
+ * kind of agreement that holds until somebody economises on a tier one
+ * afternoon. A generated shot is cut into a master rendered at 1080p or 4K,
+ * where it is already the softest thing on the screen; below 720p it stops
+ * looking like a choice and starts looking like a mistake. The type no longer
+ * admits a lower value, so the economy cannot be made by accident.
+ */
+export const MIN_VIDEO_RESOLUTION = '720p';
+export const VIDEO_RESOLUTION: Record<MediaTier, typeof MIN_VIDEO_RESOLUTION> = {
   authentic: '720p',
   studio: '720p',
   cinematic: '720p',
 };
 
-/** Soul 2 renders at 720p or 1080p. */
-const IMAGE_RESOLUTION: Record<MediaTier, '720p' | '1080p'> = {
+/** Soul 2 renders at 720p or 1080p, and never below what a video shot gets. */
+export const IMAGE_RESOLUTION: Record<MediaTier, '720p' | '1080p'> = {
   authentic: '720p',
   studio: '720p',
   cinematic: '1080p',
