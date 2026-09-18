@@ -1,13 +1,19 @@
 import Link from 'next/link';
+import { can } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { formatPronunciations, loadVoiceOverview } from '@/server/voice.ts';
+import { BrandVoicePanel } from './BrandVoicePanel.tsx';
 import styles from '../app.module.css';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BrandPage() {
   const session = await requireSessionForPage('/app/brand');
-  const brands = await getStore().brands.list(session.organizationId);
+  const [brands, voice] = await Promise.all([
+    getStore().brands.list(session.organizationId),
+    loadVoiceOverview(session),
+  ]);
 
   return (
     <>
@@ -91,6 +97,18 @@ export default async function BrandPage() {
           ))}
         </div>
       )}
+
+      <div className={styles.panels} style={{ marginTop: 'var(--space-5)' }}>
+        <BrandVoicePanel
+          voices={voice.voices}
+          consents={voice.consents}
+          pronunciations={formatPronunciations(voice.settings?.pronunciations ?? [])}
+          may={voice.may}
+          library={voice.library}
+          planName={voice.planName}
+          canEdit={can(session.actor, 'brand:edit')}
+        />
+      </div>
     </>
   );
 }

@@ -17,6 +17,7 @@ import { runRender } from './stages/render.ts';
 import { runCampaign } from './stages/campaign.ts';
 import { runCopy } from './stages/copy.ts';
 import { runAnimatic } from './stages/animatic.ts';
+import { runAudioEdition } from './stages/audio-edition.ts';
 import { runRevision } from './stages/revision.ts';
 import { runSceneAssets } from './stages/assets.ts';
 
@@ -58,6 +59,7 @@ const RUNNING_STATE: Record<JobKind, JobState> = {
   repair_scene: 'storyboarding',
   generate_campaign: 'rendering_motion',
   generate_copy: 'writing_copy',
+  produce_audio: 'sound',
 };
 
 export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): Promise<JobOutcome> {
@@ -200,6 +202,13 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
         ...(typeof payload['storyboardId'] === 'string'
           ? { storyboardId: payload['storyboardId'] }
           : {}),
+      });
+
+    case 'produce_audio':
+      return runAudioEdition(context, {
+        ...(typeof payload['editionId'] === 'string' ? { editionId: payload['editionId'] } : {}),
+        ...(typeof payload['storyboardId'] === 'string' ? { storyboardId: payload['storyboardId'] } : {}),
+        ...(typeof payload['brandVoiceId'] === 'string' ? { brandVoiceId: payload['brandVoiceId'] } : {}),
       });
 
     default:

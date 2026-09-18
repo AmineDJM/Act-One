@@ -81,6 +81,8 @@ function filenameFor(kind: string, contentType: string, id: string): string {
         ? 'jpg'
         : contentType.includes('wav')
           ? 'wav'
-          : 'bin';
+          : contentType.includes('mpeg')
+            ? 'mp3'
+            : 'bin';
   return `${kind}-${id}.${extension}`;
 }

@@ -54,7 +54,10 @@ class FakeVoice implements SpeechProvider {
   readonly name = 'fake-voice';
   readonly kind = 'speech' as const;
   readonly requests: SpeechRequest[] = [];
-  constructor(private readonly plan: Plan) {}
+  private readonly plan: Plan;
+  constructor(plan: Plan) {
+    this.plan = plan;
+  }
   async health() {
     return { provider: this.name, kind: 'speech' as const, healthy: true, checkedAt: new Date().toISOString() };
   }
@@ -82,7 +85,10 @@ class ScriptedEar implements SpeechRecognizer {
   readonly name = 'fake-ear';
   readonly kind = 'speech' as const;
   readonly heard: TranscribeRequest[] = [];
-  constructor(private readonly answers: (index: number, request: TranscribeRequest) => Partial<Transcript>) {}
+  private readonly answers: (index: number, request: TranscribeRequest) => Partial<Transcript>;
+  constructor(answers: (index: number, request: TranscribeRequest) => Partial<Transcript>) {
+    this.answers = answers;
+  }
   async health() {
     return { provider: this.name, kind: 'speech' as const, healthy: true, checkedAt: new Date().toISOString() };
   }

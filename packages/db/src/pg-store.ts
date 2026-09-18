@@ -20,7 +20,9 @@ import type {
   Approval,
   ApprovalGate,
   Asset,
+  AudioEdition,
   BrandSystem,
+  BrandVoice,
   Comment,
   CommentTarget,
   Concept,
@@ -45,6 +47,8 @@ import type {
   Subscription,
   User,
   Variant,
+  VoiceConsentRecord,
+  VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
 import type { PlatformSettings, Store } from './store.ts';
@@ -1469,6 +1473,17 @@ export class PgStore implements Store {
         return num(r.rows[0]?.total);
       }),
 
+    listSince: async (since: string, operationPrefix?: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `SELECT * FROM generation_costs
+           WHERE created_at >= $1 ${operationPrefix ? 'AND operation LIKE $2' : ''}
+           ORDER BY created_at DESC LIMIT 5000`,
+          operationPrefix ? [since, `${operationPrefix.replace(/[%_]/g, '')}%`] : [since],
+        );
+        return r.rows.map(toCost);
+      }),
+
     dailySeries: async (since: string) =>
       this.asPlatform(async (c) => {
         const r = await c.query<{
@@ -1784,6 +1799,173 @@ export class PgStore implements Store {
         );
         if (!r.rows[0]) throw notFound('Revision request');
         return toRevision(r.rows[0]);
+      }),
+  };
+
+  // --- the voice --------------------------------------------------------
+
+  readonly brandVoices = {
+    create: async (voice: BrandVoice) =>
+      this.tenant(voice.organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO brand_voices (id, organization_id, consent_id, is_default, data, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [voice.id, voice.organizationId, voice.consentId, voice.isDefault, voice, voice.createdAt, voice.updatedAt],
+        );
+        return voice;
+      }),
+
+    get: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query('SELECT data FROM brand_voices WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+        return (r.rows[0]?.['data'] as BrandVoice) ?? null;
+      }),
+
+    list: async (organizationId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT data FROM brand_voices WHERE organization_id = $1 ORDER BY is_default DESC, created_at',
+          [organizationId],
+        );
+        return r.rows.map((row) => row['data'] as BrandVoice);
+      }),
+
+    update: async (organizationId: string, id: string, patch: Partial<BrandVoice>) =>
+      this.tenant(organizationId, async (c) => {
+        const current = await c.query('SELECT data FROM brand_voices WHERE id = $1 AND organization_id = $2 FOR UPDATE', [id, organizationId]);
+        if (!current.rows[0]) throw notFound('Brand voice');
+        const next: BrandVoice = {
+          ...(current.rows[0]['data'] as BrandVoice),
+          ...patch,
+          id,
+          organizationId,
+          updatedAt: new Date().toISOString(),
+        };
+        await c.query(
+          'UPDATE brand_voices SET data = $3, consent_id = $4, is_default = $5, updated_at = $6 WHERE id = $1 AND organization_id = $2',
+          [id, organizationId, next, next.consentId, next.isDefault, next.updatedAt],
+        );
+        return next;
+      }),
+
+    setDefault: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        const chosen = await c.query('SELECT data FROM brand_voices WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+        if (!chosen.rows[0]) throw notFound('Brand voice');
+        await c.query(
+          `UPDATE brand_voices SET is_default = FALSE, data = data || '{"isDefault": false}'::jsonb WHERE organization_id = $1 AND id <> $2 AND is_default`,
+          [organizationId, id],
+        );
+        const now = new Date().toISOString();
+        const next: BrandVoice = { ...(chosen.rows[0]['data'] as BrandVoice), isDefault: true, updatedAt: now };
+        await c.query('UPDATE brand_voices SET is_default = TRUE, data = $3, updated_at = $4 WHERE id = $1 AND organization_id = $2', [id, organizationId, next, now]);
+        return next;
+      }),
+
+    remove: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query('DELETE FROM brand_voices WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+      }),
+  };
+
+  readonly voiceConsents = {
+    create: async (consent: VoiceConsentRecord) =>
+      this.tenant(consent.organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO voice_consents
+             (id, organization_id, project_id, subject_name, granted_by_user_id, scope, provider_voice_id, granted_at, revoked_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [
+            consent.id, consent.organizationId, consent.projectId, consent.subjectName, consent.grantedByUserId,
+            consent.scope, consent.providerVoiceId, consent.grantedAt, consent.revokedAt,
+          ],
+        );
+        return consent;
+      }),
+
+    get: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query('SELECT * FROM voice_consents WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+        return r.rows[0] ? toVoiceConsent(r.rows[0]) : null;
+      }),
+
+    list: async (organizationId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query('SELECT * FROM voice_consents WHERE organization_id = $1 ORDER BY granted_at DESC', [organizationId]);
+        return r.rows.map(toVoiceConsent);
+      }),
+
+    revoke: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'UPDATE voice_consents SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1 AND organization_id = $2 RETURNING *',
+          [id, organizationId],
+        );
+        if (!r.rows[0]) throw notFound('Voice consent');
+        return toVoiceConsent(r.rows[0]);
+      }),
+
+    setProviderVoice: async (organizationId: string, id: string, providerVoiceId: string | null) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'UPDATE voice_consents SET provider_voice_id = $3 WHERE id = $1 AND organization_id = $2 RETURNING *',
+          [id, organizationId, providerVoiceId],
+        );
+        if (!r.rows[0]) throw notFound('Voice consent');
+        return toVoiceConsent(r.rows[0]);
+      }),
+  };
+
+  readonly voiceSettings = {
+    get: async (organizationId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query('SELECT data FROM voice_settings WHERE organization_id = $1', [organizationId]);
+        return (r.rows[0]?.['data'] as VoiceSettings) ?? null;
+      }),
+
+    save: async (settings: VoiceSettings) =>
+      this.tenant(settings.organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO voice_settings (organization_id, data, updated_at) VALUES ($1,$2,$3)
+           ON CONFLICT (organization_id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at`,
+          [settings.organizationId, settings, settings.updatedAt],
+        );
+        return settings;
+      }),
+  };
+
+  readonly audioEditions = {
+    create: async (edition: AudioEdition) =>
+      this.tenant(edition.organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO audio_editions (id, organization_id, project_id, status, data, created_at) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [edition.id, edition.organizationId, edition.projectId, edition.status, edition, edition.createdAt],
+        );
+        return edition;
+      }),
+
+    get: async (organizationId: string, id: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query('SELECT data FROM audio_editions WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+        return (r.rows[0]?.['data'] as AudioEdition) ?? null;
+      }),
+
+    listForProject: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT data FROM audio_editions WHERE organization_id = $1 AND project_id = $2 ORDER BY created_at DESC',
+          [organizationId, projectId],
+        );
+        return r.rows.map((row) => row['data'] as AudioEdition);
+      }),
+
+    update: async (organizationId: string, id: string, patch: Partial<AudioEdition>) =>
+      this.tenant(organizationId, async (c) => {
+        const current = await c.query('SELECT data FROM audio_editions WHERE id = $1 AND organization_id = $2 FOR UPDATE', [id, organizationId]);
+        if (!current.rows[0]) throw notFound('Audio edition');
+        const next: AudioEdition = { ...(current.rows[0]['data'] as AudioEdition), ...patch, id, organizationId };
+        await c.query('UPDATE audio_editions SET data = $3, status = $4 WHERE id = $1 AND organization_id = $2', [id, organizationId, next, next.status]);
+        return next;
       }),
   };
 
@@ -2272,6 +2454,20 @@ function toApproval(row: Row): Approval {
     targetId: row['target_id'] as string,
     approvedByUserId: row['approved_by_user_id'] as string,
     createdAt: iso(row['created_at']),
+  };
+}
+
+function toVoiceConsent(row: Row): VoiceConsentRecord {
+  return {
+    id: row['id'] as string,
+    organizationId: row['organization_id'] as string,
+    projectId: (row['project_id'] as string) ?? null,
+    subjectName: row['subject_name'] as string,
+    grantedByUserId: row['granted_by_user_id'] as string,
+    scope: (row['scope'] as VoiceConsentRecord['scope']) ?? 'organization',
+    providerVoiceId: (row['provider_voice_id'] as string) ?? null,
+    grantedAt: iso(row['granted_at']),
+    revokedAt: isoOrNull(row['revoked_at']),
   };
 }
 

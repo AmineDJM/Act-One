@@ -19,6 +19,7 @@ import {
   canRevise,
   type Project,
   type ProjectStage,
+  type Entitlement,
 } from '@act-one/core';
 import { getStore } from './store.ts';
 import { loadProductAccess } from './credentials.ts';
@@ -149,7 +150,7 @@ export async function loadProjectView(session: Session, projectId: string) {
   const store = getStore();
   const project = await getProjectOr404(session, projectId);
 
-  const [understanding, brand, concepts, storyboards, renders, jobs, organization] =
+  const [understanding, brand, concepts, storyboards, renders, jobs, organization, editions] =
     await Promise.all([
       project.productUnderstandingId
         ? store.understandings.get(session.organizationId, project.productUnderstandingId)
@@ -160,11 +161,12 @@ export async function loadProjectView(session: Session, projectId: string) {
       store.renders.listForProject(session.organizationId, project.id),
       store.jobs.listForProject(session.organizationId, project.id),
       store.organizations.get(session.organizationId),
+      store.audioEditions.listForProject(session.organizationId, project.id),
     ]);
 
   const { plan, entitlements } = organization
     ? await entitlementsFor(organization)
-    : { plan: null, entitlements: new Set<never>() };
+    : { plan: null, entitlements: new Set<Entitlement>() };
 
   // The finished film, and the cuts made from it. Without these the project
   // page can say a film is ready but has nothing to hand over.
@@ -280,6 +282,9 @@ export async function loadProjectView(session: Session, projectId: string) {
     /** The timing preview being built right now, reported where it was asked for. */
     animaticJob:
       jobs.find((job) => job.kind === 'render_animatic' && !jobIsTerminal(job.state)) ?? null,
+    /** The newest audio version, and the job reading one right now. */
+    audioEdition: editions[0] ?? null,
+    audioJob: jobs.find((job) => job.kind === 'produce_audio' && !jobIsTerminal(job.state)) ?? null,
     /*
      * Why the project stopped, in the words the worker recorded.
      *

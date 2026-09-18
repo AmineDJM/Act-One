@@ -19,6 +19,7 @@ import { CopyKitPanel } from './CopyKit.tsx';
 import { ProductAccess } from './ProductAccess.tsx';
 import { Notes } from './Notes.tsx';
 import { BriefPanel } from './BriefPanel.tsx';
+import { AudioEditionPanel } from './AudioEditionPanel.tsx';
 import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
@@ -48,12 +49,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     latestRender,
     animatic,
     animaticJob,
+    audioEdition,
+    audioJob,
     variants,
     poster,
     copyKit,
     access,
     notes,
     failure,
+    plan,
+    entitlements,
   } = view;
 
   /*
@@ -117,6 +122,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             projectName={project.name}
           />
           {copyKit && copyKit.lines.length > 0 ? <CopyKitPanel lines={copyKit.lines} /> : null}
+          <AudioEditionPanel
+            projectId={project.id}
+            edition={audioEdition}
+            progress={audioJob ? audioJob.progress : null}
+            may={entitlements.has('audio.editions')}
+            planName={plan?.name ?? 'your plan'}
+            canProduce={can(session.actor, 'project:update')}
+            hasStoryboard={Boolean(project.activeStoryboardId)}
+          />
         </div>
       ) : null}
 

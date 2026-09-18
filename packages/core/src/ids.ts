@@ -32,6 +32,9 @@ export type IdPrefix =
   | 'evt'
   | 'sec'
   | 'cmt'
+  | 'aed'
+  | 'bvc'
+  | 'vcs'
   | 'inv'
   | 'mom'
   | 'cpy';

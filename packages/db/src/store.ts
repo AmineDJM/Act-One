@@ -34,8 +34,7 @@ import type {
   Storyboard,
   Subscription,
   User,
-  Variant,
-} from '@act-one/core';
+  Variant, AudioEdition, BrandVoice, VoiceConsentRecord, VoiceSettings,} from '@act-one/core';
 
 /**
  * The persistence contract.
@@ -75,6 +74,10 @@ export interface Store {
   readonly comments: CommentRepo;
   readonly approvals: ApprovalRepo;
   readonly revisions: RevisionRepo;
+  readonly brandVoices: BrandVoiceRepo;
+  readonly voiceConsents: VoiceConsentRepo;
+  readonly voiceSettings: VoiceSettingsRepo;
+  readonly audioEditions: AudioEditionRepo;
   readonly credentials: CredentialRepo;
   readonly platform: PlatformRepo;
   readonly rateLimits: RateLimitRepo;
@@ -298,6 +301,8 @@ export interface CostRepo {
   listForProject(organizationId: string, projectId: string): Promise<GenerationCost[]>;
   totalForProject(organizationId: string, projectId: string): Promise<number>;
   totalForOrganization(organizationId: string, since?: string): Promise<number>;
+  /** Platform-wide rows since a moment, optionally only one family of operations ('speech.'). */
+  listSince(since: string, operationPrefix?: string): Promise<GenerationCost[]>;
   /** Platform-wide rollup for the Super Admin dashboard. */
   platformSummary(since: string): Promise<{
     totalCostUsd: number;
@@ -352,6 +357,38 @@ export interface ApprovalRepo {
   create(approval: Approval): Promise<Approval>;
   listForProject(organizationId: string, projectId: string): Promise<Approval[]>;
   has(organizationId: string, projectId: string, gate: ApprovalGate, targetId: string): Promise<boolean>;
+}
+
+/** One narrator kept across everything an organisation makes. */
+export interface BrandVoiceRepo {
+  create(voice: BrandVoice): Promise<BrandVoice>;
+  get(organizationId: string, id: string): Promise<BrandVoice | null>;
+  list(organizationId: string): Promise<BrandVoice[]>;
+  update(organizationId: string, id: string, patch: Partial<BrandVoice>): Promise<BrandVoice>;
+  /** Makes this the voice that reads by default; every other loses the flag. */
+  setDefault(organizationId: string, id: string): Promise<BrandVoice>;
+  remove(organizationId: string, id: string): Promise<void>;
+}
+
+/** A person's recorded, revocable consent to be cloned. Never deleted: revoked. */
+export interface VoiceConsentRepo {
+  create(consent: VoiceConsentRecord): Promise<VoiceConsentRecord>;
+  get(organizationId: string, id: string): Promise<VoiceConsentRecord | null>;
+  list(organizationId: string): Promise<VoiceConsentRecord[]>;
+  revoke(organizationId: string, id: string): Promise<VoiceConsentRecord>;
+  setProviderVoice(organizationId: string, id: string, providerVoiceId: string | null): Promise<VoiceConsentRecord>;
+}
+
+export interface VoiceSettingsRepo {
+  get(organizationId: string): Promise<VoiceSettings | null>;
+  save(settings: VoiceSettings): Promise<VoiceSettings>;
+}
+
+export interface AudioEditionRepo {
+  create(edition: AudioEdition): Promise<AudioEdition>;
+  get(organizationId: string, id: string): Promise<AudioEdition | null>;
+  listForProject(organizationId: string, projectId: string): Promise<AudioEdition[]>;
+  update(organizationId: string, id: string, patch: Partial<AudioEdition>): Promise<AudioEdition>;
 }
 
 export interface RevisionRepo {

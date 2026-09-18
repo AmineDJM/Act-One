@@ -11,7 +11,7 @@ import type { Job, JobKind } from './job.ts';
  * or nothing at all when there is no history, never a number made up.
  */
 export type RunStepKey =
-  'research' | 'concepts' | 'storyboard' | 'revision' | 'render' | 'campaign';
+  'research' | 'concepts' | 'storyboard' | 'revision' | 'render' | 'campaign' | 'audio';
 
 export const RUN_STEPS: Record<RunStepKey, { label: string; kinds: readonly JobKind[] }> = {
   research: {
@@ -23,6 +23,7 @@ export const RUN_STEPS: Record<RunStepKey, { label: string; kinds: readonly JobK
   revision: { label: 'Working out the change', kinds: ['repair_scene'] },
   render: { label: 'Making the film', kinds: ['render_film', 'render_variant'] },
   campaign: { label: 'Cutting it for every channel', kinds: ['generate_campaign'] },
+  audio: { label: 'Reading the audio version', kinds: ['produce_audio'] },
 };
 
 /** The chains, in the order their steps run. A step may belong to several. */
@@ -32,6 +33,7 @@ const RUNS: readonly (readonly RunStepKey[])[] = [
   ['revision', 'render'],
   ['render'],
   ['campaign'],
+  ['audio'],
 ];
 
 /** How far apart two jobs may be and still be one run. */

@@ -472,6 +472,22 @@ export async function previewTimingAction(
   }
 }
 
+/** Reads the film aloud as one piece: the audio version, for feeds and posts. */
+export async function produceAudioAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const project = await getProjectOr404(session, String(formData.get('projectId') ?? ''));
+    const { produceAudioEdition } = await import('@/server/voice.ts');
+    await produceAudioEdition(session, project, {
+      brandVoiceId: String(formData.get('brandVoiceId') ?? '') || null,
+    });
+    revalidatePath(`/app/projects/${project.id}`);
+    return { error: null, message: 'Writing it for the ear, then reading it.' };
+  } catch (error) {
+    return { error: reportError('produceAudioAction', error).publicMessage };
+  }
+}
+
 /**
  * Corrects the address a project was started from, and reads it again.
  *

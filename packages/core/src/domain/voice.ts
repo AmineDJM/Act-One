@@ -396,3 +396,69 @@ export const NARRATION_CONTEXT_LABELS: Record<NarrationContext, string> = {
   executive_update: 'Executive updates',
   community: 'Community pieces',
 };
+
+// ---------------------------------------------------------------------------
+// Consent, settings, audio editions
+// ---------------------------------------------------------------------------
+
+/**
+ * A person's recorded consent to have their voice cloned and used. Granted
+ * by a named member for a named person, for one project or the whole
+ * organisation, and revocable: a revoked consent stops the voice and
+ * deletes it at the vendor.
+ */
+export const VoiceConsentRecord = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  projectId: z.string().nullable().default(null),
+  subjectName: z.string().trim().min(1).max(160),
+  grantedByUserId: z.string(),
+  scope: z.enum(['project', 'organization']).default('organization'),
+  /** The vendor's id for the cloned voice, once it exists. */
+  providerVoiceId: z.string().nullable().default(null),
+  grantedAt: z.string(),
+  revokedAt: z.string().nullable().default(null),
+});
+export type VoiceConsentRecord = z.infer<typeof VoiceConsentRecord>;
+
+/** An organisation's own words: how its names are said, and which voice reads by default. */
+export const VoiceSettings = z.object({
+  organizationId: z.string(),
+  pronunciations: z.array(PronunciationRule).max(200).default([]),
+  defaultBrandVoiceId: z.string().nullable().default(null),
+  updatedAt: z.string(),
+});
+export type VoiceSettings = z.infer<typeof VoiceSettings>;
+
+export const AudioEditionStatus = z.enum(['queued', 'running', 'completed', 'failed']);
+export type AudioEditionStatus = z.infer<typeof AudioEditionStatus>;
+
+/**
+ * An audio edition: the film's argument, written again for the ear and read
+ * as one piece — segmented, performed, checked, stitched and mastered.
+ */
+export const AudioEdition = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  projectId: z.string(),
+  storyboardId: z.string().nullable().default(null),
+  status: AudioEditionStatus.default('queued'),
+  title: z.string().max(200).default(''),
+  /** The script as read, paragraph by paragraph. */
+  script: z.array(z.string()).default([]),
+  language: z.string().nullable().default(null),
+  /** The brand voice it was read with, when one was. */
+  brandVoiceId: z.string().nullable().default(null),
+  provider: z.string().nullable().default(null),
+  voiceId: z.string().nullable().default(null),
+  assetId: z.string().nullable().default(null),
+  durationSeconds: z.number().min(0).default(0),
+  integratedLufs: z.number().nullable().default(null),
+  costUsd: z.number().min(0).default(0),
+  /** What QA found and let stand. */
+  findings: z.array(z.object({ check: z.string(), severity: z.string(), message: z.string() })).default([]),
+  error: z.string().nullable().default(null),
+  createdAt: z.string(),
+  completedAt: z.string().nullable().default(null),
+});
+export type AudioEdition = z.infer<typeof AudioEdition>;

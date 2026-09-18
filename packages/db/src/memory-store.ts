@@ -22,7 +22,9 @@ import type {
   Approval,
   ApprovalGate,
   Asset,
+  AudioEdition,
   BrandSystem,
+  BrandVoice,
   Comment,
   CommentTarget,
   Concept,
@@ -42,6 +44,8 @@ import type {
   QaReport,
   Render,
   RevisionRequest,
+  VoiceConsentRecord,
+  VoiceSettings,
   Scene,
   Storyboard,
   Subscription,
@@ -88,6 +92,10 @@ export class MemoryStore implements Store {
     comments: new Map<string, Comment>(),
     approvals: new Map<string, Approval>(),
     revisions: new Map<string, RevisionRequest & { organizationId: string }>(),
+    brandVoices: new Map<string, BrandVoice>(),
+    voiceConsents: new Map<string, VoiceConsentRecord>(),
+    voiceSettings: new Map<string, VoiceSettings>(),
+    audioEditions: new Map<string, AudioEdition>(),
     credentials: new Map<string, ProductCredential & { ciphertext: unknown }>(),
     credentialAudit: new Map<string, CredentialAuditEvent>(),
     stripeEvents: new Map<string, string>(),
@@ -765,6 +773,11 @@ export class MemoryStore implements Store {
       this.scoped(this.tables.costs, organizationId)
         .filter((c) => !since || c.createdAt >= since)
         .reduce((sum, c) => sum + c.actualCostUsd, 0),
+    listSince: async (since: string, operationPrefix?: string) =>
+      [...this.tables.costs.values()]
+        .filter((c) => c.createdAt >= since && (!operationPrefix || c.operation.startsWith(operationPrefix)))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 5000),
     dailySeries: async (since: string) => {
       const byDay = new Map<string, { day: string; costUsd: number; creditsCharged: number; calls: number; failures: number }>();
       for (const row of this.tables.costs.values()) {
@@ -924,6 +937,74 @@ export class MemoryStore implements Store {
         { applied: true, appliedAt: new Date().toISOString(), affectedSceneIds },
         'Revision request',
       ),
+  };
+
+  readonly brandVoices = {
+    create: async (voice: BrandVoice) => {
+      this.tables.brandVoices.set(voice.id, voice);
+      return voice;
+    },
+    get: async (organizationId: string, id: string) =>
+      this.scoped(this.tables.brandVoices, organizationId).find((v) => v.id === id) ?? null,
+    list: async (organizationId: string) =>
+      this.scoped(this.tables.brandVoices, organizationId).sort(
+        (a, b) => Number(b.isDefault) - Number(a.isDefault) || a.createdAt.localeCompare(b.createdAt),
+      ),
+    update: async (organizationId: string, id: string, patch: Partial<BrandVoice>) =>
+      this.patch(this.tables.brandVoices, organizationId, id, { ...patch, updatedAt: new Date().toISOString() }, 'Brand voice'),
+    setDefault: async (organizationId: string, id: string) => {
+      const chosen = this.scoped(this.tables.brandVoices, organizationId).find((v) => v.id === id);
+      if (!chosen) throw notFound('Brand voice');
+      for (const voice of this.scoped(this.tables.brandVoices, organizationId)) {
+        if (voice.id !== id && voice.isDefault) this.tables.brandVoices.set(voice.id, { ...voice, isDefault: false });
+      }
+      return this.patch(this.tables.brandVoices, organizationId, id, { isDefault: true, updatedAt: new Date().toISOString() }, 'Brand voice');
+    },
+    remove: async (organizationId: string, id: string) => {
+      const existing = this.tables.brandVoices.get(id);
+      if (existing && existing.organizationId === organizationId) this.tables.brandVoices.delete(id);
+    },
+  };
+
+  readonly voiceConsents = {
+    create: async (consent: VoiceConsentRecord) => {
+      this.tables.voiceConsents.set(consent.id, consent);
+      return consent;
+    },
+    get: async (organizationId: string, id: string) =>
+      this.scoped(this.tables.voiceConsents, organizationId).find((c) => c.id === id) ?? null,
+    list: async (organizationId: string) =>
+      this.scoped(this.tables.voiceConsents, organizationId).sort((a, b) => b.grantedAt.localeCompare(a.grantedAt)),
+    revoke: async (organizationId: string, id: string) => {
+      const existing = this.scoped(this.tables.voiceConsents, organizationId).find((c) => c.id === id);
+      if (!existing) throw notFound('Voice consent');
+      return this.patch(this.tables.voiceConsents, organizationId, id, { revokedAt: existing.revokedAt ?? new Date().toISOString() }, 'Voice consent');
+    },
+    setProviderVoice: async (organizationId: string, id: string, providerVoiceId: string | null) =>
+      this.patch(this.tables.voiceConsents, organizationId, id, { providerVoiceId }, 'Voice consent'),
+  };
+
+  readonly voiceSettings = {
+    get: async (organizationId: string) => this.tables.voiceSettings.get(organizationId) ?? null,
+    save: async (settings: VoiceSettings) => {
+      this.tables.voiceSettings.set(settings.organizationId, settings);
+      return settings;
+    },
+  };
+
+  readonly audioEditions = {
+    create: async (edition: AudioEdition) => {
+      this.tables.audioEditions.set(edition.id, edition);
+      return edition;
+    },
+    get: async (organizationId: string, id: string) =>
+      this.scoped(this.tables.audioEditions, organizationId).find((e) => e.id === id) ?? null,
+    listForProject: async (organizationId: string, projectId: string) =>
+      this.scoped(this.tables.audioEditions, organizationId)
+        .filter((e) => e.projectId === projectId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    update: async (organizationId: string, id: string, patch: Partial<AudioEdition>) =>
+      this.patch(this.tables.audioEditions, organizationId, id, patch, 'Audio edition'),
   };
 
   readonly credentials = {

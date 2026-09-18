@@ -12,6 +12,7 @@ export const AssetKind = z.enum([
   'audio_music',
   'audio_sfx',
   'audio_voice',
+  'audio_edition',
   'master_video',
   'variant_video',
   'animatic',

@@ -8,3 +8,4 @@ export { runCampaign } from './stages/campaign.ts';
 export { runRevision } from './stages/revision.ts';
 export { runSceneAssets, type AssetResult } from './stages/assets.ts';
 export { narrate, seedFor, type NarrationOptions, type NarrationPassage, type NarrationResult, type NarrationTrack, type NarrationUsage } from './narration.ts';
+export { runAudioEdition } from './stages/audio-edition.ts';

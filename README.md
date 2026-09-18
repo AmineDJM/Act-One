@@ -280,10 +280,44 @@ before and after each one so the film is one read. Every passage is then
 transcribed back by a *different* recogniser than the voice that spoke —
 Whisper or Scribe, chosen under Routing — and compared with the script.
 
-Founder and brand voices are cloned only against a recorded consent. The
-provider refuses without one, and a cloned voice can never be cast by
+Every line then goes through the narration engine, whichever engine reads:
+fitted to its room (rewritten shorter by the model as a copy editor, every
+figure kept to the character, before it is ever hurried, and never past ten
+percent); performed with the lines around it; measured by FFmpeg for peak,
+silence and level; and, for finals, transcribed back by the recogniser and
+compared with the script — the wrong language, a figure not said, an ending
+cut off, a pause that is not written, a read that runs past its scene. The
+best take is kept, a failed one is read again, and the passages are brought
+to one level before anything hears them together. Each recording is our own
+asset, with who read it, in which language, how many characters, what it
+cost and what QA found.
+
+**Brand voice.** On the Brand page an organisation casts one narrator for
+everything it makes — from the engine's library, by ear, with a sample — and
+writes down how its own names are said (`Ornikar = Or-nee-car`). Plans decide
+by entitlement, never by name: the premium engine for finals, alternative
+takes, a brand voice, cloning, audio editions.
+
+**Cloning.** A person's voice is cloned only under a recorded consent naming
+them, granted by a member who ticks the statement in plain words; the consent
+exists before the vendor is asked, the vendor checks it again, and revoking
+it deletes the voice in the same breath. A cloned voice can never be cast by
 accident: the library is searched with clones excluded, and naming one
-outright is refused unless the consent travels with the request.
+outright is refused unless the consent travels with the request. Staff switch
+cloning on or off for the platform under **Voice** in the console.
+
+**Audio editions.** The film's argument, written again for the ear from the
+approved storyboard and the published facts (a draft that invents a figure is
+refused and the narration itself is read), segmented at sentences, read by
+the brand voice, stitched with the pauses the paragraphs ask for, mastered to
+−16 LUFS and delivered as its own file beside the film.
+
+**For staff**, the console's Voice page chooses the engines for finals,
+previews and listening back; curates which voice reads each language and
+accent, per gender and profile, from the library; sets takes, regenerations,
+the cost ceiling and cloning; shows what the voice cost, by engine and model,
+from the ledger; and reads one line on every engine with a key for a blind
+comparison.
 
 ### Revisions are a conversation
 

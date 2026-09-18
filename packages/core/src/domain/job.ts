@@ -34,6 +34,7 @@ export const JobKind = z.enum([
   'repair_scene',
   'generate_campaign',
   'generate_copy',
+  'produce_audio',
 ]);
 export type JobKind = z.infer<typeof JobKind>;
 
