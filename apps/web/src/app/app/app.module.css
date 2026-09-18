@@ -89,6 +89,26 @@
 }
 .progressBar { height: 100%; background: var(--accent); transition: width 600ms var(--ease); }
 
+/* The wait, as steps: what is done, what is happening, what is still to come. */
+.run { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
+.runSteps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.runSteps li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.runSteps li[data-state='current'] { color: var(--text); font-weight: 500; }
+.runSteps li[data-state='done'] .runLabel { text-decoration: line-through; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); }
+.runTick { font-size: 0.8rem; text-align: center; }
+.runSteps li[data-state='done'] .runTick { color: var(--accent-text); }
+.runSteps li[data-state='current'] .runTick { color: var(--accent); }
+.runTime { font-variant-numeric: tabular-nums; font-size: 0.82rem; color: var(--text-secondary); white-space: nowrap; }
+.runMessage { font-size: 0.88rem; color: var(--text-secondary); margin: 0; }
+.runTiming { font-size: 0.82rem; color: var(--text-secondary); margin: 0; font-variant-numeric: tabular-nums; }
+
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-5); }
 .panel {
   min-width: 0;

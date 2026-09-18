@@ -1,9 +1,9 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { PrimaryCta } from '@act-one/core';
+import type { PrimaryCta, RunView } from '@act-one/core';
 import {
   createCampaignAction,
   retryProjectAction,
@@ -26,8 +26,8 @@ export function ProjectCta(props: {
   label: string;
   headline: string;
   body: string;
-  progress: number | null;
-  status: string | null;
+  /** The work in flight, as steps with timing. Null when nothing is running. */
+  run: RunView | null;
   disabled: boolean;
   /** What to do about it when the action is blocked by the plan. */
   remedy?: 'none' | 'upgrade' | 'wait' | 'billing' | 'contact';
@@ -78,18 +78,7 @@ export function ProjectCta(props: {
     <section className={styles.cta}>
       <div className={styles.ctaCopy}>
         <h2>{props.headline}</h2>
-        <p>{props.status && working ? props.status : props.body}</p>
-        {working ? (
-          <div
-            className={styles.progress}
-            role="progressbar"
-            aria-valuenow={Math.round((props.progress ?? 0) * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div className={styles.progressBar} style={{ width: `${(props.progress ?? 0.05) * 100}%` }} />
-          </div>
-        ) : null}
+        {working && props.run ? <RunProgress run={props.run} /> : <p>{props.body}</p>}
         {result ? (
           <p role="alert" style={{ color: 'var(--danger)', fontSize: '0.88rem' }}>
             {result}
@@ -98,13 +87,13 @@ export function ProjectCta(props: {
       </div>
 
       {/*
-        * A blocked action offers the way out rather than a dead button.
-        *
-        * Hitting a plan ceiling used to leave a greyed-out control beside a
-        * sentence explaining why, and nothing to press — which is the one
-        * moment a customer has decided they want the thing badly enough to
-        * pay for it.
-        */}
+       * A blocked action offers the way out rather than a dead button.
+       *
+       * Hitting a plan ceiling used to leave a greyed-out control beside a
+       * sentence explaining why, and nothing to press — which is the one
+       * moment a customer has decided they want the thing badly enough to
+       * pay for it.
+       */}
       {action && props.disabled && props.remedy === 'upgrade' ? (
         <Link href="/app/billing" className="btn btn--lg">
           See plans
@@ -125,4 +114,100 @@ export function ProjectCta(props: {
       ) : null}
     </section>
   );
+}
+
+/**
+ * The wait, as steps.
+ *
+ * A single bar that filled and snapped back at every stage told the customer
+ * nothing except that something moved. This names the steps, ticks the clock
+ * on the one in progress, and estimates what is left from how long the same
+ * steps have taken on this platform before — or says plainly that there is
+ * no history yet. The bar never goes backwards: it is the whole run, and it
+ * only ever climbs.
+ */
+function RunProgress({ run }: { run: RunView }) {
+  const [now, setNow] = useState(() => Date.now());
+  // The furthest the bar has been for this run. A refresh that computes a
+  // slightly lower figure — a step's weight revised, a worker restart —
+  // must not be seen as the work undoing itself.
+  const peak = useRef<{ id: string; overall: number }>({ id: run.id, overall: run.overall });
+  if (peak.current.id !== run.id) peak.current = { id: run.id, overall: run.overall };
+  else peak.current.overall = Math.max(peak.current.overall, run.overall);
+  const overall = peak.current.overall;
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const sinceView = Math.max(0, now - Date.parse(run.asOf));
+  const elapsed = run.elapsedMs + sinceView;
+  const remaining = run.remainingMs === null ? null : Math.max(0, run.remainingMs - sinceView);
+  const current = run.steps.find((step) => step.state === 'current');
+
+  return (
+    <div className={styles.run}>
+      <ol className={styles.runSteps}>
+        {run.steps.map((step) => (
+          <li key={step.key} data-state={step.state}>
+            <span className={styles.runTick} aria-hidden="true">
+              {step.state === 'done' ? '✓' : step.state === 'current' ? '●' : '○'}
+            </span>
+            <span className={styles.runLabel}>{step.label}</span>
+            <span className={styles.runTime}>
+              {step.state === 'done' && step.elapsedMs !== null
+                ? formatClock(step.elapsedMs)
+                : step.state === 'current'
+                  ? run.waiting
+                    ? 'queued'
+                    : formatClock((step.elapsedMs ?? 0) + sinceView) +
+                      (step.typicalMs ? ` · usually ${formatAbout(step.typicalMs)}` : '')
+                  : step.typicalMs
+                    ? `usually ${formatAbout(step.typicalMs)}`
+                    : ''}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {run.message ? (
+        <p className={styles.runMessage}>{run.message}</p>
+      ) : current ? (
+        <p className={styles.runMessage}>{current.label}…</p>
+      ) : null}
+      <div
+        className={styles.progress}
+        role="progressbar"
+        aria-valuenow={Math.round(overall * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className={styles.progressBar} style={{ width: `${Math.max(2, overall * 100)}%` }} />
+      </div>
+      <p className={styles.runTiming}>
+        {`Started ${formatClock(elapsed)} ago`}
+        {remaining === null
+          ? ' · no estimate yet: this is the first run of its kind here.'
+          : remaining < 15_000
+            ? ' · any moment now.'
+            : ` · ${formatAbout(remaining)} left.`}{' '}
+        You can close the tab.
+      </p>
+    </div>
+  );
+}
+
+/** 0:07, 1:40, 12:05 — a clock, because it ticks. */
+function formatClock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+/** "about 3 min", "under a minute" — an estimate, so never to the second. */
+function formatAbout(ms: number): string {
+  if (ms < 45_000) return 'under a minute';
+  const minutes = Math.round(ms / 60_000);
+  return minutes <= 1 ? 'about a minute' : `about ${minutes} min`;
 }

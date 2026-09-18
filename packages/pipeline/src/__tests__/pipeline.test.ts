@@ -232,7 +232,7 @@ async function enqueued(
   await store.jobs.enqueue({
     id: newId('job'), organizationId, projectId, kind, state: 'queued', payload,
     progress: 0, statusMessage: '', attempts: 0, maxAttempts: 3, lastError: null,
-    runAfter: now, lockedBy: null, lockedAt: null, priority: 0, createdAt: now, updatedAt: now,
+    runAfter: now, lockedBy: null, lockedAt: null, startedAt: null, priority: 0, createdAt: now, updatedAt: now,
   });
   const claimed = await store.jobs.claim('test-worker', [kind]);
   if (!claimed) throw new Error(`Nothing claimable for ${kind}`);

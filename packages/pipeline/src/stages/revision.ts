@@ -74,6 +74,7 @@ export async function runRevision(
       runAfter: now,
       lockedBy: null,
       lockedAt: null,
+    startedAt: null,
       priority: 7,
       createdAt: now,
       updatedAt: now,

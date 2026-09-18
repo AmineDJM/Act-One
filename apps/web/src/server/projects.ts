@@ -11,6 +11,10 @@ import {
   jobAdvancesProject,
   jobIsTerminal,
   type JobKind,
+  RUN_STEPS,
+  type RunView,
+  buildRunView,
+  stepsAround,
   storyboardDuration,
   type Project,
   type ProjectStage,
@@ -116,6 +120,7 @@ export async function enqueue(
     runAfter: now,
     lockedBy: null,
     lockedAt: null,
+    startedAt: null,
     priority,
     createdAt: now,
     updatedAt: now,
@@ -206,6 +211,16 @@ export async function loadProjectView(session: Session, projectId: string) {
   const access = await loadProductAccess(session, project.id);
   const notes = await loadComments(session, project.id);
 
+  /*
+   * The job the customer is waiting on. A side errand — a timing preview, the
+   * launch copy — runs beside the project without being what the project is
+   * doing, and letting one answer this question put "Working on it" over the
+   * whole page and took away the button that renders the film.
+   */
+  const activeJob =
+    jobs.find((job) => !jobIsTerminal(job.state) && jobAdvancesProject(job.kind)) ?? null;
+  const run = activeJob ? await runViewFor(jobs, activeJob) : null;
+
   return {
     access,
     notes,
@@ -226,14 +241,8 @@ export async function loadProjectView(session: Session, projectId: string) {
     storyboard:
       storyboards.find((board) => board.id === project.activeStoryboardId) ?? storyboards[0] ?? null,
     renders,
-    /*
-     * The job the customer is waiting on. A side errand — a timing preview, the
-     * launch copy — runs beside the project without being what the project is
-     * doing, and letting one answer this question put "Working on it" over the
-     * whole page and took away the button that renders the film.
-     */
-    activeJob:
-      jobs.find((job) => !jobIsTerminal(job.state) && jobAdvancesProject(job.kind)) ?? null,
+    activeJob,
+    run,
     /** The timing preview being built right now, reported where it was asked for. */
     animaticJob:
       jobs.find((job) => job.kind === 'render_animatic' && !jobIsTerminal(job.state)) ?? null,
@@ -300,4 +309,19 @@ export function hostLabel(url: string): string {
   } catch {
     return 'New project';
   }
+}
+
+/**
+ * The run this job belongs to, measured against this platform's own history:
+ * the median of recent completed jobs of each step's kind, or nothing.
+ */
+async function runViewFor(jobs: Job[], active: Job): Promise<RunView | null> {
+  const store = getStore();
+  const typicalMs: Partial<Record<keyof typeof RUN_STEPS, number | null>> = {};
+  await Promise.all(
+    stepsAround(active.kind).map(async (key) => {
+      typicalMs[key] = await store.jobs.typicalDurationMs(RUN_STEPS[key].kinds[0]!);
+    }),
+  );
+  return buildRunView({ jobs, active, now: Date.now(), typicalMs });
 }

@@ -1260,12 +1260,12 @@ export class PgStore implements Store {
         await c.query(
           `INSERT INTO jobs
              (id, organization_id, project_id, kind, state, payload, progress, status_message,
-              attempts, max_attempts, run_after, priority, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+              attempts, max_attempts, run_after, priority, created_at, updated_at, started_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [
             job.id, job.organizationId, job.projectId, job.kind, job.state, job.payload,
             job.progress, job.statusMessage, job.attempts, job.maxAttempts, job.runAfter,
-            job.priority, job.createdAt, job.updatedAt,
+            job.priority, job.createdAt, job.updatedAt, job.startedAt,
           ],
         );
         return job;
@@ -1286,7 +1286,8 @@ export class PgStore implements Store {
         // each transaction takes a different row instead of serialising on the
         // same one or double-claiming it.
         const r = await c.query(
-          `UPDATE jobs SET locked_by = $1, locked_at = now(), attempts = attempts + 1, updated_at = now()
+          `UPDATE jobs SET locked_by = $1, locked_at = now(), started_at = now(),
+             attempts = attempts + 1, updated_at = now()
            WHERE id = (
              SELECT id FROM jobs
              WHERE state = 'queued' AND locked_by IS NULL AND run_after <= now()
@@ -1376,6 +1377,24 @@ export class PgStore implements Store {
           'SELECT state, COUNT(*)::int AS count FROM jobs GROUP BY state',
         );
         return Object.fromEntries(r.rows.map((row) => [row.state, num(row.count)]));
+      }),
+
+    typicalDurationMs: async (kind: JobKind) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ median: number | null; samples: number }>(
+          `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY ms) AS median, COUNT(*)::int AS samples
+           FROM (
+             SELECT EXTRACT(EPOCH FROM (updated_at - started_at)) * 1000 AS ms
+             FROM jobs
+             WHERE kind = $1 AND state = 'completed' AND started_at IS NOT NULL
+             ORDER BY updated_at DESC
+             LIMIT 12
+           ) recent`,
+          [kind],
+        );
+        const row = r.rows[0];
+        if (!row || row.median === null || num(row.samples) < 2) return null;
+        return Math.round(num(row.median));
       }),
   };
 
@@ -2113,6 +2132,7 @@ function toJob(row: Row): Job {
     runAfter: iso(row['run_after']),
     lockedBy: (row['locked_by'] as string) ?? null,
     lockedAt: isoOrNull(row['locked_at']),
+    startedAt: isoOrNull(row['started_at']),
     priority: num(row['priority']),
     createdAt: iso(row['created_at']),
     updatedAt: iso(row['updated_at']),

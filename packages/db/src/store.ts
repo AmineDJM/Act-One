@@ -284,6 +284,13 @@ export interface JobRepo {
   /** Releases jobs whose worker died holding the lock. */
   reapStale(olderThanMs: number): Promise<number>;
   countByState(): Promise<Record<string, number>>;
+  /**
+   * What a job of this kind usually takes here: the median over recent
+   * completed ones, across the platform. Null until there are at least two,
+   * because one job is an anecdote and the page must not present it as a
+   * forecast.
+   */
+  typicalDurationMs(kind: JobKind): Promise<number | null>;
 }
 
 export interface CostRepo {

@@ -20,6 +20,7 @@ function job(organizationId: string, over: Partial<Job> = {}): Job {
     runAfter: now,
     lockedBy: null,
     lockedAt: null,
+    startedAt: null,
     priority: 0,
     createdAt: now,
     updatedAt: now,
@@ -145,5 +146,63 @@ describe('retryDelayMs', () => {
       expect(delay).toBeGreaterThanOrEqual(base * 0.8);
       expect(delay).toBeLessThanOrEqual(base * 1.2);
     }
+  });
+});
+
+describe.each(storeCases())('job timing on $name', ({ open, close, clearJobs }) => {
+  let store: Store;
+  let organizationId = '';
+
+  beforeEach(async () => {
+    store = await open();
+    await clearJobs(store);
+    const organization = await store.organizations.create({
+      id: newId('org'),
+      name: 'Timing',
+      slug: uniqueSlug('timing'),
+      planId: 'free',
+      stripeCustomerId: null,
+      creditBalance: 0,
+      maxProjectCostUsd: 120,
+      isSuspended: false,
+      createdAt: new Date().toISOString(),
+    });
+    organizationId = organization.id;
+  });
+
+  afterEach(async () => {
+    await close(store);
+  });
+
+  it('remembers when a job began, even after it is done', async () => {
+    const queued = await store.jobs.enqueue(job(organizationId, { kind: 'generate_concepts' }));
+    const claimed = await store.jobs.claim('worker-1', ['generate_concepts']);
+    expect(claimed?.id).toBe(queued.id);
+    expect(claimed?.startedAt).not.toBeNull();
+    const done = await store.jobs.complete(queued.id, 'completed', 'Done');
+    expect(done.lockedAt).toBeNull();
+    expect(done.startedAt).toBe(claimed?.startedAt);
+  });
+
+  it('calls one finished job an anecdote and three a typical duration', async () => {
+    const finished = (msAgoStart: number, msAgoEnd: number) => {
+      const end = Date.now() - msAgoEnd;
+      return job(organizationId, {
+        kind: 'build_storyboard',
+        state: 'completed',
+        progress: 1,
+        startedAt: new Date(end - msAgoStart).toISOString(),
+        updatedAt: new Date(end).toISOString(),
+        createdAt: new Date(end - msAgoStart - 1000).toISOString(),
+      });
+    };
+    expect(await store.jobs.typicalDurationMs('build_storyboard')).toBeNull();
+    await store.jobs.enqueue(finished(90_000, 30_000));
+    expect(await store.jobs.typicalDurationMs('build_storyboard')).toBeNull();
+    await store.jobs.enqueue(finished(120_000, 20_000));
+    await store.jobs.enqueue(finished(600_000, 10_000));
+    // The median, so one slow outlier does not become the forecast.
+    expect(await store.jobs.typicalDurationMs('build_storyboard')).toBe(120_000);
+    expect(await store.jobs.typicalDurationMs('render_film')).toBeNull();
   });
 });

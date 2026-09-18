@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     await store.jobs.enqueue({
       id: newId('job'), organizationId: organization.id, projectId: project.id, kind,
       state: 'queued', payload, progress: 0, statusMessage: '', attempts: 0, maxAttempts: 1,
-      lastError: null, runAfter: created, lockedBy: null, lockedAt: null, priority: 0,
+      lastError: null, runAfter: created, lockedBy: null, lockedAt: null, startedAt: null, priority: 0,
       createdAt: created, updatedAt: created,
     });
     const claimed = await store.jobs.claim('demo', [kind]);

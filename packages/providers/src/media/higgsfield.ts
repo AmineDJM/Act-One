@@ -109,11 +109,41 @@ const RequestStatus = z.object({
 });
 type RequestStatus = z.infer<typeof RequestStatus>;
 
-/** `POST /estimate/{model}`: what the request would cost, in credits and dollars. */
-const Estimate = z.object({
-  credits: z.union([z.string(), z.number()]).optional(),
-  usd: z.union([z.string(), z.number()]),
-});
+/**
+ * `POST /estimate/{model}`: what the request would cost. The documentation
+ * shows `{ credits, usd }` as strings; the answer is read leniently, because
+ * the first live check found something the schema did not expect, and a
+ * price is a number wherever the vendor puts it.
+ */
+const Estimate = z.record(z.string(), z.unknown());
+
+/** Dollars, or credits at the vendor's documented rate: 1.500 credits for $0.094. */
+const USD_PER_CREDIT = 0.094 / 1.5;
+
+function priceFromEstimate(answer: unknown): { usd: number; approximate: boolean } | null {
+  const numeric = (value: unknown): number | null => {
+    const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const search = (node: unknown, depth: number): { usd: number; approximate: boolean } | null => {
+    if (!node || typeof node !== 'object' || depth > 3) return null;
+    const record = node as Record<string, unknown>;
+    for (const key of ['usd', 'price_usd', 'cost_usd', 'total_usd', 'amount_usd', 'priceUsd', 'costUsd']) {
+      const usd = numeric(record[key]);
+      if (usd !== null) return { usd, approximate: false };
+    }
+    for (const key of ['credits', 'price_credits', 'cost_credits', 'total_credits', 'priceCredits']) {
+      const credits = numeric(record[key]);
+      if (credits !== null) return { usd: credits * USD_PER_CREDIT, approximate: true };
+    }
+    for (const value of Object.values(record)) {
+      const found = search(value, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  return search(answer, 0);
+}
 
 /** `POST /files/generate-upload-url`: a presigned slot on the vendor's CDN. */
 const UploadGrant = z.object({
@@ -476,18 +506,22 @@ export class HiggsfieldProvider implements GenerativeMediaProvider {
     const cached = this.estimates.get(key);
     if (cached && Date.now() - cached.at < 60_000) return cached.usd;
 
-    const estimate = await this.api(Estimate, 'POST', `/estimate/${endpoint}`, input, {
+    const answer = await this.api(Estimate, 'POST', `/estimate/${endpoint}`, input, {
       timeoutMs: 20_000,
       attempts: 2,
     });
-    const usd = Number(estimate.usd);
-    if (!Number.isFinite(usd) || usd < 0) {
-      throw new ProviderError(this.name, 'Higgsfield returned an estimate without a price.', {
-        retryable: true,
-      });
+    const price = priceFromEstimate(answer);
+    if (!price) {
+      // The answer itself, so the console says what came back rather than
+      // that something did. An estimate carries no secret.
+      throw new ProviderError(
+        this.name,
+        `Higgsfield answered the estimate without a price: ${JSON.stringify(answer).slice(0, 300)}`,
+        { retryable: false },
+      );
     }
-    this.estimates.set(key, { usd, at: Date.now() });
-    return usd;
+    this.estimates.set(key, { usd: price.usd, at: Date.now() });
+    return price.usd;
   }
 
   /**

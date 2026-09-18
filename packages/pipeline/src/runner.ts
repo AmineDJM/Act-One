@@ -226,6 +226,7 @@ async function enqueueNext(
     runAfter: now,
     lockedBy: null,
     lockedAt: null,
+    startedAt: null,
     priority,
     createdAt: now,
     updatedAt: now,

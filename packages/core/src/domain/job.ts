@@ -53,6 +53,8 @@ export const Job = z.object({
   runAfter: z.string(),
   lockedBy: z.string().nullable().default(null),
   lockedAt: z.string().nullable().default(null),
+  /** When a worker first began it. Kept after completion, unlike the lock. */
+  startedAt: z.string().nullable().default(null),
   priority: z.number().int().default(0),
   createdAt: z.string(),
   updatedAt: z.string(),

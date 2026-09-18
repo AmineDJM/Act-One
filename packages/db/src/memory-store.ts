@@ -651,6 +651,7 @@ export class MemoryStore implements Store {
         ...job,
         lockedBy: workerId,
         lockedAt: now,
+        startedAt: now,
         attempts: job.attempts + 1,
         updatedAt: now,
       };
@@ -720,6 +721,21 @@ export class MemoryStore implements Store {
         counts[job.state] = (counts[job.state] ?? 0) + 1;
       }
       return counts;
+    },
+    typicalDurationMs: async (kind: JobKind) => {
+      const durations = [...this.tables.jobs.values()]
+        .filter((job) => job.kind === kind && job.state === 'completed' && job.startedAt)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, 12)
+        .map((job) => Date.parse(job.updatedAt) - Date.parse(job.startedAt!))
+        .sort((a, b) => a - b);
+      if (durations.length < 2) return null;
+      const middle = durations.length / 2;
+      return Math.round(
+        durations.length % 2 === 1
+          ? durations[Math.floor(middle)]!
+          : (durations[middle - 1]! + durations[middle]!) / 2,
+      );
     },
   };
 

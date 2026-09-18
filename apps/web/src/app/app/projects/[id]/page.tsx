@@ -41,6 +41,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     concepts,
     storyboard,
     activeJob,
+    run,
     latestRender,
     animatic,
     animaticJob,
@@ -85,8 +86,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         label={CTA_LABELS[cta]}
         headline={headlineFor(cta, project.name, failure)}
         body={bodyFor(cta, permission.watermarked, permission.reason, failure)}
-        progress={activeJob ? activeJob.progress : null}
-        status={activeJob?.statusMessage ?? null}
+        run={run}
         disabled={!permission.allowed && cta === 'render_film'}
         remedy={permission.remedy}
       />
