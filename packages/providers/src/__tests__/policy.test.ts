@@ -85,6 +85,18 @@ describe('authenticated product policy', () => {
     expect(checkNavigation(policy, 'https://evil.example/collect').allowed).toBe(false);
   });
 
+  it('always admits the sign-in page, whatever paths were authorised', () => {
+    // "/app" describes the product, not the door to it.
+    const scoped = policyForAuthenticatedProduct({
+      loginUrl: 'https://app.acme.com/login',
+      allowedPaths: ['/app'],
+      deniedPaths: [],
+    });
+    expect(checkNavigation(scoped, 'https://app.acme.com/login').allowed).toBe(true);
+    expect(checkNavigation(scoped, 'https://app.acme.com/app/issues').allowed).toBe(true);
+    expect(checkNavigation(scoped, 'https://app.acme.com/marketing').allowed).toBe(false);
+  });
+
   it('confines the session to the authorised paths', () => {
     expect(checkNavigation(policy, 'https://app.acme.com/analytics/usage').allowed).toBe(true);
     expect(checkNavigation(policy, 'https://app.acme.com/team/members').allowed).toBe(false);

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
 import { DEFAULT_FPS, dimensionsFor, type AspectRatio, type RenderQuality } from '@act-one/core';
-import { compositionId, type FilmProps } from './composition.ts';
+import { compositionId, filmDurationInFrames, type FilmProps } from './composition.ts';
 
 /**
  * Server-side rendering.
@@ -95,6 +95,11 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
     width,
     height,
     fps,
+    // The composition counts its frames at the default rate. A render asked
+    // for at another rate keeps the film's length, not its frame count —
+    // without this, 15 fps rendered every frame of a 30 fps count and the
+    // film ran at half speed for twice as long.
+    durationInFrames: filmDurationInFrames(options.props.storyboard, fps),
   };
 
   if (options.stillAtSeconds !== undefined) {

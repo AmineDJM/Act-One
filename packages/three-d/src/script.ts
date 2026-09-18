@@ -13,7 +13,10 @@ import { RIGS, type ThreeDScene } from './rigs.ts';
  * a backslash would otherwise break out of the string literal, and in a
  * language with `os.system` that is not a cosmetic bug.
  */
-export function buildBlenderScript(scene: ThreeDScene): string {
+export function buildBlenderScript(
+  scene: ThreeDScene,
+  options: { outputPattern?: string } = {},
+): string {
   const rig = RIGS[scene.rig];
   const background = linear(scene.backgroundColor);
   const accent = linear(scene.accentColor);
@@ -32,6 +35,9 @@ HEIGHT = ${int(scene.height)}
 FOCAL = ${num(scene.focalLengthMm)}
 DOF = ${num(scene.depthOfField)}
 SAMPLES = ${int(scene.samples)}
+# Where frames go, as "dir/frame_" with the frame number appended. Empty
+# builds the scene and renders nothing, which is what the tests want.
+OUTPUT = ${JSON.stringify(options.outputPattern ?? '')}
 BACKGROUND = (${num(background.r)}, ${num(background.g)}, ${num(background.b)}, 1.0)
 ACCENT = (${num(accent.r)}, ${num(accent.g)}, ${num(accent.b)}, 1.0)
 
@@ -43,7 +49,16 @@ def reset():
     scene.cycles.samples = SAMPLES
     # Denoising lets us run far fewer samples for the same visual result, which
     # is the difference between a viable render budget and an unviable one.
-    scene.cycles.use_denoising = True
+    # A build without OpenImageDenoise lists no denoisers at all; asking for
+    # one there fails before a frame is rendered. Without it, samples go up
+    # to buy the same quality.
+    denoisers = [item.identifier for item in scene.cycles.bl_rna.properties['denoiser'].enum_items]
+    if 'OPENIMAGEDENOISE' in denoisers:
+        scene.cycles.denoiser = 'OPENIMAGEDENOISE'
+        scene.cycles.use_denoising = True
+    else:
+        scene.cycles.use_denoising = False
+        scene.cycles.samples = min(512, SAMPLES * 3)
     scene.render.resolution_x = WIDTH
     scene.render.resolution_y = HEIGHT
     scene.render.resolution_percentage = 100
@@ -123,6 +138,23 @@ ${cameraBlock(scene)}
     return cam
 
 
+def render(scene):
+    # The script renders rather than the command line, so a failure can be
+    # answered. Not every build has the denoiser — a distribution's Blender
+    # may be built without OpenImageDenoise, and asking for it fails at the
+    # first frame with "No device available to denoise on". Without it,
+    # samples go up to buy the same quality, and the render goes again.
+    scene.render.filepath = OUTPUT
+    try:
+        bpy.ops.render.render(animation=True)
+    except Exception as error:
+        if 'denois' not in str(error).lower():
+            raise
+        scene.cycles.use_denoising = False
+        scene.cycles.samples = min(512, SAMPLES * 3)
+        bpy.ops.render.render(animation=True)
+
+
 def main():
     scene = reset()
     world(scene)
@@ -130,6 +162,8 @@ def main():
         add_screen(index, path)
     lighting()
     camera(scene)
+    if OUTPUT:
+        render(scene)
 
 
 main()

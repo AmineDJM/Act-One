@@ -63,8 +63,13 @@ jobs:
           path: .cache/ms-playwright
           key: chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install Chromium
-        run: npx playwright-core install --with-deps chromium
+      - name: Install the browsers
+        # The system libraries Chromium needs, then the same installer the
+        # worker's build runs: Playwright's Chromium for the browser tests and
+        # Remotion's chrome-headless-shell for the render test.
+        run: |
+          npx playwright-core install-deps chromium
+          npm run browsers
 
       - name: Migrate
         run: npm run migrate

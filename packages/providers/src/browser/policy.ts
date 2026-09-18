@@ -110,9 +110,21 @@ export function policyForAuthenticatedProduct(params: {
   if (!normalized) {
     throw new AppError('validation_failed', 'Product login URL is not usable.');
   }
+  const login = new URL(normalized);
+  /*
+   * The sign-in page is always allowed. A customer who lists the paths we may
+   * tour — "/app", say — is describing the product, not the door to it, and
+   * a policy that refused the door failed sign-in with "outside what we are
+   * permitted to do" before a single screen was seen.
+   */
+  const loginPath = login.pathname.replace(/\/$/, '') || '/';
+  const allowedPaths =
+    params.allowedPaths.length > 0 && !params.allowedPaths.some((prefix) => loginPath.startsWith(prefix))
+      ? [...params.allowedPaths, loginPath]
+      : params.allowedPaths;
   return {
-    allowedOrigins: [new URL(normalized).origin],
-    allowedPaths: params.allowedPaths,
+    allowedOrigins: [login.origin],
+    allowedPaths,
     deniedPaths: [...new Set([...DEFAULT_DENIED_PATH_FRAGMENTS, ...params.deniedPaths])],
     authenticated: true,
     maxPages: params.maxPages ?? 18,

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildBlenderScript } from './script.ts';
@@ -46,7 +46,12 @@ export async function renderThreeDScene(options: RenderOptions): Promise<Blender
   const timeoutMs = options.timeoutMs ?? Math.min(45 * 60_000, Math.max(120_000, estimated * 2500));
 
   try {
-    await writeFile(scriptPath, buildBlenderScript(scene), 'utf8');
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(
+      scriptPath,
+      buildBlenderScript(scene, { outputPattern: path.join(outputDir, 'frame_') }),
+      'utf8',
+    );
 
     const result = await run(
       blender,
@@ -57,11 +62,10 @@ export async function renderThreeDScene(options: RenderOptions): Promise<Blender
         '--factory-startup',
         '--python-exit-code',
         '1',
+        // The script renders: it knows what to do when the build cannot
+        // denoise, and the command line does not.
         '--python',
         scriptPath,
-        '--render-output',
-        path.join(outputDir, 'frame_'),
-        '--render-anim',
       ],
       { timeoutMs, ...(options.signal ? { signal: options.signal } : {}), ...(options.onProgress ? { onProgress: options.onProgress } : {}) },
     );

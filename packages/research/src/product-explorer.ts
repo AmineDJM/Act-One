@@ -188,7 +188,18 @@ export class ProductExplorer {
    * logged or shared.
    */
   private async signIn(session: BrowserSession, options: ExploreOptions): Promise<boolean> {
-    await session.goto(options.credentials.loginUrl, { waitUntil: 'domcontentloaded' });
+    try {
+      await session.goto(options.credentials.loginUrl, { waitUntil: 'domcontentloaded' });
+    } catch (error) {
+      // The policy refused the door itself, or it did not open. Either way the
+      // tour is over before it began, and that is a fact for the audit trail,
+      // not an exception for the research stage.
+      options.onAudit?.({
+        action: 'blocked',
+        detail: `Could not open the sign-in page: ${(error as Error).message.slice(0, 160)}`,
+      });
+      return false;
+    }
     options.onAudit?.({ action: 'navigate', detail: options.credentials.loginUrl });
 
     const passwordSelector = await firstPresent(session, [
