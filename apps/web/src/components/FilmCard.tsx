@@ -33,6 +33,13 @@ export function FilmCard({
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  /*
+   * Muted until asked, because autoplay policy requires it and three films
+   * shouting at once is nobody's first impression. But a product that scores
+   * its films has to let somebody hear one, or the sound design is a claim
+   * rather than a demonstration.
+   */
+  const [muted, setMuted] = useState(true);
 
   const play = () => {
     // A rejected play() is normal — a browser may refuse until a real gesture,
@@ -40,12 +47,38 @@ export function FilmCard({
     void video.current?.play().then(() => setPlaying(true)).catch(() => undefined);
   };
 
+  /*
+   * Hovering away stops the film — unless somebody has asked for sound.
+   *
+   * An explicit click outranks an incidental mouse movement. Resetting on
+   * every mouseleave made unmuting useless: turn the sound on, move the
+   * pointer, lose both the playback and the choice.
+   */
   const stop = () => {
+    if (!muted) return;
     const element = video.current;
     if (!element) return;
     element.pause();
     element.currentTime = 0;
     setPlaying(false);
+  };
+
+  const toggleSound = () => {
+    const element = video.current;
+    if (!element) return;
+    const next = !muted;
+    setMuted(next);
+    element.muted = next;
+
+    if (next) {
+      // Muting is also how you put the card back: it stops rather than
+      // carrying on silently in a corner of the page.
+      element.pause();
+      element.currentTime = 0;
+      setPlaying(false);
+    } else {
+      play();
+    }
   };
 
   return (
@@ -64,7 +97,7 @@ export function FilmCard({
           ref={video}
           src={`/work/${slug}.mp4`}
           poster={`/work/${slug}.png`}
-          muted
+          muted={muted}
           loop
           playsInline
           preload="none"
@@ -74,6 +107,18 @@ export function FilmCard({
         <span className={styles.badge} data-playing={playing}>
           {playing ? 'Playing' : `▶ ${duration}`}
         </span>
+      </button>
+
+      {/* Outside the play button, because a control nested in another control
+          is not operable by keyboard and is a coin toss by mouse. */}
+      <button
+        type="button"
+        className={styles.sound}
+        onClick={toggleSound}
+        aria-pressed={!muted}
+        aria-label={`${muted ? 'Unmute' : 'Mute'} the ${company} film`}
+      >
+        {muted ? 'Sound off' : 'Sound on'}
       </button>
 
       <figcaption>
