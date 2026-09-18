@@ -1,0 +1,29 @@
+/* Long-form reading: one column, generous line height, nothing decorative. */
+.prose { display: grid; gap: var(--space-4); max-width: 68ch; }
+.prose p { font-size: 1.05rem; line-height: 1.72; color: var(--text-secondary); }
+.prose strong { color: var(--text); font-weight: 600; }
+.prose em { font-style: italic; }
+.prose a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.prose a:hover { color: var(--text); }
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.prose h3, .prose h4, .prose h5 { color: var(--text); letter-spacing: -0.02em; margin-top: var(--space-4); }
+.prose h3 { font-size: 1.15rem; }
+.prose h4 { font-size: 1.02rem; }
+.prose ul, .prose ol { display: grid; gap: var(--space-2); padding-left: 1.2em; color: var(--text-secondary); font-size: 1.02rem; line-height: 1.65; }
+.prose li { padding-left: 2px; }
+.prose blockquote {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--accent);
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1.65;
+}

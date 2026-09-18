@@ -25,6 +25,7 @@ const NAV = [
   { href: '/admin/applications', label: 'Requests' },
   { href: '/admin/collections', label: 'Collections' },
   { href: '/admin/referrals', label: 'Referrals' },
+  { href: '/admin/blog', label: 'Journal' },
   { href: '/admin/jobs', label: 'Jobs' },
   { href: '/admin/providers', label: 'Integrations' },
   { href: '/admin/voice', label: 'Voice' },

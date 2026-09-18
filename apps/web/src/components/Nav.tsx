@@ -20,6 +20,7 @@ export function Nav({ policy }: { policy?: SignUpPolicy }) {
           <Link href="/how-it-works">How it works</Link>
           <Link href="/collections">Collections</Link>
           <Link href="/work">Work</Link>
+          <Link href="/blog">Journal</Link>
           <Link href="/pricing">Pricing</Link>
         </div>
         <div className="row" style={{ gap: 'var(--space-3)' }}>

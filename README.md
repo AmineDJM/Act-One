@@ -171,6 +171,34 @@ finds an answer rather than an absence. The payout decision itself lives in
 while a payment clears inside the app, and the two must never answer
 differently.
 
+### The journal
+
+Articles about launching software live at `/blog`, with a page each and the
+sitemap, structured data (`Article`, `BreadcrumbList`) and canonicals that go
+with them. Bodies are Markdown rendered by our own small renderer, so nothing
+an editor or a model writes ever becomes HTML in a page.
+
+The console's *Journal* is the whole CMS: what is in flight, what is worth
+writing next, and the rules the machine is held to. An editor can start an
+empty draft or have one written — topic, outline, section by section, closing,
+then the words search engines read — and rewrite any single section against a
+fresh instruction without touching the rest. Every article carries what the
+pipeline did and what the standards say about it: length, the description,
+a picture somebody can hear, and the two ways a generated piece lies —
+inventing figures and saying nothing. A blocking finding cannot be pressed
+through; it has to be fixed.
+
+Drafting and publishing are separate switches, both off by default. The
+worker's own clock publishes what was scheduled and, when an operator has
+asked for it, drafts one piece per cadence — one, because a journal that
+publishes in bursts reads like a content farm.
+
+Work the product does for itself runs under a workspace of its own,
+`org_platform`, created by a migration and impossible to sign into. It exists
+so the journal's model calls land in the same cost ledger as a customer's:
+"what does the journal cost?" is answered by the same query as "what does
+this customer cost?".
+
 ## The pipeline
 
 ```

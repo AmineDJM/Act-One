@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 import { CollectionCategory } from '@act-one/core';
 import { absoluteUrl } from '@/lib/site.ts';
 import { listPublicFilms } from '@/server/collections.ts';
+import { listPublicArticles } from '@/server/blog.ts';
 
 /**
  * Only pages that can actually rank. Authenticated routes are never listed.
@@ -11,17 +12,19 @@ import { listPublicFilms } from '@/server/collections.ts';
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const films = await listPublicFilms().catch(() => []);
+  const [films, articles] = await Promise.all([listPublicFilms().catch(() => []), listPublicArticles(500).catch(() => [])]);
   const categories = new Set(films.map((film) => film.category));
   return [
     { url: absoluteUrl('/'), lastModified: now, changeFrequency: 'weekly', priority: 1 },
     { url: absoluteUrl('/pricing'), lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
     { url: absoluteUrl('/collections'), lastModified: films[0] ? new Date(films.map((film) => film.updatedAt).sort().at(-1)!) : now, changeFrequency: 'weekly', priority: 0.9 },
     { url: absoluteUrl('/work'), lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+    { url: absoluteUrl('/blog'), lastModified: articles[0] ? new Date(articles[0].publishedAt) : now, changeFrequency: 'weekly', priority: 0.8 },
     { url: absoluteUrl('/how-it-works'), lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     ...CollectionCategory.options
       .filter((category) => categories.has(category))
       .map((category) => ({ url: absoluteUrl(`/collections/category/${category}`), lastModified: now, changeFrequency: 'weekly' as const, priority: 0.6 })),
     ...films.map((film) => ({ url: absoluteUrl(film.path), lastModified: new Date(film.updatedAt), changeFrequency: 'monthly' as const, priority: 0.7 })),
+    ...articles.map((article) => ({ url: absoluteUrl(article.path), lastModified: new Date(article.updatedAt), changeFrequency: 'monthly' as const, priority: 0.6 })),
   ];
 }

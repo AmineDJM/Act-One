@@ -28,6 +28,8 @@ import type {
   BetaApplicationStatus,
   CollectionEntry,
   Referral,
+  Article,
+  ArticleTopic,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -63,7 +65,7 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
+import type { ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -98,6 +100,8 @@ export class MemoryStore implements Store {
     applications: new Map<string, BetaApplication>(),
     collections: new Map<string, CollectionEntry>(),
     referrals: new Map<string, Referral>(),
+    articles: new Map<string, Article>(),
+    topics: new Map<string, ArticleTopic>(),
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
@@ -237,6 +241,69 @@ export class MemoryStore implements Store {
       const counts: Record<string, number> = {};
       for (const referral of this.tables.referrals.values()) counts[referral.stage] = (counts[referral.stage] ?? 0) + 1;
       return counts;
+    },
+  };
+
+  readonly articles = {
+    create: async (article: Article) => {
+      for (const existing of this.tables.articles.values()) {
+        if (existing.slug === article.slug) throw new AppError('conflict', 'That address is taken.');
+      }
+      this.tables.articles.set(article.id, article);
+      return article;
+    },
+    get: async (id: string) => this.tables.articles.get(id) ?? null,
+    getBySlug: async (slug: string) => [...this.tables.articles.values()].find((article) => article.slug === slug) ?? null,
+    list: async (query: ArticleQuery = {}) =>
+      [...this.tables.articles.values()]
+        .filter((article) => !query.status || article.status === query.status)
+        .sort((a, b) => (b.publishedAt ?? b.updatedAt).localeCompare(a.publishedAt ?? a.updatedAt))
+        .slice(0, query.limit ?? 100),
+    update: async (id: string, patch: Partial<Article>) => {
+      const existing = this.require(this.tables.articles.get(id), 'Article');
+      if (patch.slug && patch.slug !== existing.slug) {
+        for (const other of this.tables.articles.values()) {
+          if (other.id !== id && other.slug === patch.slug) throw new AppError('conflict', 'That address is taken.');
+        }
+      }
+      const next = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
+      this.tables.articles.set(id, next);
+      return next;
+    },
+    delete: async (id: string) => {
+      this.tables.articles.delete(id);
+    },
+    listDue: async (now: string, limit = 20) =>
+      [...this.tables.articles.values()]
+        .filter((article) => article.status === 'scheduled' && article.scheduledFor !== null && article.scheduledFor <= now)
+        .sort((a, b) => (a.scheduledFor ?? '').localeCompare(b.scheduledFor ?? ''))
+        .slice(0, limit),
+    countByStatus: async () => {
+      const counts: Record<string, number> = {};
+      for (const article of this.tables.articles.values()) counts[article.status] = (counts[article.status] ?? 0) + 1;
+      return counts;
+    },
+  };
+
+  readonly topics = {
+    create: async (topic: ArticleTopic) => {
+      this.tables.topics.set(topic.id, topic);
+      return topic;
+    },
+    get: async (id: string) => this.tables.topics.get(id) ?? null,
+    list: async (query: { status?: ArticleTopic['status']; limit?: number } = {}) =>
+      [...this.tables.topics.values()]
+        .filter((topic) => !query.status || topic.status === query.status)
+        .sort((a, b) => b.score - a.score || b.createdAt.localeCompare(a.createdAt))
+        .slice(0, query.limit ?? 100),
+    update: async (id: string, patch: Partial<ArticleTopic>) => {
+      const existing = this.require(this.tables.topics.get(id), 'Topic');
+      const next = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
+      this.tables.topics.set(id, next);
+      return next;
+    },
+    delete: async (id: string) => {
+      this.tables.topics.delete(id);
     },
   };
 

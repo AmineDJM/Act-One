@@ -492,3 +492,28 @@
 .stills { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); margin-top: var(--space-6); }
 .stills img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: block; }
 @media (max-width: 800px) { .filmFacts { grid-template-columns: 1fr; } }
+
+/* --- the journal ------------------------------------------------------------------ */
+
+.leadArticle { display: grid; gap: var(--space-3); padding-bottom: var(--space-6); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); max-width: 70ch; }
+.leadArticle h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); letter-spacing: -0.03em; }
+.leadArticle h2 a { color: inherit; }
+.leadArticle h2 a:hover { color: var(--accent-text); }
+
+.articleList { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+.articleList li { border-bottom: 1px solid var(--line); padding-bottom: var(--space-5); }
+.articleList li:last-child { border-bottom: 0; }
+.articleList a { display: grid; gap: var(--space-2); max-width: 70ch; color: inherit; }
+.articleList h3 { font-size: 1.25rem; letter-spacing: -0.02em; }
+.articleList a:hover h3 { color: var(--accent-text); }
+.articleList p { color: var(--text-secondary); font-size: 0.98rem; line-height: 1.6; }
+
+.articleHero { width: 100%; max-width: 900px; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--line); border-radius: var(--radius-lg); margin: var(--space-6) 0; display: block; }
+.articleBody { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+.articleBody > section { display: grid; gap: var(--space-4); }
+.articleBody h2 { font-size: 1.5rem; letter-spacing: -0.025em; max-width: 60ch; }
+
+.sources { margin-top: var(--space-7); padding-top: var(--space-5); border-top: 1px solid var(--line); display: grid; gap: var(--space-3); max-width: 70ch; }
+.sources ol { display: grid; gap: var(--space-2); padding-left: 1.2em; font-size: 0.92rem; color: var(--text-secondary); }
+.sources a { color: var(--text-secondary); }
+.sources a:hover { color: var(--text); }

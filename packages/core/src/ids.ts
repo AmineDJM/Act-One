@@ -23,6 +23,8 @@ export type IdPrefix =
   | 'bsg'
   | 'col'
   | 'ref'
+  | 'art'
+  | 'top'
   | 'bap'
   | 'pun'
   | 'cpt'

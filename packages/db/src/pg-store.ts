@@ -1,4 +1,4 @@
-import { Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, Referral as ReferralSchema } from '@act-one/core';
+import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, Referral as ReferralSchema } from '@act-one/core';
 import {
   AppError,
   newId,
@@ -26,6 +26,8 @@ import type {
   BetaApplicationStatus,
   CollectionEntry,
   Referral,
+  Article,
+  ArticleTopic,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -62,7 +64,7 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
+import type { ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -2527,6 +2529,131 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly articles = {
+    create: async (article: Article) =>
+      this.asPlatform(async (c) => {
+        try {
+          await c.query(
+            `INSERT INTO articles (id, slug, title, status, origin, scheduled_for, published_at, created_at, updated_at, data)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [article.id, article.slug, article.title, article.status, article.origin, article.scheduledFor, article.publishedAt, article.createdAt, article.updatedAt, article],
+          );
+        } catch (error) {
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That address is taken.');
+          throw error;
+        }
+        return article;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM articles WHERE id = $1', [id]);
+        return r.rows[0] ? articleFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getBySlug: async (slug: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM articles WHERE slug = $1', [slug]);
+        return r.rows[0] ? articleFromRow(r.rows[0]['data']) : null;
+      }),
+
+    list: async (query: ArticleQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const params: unknown[] = [];
+        const where = query.status ? `WHERE status = $${params.push(query.status)}` : '';
+        const r = await c.query(
+          `SELECT data FROM articles ${where}
+           ORDER BY COALESCE(published_at, updated_at) DESC
+           LIMIT ${Math.min(Math.max(query.limit ?? 100, 1), 500)}`,
+          params,
+        );
+        return r.rows.map((row) => articleFromRow(row['data']));
+      }),
+
+    update: async (id: string, patch: Partial<Article>) =>
+      this.asPlatform(async (c) => {
+        const current = await c.query('SELECT data FROM articles WHERE id = $1 FOR UPDATE', [id]);
+        if (!current.rows[0]) throw notFound('Article');
+        const next: Article = { ...articleFromRow(current.rows[0]['data']), ...patch, id, updatedAt: new Date().toISOString() };
+        try {
+          await c.query(
+            `UPDATE articles SET slug = $2, title = $3, status = $4, origin = $5, scheduled_for = $6, published_at = $7, data = $8, updated_at = now()
+             WHERE id = $1`,
+            [id, next.slug, next.title, next.status, next.origin, next.scheduledFor, next.publishedAt, next],
+          );
+        } catch (error) {
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That address is taken.');
+          throw error;
+        }
+        return next;
+      }),
+
+    delete: async (id: string) =>
+      this.asPlatform(async (c) => {
+        await c.query('DELETE FROM articles WHERE id = $1', [id]);
+      }),
+
+    listDue: async (now: string, limit = 20) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `SELECT data FROM articles WHERE status = 'scheduled' AND scheduled_for IS NOT NULL AND scheduled_for <= $1
+           ORDER BY scheduled_for LIMIT ${Math.min(Math.max(limit, 1), 100)}`,
+          [now],
+        );
+        return r.rows.map((row) => articleFromRow(row['data']));
+      }),
+
+    countByStatus: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ status: string; count: number }>('SELECT status, COUNT(*)::int AS count FROM articles GROUP BY status');
+        return Object.fromEntries(r.rows.map((row) => [row.status, num(row.count)]));
+      }),
+  };
+
+  readonly topics = {
+    create: async (topic: ArticleTopic) =>
+      this.asPlatform(async (c) => {
+        await c.query(
+          `INSERT INTO article_topics (id, status, score, article_id, created_at, updated_at, data) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [topic.id, topic.status, topic.score, topic.articleId, topic.createdAt, topic.updatedAt, topic],
+        );
+        return topic;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM article_topics WHERE id = $1', [id]);
+        return r.rows[0] ? topicFromRow(r.rows[0]['data']) : null;
+      }),
+
+    list: async (query: { status?: ArticleTopic['status']; limit?: number } = {}) =>
+      this.asPlatform(async (c) => {
+        const params: unknown[] = [];
+        const where = query.status ? `WHERE status = $${params.push(query.status)}` : '';
+        const r = await c.query(
+          `SELECT data FROM article_topics ${where} ORDER BY score DESC, created_at DESC LIMIT ${Math.min(Math.max(query.limit ?? 100, 1), 500)}`,
+          params,
+        );
+        return r.rows.map((row) => topicFromRow(row['data']));
+      }),
+
+    update: async (id: string, patch: Partial<ArticleTopic>) =>
+      this.asPlatform(async (c) => {
+        const current = await c.query('SELECT data FROM article_topics WHERE id = $1 FOR UPDATE', [id]);
+        if (!current.rows[0]) throw notFound('Topic');
+        const next: ArticleTopic = { ...topicFromRow(current.rows[0]['data']), ...patch, id, updatedAt: new Date().toISOString() };
+        await c.query('UPDATE article_topics SET status = $2, score = $3, article_id = $4, data = $5, updated_at = now() WHERE id = $1', [
+          id, next.status, next.score, next.articleId, next,
+        ]);
+        return next;
+      }),
+
+    delete: async (id: string) =>
+      this.asPlatform(async (c) => {
+        await c.query('DELETE FROM article_topics WHERE id = $1', [id]);
+      }),
+  };
+
   readonly applications = {
     create: async (application: BetaApplication) =>
       this.asPlatform(async (c) => {
@@ -2812,6 +2939,14 @@ function brandFromRow(data: unknown): BrandSystem {
 }
 
 /** An entry as stored, brought up to the current shape. */
+function articleFromRow(data: unknown): Article {
+  return ArticleSchema.parse(data);
+}
+
+function topicFromRow(data: unknown): ArticleTopic {
+  return ArticleTopicSchema.parse(data);
+}
+
 function referralFromRow(data: unknown): Referral {
   return ReferralSchema.parse(data);
 }

@@ -79,3 +79,12 @@ export const SAFE_AREAS = {
 } as const;
 
 export const DEFAULT_FPS = 30;
+
+/**
+ * The platform's own workspace.
+ *
+ * Work the product does for itself — the journal, a commissioned film — runs
+ * under this id so its cost lands in the same ledger as a customer's. Nobody
+ * signs into it: it has no members, and the product never makes one.
+ */
+export const PLATFORM_ORGANIZATION_ID = 'org_platform';

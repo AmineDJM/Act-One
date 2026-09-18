@@ -11,6 +11,9 @@ import type {
   CollectionStatus,
   Referral,
   ReferralStage,
+  Article,
+  ArticleStatus,
+  ArticleTopic,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -93,6 +96,8 @@ export interface Store {
   readonly applications: BetaApplicationRepo;
   readonly collections: CollectionRepo;
   readonly referrals: ReferralRepo;
+  readonly articles: ArticleRepo;
+  readonly topics: ArticleTopicRepo;
   readonly brandVoices: BrandVoiceRepo;
   readonly voiceConsents: VoiceConsentRepo;
   readonly voiceSettings: VoiceSettingsRepo;
@@ -566,6 +571,30 @@ export interface ReferralRepo {
   /** How many of this person's referrals have ever been rewarded. */
   countRewardedFor(inviterUserId: string): Promise<number>;
   countByStage(): Promise<Record<string, number>>;
+}
+
+/** The journal: articles, and the topics waiting to become one. */
+export type ArticleQuery = { status?: ArticleStatus; limit?: number };
+
+export interface ArticleRepo {
+  create(article: Article): Promise<Article>;
+  get(id: string): Promise<Article | null>;
+  getBySlug(slug: string): Promise<Article | null>;
+  /** Newest published first for the public list; newest touched first otherwise. */
+  list(query?: ArticleQuery): Promise<Article[]>;
+  update(id: string, patch: Partial<Article>): Promise<Article>;
+  delete(id: string): Promise<void>;
+  /** Scheduled pieces whose time has come. */
+  listDue(now: string, limit?: number): Promise<Article[]>;
+  countByStatus(): Promise<Record<string, number>>;
+}
+
+export interface ArticleTopicRepo {
+  create(topic: ArticleTopic): Promise<ArticleTopic>;
+  get(id: string): Promise<ArticleTopic | null>;
+  list(query?: { status?: ArticleTopic['status']; limit?: number }): Promise<ArticleTopic[]>;
+  update(id: string, patch: Partial<ArticleTopic>): Promise<ArticleTopic>;
+  delete(id: string): Promise<void>;
 }
 
 /** Requests for access while the product is by invitation. */

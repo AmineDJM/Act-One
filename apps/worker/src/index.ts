@@ -1,3 +1,4 @@
+import { PLATFORM_ORGANIZATION_ID } from '@act-one/core';
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
 import { installProxyFromEnvironment } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   await preflight();
   installSignalHandlers(state);
   startReaper(state);
+  startEditor(state);
 
   // The main loop. Claims up to `concurrency` jobs, then waits — either for a
   // slot to free up or for the poll interval, whichever comes first.
@@ -258,3 +260,42 @@ main().catch((error: unknown) => {
   console.error('[worker] fatal:', error);
   process.exit(1);
 });
+
+/**
+ * The journal's own clock.
+ *
+ * Publishes what was scheduled and, when the operator has asked for it,
+ * drafts one piece per cadence. Runs beside the queue rather than in it: an
+ * article has no project, and a journal must never delay a customer's film.
+ * Every failure is logged and swallowed — the worker's job is the queue.
+ */
+function startEditor(state: WorkerState): void {
+  const tick = async () => {
+    if (state.shuttingDown) return;
+    try {
+      const { runEditorialTick } = await import('@act-one/pipeline/editorial');
+      const { readEditorialSchedule, writeEditorialSchedule } = await import('./editorial.ts');
+      const schedule = await readEditorialSchedule(state.config.store);
+      const registry = await state.deps.buildRegistry({ organizationId: PLATFORM_ORGANIZATION_ID, projectId: null });
+      const outcome = await runEditorialTick({
+        store: state.config.store,
+        llm: registry.llm(),
+        schedule,
+        context: { organizationId: PLATFORM_ORGANIZATION_ID, projectId: null },
+      });
+      if (outcome.drafted) {
+        await writeEditorialSchedule(state.config.store, { ...schedule, lastRunAt: new Date().toISOString() });
+        log(`journal: drafted ${outcome.drafted}`);
+      }
+      for (const slug of outcome.published) log(`journal: published ${slug}`);
+    } catch (error) {
+      log(`journal tick failed: ${(error as Error).message}`);
+    }
+  };
+
+  // Every ten minutes: often enough that a scheduled article appears on time,
+  // rare enough to cost nothing when there is nothing to do.
+  const timer = setInterval(() => void tick(), 10 * 60_000);
+  timer.unref?.();
+  void tick();
+}

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ReferralProgram } from './referral.ts';
+import { EditorialSchedule } from './editorial.ts';
 
 /**
  * Where the product is in its life, decided in one place.
@@ -61,6 +62,8 @@ export const ProductConfig = z.object({
   invites: InviteConfig.default(() => InviteConfig.parse({})),
   /** The referral programme's rules; see domain/referral.ts. */
   referrals: ReferralProgram.default(() => ReferralProgram.parse({})),
+  /** The journal's rules; see domain/editorial.ts. */
+  editorial: EditorialSchedule.default(() => EditorialSchedule.parse({})),
 });
 export type ProductConfig = z.infer<typeof ProductConfig>;
 export const DEFAULT_PRODUCT_CONFIG: ProductConfig = ProductConfig.parse({});
