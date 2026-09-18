@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { brandDirectionLines } from './brief-lines.ts';
 import {
+  standardsBrief,
   VoiceStrategy,
   newId,
   topMoments,
@@ -58,6 +59,8 @@ On voice: do not default to voice-over. Choose "none" unless narration genuinely
 On the script: if the film has no narration, "script" should contain the on-screen text beats instead, one per line, in order. If there is narration, write it as narration. Either way write it tight — you have seconds, not paragraphs.
 
 Write like a director, not a marketer. Concrete nouns, specific instructions. "The cursor hesitates, then commits" beats "dynamic and engaging interactions".
+
+${standardsBrief('direction')}
 
 Return JSON only.`;
 

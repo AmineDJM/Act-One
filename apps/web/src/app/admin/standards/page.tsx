@@ -6,8 +6,10 @@ import {
   LAYOUT_STANDARDS,
   MOTION_STANDARDS,
   TYPE_STANDARDS,
+  briefedStandards,
   cite,
   type Authority,
+  type Craft,
   type Enforcement,
   type Standard,
 } from '@act-one/core';
@@ -94,8 +96,41 @@ const AUTHORITY_LABEL: Record<Authority, string> = {
   house: 'Our rule',
 };
 
+const CRAFT_LABEL: Record<Craft, string> = {
+  direction: 'the director',
+  storyboard: 'the storyboard',
+  copy: 'the writer',
+  narration: 'the narration',
+  sound: 'the composer',
+  editing: 'the edit',
+};
+
+/**
+ * Which agents are told each rule.
+ *
+ * The checks are only half of it. Every creative decision here is made by a
+ * model, and a model with no standards makes the choice it has seen most
+ * often — which is what average work looks like. So the same corpus the checks
+ * are written against is what the agents are briefed with, and this says which
+ * ones heard which.
+ *
+ * A rule briefed to nobody is not necessarily wrong: some are enforced by an
+ * engine that gives the model no say. It is worth seeing, though, because the
+ * other reason a rule reaches nobody is that it was written and forgotten.
+ */
+function briefedTo(): Map<string, Craft[]> {
+  const index = new Map<string, Craft[]>();
+  for (const [craft, standards] of briefedStandards()) {
+    for (const standard of standards) {
+      index.set(standard.id, [...(index.get(standard.id) ?? []), craft]);
+    }
+  }
+  return index;
+}
+
 export default function StandardsPage() {
   const all = GROUPS.flatMap((group) => Object.values(group.standards));
+  const briefed = briefedTo();
   const counts = {
     checked: all.filter((s) => s.enforcement === 'checked').length,
     designed_in: all.filter((s) => s.enforcement === 'designed_in').length,
@@ -111,7 +146,9 @@ export default function StandardsPage() {
             {all.length} rules the engines measure against. {counts.checked} are checked on every
             render, {counts.designed_in} cannot be broken by the engines, and {counts.documented}{' '}
             {counts.documented === 1 ? 'is' : 'are'} written down so the system has one answer, not
-            yet mechanised.
+            yet mechanised. {briefed.size} of them are also written into the briefs the agents work
+            from, because a rule the writer never hears is a rule the checks spend their time
+            catching.
           </p>
         </div>
       </div>
@@ -139,6 +176,9 @@ export default function StandardsPage() {
                 </p>
                 <p className={styles.standardSource}>
                   {AUTHORITY_LABEL[standard.authority]} · {cite(standard)} · <code>{standard.id}</code>
+                  {briefed.has(standard.id)
+                    ? ` · briefed to ${briefed.get(standard.id)!.map((craft) => CRAFT_LABEL[craft]).join(', ')}`
+                    : ' · enforced without asking'}
                 </p>
               </li>
             ))}

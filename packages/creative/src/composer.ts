@@ -5,6 +5,7 @@ import {
   MOVEMENT_MIN_SECONDS,
   MOVEMENTS_MAX,
   fitScore,
+  standardsBrief,
   movementBoundaries,
   scenesInMovement,
   storyboardDuration,
@@ -66,6 +67,8 @@ const SYSTEM_PROMPT = [
   'a style copied from something is a legal problem and an unoriginal film.',
   '',
   'Write nothing that could be sung. This is instrumental.',
+  '',
+  standardsBrief('sound'),
 ].join('\n');
 
 const Draft = z.object({

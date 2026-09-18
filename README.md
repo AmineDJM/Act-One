@@ -210,6 +210,34 @@ their interface may carry a product beat, and a generated shot is anchored
 to an approved product still and records it as its parent. Versions point
 at their original.
 
+### The standards the agents are held to
+
+Every numeric decision the engines make — contrast, measure, shot length,
+loudness — comes from a rule with a source, and those rules are checked. What
+was missing is the other half: every *creative* decision here is made by a
+model, and a model with no standards makes the choice it has seen most often,
+which is what average work looks like. Telling one to be "professional" does
+nothing. Telling it that a line runs 45 to 75 characters because Bringhurst
+measured it, that text stays inside 90% of the frame because EBU R 95 says so,
+and that the mix will be normalised to a measured target so nothing should be
+written that only works loud — that changes the output.
+
+So the same corpus the checks are written against is what the agents are
+briefed with. The director, the storyboard, the writer, the narration and the
+composer each get the rules that govern their craft, stated verbatim with the
+source and the reasoning, because a rule nobody understands is a rule that
+gets discarded the moment the brief pulls the other way. An agent cannot be
+briefed on a rule that is not in the corpus, a rule cannot be softened for a
+brief without softening the check, and a new standard reaches every craft it
+governs the day it is written down. The console's *Standards* page says which
+agents heard which rule, and which are enforced by an engine that gives the
+model no say.
+
+The frame reviewer is deliberately left out of this. It looks for defects a
+viewer would notice — a warped interface, text inside a generated image, a
+frame where nothing leads the eye — and asking it to judge a contrast ratio
+would produce a guess where a measurement already exists.
+
 ### The score
 
 A track chosen from a library is the same track whatever happens on screen: it

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { briefDirectionLines } from './brief-lines.ts';
 import {
+  standardsBrief,
   COPY_LABELS,
   COPY_LIMITS,
   COPY_ORDER,
@@ -63,6 +64,8 @@ Rules:
 - No exclamation marks. None of these, in any form: ${WEASEL_PHRASES.join(', ')}.
 - Respect the length limit given for each surface. A line over its limit is discarded.
 - Write two or three options for the short surfaces, one for the long ones.
+
+${standardsBrief('copy')}
 
 Return JSON only.`;
 

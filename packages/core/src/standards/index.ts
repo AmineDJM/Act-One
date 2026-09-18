@@ -6,3 +6,4 @@ export * from './motion.ts';
 export * from './audio.ts';
 export * from './editorial.ts';
 export * from './conversion.ts';
+export * from './brief.ts';

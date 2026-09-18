@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { languageName, type ProductUnderstanding, type Storyboard } from '@act-one/core';
+import { languageName, standardsBrief, type ProductUnderstanding, type Storyboard } from '@act-one/core';
 import type { CallContext, LlmProvider } from '@act-one/providers';
 import { numbersOf } from './fit.ts';
 
@@ -70,7 +70,9 @@ export async function writeAudioEdition(
             (language ? ` (${language})` : '') +
             '; short sentences, one idea at a time; name the product in the first sentence; say the web address ' +
             'once, plainly, at the end; no headings, no lists, no stage directions, no emojis. ' +
-            `About ${targetWords} words, in 3 to 6 paragraphs. Answer with JSON: {"title": "...", "paragraphs": ["...", "..."]}.`,
+            `About ${targetWords} words, in 3 to 6 paragraphs.\n\n` +
+            standardsBrief('narration') +
+            `\n\nAnswer with JSON: {"title": "...", "paragraphs": ["...", "..."]}.`,
         },
         {
           role: 'user',

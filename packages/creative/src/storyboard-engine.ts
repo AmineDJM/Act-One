@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { brandDirectionLines, briefDirectionLines } from './brief-lines.ts';
 import {
+  standardsBrief,
   MODE_BUDGETS,
   findMoment,
   newId,
@@ -85,6 +86,8 @@ Rules:
 - The library lists real pictures the customer supplied or the research kept. Real pictures come before anything imagined: when a beat about people, a place, a product or a proof can be carried by one of them, set "libraryAssetId" to its id and leave "generativeBrief" empty. Prefer pictures marked approved. Use each picture at most once. A UI picture from the library may carry a product beat only when it shows the moment the scene films; a photograph of people, an office or a product carries a human or environmental beat.
 - Every line of on-screen text is a complete thought on its own. Never end a line expecting the next thing to finish it — the end card is composed separately and will not complete your sentence.
 - The first scene is the hook. Do not write the ending: the film closes on its own end card, with the company's name and address. Earn everything in between.
+
+${standardsBrief('storyboard')}
 
 Return JSON only.`;
 
