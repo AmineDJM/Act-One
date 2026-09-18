@@ -87,7 +87,7 @@ export const PROVIDER_SLOTS = [
     id: 'elevenlabs',
     label: 'ElevenLabs',
     purpose:
-      'Voice-over that does not sound synthesised: a voice chosen for the language of the film and for who the customer asked to hear. Optional; without it narration comes from OpenAI.',
+      'Four engines behind one key: the voice, cast for the language of the film and for who the customer asked to hear; a score composed for the film rather than chosen from a library; sounds built from what each shot does; and the alignment that times the captions to the recording. Optional. Without it the voice comes from OpenAI, the music from the library, and caption timings are estimated.',
     required: false,
     fields: [
       { key: 'apiKey', label: 'API key', placeholder: 'sk_…', secret: true, envVar: 'ELEVENLABS_API_KEY' },
