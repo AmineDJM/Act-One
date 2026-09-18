@@ -15,7 +15,7 @@ import {
 } from '@act-one/core';
 import { requireSession, switchWorkspace } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
-import { createProject, enqueue, getProjectOr404 } from '@/server/projects.ts';
+import { createProject, enqueue, getProjectOr404, hostLabel } from '@/server/projects.ts';
 import { reportError } from '@/server/report.ts';
 import { authorizeProductAccess, revokeProductAccess } from '@/server/credentials.ts';
 import { postComment, resolveComment } from '@/server/collaboration.ts';
@@ -411,5 +411,58 @@ export async function previewTimingAction(
     return { error: null, message: 'Building a preview of the cut.' };
   } catch (error) {
     return { error: reportError('previewTimingAction', error).publicMessage };
+  }
+}
+
+/**
+ * Corrects the address a project was started from, and reads it again.
+ *
+ * A founder who typed their own domain wrong had a permanently dead project:
+ * the research failed, the page offered a retry that would fail identically
+ * forever, and nothing anywhere could change the URL. The only way out was to
+ * abandon the project and start another one, which nothing said either.
+ *
+ * Everything downstream is derived from what we read, so correcting the
+ * address restarts from research rather than trying to salvage a brief built
+ * from a site that was never reached.
+ */
+export async function correctWebsiteAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    const project = await getProjectOr404(session, String(formData.get('projectId') ?? ''));
+
+    if (!can(session.actor, 'project:update')) {
+      throw new AppError('forbidden', 'Your role cannot change this project.');
+    }
+
+    const website = normalizeUrl(String(formData.get('website') ?? ''));
+    if (!website) {
+      return { error: 'That does not look like a website address. Try acme.com.' };
+    }
+    if (website === project.websiteUrl) {
+      return { error: 'That is the same address. Change it, or try again as it is.' };
+    }
+
+    const store = getStore();
+    await store.projects.update(session.organizationId, project.id, {
+      websiteUrl: website,
+      // The name came from the old host, so it would otherwise keep a typo in
+      // the title of every film made from this project.
+      name: hostLabel(website),
+      productUnderstandingId: null,
+      selectedConceptId: null,
+      activeStoryboardId: null,
+      latestRenderId: null,
+      stage: 'created',
+    });
+    await enqueue({ ...project, websiteUrl: website }, 'research_product', {}, 1);
+
+    revalidatePath(`/app/projects/${project.id}`);
+    return { error: null, message: `Reading ${hostLabel(website)} instead.` };
+  } catch (error) {
+    return { error: reportError('correctWebsiteAction', error).publicMessage };
   }
 }

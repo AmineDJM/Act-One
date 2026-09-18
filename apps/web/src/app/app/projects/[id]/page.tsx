@@ -17,6 +17,7 @@ import { FilmDelivery } from './FilmDelivery.tsx';
 import { CopyKitPanel } from './CopyKit.tsx';
 import { ProductAccess } from './ProductAccess.tsx';
 import { Notes } from './Notes.tsx';
+import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -48,6 +49,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     copyKit,
     access,
     notes,
+    failure,
   } = view;
 
   /*
@@ -81,13 +83,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         projectId={project.id}
         cta={cta}
         label={CTA_LABELS[cta]}
-        headline={headlineFor(cta, project.name)}
-        body={bodyFor(cta, permission.watermarked, permission.reason)}
+        headline={headlineFor(cta, project.name, failure)}
+        body={bodyFor(cta, permission.watermarked, permission.reason, failure)}
         progress={activeJob ? activeJob.progress : null}
         status={activeJob?.statusMessage ?? null}
         disabled={!permission.allowed && cta === 'render_film'}
         remedy={permission.remedy}
       />
+
+      {/* Offered only on a stopped project: see CorrectWebsite. */}
+      {project.stage === 'failed' ? (
+        <section className={styles.panel}>
+          <div className={styles.panelHead}>
+            <h3>The address</h3>
+          </div>
+          <CorrectWebsite projectId={project.id} current={project.websiteUrl} />
+        </section>
+      ) : null}
 
       {/* The film comes first once it exists: it is what everything else was for. */}
       {latestRender ? (
@@ -245,7 +257,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   );
 }
 
-function headlineFor(cta: PrimaryCta, projectName: string): string {
+function headlineFor(cta: PrimaryCta, projectName: string, failure: string | null): string {
   switch (cta) {
     case 'understand_product':
       return 'Let us read your product.';
@@ -256,13 +268,23 @@ function headlineFor(cta: PrimaryCta, projectName: string): string {
     case 'create_variants':
       return `${projectName} is finished.`;
     case 'retry':
-      return 'Something went wrong.';
+      /*
+       * "Something went wrong" over a body that says exactly what went wrong
+       * reads as a system that does not know. When we do know, the headline
+       * says the state and the body carries the reason.
+       */
+      return failure ? 'This project stopped.' : 'Something went wrong.';
     default:
       return 'Working on it.';
   }
 }
 
-function bodyFor(cta: PrimaryCta, watermarked: boolean, reason: string): string {
+function bodyFor(
+  cta: PrimaryCta,
+  watermarked: boolean,
+  reason: string,
+  failure: string | null,
+): string {
   switch (cta) {
     case 'choose_concept':
       return 'Pick one, combine two, or ask for three new directions. Nothing is charged yet.';
@@ -276,7 +298,14 @@ function bodyFor(cta: PrimaryCta, watermarked: boolean, reason: string): string 
     case 'watch_progress':
       return 'This runs in the background. You can close the tab.';
     case 'retry':
-      return 'We kept everything we had. Retrying picks up where it stopped.';
+      /*
+       * What actually failed, when the worker wrote down something a customer
+       * can act on. A founder whose domain had a typo was told "Something went
+       * wrong" and offered a retry that would fail identically forever.
+       */
+      return failure
+        ? `${failure} We kept everything else. Fix the address or try again.`
+        : 'We kept everything we had. Retrying picks up where it stopped.';
     default:
       return 'Free until you render.';
   }

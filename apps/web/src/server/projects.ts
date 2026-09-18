@@ -237,6 +237,16 @@ export async function loadProjectView(session: Session, projectId: string) {
     /** The timing preview being built right now, reported where it was asked for. */
     animaticJob:
       jobs.find((job) => job.kind === 'render_animatic' && !jobIsTerminal(job.state)) ?? null,
+    /*
+     * Why the project stopped, in the words the worker recorded.
+     *
+     * The page told a customer whose domain did not resolve "Something went
+     * wrong.", while the worker had written down "We could not read anything at
+     * https://…" — the one sentence that would have let them fix it. The
+     * generic message exists so internal failure text does not leak; a failure
+     * caused by what the customer typed is not internal.
+     */
+    failure: jobs.find((job) => job.state === 'failed' && job.lastError)?.lastError ?? null,
     jobs,
     organization,
     plan,
@@ -282,7 +292,7 @@ export async function renderPermission(session: Session, project: Project) {
   };
 }
 
-function hostLabel(url: string): string {
+export function hostLabel(url: string): string {
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
     const name = host.split('.')[0] ?? host;
