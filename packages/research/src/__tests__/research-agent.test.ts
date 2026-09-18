@@ -38,11 +38,14 @@ class FakeBrowser implements BrowserAutomationProvider {
   readonly name = 'fake';
   readonly kind = 'browser' as const;
   readonly requested: CaptureOptions[] = [];
-  constructor(
-    private readonly site: Site,
-    private readonly pageShot: Uint8Array,
-    private readonly imageShot: Uint8Array,
-  ) {}
+  private readonly site: Site;
+  private readonly pageShot: Uint8Array;
+  private readonly imageShot: Uint8Array;
+  constructor(site: Site, pageShot: Uint8Array, imageShot: Uint8Array) {
+    this.site = site;
+    this.pageShot = pageShot;
+    this.imageShot = imageShot;
+  }
   async health(): Promise<ProviderHealth> {
     return { provider: this.name, kind: 'browser', healthy: true, checkedAt: new Date().toISOString() };
   }

@@ -558,7 +558,13 @@ function unescape(rbsp: Buffer): Buffer {
 
 class BitReader {
   private position = 0;
-  constructor(private readonly data: Buffer) {}
+  private readonly data: Buffer;
+
+  // Not a parameter property: the worker runs on Node's strip-only TypeScript,
+  // which refuses that syntax, and the first render job found out in production.
+  constructor(data: Buffer) {
+    this.data = data;
+  }
 
   u(count: number): number {
     let value = 0;
