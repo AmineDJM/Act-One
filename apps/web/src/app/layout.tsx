@@ -90,7 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   '@id': absoluteUrl('/#organization'),
                   name: site.legalName,
                   url: site.url,
-                  email: site.supportEmail,
+                  ...(site.supportEmail ? { email: site.supportEmail } : {}),
                 },
                 {
                   '@type': 'WebSite',

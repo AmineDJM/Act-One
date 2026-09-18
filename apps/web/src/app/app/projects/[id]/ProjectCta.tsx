@@ -109,11 +109,11 @@ export function ProjectCta(props: {
         <Link href="/app/billing" className="btn btn--lg">
           See plans
         </Link>
-      ) : action && props.disabled && props.remedy === 'contact' ? (
+      ) : action && props.disabled && props.remedy === 'contact' && site.supportEmail ? (
         <a href={`mailto:${site.supportEmail}`} className="btn btn--lg btn--secondary">
           Talk to us
         </a>
-      ) : action ? (
+      ) : action && props.disabled && props.remedy === 'contact' ? null : action ? (
         <form action={action}>
           <input type="hidden" name="projectId" value={props.projectId} />
           <button className="btn btn--lg" type="submit" disabled={pending || props.disabled}>

@@ -51,17 +51,31 @@ export class AesSecretVault implements SecretVault {
   }
 
   /**
-   * Reads keys from the environment. Format:
-   *   ACT_ONE_SECRET_KEYS='{"k1":"<base64-32-bytes>"}'
+   * Reads keys from the environment. Two forms:
+   *
+   *   ACT_ONE_SECRET_KEYS='{"k1":"<base64-32-bytes>"}'   a keyring, for rotation
+   *   ACT_ONE_SECRET_KEYS='<any secret string>'          one key, as a host generates it
    *   ACT_ONE_SECRET_ACTIVE_KEY=k1
+   *
+   * The second form is what lets a deploy be automatic: a platform that can
+   * generate a random value for a variable cannot be asked to generate JSON
+   * in our shape. A bare value becomes key "k1" (or the active id). Material
+   * that is not 32 bytes of base64 is stretched to 32 bytes with SHA-256, so
+   * whatever the host produced is a usable AES-256 key — and the same string
+   * on the web service and the worker yields the same key, which is the one
+   * thing that has to hold.
    */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): AesSecretVault {
-    const raw = env.ACT_ONE_SECRET_KEYS;
+    const raw = env.ACT_ONE_SECRET_KEYS?.trim();
     if (!raw) {
       throw new AppError(
         'internal',
         'ACT_ONE_SECRET_KEYS is not set. Refusing to handle secrets without a vault key.',
       );
+    }
+    if (!raw.startsWith('{')) {
+      const active = env.ACT_ONE_SECRET_ACTIVE_KEY?.trim() || 'k1';
+      return new AesSecretVault({ [active]: keyMaterialFrom(raw) }, active);
     }
     let parsed: Record<string, string>;
     try {
@@ -142,4 +156,20 @@ export function constantTimeEquals(a: string, b: string): boolean {
 /** Generates a fresh vault key for operators bootstrapping an environment. */
 export function generateVaultKey(): string {
   return randomBytes(32).toString('base64');
+}
+
+/**
+ * 32 bytes of key, base64, from whatever a host handed us.
+ *
+ * Exactly 32 bytes of base64 is used as it is. Anything else — a hex string,
+ * a UUID, a longer random token — is hashed to 32 bytes. Hashing is not
+ * key stretching against a weak input; the input is expected to be random
+ * already. It is shape conversion, so that "generate a random value" on a
+ * deploy platform is enough.
+ */
+export function keyMaterialFrom(value: string): string {
+  const decoded = Buffer.from(value, 'base64');
+  // Canonical base64 of exactly 32 bytes round-trips to itself.
+  if (decoded.length === 32 && decoded.toString('base64') === value) return value;
+  return createHash('sha256').update(value, 'utf8').digest('base64');
 }

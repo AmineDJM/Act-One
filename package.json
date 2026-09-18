@@ -25,7 +25,8 @@
     "demo": "vite-node scripts/demo.ts",
     "reference-films": "vite-node scripts/reference-films.ts",
     "sound-library": "vite-node scripts/build-sound-library.ts",
-    "browsers": "node --experimental-strip-types scripts/install-browsers.ts"
+    "browsers": "node --experimental-strip-types scripts/install-browsers.ts",
+    "db:app-role": "node --experimental-strip-types packages/db/src/cli/app-role.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

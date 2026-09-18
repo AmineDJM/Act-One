@@ -9,6 +9,19 @@
 # the Super Admin console — the variables below are only what is needed to boot
 # before anybody has signed in.
 
+# Shared between the web service and the worker: a secret the two must agree
+# on cannot be generated twice. Render generates the vault key when the
+# Blueprint is applied, so nobody types one in, and the application accepts
+# the bare value (see AesSecretVault.fromEnv). Rotation means adding a key,
+# never replacing this one — every stored secret is sealed under it.
+envVarGroups:
+  - name: act-one-vault
+    envVars:
+      - key: ACT_ONE_SECRET_KEYS
+        generateValue: true
+      - key: ACT_ONE_SECRET_ACTIVE_KEY
+        value: k1
+
 databases:
   - name: act-one-db
     databaseName: act_one
@@ -42,22 +55,15 @@ services:
         fromDatabase:
           name: act-one-db
           property: connectionString
-      # Vault key for provider credentials and customer product logins.
-      # Generate with: node -e "console.log(JSON.stringify({k1:require('crypto').randomBytes(32).toString('base64')}))"
-      # Rotating means ADDING a key and moving the active pointer — never
-      # replacing, or every stored secret becomes unreadable.
-      - key: ACT_ONE_SECRET_KEYS
-        sync: false
-      - key: ACT_ONE_SECRET_ACTIVE_KEY
-        value: k1
-      # Canonical origin. Without it every canonical tag, sitemap entry and
-      # social card URL points at localhost.
-      - key: ACT_ONE_SITE_URL
-        sync: false
+      - fromGroup: act-one-vault
+      # The canonical origin is taken from RENDER_EXTERNAL_URL, which Render
+      # sets to the service's own address. Set ACT_ONE_SITE_URL here only once
+      # a custom domain is attached.
       - key: ACT_ONE_PRODUCT_NAME
         value: Act One
-      - key: ACT_ONE_SUPPORT_EMAIL
-        sync: false
+      # Optional: ACT_ONE_SUPPORT_EMAIL adds a contact link and an email to
+      # the structured data. Add it in the dashboard when there is an inbox
+      # behind it; nothing is invented meanwhile.
 
   # ---------------------------------------------------------------------------
   # Worker: research, concepts, storyboards, rendering, sound, QA.
@@ -85,10 +91,7 @@ services:
         fromDatabase:
           name: act-one-db
           property: connectionString
-      - key: ACT_ONE_SECRET_KEYS
-        sync: false
-      - key: ACT_ONE_SECRET_ACTIVE_KEY
-        value: k1
+      - fromGroup: act-one-vault
       # Two concurrent renders per host. More makes every one of them slower
       # and risks the OOM killer taking the whole worker rather than one job.
       - key: ACT_ONE_WORKER_CONCURRENCY

@@ -13,7 +13,7 @@ export function Footer() {
           <Link href="/how-it-works">How it works</Link>
           <Link href="/work">Work</Link>
           <Link href="/pricing">Pricing</Link>
-          <a href={`mailto:${site.supportEmail}`}>Contact</a>
+          {site.supportEmail ? <a href={`mailto:${site.supportEmail}`}>Contact</a> : null}
         </div>
       </div>
     </footer>

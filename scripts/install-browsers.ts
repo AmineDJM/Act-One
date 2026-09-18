@@ -17,6 +17,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { ensureBrowser } from '@remotion/renderer';
 
 const require = createRequire(import.meta.url);
@@ -29,7 +30,9 @@ step('Playwright Chromium (research)');
 if (process.env.ACT_ONE_CHROMIUM_PATH) {
   console.log(`  using ACT_ONE_CHROMIUM_PATH=${process.env.ACT_ONE_CHROMIUM_PATH}`);
 } else {
-  const cli = require.resolve('playwright-core/cli.js');
+  // The CLI is not in the package's export map, so it is located beside the
+  // entry point rather than resolved by name.
+  const cli = path.join(path.dirname(require.resolve('playwright-core')), 'cli.js');
   const result = spawnSync(process.execPath, [cli, 'install', 'chromium'], { stdio: 'inherit' });
   if (result.status !== 0) {
     console.error('  Chromium install failed.');

@@ -187,6 +187,22 @@ Three things the worker host needs, all installed by the build:
 The Postgres plan in `render.yaml` is `basic-1gb`: films live in object
 storage, so the database grows with customers, not with render volume.
 
+### The vault key
+
+Nothing to type on Render: the Blueprint has Render generate
+`ACT_ONE_SECRET_KEYS` in an environment group shared by the web service and
+the worker, so both hold the same key and nobody handles it. The application
+accepts either form:
+
+```
+ACT_ONE_SECRET_KEYS=<any random string>              one key, as a host generates it
+ACT_ONE_SECRET_KEYS={"k1":"<base64 32 bytes>", ...}   a keyring, for rotation
+```
+
+A bare value that is not 32 bytes of base64 is hashed to 32 bytes; the same
+string always yields the same key. Self-hosting, generate one with
+`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+
 ### Rotating the vault key
 
 Add a key and move the active pointer:
@@ -197,7 +213,15 @@ ACT_ONE_SECRET_ACTIVE_KEY=k2
 ```
 
 Never replace. Rows are decrypted with the key they were written under, and
-removing it makes every stored secret permanently unreadable.
+removing it makes every stored secret permanently unreadable. To rotate away
+from a host-generated key, `k1` in the keyring is that generated value.
+
+### Addresses
+
+The canonical origin comes from `ACT_ONE_SITE_URL`, or from
+`RENDER_EXTERNAL_URL` when Render sets it. Set the first only for a custom
+domain. `ACT_ONE_SUPPORT_EMAIL` is optional; when it is empty there is no
+contact link and no email in the structured data, rather than a made-up one.
 
 ---
 

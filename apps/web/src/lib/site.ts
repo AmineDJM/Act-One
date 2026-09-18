@@ -16,10 +16,22 @@ export const site = {
    * tags, sitemap entries and OG image URLs all point at localhost, which is
    * the single most common way a launch gets deindexed.
    */
-  url: (process.env.ACT_ONE_SITE_URL ?? 'http://localhost:3000').replace(/\/$/, ''),
+  url: (
+    process.env.ACT_ONE_SITE_URL ??
+    // What the host says it is serving us at. Set ACT_ONE_SITE_URL only for
+    // a custom domain; otherwise the deploy is correct without anybody
+    // typing the address in.
+    process.env.RENDER_EXTERNAL_URL ??
+    'http://localhost:3000'
+  ).replace(/\/$/, ''),
   locale: 'en_US',
   twitter: process.env.ACT_ONE_TWITTER ?? '',
-  supportEmail: process.env.ACT_ONE_SUPPORT_EMAIL ?? 'hello@example.com',
+  /**
+   * Optional. Empty means no contact link and no email in the structured
+   * data — an invented address is worse than none, and this used to default
+   * to one.
+   */
+  supportEmail: process.env.ACT_ONE_SUPPORT_EMAIL ?? '',
   /** Company behind the product, for structured data. */
   legalName: process.env.ACT_ONE_LEGAL_NAME ?? PRODUCT_NAME,
 } as const;

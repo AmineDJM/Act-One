@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AesSecretVault, generateVaultKey, secretContext, redact } from '../index.ts';
+import { AesSecretVault, keyMaterialFrom, generateVaultKey, secretContext, redact } from '../index.ts';
 
 const keyA = generateVaultKey();
 const keyB = generateVaultKey();
@@ -50,6 +50,36 @@ describe('AesSecretVault', () => {
     expect(() => new AesSecretVault({ bad: Buffer.from('short').toString('base64') }, 'bad')).toThrow(
       /32 bytes/,
     );
+  });
+
+  it('accepts one bare key, the way a deploy platform generates it', () => {
+    // Render, Fly and friends can generate a random value for a variable; none
+    // can generate JSON in our shape. The bare form must round-trip, and the
+    // same string must give the web service and the worker the same key.
+    const generated = 'p8Yx2mKq7LwZ4nRt9vBc1dFg6hJk3sAe5uWyEiOl0TzX';
+    const web = AesSecretVault.fromEnv({ ACT_ONE_SECRET_KEYS: generated });
+    const worker = AesSecretVault.fromEnv({ ACT_ONE_SECRET_KEYS: generated, ACT_ONE_SECRET_ACTIVE_KEY: 'k1' });
+    const sealed = web.encrypt('sk-live-abcdef', 'org:org_1:provider');
+    expect(sealed.keyId).toBe('k1');
+    expect(worker.decrypt(sealed, 'org:org_1:provider')).toBe('sk-live-abcdef');
+  });
+
+  it('uses 32 bytes of base64 as they are, and hashes anything else to 32 bytes', () => {
+    const exact = Buffer.alloc(32, 7).toString('base64');
+    expect(keyMaterialFrom(exact)).toBe(exact);
+    const hex = 'deadbeef'.repeat(8);
+    expect(Buffer.from(keyMaterialFrom(hex), 'base64')).toHaveLength(32);
+    expect(keyMaterialFrom(hex)).not.toBe(hex);
+    expect(keyMaterialFrom(hex)).toBe(keyMaterialFrom(hex));
+  });
+
+  it('still reads a keyring, and still refuses a short key inside one', () => {
+    const ring = JSON.stringify({ k1: Buffer.alloc(32, 1).toString('base64'), k2: Buffer.alloc(32, 2).toString('base64') });
+    const vault = AesSecretVault.fromEnv({ ACT_ONE_SECRET_KEYS: ring, ACT_ONE_SECRET_ACTIVE_KEY: 'k2' });
+    expect(vault.encrypt('x', 'ctx').keyId).toBe('k2');
+    expect(() =>
+      AesSecretVault.fromEnv({ ACT_ONE_SECRET_KEYS: JSON.stringify({ k1: Buffer.from('short').toString('base64') }) }),
+    ).toThrow(/32 bytes/);
   });
 
   it('fingerprints without revealing the secret', () => {
