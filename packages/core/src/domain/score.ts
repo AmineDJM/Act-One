@@ -190,64 +190,6 @@ export const EffectBrief = z.object({
 });
 export type EffectBrief = z.infer<typeof EffectBrief>;
 
-/** What a caption needs: the words, when they are said, and where they break. */
-export type CaptionCue = { start: number; end: number; text: string };
-
-/**
- * Captions from aligned words.
- *
- * Built to the rules broadcast captioning actually uses: at most two lines of
- * about forty characters, at least a second on screen, and a break at a clause
- * rather than mid-phrase. Estimated timings — words per minute over a
- * sentence — drift within a few seconds and read as sloppy; these come from
- * the audio itself.
- */
-export function captionsFrom(
-  words: readonly { word: string; start: number; end: number }[],
-  options: { maxCharacters?: number; maxSeconds?: number; minSeconds?: number } = {},
-): CaptionCue[] {
-  const maxCharacters = options.maxCharacters ?? 80;
-  const maxSeconds = options.maxSeconds ?? 6;
-  const minSeconds = options.minSeconds ?? 1;
-  const cues: CaptionCue[] = [];
-  let current: { start: number; end: number; words: string[] } | null = null;
-
-  for (const entry of words) {
-    const word = entry.word.trim();
-    if (!word) continue;
-    if (!current) {
-      current = { start: entry.start, end: entry.end, words: [word] };
-      continue;
-    }
-    const candidate = [...current.words, word].join(' ');
-    const tooLong = candidate.length > maxCharacters;
-    const tooSlow = entry.end - current.start > maxSeconds;
-    // A sentence that ended is the best place to break, whatever the length.
-    const ended = /[.!?…]$/.test(current.words.at(-1) ?? '');
-    if (tooLong || tooSlow || (ended && candidate.length > maxCharacters * 0.5)) {
-      cues.push({ start: current.start, end: Math.max(current.end, current.start + minSeconds), text: current.words.join(' ') });
-      current = { start: entry.start, end: entry.end, words: [word] };
-      continue;
-    }
-    current.words.push(word);
-    current.end = entry.end;
-  }
-  if (current) cues.push({ start: current.start, end: Math.max(current.end, current.start + minSeconds), text: current.words.join(' ') });
-  return cues;
-}
-
-/** Captions as WebVTT, which is what a browser reads. */
-export function toWebVtt(cues: readonly CaptionCue[]): string {
-  const stamp = (seconds: number) => {
-    const whole = Math.max(0, seconds);
-    const hours = Math.floor(whole / 3600);
-    const minutes = Math.floor((whole % 3600) / 60);
-    const rest = whole % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${rest.toFixed(3).padStart(6, '0')}`;
-  };
-  return ['WEBVTT', '', ...cues.flatMap((cue, index) => [String(index + 1), `${stamp(cue.start)} --> ${stamp(cue.end)}`, cue.text, ''])].join('\n');
-}
-
 /** The film's length, for anything that needs the score to match the picture. */
 export function filmSecondsOf(storyboard: Storyboard): number {
   return storyboardDuration(storyboard);

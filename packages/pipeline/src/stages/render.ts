@@ -62,6 +62,7 @@ import {
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
 import { narrate } from '../narration.ts';
+import { captionFilm, NO_CAPTIONS, type FilmCaptions } from './captions.ts';
 import { scoreFilm } from './score.ts';
 
 /**
@@ -96,6 +97,14 @@ export type RenderOptions = {
    * render from the customer's plan.
    */
   kind?: RenderKind;
+  /**
+   * Whether the captions go into the picture as well as beside it.
+   *
+   * Set per cut, from the format's own spec: a vertical ad is watched muted in
+   * a feed, where a caption the viewer has to switch on is a caption nobody
+   * reads. Every render gets the sidecar track regardless.
+   */
+  burnCaptions?: boolean;
 };
 
 export async function runRender(
@@ -164,6 +173,7 @@ export async function runRender(
     status: 'rendering_scenes',
     masterAssetId: null,
     posterAssetId: null,
+    captionsAssetId: null,
     watermarked,
     durationSeconds: storyboardDuration(storyboard),
     costUsd: 0,
@@ -180,6 +190,12 @@ export async function runRender(
     let current = storyboard;
     let issues: QaIssue[] = [];
     let masterPath = '';
+    /*
+     * From the last attempt, not the first: a repair re-reads the shots it
+     * changed, so the timings shift and a track built from the first pass
+     * would caption a film that no longer exists.
+     */
+    let captions: FilmCaptions = NO_CAPTIONS;
     const maxAttempts = options.maxRepairAttempts ?? 2;
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
@@ -195,8 +211,10 @@ export async function runRender(
         attempt,
         understanding,
         voice,
+        burnCaptions: options.burnCaptions ?? false,
       });
       masterPath = rendered.path;
+      captions = rendered.captions;
 
       issues = await inspect(context, {
         storyboard: current,
@@ -322,6 +340,31 @@ export async function runRender(
       metadata: { aspect, quality, watermarked },
     });
 
+    /*
+     * The caption track, stored whether or not it is also in the picture.
+     *
+     * WCAG asks for captions on prerecorded audio and the sidecar is what a
+     * browser, a screen reader and a search index can all read; burning them
+     * into the frame satisfies a viewer and nothing else.
+     */
+    const captionAsset =
+      captions.vtt.length > 0
+        ? await storeAsset(context, {
+            data: new TextEncoder().encode(captions.vtt),
+            kind: 'caption_track',
+            origin: 'rendered',
+            rights: 'customer_owned',
+            extension: 'vtt',
+            contentType: 'text/vtt',
+            metadata: {
+              cues: captions.cues.length,
+              language: current.language ?? context.project.brief.language ?? null,
+              timing: captions.alignedPassages === captions.passages ? 'aligned' : 'estimated',
+              burnedIn: options.burnCaptions ?? false,
+            },
+          })
+        : null;
+
     const posterPath = path.join(workDir, 'poster.jpg');
     const poster = await runFfmpeg(
       // Chosen from the cut rather than from the clock: a fixed 1.5s lands
@@ -357,6 +400,7 @@ export async function runRender(
       status: passed ? 'completed' : 'failed',
       masterAssetId: master.asset.id,
       posterAssetId: posterAsset?.asset.id ?? null,
+      captionsAssetId: captionAsset?.asset.id ?? null,
       durationSeconds: storyboardDuration(current),
       completedAt: new Date().toISOString(),
       ...(passed ? {} : { error: 'Quality checks did not pass.' }),
@@ -460,9 +504,56 @@ async function renderOnce(
     system: ReturnType<typeof getSystem>;
     understanding: ProductUnderstanding | null;
     voice: VoiceTerms;
+    /** Whether this cut wears its captions in the picture. */
+    burnCaptions: boolean;
   },
-): Promise<{ path: string; missingAudio: string[]; soundIssues: QaIssue[] }> {
+): Promise<{ path: string; missingAudio: string[]; soundIssues: QaIssue[]; captions: FilmCaptions }> {
   const { storyboard, brand, system } = params;
+
+  /*
+   * The voice, before the picture.
+   *
+   * Captions are burned into the frame on the cuts that need them, and a
+   * caption cannot be burned into a film that has already been rendered. The
+   * narration does not depend on the picture — it is read from the storyboard
+   * — so reading it first costs nothing and has one more benefit: a render
+   * that was going to fail on the voice now fails before the expensive part
+   * rather than after it.
+   */
+  await context.progress(0.08, 'Reading the narration');
+  await context.activity({ step: 'voice', kind: 'step', label: 'reading the narration', status: 'active' });
+  const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
+  const voiceTracks = narration.tracks;
+  await context.activity({
+    step: 'voice',
+    kind: 'step',
+    label:
+      voiceTracks.length > 0
+        ? `${voiceTracks.length} passage${voiceTracks.length === 1 ? '' : 's'} read`
+        : storyboard.voiceStrategy === 'none'
+          ? 'no voice-over on this film'
+          : 'nothing to read',
+    status: voiceTracks.length > 0 || storyboard.voiceStrategy === 'none' ? 'done' : 'skipped',
+  });
+
+  const captions = await captionFilm(context, {
+    tracks: voiceTracks,
+    language: storyboard.language ?? context.project.brief.language ?? null,
+    filmSeconds: storyboardDuration(storyboard),
+    boundaries: storyboard.scenes.map((scene) => scene.startTime).filter((at) => at > 0),
+  });
+  if (captions.cues.length > 0) {
+    await context.activity({
+      step: 'voice',
+      kind: 'step',
+      label: `${captions.cues.length} caption${captions.cues.length === 1 ? '' : 's'}`,
+      detail:
+        captions.alignedPassages === captions.passages
+          ? 'timed from the recording'
+          : `${captions.alignedPassages} of ${captions.passages} timed from the recording`,
+      status: 'done',
+    });
+  }
 
   await context.progress(0.15, params.attempt === 0 ? 'Composing the master' : 'Directing the refined shots again');
   await context.activity({
@@ -502,6 +593,15 @@ async function renderOnce(
       // One clause, not the whole one-liner: the lockup holds a single line,
       // and handing it a paragraph is how a film ends mid-phrase.
       tagline: params.understanding ? firstClause(params.understanding.oneLiner) : '',
+      /*
+       * Burned in only where the format asks for it.
+       *
+       * A vertical cut is watched with the sound off in a feed, so a caption
+       * that can be turned off is a caption nobody sees. A hero film is
+       * watched on a page with a player around it, where a track the viewer
+       * controls is better than type nailed to the frame. Both get the track.
+       */
+      ...(params.burnCaptions && captions.cues.length > 0 ? { captions: captions.cues } : {}),
     },
     aspect: params.aspect,
     quality: params.quality,
@@ -518,7 +618,6 @@ async function renderOnce(
     status: 'done',
   });
   await context.progress(0.62, 'Designing the sound');
-  await context.activity({ step: 'voice', kind: 'step', label: 'reading the narration', status: 'active' });
 
   const design = directSound({
     storyboard,
@@ -586,19 +685,6 @@ async function renderOnce(
         .filter((key) => resolvedPaths[key] === undefined),
     ),
   ].sort();
-  const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
-  const voiceTracks = narration.tracks;
-  await context.activity({
-    step: 'voice',
-    kind: 'step',
-    label:
-      voiceTracks.length > 0
-        ? `${voiceTracks.length} passage${voiceTracks.length === 1 ? '' : 's'} read`
-        : storyboard.voiceStrategy === 'none'
-          ? 'no voice-over on this film'
-          : 'nothing to read',
-    status: voiceTracks.length > 0 || storyboard.voiceStrategy === 'none' ? 'done' : 'skipped',
-  });
   await context.activity({ step: 'composition', kind: 'step', label: 'designing the sound', status: 'active' });
 
   /*
@@ -615,7 +701,7 @@ async function renderOnce(
     durationSeconds: storyboardDuration(storyboard),
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
-  const soundIssues: QaIssue[] = [...narration.issues];
+  const soundIssues: QaIssue[] = [...narration.issues, ...captions.issues];
   if (voiceTracks.length > 0 && design.music) {
     let lead = await measureDialogueLead(plan, voiceTracks, { ...(context.signal ? { signal: context.signal } : {}) });
     const reduction = lead ? bedReductionDb(lead) : 0;
@@ -656,7 +742,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio: stillMissing, soundIssues };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -686,10 +772,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions };
 }
 
 /**
@@ -929,7 +1015,17 @@ async function speakNarration(
   workDir: string,
   quality: RenderQuality,
   voice: VoiceTerms,
-): Promise<{ tracks: { path: string; atSeconds: number; durationSeconds: number }[]; issues: QaIssue[] }> {
+): Promise<{
+  tracks: {
+    path: string;
+    atSeconds: number;
+    durationSeconds: number;
+    headSilenceSeconds: number;
+    tailSilenceSeconds: number;
+    text: string;
+  }[];
+  issues: QaIssue[];
+}> {
   const spoken = storyboard.scenes.filter(
     (scene) => scene.voiceOver && scene.narration.trim().length > 0,
   );
@@ -983,6 +1079,12 @@ async function speakNarration(
         path: track.path,
         atSeconds: track.atSeconds,
         durationSeconds: track.durationSeconds,
+        // Carried for the captions: where the words start inside the file, and
+        // what was actually read, which is not always what the scene says
+        // after a line was shortened to fit its room.
+        headSilenceSeconds: track.headSilenceSeconds,
+        tailSilenceSeconds: track.tailSilenceSeconds,
+        text: track.text,
       })),
       issues: result.issues,
     };

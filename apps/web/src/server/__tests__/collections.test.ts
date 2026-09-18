@@ -103,6 +103,7 @@ async function finishedFilm(session: Session, options: { watermarked?: boolean }
     status: 'completed',
     masterAssetId: master.id,
     posterAssetId: poster.id,
+    captionsAssetId: null,
     watermarked: options.watermarked ?? false,
     durationSeconds: 19,
     costUsd: 1,

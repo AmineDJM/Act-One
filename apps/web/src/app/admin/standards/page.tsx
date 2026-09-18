@@ -1,5 +1,6 @@
 import {
   AUDIO_STANDARDS,
+  CAPTION_STANDARDS,
   COLOR_STANDARDS,
   CONVERSION_STANDARDS,
   EDITORIAL_STANDARDS,
@@ -64,6 +65,11 @@ const GROUPS: { title: string; blurb: string; standards: Record<string, Standard
     title: 'Sound',
     blurb: 'Fully standardised, and still the thing self-produced films get wrong.',
     standards: AUDIO_STANDARDS,
+  },
+  {
+    title: 'Captions',
+    blurb: 'Read rather than watched, and almost entirely published by people who measured it.',
+    standards: CAPTION_STANDARDS,
   },
   {
     title: 'Editorial',

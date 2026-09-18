@@ -1,4 +1,4 @@
-import { dimensionsFor, storyboardDuration, type AspectRatio, type BrandSystem, type RenderQuality, type Storyboard } from '@act-one/core';
+import { dimensionsFor, storyboardDuration, type AspectRatio, type BrandSystem, type CaptionCue, type RenderQuality, type Storyboard } from '@act-one/core';
 
 /**
  * The parts of the film package that carry no JSX.
@@ -21,6 +21,14 @@ export type FilmProps = {
   watermarkLabel?: string | null;
   cta?: string;
   tagline?: string;
+  /**
+   * Captions burned into the picture.
+   *
+   * Passed only for the cuts whose format asks for them — a vertical ad
+   * watched muted in a feed. Every render also ships the same cues as a
+   * sidecar track, which is the copy a viewer can turn off.
+   */
+  captions?: CaptionCue[];
 };
 
 export function filmDurationInFrames(storyboard: Storyboard, fps: number): number {

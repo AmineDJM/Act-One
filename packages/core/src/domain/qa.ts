@@ -33,6 +33,9 @@ export const QaCheck = z.enum([
   'narration_pause',
   'narration_truncated',
   'narration_loudness',
+  /* The captions, read back at the speed a viewer reads. */
+  'caption_readability',
+  'captions_missing',
 ]);
 export type QaCheck = z.infer<typeof QaCheck>;
 

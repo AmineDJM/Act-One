@@ -1,6 +1,20 @@
 import { ATTRIBUTION, pieceLabel, type Render, type Variant } from '@act-one/core';
 import styles from '../../app.module.css';
 
+/** What a viewer calls the track in the player's own menu. */
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  fr: 'Français',
+  de: 'Deutsch',
+  es: 'Español',
+  it: 'Italiano',
+  pt: 'Português',
+  nl: 'Nederlands',
+  ja: '日本語',
+  ko: '한국어',
+  zh: '中文',
+};
+
 const VARIANT_LABELS: Record<string, string> = {
   hero_60: 'Homepage hero',
   vertical_30: 'Vertical 30s',
@@ -33,11 +47,14 @@ export function FilmDelivery({
   variants,
   posterAssetId,
   projectName,
+  language,
 }: {
   render: Render;
   variants: Variant[];
   posterAssetId: string | null;
   projectName: string;
+  /** What the film is spoken in, for the caption track's own label. */
+  language: string | null;
 }) {
   const master = render.masterAssetId;
   if (!master) return null;
@@ -55,6 +72,13 @@ export function FilmDelivery({
         </span>
       </div>
 
+      {/*
+        * The caption track, on by default.
+        *
+        * Most of this is watched in a tab beside four others, and the first
+        * play is usually a muted one. A track the viewer has to go and find is
+        * a track that does nothing on the only viewing that matters.
+        */}
       <video
         className={styles.player}
         src={`/api/assets/${master}`}
@@ -62,12 +86,27 @@ export function FilmDelivery({
         controls
         playsInline
         preload="metadata"
-      />
+      >
+        {render.captionsAssetId ? (
+          <track
+            kind="captions"
+            label={LANGUAGE_LABELS[language ?? ''] ?? 'Subtitles'}
+            srcLang={language ?? 'en'}
+            src={`/api/assets/${render.captionsAssetId}`}
+            default
+          />
+        ) : null}
+      </video>
 
       <div className="row" style={{ gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <a className="btn" href={`/api/assets/${master}?download`} download>
           Download the master
         </a>
+        {render.captionsAssetId ? (
+          <a className="btn btn--secondary" href={`/api/assets/${render.captionsAssetId}?download`} download>
+            Download the subtitles
+          </a>
+        ) : null}
         <span className="hint">
           {render.aspect} · {Math.round(render.durationSeconds)}s · {ATTRIBUTION}
           {render.watermarked ? ' · upgrade to remove the watermark' : ''}

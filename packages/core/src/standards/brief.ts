@@ -1,4 +1,5 @@
 import { AUDIO_STANDARDS } from './audio.ts';
+import { CAPTION_STANDARDS } from './caption.ts';
 import { COLOR_STANDARDS } from './color.ts';
 import { CONVERSION_STANDARDS } from './conversion.ts';
 import { EDITORIAL_STANDARDS } from './editorial.ts';
@@ -79,6 +80,15 @@ const CRAFTS: Record<Craft, Standard[]> = {
     EDITORIAL_STANDARDS.numbers,
     AUDIO_STANDARDS.dialogueLead,
     CONVERSION_STANDARDS.hook,
+    /*
+     * The one caption rule a writer gets to act on.
+     *
+     * The rest of them are arithmetic the builder does, and briefing a model
+     * on a number it does not get to choose spends attention for nothing. This
+     * one is different: a line with too many words in it for the time it has
+     * cannot be captioned legibly by anybody, and the only fix is upstream.
+     */
+    CAPTION_STANDARDS.readingRate,
   ],
   sound: [
     AUDIO_STANDARDS.measurement,

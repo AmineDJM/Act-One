@@ -153,6 +153,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             variants={variants}
             posterAssetId={poster?.id ?? null}
             projectName={project.name}
+            language={storyboard?.language ?? project.brief.language ?? null}
           />
           {copyKit && copyKit.lines.length > 0 ? <CopyKitPanel lines={copyKit.lines} /> : null}
           <AudioEditionPanel

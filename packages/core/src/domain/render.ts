@@ -62,6 +62,15 @@ export const Render = z.object({
   status: RenderStatus.default('queued'),
   masterAssetId: z.string().nullable().default(null),
   posterAssetId: z.string().nullable().default(null),
+  /**
+   * The caption track, as WebVTT.
+   *
+   * A sidecar rather than part of the picture, because a caption burned into
+   * the frame cannot be turned off, translated, or read by anything but a
+   * human eye. Cuts for muted feeds get both: burned in so they are seen, and
+   * a track so they can still be used.
+   */
+  captionsAssetId: z.string().nullable().default(null),
   watermarked: z.boolean().default(false),
   durationSeconds: z.number().min(0).default(0),
   costUsd: z.number().min(0).default(0),

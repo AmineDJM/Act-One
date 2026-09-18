@@ -2,12 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   FilmScore,
   MOVEMENT_MIN_SECONDS,
-  captionsFrom,
   fitScore,
   movementBoundaries,
   scenesInMovement,
   scoreSeconds,
-  toWebVtt,
 } from '../index.ts';
 
 /**
@@ -94,39 +92,5 @@ describe('fitting a score to the picture', () => {
 
   it('is never sung', () => {
     expect(FilmScore.parse({ movements: [movement(5)] }).instrumental).toBe(true);
-  });
-});
-
-describe('captions from what was actually said', () => {
-  const words = [
-    { word: 'A', start: 0, end: 0.2 },
-    { word: 'week', start: 0.2, end: 0.5 },
-    { word: 'of', start: 0.5, end: 0.6 },
-    { word: 'manual', start: 0.6, end: 1.1 },
-    { word: 'reconciliation.', start: 1.1, end: 1.9 },
-    { word: 'One', start: 2.4, end: 2.7 },
-    { word: 'run.', start: 2.7, end: 3.1 },
-  ];
-
-  it('breaks where the sentence breaks, not where the character count does', () => {
-    const cues = captionsFrom(words, { maxCharacters: 40 });
-    expect(cues.length).toBeGreaterThanOrEqual(1);
-    expect(cues[0]!.text).toContain('A week of manual reconciliation.');
-    expect(cues[0]!.start).toBe(0);
-  });
-
-  it('holds every caption long enough to read', () => {
-    for (const cue of captionsFrom(words)) expect(cue.end - cue.start).toBeGreaterThanOrEqual(1);
-  });
-
-  it('writes the timings a browser can read', () => {
-    const vtt = toWebVtt(captionsFrom(words));
-    expect(vtt.startsWith('WEBVTT')).toBe(true);
-    expect(vtt).toMatch(/00:00:00\.000 --> 00:00:0\d\.\d{3}/);
-  });
-
-  it('says nothing when nothing was said', () => {
-    expect(captionsFrom([])).toEqual([]);
-    expect(toWebVtt([])).toBe('WEBVTT\n');
   });
 });

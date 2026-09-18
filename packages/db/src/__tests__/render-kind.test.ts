@@ -17,6 +17,7 @@ function render(organizationId: string, projectId: string, over: Partial<Render>
     status: 'completed',
     masterAssetId: newId('ast'),
     posterAssetId: null,
+    captionsAssetId: null,
     watermarked: false,
     durationSeconds: 60,
     costUsd: 0,

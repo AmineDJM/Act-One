@@ -1,9 +1,15 @@
 import React from 'react';
 import { type FilmProps } from './composition.ts';
-import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import {
+  TITLE_SAFE_INSET,
+  VERTICAL_CHROME_BOTTOM,
+  dimensionsFor,
   storyboardDuration,
+  type AspectRatio,
   type BrandSystem,
+  type CaptionCue,
+  type RenderQuality,
   type Scene,
   type Storyboard,
 } from '@act-one/core';
@@ -29,13 +35,14 @@ export const Film: React.FC<FilmProps> = ({
   watermarkLabel,
   cta,
   tagline,
+  captions,
 }) => {
   const { fps, width, height } = useVideoConfig();
   const aspect = aspectFor(width, height);
 
   const tokens = resolveTokens(brand, {
     aspect,
-    quality: width >= 3000 ? 'uhd' : 'hd',
+    quality: qualityOf(aspect, width),
     theme: theme ?? 'auto',
     ...(typeScale ? { scale: typeScale } : {}),
   });
@@ -67,6 +74,8 @@ export const Film: React.FC<FilmProps> = ({
         </Sequence>
       ))}
 
+      {captions && captions.length > 0 ? <Captions cues={captions} tokens={tokens} aspect={aspect} /> : null}
+
       {watermarkLabel ? (
         <AbsoluteFill
           dangerouslySetInnerHTML={{
@@ -76,6 +85,77 @@ export const Film: React.FC<FilmProps> = ({
           }}
         />
       ) : null}
+    </AbsoluteFill>
+  );
+};
+
+/**
+ * Captions, burned in.
+ *
+ * Everything here is a published rule rather than a taste: the block sits
+ * inside the EBU R 95 text safe area, and above the platform furniture on a
+ * vertical frame, because the bottom right of a phone screen belongs to the
+ * app. Each line carries its own plate, since the picture behind it changes
+ * every frame and contrast measured against one frame is a measurement of
+ * nothing. Two lines at most, because the cues were built that way.
+ *
+ * No animation. A caption that fades is a caption that is unreadable for the
+ * first two hundred milliseconds of the second and a half it has.
+ */
+const Captions: React.FC<{ cues: CaptionCue[]; tokens: DesignTokens; aspect: string }> = ({
+  cues,
+  tokens,
+  aspect,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const at = frame / fps;
+  const cue = cues.find((candidate) => at >= candidate.start && at < candidate.end);
+  if (!cue) return null;
+
+  const vertical = aspect === '9:16' || aspect === '4:5';
+  const height = tokens.frame.height;
+  // Comfortably above the 2% floor the type standards set, and larger on a
+  // vertical cut, which is watched on a phone held at arm's length.
+  const sizePx = Math.round(height * (vertical ? 0.038 : 0.03));
+  const bottom = Math.round(height * (vertical ? VERTICAL_CHROME_BOTTOM : TITLE_SAFE_INSET));
+  const pad = Math.round(sizePx * 0.32);
+
+  return (
+    <AbsoluteFill
+      style={{
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        paddingBottom: bottom,
+        paddingLeft: Math.round(tokens.frame.width * TITLE_SAFE_INSET),
+        paddingRight: Math.round(tokens.frame.width * TITLE_SAFE_INSET),
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(sizePx * 0.16) }}>
+        {(cue.lines.length > 0 ? cue.lines : [cue.text]).map((line, index) => (
+          <span
+            key={`${cue.start}-${index}`}
+            style={{
+              fontFamily: tokens.type.body.family,
+              fontWeight: 600,
+              fontSize: sizePx,
+              lineHeight: 1.25,
+              letterSpacing: 0,
+              color: '#FFFFFF',
+              // Black at 78% carries 4.5:1 against white over any picture, and
+              // reads as a caption rather than as a graphic.
+              backgroundColor: 'rgba(0, 0, 0, 0.78)',
+              padding: `${Math.round(pad * 0.55)}px ${pad}px`,
+              borderRadius: tokens.radius.sm,
+              textAlign: 'center',
+              textWrap: 'balance',
+            }}
+          >
+            {line}
+          </span>
+        ))}
+      </div>
     </AbsoluteFill>
   );
 };
@@ -430,6 +510,24 @@ function cursorPath(scene: Scene): { x: number; y: number }[] {
     { x: 0.62, y: 0.38 },
     { x: 0.5, y: 0.55 },
   ];
+}
+
+/**
+ * Which resolution is actually being drawn.
+ *
+ * Every size in the design system comes off the frame, so the tokens have to
+ * be resolved against the frame that is really on screen. This used to ask
+ * whether the width was over 3000 — true of 4K, false of everything else — so
+ * a preview render, whose canvas is half HD, laid itself out at full HD inside
+ * it. Type came out at twice the size and ran off the edge, which means the
+ * animatic a customer looks at to check their own cut did not look like the
+ * film they were checking.
+ */
+function qualityOf(aspect: AspectRatio, width: number): RenderQuality {
+  const qualities: RenderQuality[] = ['preview', 'hd', 'uhd'];
+  return qualities
+    .map((quality) => ({ quality, distance: Math.abs(dimensionsFor(aspect, quality).width - width) }))
+    .sort((left, right) => left.distance - right.distance)[0]!.quality;
 }
 
 function aspectFor(width: number, height: number): '16:9' | '9:16' | '1:1' | '4:5' {

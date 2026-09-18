@@ -62,6 +62,13 @@ export async function runCampaign(
         skipVisionQa: true,
         maxRepairAttempts: 1,
         kind: 'cut',
+        /*
+         * Burned in where the format says so, which is every vertical and
+         * square cut. Those are watched muted in a feed, where a caption the
+         * viewer has to switch on is a caption nobody reads — and the plan
+         * has already decided it, per purpose, from the channel's own spec.
+         */
+        burnCaptions: plan.captionsBurned,
       });
 
       await store.variants.update(organizationId, variant.id, {

@@ -100,6 +100,8 @@ function filenameFor(kind: string, contentType: string, id: string): string {
               ? 'wav'
               : contentType.includes('mpeg')
                 ? 'mp3'
-                : 'bin';
+                : contentType.includes('vtt')
+                  ? 'vtt'
+                  : 'bin';
   return `${kind}-${id}.${extension}`;
 }
