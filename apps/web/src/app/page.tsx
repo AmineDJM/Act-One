@@ -107,11 +107,17 @@ const SYSTEM_FRAMES: Record<string, { poster: string; company: string }> = {
 };
 
 /*
- * Rendered on request and kept for a minute: the phase and the landing copy
- * are read from the console, and a change there should reach the public
- * page without a deploy — but not cost a database read per visitor.
+ * Rendered per request, because a build has no database.
+ *
+ * This page reads published rows, and the machine that runs `next build` is
+ * not the machine that runs the migrations: on a fresh environment the table
+ * does not exist yet and prerendering fails the whole build. Even where it
+ * succeeds it bakes in whatever was published at build time, so a film
+ * selected an hour after a deploy would not appear until something else
+ * triggered a rebuild.
  */
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+
 
 export default async function HomePage() {
   const launch = DEFAULT_PLANS.find((plan) => plan.id === 'launch');

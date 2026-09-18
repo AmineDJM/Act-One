@@ -10,7 +10,18 @@ import { site, absoluteUrl } from '@/lib/site.ts';
 import { breadcrumbs, itemList, jsonLd, pageMetadata } from '@/lib/seo.ts';
 import styles from '@/components/marketing.module.css';
 
-export const revalidate = 300;
+/*
+ * Rendered per request, because a build has no database.
+ *
+ * This page reads published rows, and the machine that runs `next build` is
+ * not the machine that runs the migrations: on a fresh environment the table
+ * does not exist yet and prerendering fails the whole build. Even where it
+ * succeeds it bakes in whatever was published at build time, so a film
+ * selected an hour after a deploy would not appear until something else
+ * triggered a rebuild.
+ */
+export const dynamic = 'force-dynamic';
+
 
 export const metadata: Metadata = pageMetadata({
   title: 'Journal',

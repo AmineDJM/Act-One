@@ -6,11 +6,17 @@ import { pageMetadata } from '@/lib/seo.ts';
 import { CollectionsIndex } from './CollectionsIndex.tsx';
 
 /*
- * Rendered ahead of time and refreshed when an entry is published, unpublished
- * or edited; a slow gallery page is the worst place to be slow, because this
- * is the page that gets shared.
+ * Rendered per request, because a build has no database.
+ *
+ * This page reads published rows, and the machine that runs `next build` is
+ * not the machine that runs the migrations: on a fresh environment the table
+ * does not exist yet and prerendering fails the whole build. Even where it
+ * succeeds it bakes in whatever was published at build time, so a film
+ * selected an hour after a deploy would not appear until something else
+ * triggered a rebuild.
  */
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
+
 
 export const metadata: Metadata = pageMetadata({
   title: 'Collections',

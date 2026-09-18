@@ -14,10 +14,17 @@ import { monthYear } from '../CollectionsIndex.tsx';
 import styles from '@/components/marketing.module.css';
 
 /*
- * A film's own page. Rendered ahead of time under its address and refreshed
- * when the entry changes; an unpublished film is a 404 from the next request.
+ * Rendered per request, because a build has no database.
+ *
+ * This page reads published rows, and the machine that runs `next build` is
+ * not the machine that runs the migrations: on a fresh environment the table
+ * does not exist yet and prerendering fails the whole build. Even where it
+ * succeeds it bakes in whatever was published at build time, so a film
+ * selected an hour after a deploy would not appear until something else
+ * triggered a rebuild.
  */
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
+
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const film = await getPublicFilm((await params).slug);

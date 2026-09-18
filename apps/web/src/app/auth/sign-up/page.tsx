@@ -8,6 +8,16 @@ import { SignUpForm } from './SignUpForm.tsx';
 import { Wordmark } from '@/components/ui/Wordmark.tsx';
 import styles from '../auth.module.css';
 
+/*
+ * Rendered per request, because a build has no database.
+ *
+ * The machine that runs the build is not the machine that runs the migrations,
+ * so on a fresh environment the tables this reads do not exist yet and
+ * prerendering fails the whole deploy. It also reads settings an operator can
+ * change from the console, which a page baked at build time would not notice.
+ */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Create your account',
   alternates: { canonical: '/auth/sign-up' },

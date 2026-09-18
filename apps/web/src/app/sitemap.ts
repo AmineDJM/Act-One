@@ -5,12 +5,17 @@ import { listPublicFilms } from '@/server/collections.ts';
 import { listPublicArticles } from '@/server/blog.ts';
 
 /*
- * Rewritten when something is published — every action that changes a public
- * page revalidates this path — and, failing that, every five minutes. The
- * timer is the safety net: a build that could not reach the database would
- * otherwise serve a map of the fixed pages alone until the next publication.
+ * Rendered per request, because a build has no database.
+ *
+ * This page reads published rows, and the machine that runs `next build` is
+ * not the machine that runs the migrations: on a fresh environment the table
+ * does not exist yet and prerendering fails the whole build. Even where it
+ * succeeds it bakes in whatever was published at build time, so a film
+ * selected an hour after a deploy would not appear until something else
+ * triggered a rebuild.
  */
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
+
 
 /**
  * Only pages that can actually rank. Authenticated routes are never listed.
