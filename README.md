@@ -246,6 +246,13 @@ four are replaceable infrastructure; the moat is product understanding, creative
 strategy, art direction, premium motion systems, real product cinematography,
 Brand DNA, automated QA and the revision system.
 
+### Browserbase
+
+Paste the API key in **Integrations**; the project is found from the key, and
+saving shows its name and how many sessions it may run. Set the Project ID only
+if the key reaches several projects. To bootstrap a deploy instead, set
+`BROWSERBASE_API_KEY`. Without it, research runs on a local Chromium.
+
 ### Higgsfield
 
 Generated shots come from **Seedance 2.5** through the official SDK:

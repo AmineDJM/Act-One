@@ -91,7 +91,7 @@ export async function buildRegistry(
         routing: providerConfig.llm.routing,
       }),
       browser:
-        browserbase['apiKey'] && browserbase['projectId']
+        browserbase['apiKey']
           ? new BrowserbaseProvider({
               apiKey: browserbase['apiKey'],
               projectId: browserbase['projectId'],

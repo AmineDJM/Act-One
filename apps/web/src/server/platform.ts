@@ -46,11 +46,18 @@ export const PROVIDER_SLOTS = [
   {
     id: 'browserbase',
     label: 'Browserbase',
-    purpose: 'Isolated browsers for reading sites and exploring customer products.',
+    purpose:
+      'Isolated browsers for reading sites and exploring customer products. Paste the API key; the project is found from it.',
     required: false,
     fields: [
-      { key: 'apiKey', label: 'API key', placeholder: 'bb_…', secret: true, envVar: 'BROWSERBASE_API_KEY' },
-      { key: 'projectId', label: 'Project ID', placeholder: 'uuid', secret: false, envVar: 'BROWSERBASE_PROJECT_ID' },
+      { key: 'apiKey', label: 'API key', placeholder: 'bb_live_…', secret: true, envVar: 'BROWSERBASE_API_KEY' },
+      {
+        key: 'projectId',
+        label: 'Project ID (optional)',
+        placeholder: 'Only if the key reaches several projects',
+        secret: false,
+        envVar: 'BROWSERBASE_PROJECT_ID',
+      },
     ],
     envFallback: 'BROWSERBASE_API_KEY',
     docsUrl: 'https://www.browserbase.com/settings',
@@ -393,7 +400,7 @@ export async function buildRegistry(scope: {
     LocalFsStorageProvider,
   } = await import('@act-one/providers');
 
-  const browserConfigured = Boolean(openai && browserbase['apiKey'] && browserbase['projectId']);
+  const browserConfigured = Boolean(openai && browserbase['apiKey']);
 
   return new ProviderRegistry({
     config: config.providers,
