@@ -16,6 +16,7 @@ import {
   buildRunView,
   stepsAround,
   storyboardDuration,
+  canRevise,
   type Project,
   type ProjectStage,
 } from '@act-one/core';
@@ -297,6 +298,8 @@ export async function renderPermission(session: Session, project: Project) {
     // Carried through, because a blocked action needs somewhere to go: a
     // disabled button beside a sentence explaining why is a dead end.
     remedy: decision.remedy,
+    /** What the plan will render, so the brief only offers lengths that fit. */
+    maxDurationSeconds: plan.limits.maxMasterDurationSeconds,
     plan,
   };
 }
@@ -324,4 +327,55 @@ async function runViewFor(jobs: Job[], active: Job): Promise<RunView | null> {
     }),
   );
   return buildRunView({ jobs, active, now: Date.now(), typicalMs });
+}
+
+/** Length, tone and language on an existing project. */
+export async function updateBrief(
+  session: Session,
+  project: Project,
+  patch: Pick<ProjectBriefType, 'durationSeconds' | 'tone' | 'language'>,
+): Promise<Project> {
+  const store = getStore();
+  const organization = await store.organizations.get(session.organizationId);
+  if (!organization) throw new AppError('not_found', 'Workspace not found.');
+  const { plan } = await entitlementsFor(organization);
+  // The plan's runtime ceiling is enforced at render time too; refusing it
+  // here says so before the customer has waited for a storyboard.
+  if (patch.durationSeconds && patch.durationSeconds > plan.limits.maxMasterDurationSeconds) {
+    throw new AppError(
+      'entitlement_required',
+      `${plan.name} renders up to ${plan.limits.maxMasterDurationSeconds} seconds.`,
+    );
+  }
+  return store.projects.update(session.organizationId, project.id, {
+    brief: ProjectBrief.parse({ ...project.brief, ...patch }),
+  });
+}
+
+export type RevisionAllowance = {
+  allowed: boolean;
+  reason: string;
+  remedy: 'none' | 'upgrade' | 'wait' | 'billing' | 'contact';
+  used: number;
+  /** -1 means unlimited. */
+  limit: number;
+};
+
+/**
+ * How many revisions this project has had against how many the plan
+ * includes. A revision that failed or was canceled did not happen.
+ */
+export async function revisionAllowance(session: Session, project: Project): Promise<RevisionAllowance> {
+  const store = getStore();
+  const [organization, jobs] = await Promise.all([
+    store.organizations.get(session.organizationId),
+    store.jobs.listForProject(session.organizationId, project.id),
+  ]);
+  if (!organization) throw new AppError('not_found', 'Workspace not found.');
+  const { plan } = await entitlementsFor(organization);
+  const used = jobs.filter(
+    (job) => job.kind === 'repair_scene' && job.state !== 'failed' && job.state !== 'canceled',
+  ).length;
+  const decision = canRevise({ plan, organization, revisionsUsed: used });
+  return { ...decision, used };
 }

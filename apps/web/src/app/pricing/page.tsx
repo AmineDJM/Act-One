@@ -113,6 +113,14 @@ export default async function PricingPage() {
                       <dd>{plan.limits.maxMasterDurationSeconds}s</dd>
                     </div>
                     <div>
+                      <dt>Revisions</dt>
+                      <dd>
+                        {plan.entitlements.includes('revisions.unlimited') || plan.limits.revisionsPerProject < 0
+                          ? 'Unlimited'
+                          : `${plan.limits.revisionsPerProject}/project`}
+                      </dd>
+                    </div>
+                    <div>
                       <dt>Seats</dt>
                       <dd>{plan.limits.maxSeats < 0 ? 'Unlimited' : plan.limits.maxSeats}</dd>
                     </div>

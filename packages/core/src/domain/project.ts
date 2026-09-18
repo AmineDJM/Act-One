@@ -166,11 +166,65 @@ export const CTA_LABELS: Record<PrimaryCta, string> = {
  * Advanced settings. Every one of these is optional and hidden by default;
  * the system infers all of them. Exposing them is an escape hatch, not the flow.
  */
+/**
+ * The voice the film speaks in. Chosen by the customer, or, when they say
+ * nothing, read from the brand's own writing.
+ */
+export const Tone = z.enum(['confident', 'warm', 'playful', 'bold', 'calm', 'technical']);
+export type Tone = z.infer<typeof Tone>;
+
+export const TONE_LABELS: Record<Tone, string> = {
+  confident: 'Confident — plain, assured, no hedging',
+  warm: 'Warm — human, close, on the customer\'s side',
+  playful: 'Playful — light, quick, a little wit',
+  bold: 'Bold — big claims made calmly, high contrast',
+  calm: 'Calm — slow, spacious, understated',
+  technical: 'Technical — precise, for people who know the field',
+};
+
+/**
+ * Languages a film can be written and narrated in. The code is what the
+ * creative engines and the voice are told; the name is what the customer sees.
+ * Null in a brief means the language of the product's own site.
+ */
+export const FILM_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'pt', name: 'Português' },
+  { code: 'nl', name: 'Nederlands' },
+  { code: 'sv', name: 'Svenska' },
+  { code: 'da', name: 'Dansk' },
+  { code: 'nb', name: 'Norsk' },
+  { code: 'fi', name: 'Suomi' },
+  { code: 'pl', name: 'Polski' },
+  { code: 'tr', name: 'Türkçe' },
+  { code: 'ja', name: '日本語' },
+  { code: 'ko', name: '한국어' },
+  { code: 'zh', name: '中文' },
+  { code: 'ar', name: 'العربية' },
+  { code: 'hi', name: 'हिन्दी' },
+] as const;
+export type FilmLanguage = (typeof FILM_LANGUAGES)[number]['code'];
+
+export function languageName(code: string | null | undefined): string | null {
+  return FILM_LANGUAGES.find((language) => language.code === code)?.name ?? null;
+}
+
+/** Runtimes offered up front, in seconds. A plan caps which of them apply. */
+export const DURATION_CHOICES = [15, 30, 45, 60, 90, 120] as const;
+
 export const ProjectBrief = z.object({
   targetAudience: z.string().max(400).nullable().default(null),
   goal: LaunchContext.nullable().default(null),
   keyMessage: z.string().max(400).nullable().default(null),
   durationSeconds: z.number().int().min(6).max(180).nullable().default(null),
+  /** ISO 639-1 code. Null: the language of the product's own site. */
+  language: z.string().min(2).max(12).nullable().default(null),
+  /** Null: read from the brand's own writing. */
+  tone: Tone.nullable().default(null),
   channels: z.array(Channel).default([]),
   creativeMode: CreativeMode.default('studio'),
   voiceStrategy: VoiceStrategy.nullable().default(null),

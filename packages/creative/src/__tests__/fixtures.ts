@@ -106,6 +106,8 @@ export function briefFixture(over: Partial<ProjectBrief> = {}): ProjectBrief {
     goal: null,
     keyMessage: null,
     durationSeconds: 60,
+    language: null,
+    tone: null,
     channels: [],
     creativeMode: 'studio',
     voiceStrategy: null,

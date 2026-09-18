@@ -3,12 +3,13 @@ import {
   CTA_LABELS,
   can,
   primaryCtaFor,
+  stageReached,
   storyboardDuration,
   toAppError,
   type PrimaryCta,
 } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
-import { loadProjectView, renderPermission } from '@/server/projects.ts';
+import { loadProjectView, renderPermission, revisionAllowance } from '@/server/projects.ts';
 import { ProjectCta } from './ProjectCta.tsx';
 import { ConceptChoice } from './ConceptChoice.tsx';
 import { BrandConfirm } from './BrandConfirm.tsx';
@@ -17,6 +18,7 @@ import { FilmDelivery } from './FilmDelivery.tsx';
 import { CopyKitPanel } from './CopyKit.tsx';
 import { ProductAccess } from './ProductAccess.tsx';
 import { Notes } from './Notes.tsx';
+import { BriefPanel } from './BriefPanel.tsx';
 import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
@@ -61,7 +63,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
    * campaign. Anything in flight is a reason to watch, whatever the stage says.
    */
   const cta = activeJob ? 'watch_progress' : primaryCtaFor(project.stage);
-  const permission = await renderPermission(session, project);
+  const [permission, revisions] = await Promise.all([
+    renderPermission(session, project),
+    revisionAllowance(session, project),
+  ]);
 
   return (
     <>
@@ -132,6 +137,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className={styles.panels}>
+        <BriefPanel
+          projectId={project.id}
+          brief={{
+            durationSeconds: project.brief.durationSeconds ?? null,
+            language: project.brief.language ?? null,
+            tone: project.brief.tone ?? null,
+          }}
+          maxDurationSeconds={permission.maxDurationSeconds}
+          editable={can(session.actor, 'project:update') && !stageReached(project.stage, 'rendering')}
+        />
         <ProductAccess
           projectId={project.id}
           productHost={safeHost(project.websiteUrl)}
@@ -254,6 +269,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             animaticAssetId={animatic?.masterAssetId ?? null}
             animaticPosterAssetId={animatic?.posterAssetId ?? null}
             animaticProgress={animaticJob ? animaticJob.progress : null}
+            revisions={{ used: revisions.used, limit: revisions.limit, reason: revisions.reason }}
           />
         </section>
       ) : null}

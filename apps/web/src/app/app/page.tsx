@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { CTA_LABELS, primaryCtaFor } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
+import { entitlementsFor } from '@/server/platform.ts';
 import { NewProjectForm } from './NewProjectForm.tsx';
 import styles from './app.module.css';
 
@@ -9,7 +10,15 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProjectsPage() {
   const session = await requireSessionForPage('/app');
-  const projects = await getStore().projects.list(session.organizationId);
+  const store = getStore();
+  const [projects, organization] = await Promise.all([
+    store.projects.list(session.organizationId),
+    store.organizations.get(session.organizationId),
+  ]);
+  // The form only offers runtimes the plan will render.
+  const maxDurationSeconds = organization
+    ? (await entitlementsFor(organization)).plan.limits.maxMasterDurationSeconds
+    : 60;
 
   return (
     <>
@@ -30,13 +39,13 @@ export default async function ProjectsPage() {
             creative directions.
           </p>
           <div style={{ width: '100%', maxWidth: 520, marginTop: 'var(--space-3)' }}>
-            <NewProjectForm />
+            <NewProjectForm maxDurationSeconds={maxDurationSeconds} />
           </div>
         </div>
       ) : (
         <>
           <div style={{ maxWidth: 620, marginBottom: 'var(--space-7)' }}>
-            <NewProjectForm />
+            <NewProjectForm maxDurationSeconds={maxDurationSeconds} />
           </div>
           <div className={styles.projects}>
             {projects.map((project) => {

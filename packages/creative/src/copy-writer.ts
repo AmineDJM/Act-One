@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { briefDirectionLines } from './brief-lines.ts';
 import {
   COPY_LABELS,
   COPY_LIMITS,
@@ -12,6 +13,7 @@ import {
   type CopyLine,
   type CreativeTreatment,
   type ProductUnderstanding,
+  type ProjectBrief,
 } from '@act-one/core';
 import type { CallContext, LlmProvider } from '@act-one/providers';
 
@@ -70,6 +72,8 @@ export type CopyInput = {
   concept: Concept;
   treatment: CreativeTreatment;
   understanding: ProductUnderstanding;
+  /** Language and tone, as the customer set them. Absent: inferred, as the film was. */
+  brief?: Pick<ProjectBrief, 'language' | 'tone'>;
 };
 
 export class CopyWriter {
@@ -96,6 +100,7 @@ export class CopyWriter {
             `${input.understanding.name} — ${input.understanding.oneLiner}`,
             `Audience: ${input.understanding.targetAudience.join(', ') || 'unspecified'}`,
             `Their own tone: ${input.understanding.tone}`,
+            ...briefDirectionLines(input.brief ?? { language: null, tone: null }),
             ``,
             `# The approved concept, which this copy must agree with`,
             `"${input.concept.name}"`,

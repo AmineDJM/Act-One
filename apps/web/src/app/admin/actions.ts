@@ -202,6 +202,9 @@ export async function savePlanAction(
       ...existing.limits,
       projectsPerMonth: Number(formData.get('projectsPerMonth') ?? existing.limits.projectsPerMonth),
       rendersPerProject: Number(formData.get('rendersPerProject') ?? existing.limits.rendersPerProject),
+      revisionsPerProject: Number(
+        formData.get('revisionsPerProject') ?? existing.limits.revisionsPerProject,
+      ),
       maxMasterDurationSeconds: Number(
         formData.get('maxMasterDurationSeconds') ?? existing.limits.maxMasterDurationSeconds,
       ),

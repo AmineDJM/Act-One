@@ -61,6 +61,14 @@ export default async function BillingPage() {
               <dd>{plan.limits.rendersPerProject < 0 ? 'Unlimited' : plan.limits.rendersPerProject}</dd>
             </div>
             <div className={styles.kvRow}>
+              <dt>Revisions per project</dt>
+              <dd>
+                {plan.entitlements.includes('revisions.unlimited') || plan.limits.revisionsPerProject < 0
+                  ? 'Unlimited'
+                  : plan.limits.revisionsPerProject}
+              </dd>
+            </div>
+            <div className={styles.kvRow}>
               <dt>Max runtime</dt>
               <dd>{plan.limits.maxMasterDurationSeconds}s</dd>
             </div>

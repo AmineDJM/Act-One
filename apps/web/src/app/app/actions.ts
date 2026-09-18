@@ -5,12 +5,16 @@ import { redirect } from 'next/navigation';
 import {
   AppError,
   CommentTarget,
+  FILM_LANGUAGES,
   ProductCredentialKind,
+  Tone,
   can,
   newId,
   normalizeUrl,
+  stageReached,
   type JobKind,
   type Project,
+  type ProjectBrief,
   type ProjectStage,
 } from '@act-one/core';
 import { requireSession, switchWorkspace } from '@/server/auth.ts';
@@ -41,6 +45,7 @@ export async function createProjectAction(
     const project = await createProject(session, {
       websiteUrl: website,
       supplementalUrls: supplemental,
+      brief: briefFromForm(formData),
     });
     destination = `/app/projects/${project.id}`;
   } catch (error) {
@@ -154,6 +159,12 @@ export async function reviseStoryboardAction(
 
     const project = await getProjectOr404(session, projectId);
     if (!project.activeStoryboardId) return { error: 'There is no storyboard to revise yet.' };
+
+    // Plans include a number of revisions per project. The decision is the
+    // same pure function the page uses to show what is left.
+    const { revisionAllowance } = await import('@/server/projects.ts');
+    const allowance = await revisionAllowance(session, project);
+    if (!allowance.allowed) return { error: allowance.reason };
 
     await enqueue(project, 'repair_scene', {
       storyboardId: project.activeStoryboardId,
@@ -464,5 +475,45 @@ export async function correctWebsiteAction(
     return { error: null, message: `Reading ${hostLabel(website)} instead.` };
   } catch (error) {
     return { error: reportError('correctWebsiteAction', error).publicMessage };
+  }
+}
+
+/**
+ * Length, tone and language, as the forms send them. Empty means "you
+ * decide", which is the brief's own default.
+ */
+function briefFromForm(formData: FormData): Partial<ProjectBrief> {
+  const brief: Partial<ProjectBrief> = {};
+  const duration = Number(formData.get('duration') ?? '');
+  if (Number.isFinite(duration) && duration > 0) brief.durationSeconds = Math.round(duration);
+  const tone = String(formData.get('tone') ?? '');
+  if (Tone.options.includes(tone as Tone)) brief.tone = tone as Tone;
+  const language = String(formData.get('language') ?? '').trim().toLowerCase();
+  if (FILM_LANGUAGES.some((candidate) => candidate.code === language)) brief.language = language;
+  return brief;
+}
+
+export async function updateBriefAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const session = await requireSession();
+    if (!can(session.actor, 'project:update')) {
+      throw new AppError('forbidden', 'Your role cannot change the brief.');
+    }
+    const projectId = String(formData.get('projectId') ?? '');
+    const project = await getProjectOr404(session, projectId);
+    if (stageReached(project.stage, 'rendering')) {
+      return { error: 'The film is rendered; the brief is fixed. Start a new project to change it.' };
+    }
+    const { updateBrief } = await import('@/server/projects.ts');
+    await updateBrief(session, project, {
+      durationSeconds: null,
+      tone: null,
+      language: null,
+      ...briefFromForm(formData),
+    });
+    revalidatePath(`/app/projects/${projectId}`);
+    return { error: null, message: 'Saved. It applies to the next step.' };
+  } catch (error) {
+    return { error: reportError('updateBriefAction', error).publicMessage };
   }
 }

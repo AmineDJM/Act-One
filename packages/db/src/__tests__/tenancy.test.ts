@@ -72,6 +72,8 @@ function makeProject(organizationId: string, userId: string, name: string): Proj
       formats: [],
       excludedClaims: [],
       realMediaOnly: false,
+      language: null,
+      tone: null,
     },
     productCredentialId: null,
     costUsd: 0,

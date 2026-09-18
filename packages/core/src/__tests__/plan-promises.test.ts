@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_PLANS,
   canRender,
+  canRevise,
   effectivePlan,
   hasEntitlement,
   masterQualityFor,
@@ -125,5 +126,32 @@ describe('limits apply to every plan', () => {
       expect(plan.limits.rendersPerProject, `${plan.id} renders`).not.toBe(0);
       expect(plan.limits.maxMasterDurationSeconds, `${plan.id} runtime`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('revisions', () => {
+  const organization = { planId: 'free', isSuspended: false, creditBalance: 0 };
+
+  it('sells unlimited revisions only where the entitlement says so, and a number everywhere else', () => {
+    for (const plan of DEFAULT_PLANS) {
+      const decision = canRevise({ plan, organization, revisionsUsed: 0 });
+      if (hasEntitlement(plan, 'revisions.unlimited')) {
+        expect(decision.limit, plan.id).toBe(-1);
+      } else {
+        expect(decision.limit, plan.id).toBeGreaterThan(0);
+      }
+      expect(decision.allowed).toBe(true);
+    }
+  });
+
+  it('stops at the number, says which plan and what to do', () => {
+    const free = planById(DEFAULT_PLANS, 'free');
+    const stopped = canRevise({ plan: free, organization, revisionsUsed: free.limits.revisionsPerProject });
+    expect(stopped.allowed).toBe(false);
+    expect(stopped.remedy).toBe('upgrade');
+    expect(stopped.reason).toMatch(/Free includes/);
+
+    const pro = planById(DEFAULT_PLANS, 'pro');
+    expect(canRevise({ plan: pro, organization, revisionsUsed: 40 }).allowed).toBe(true);
   });
 });

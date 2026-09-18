@@ -190,3 +190,33 @@ export function missingEntitlements(plan: Plan, required: Entitlement[]): Entitl
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
+
+/**
+ * Whether one more revision may be asked for on this project.
+ *
+ * A revision is a change requested once a storyboard exists — "the opening
+ * holds too long", "remove the voice-over" — and each one is work and, after
+ * the film exists, a re-render. Plans include a number of them; the plans that
+ * sell unlimited revisions say so with the entitlement, and the limit agrees.
+ */
+export function canRevise(params: {
+  plan: Plan;
+  organization: OrganizationState;
+  revisionsUsed: number;
+}): AccessDecision & { limit: number } {
+  const limit = hasEntitlement(params.plan, 'revisions.unlimited')
+    ? -1
+    : params.plan.limits.revisionsPerProject;
+  if (params.organization.isSuspended) {
+    return { allowed: false, reason: 'This workspace is suspended.', remedy: 'contact', limit };
+  }
+  if (!withinLimit(limit, params.revisionsUsed)) {
+    return {
+      allowed: false,
+      reason: `${params.plan.name} includes ${plural(limit, 'revision')} per project, and this one has had ${params.revisionsUsed}.`,
+      remedy: 'upgrade',
+      limit,
+    };
+  }
+  return { ...ALLOWED, limit };
+}

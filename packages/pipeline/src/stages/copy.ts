@@ -35,7 +35,7 @@ export async function runCopy(context: StageContext): Promise<{ copyKitId: strin
   await context.progress(0.4, 'Writing the launch copy');
 
   const kit = await new CopyWriter(context.registry.llm()).write(
-    { projectId: project.id, organizationId, concept, treatment, understanding },
+    { projectId: project.id, organizationId, concept, treatment, understanding, brief: project.brief },
     { organizationId, projectId: project.id },
   );
 

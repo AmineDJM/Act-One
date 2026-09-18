@@ -77,6 +77,7 @@ export function PlanEditor({ plan }: { plan: Plan }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <LimitField planId={plan.id} name="projectsPerMonth" label="Projects / month" value={plan.limits.projectsPerMonth} />
             <LimitField planId={plan.id} name="rendersPerProject" label="Renders / project" value={plan.limits.rendersPerProject} />
+            <LimitField planId={plan.id} name="revisionsPerProject" label="Revisions / project" value={plan.limits.revisionsPerProject} />
             <LimitField planId={plan.id} name="maxMasterDurationSeconds" label="Max runtime (s)" value={plan.limits.maxMasterDurationSeconds} />
             <LimitField planId={plan.id} name="maxSeats" label="Seats" value={plan.limits.maxSeats} />
             <LimitField planId={plan.id} name="maxBrands" label="Brands" value={plan.limits.maxBrands} />

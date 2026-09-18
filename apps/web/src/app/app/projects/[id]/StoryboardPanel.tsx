@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
 import type { Storyboard } from '@act-one/core';
 import { previewTimingAction, reviseStoryboardAction, type FormState } from '../../actions.ts';
@@ -28,6 +29,7 @@ export function StoryboardPanel({
   animaticAssetId,
   animaticPosterAssetId,
   animaticProgress,
+  revisions,
 }: {
   projectId: string;
   storyboard: Storyboard;
@@ -36,7 +38,10 @@ export function StoryboardPanel({
   animaticPosterAssetId: string | null;
   /** Set while a preview is being built, so it reports where it was asked for. */
   animaticProgress: number | null;
+  /** Revisions this project has had against what the plan includes; -1 is unlimited. */
+  revisions: { used: number; limit: number; reason: string };
 }) {
+  const exhausted = revisions.limit >= 0 && revisions.used >= revisions.limit;
   const [state, revise, pending] = useActionState<FormState, FormData>(reviseStoryboardAction, {
     error: null,
   });
@@ -125,7 +130,7 @@ export function StoryboardPanel({
           ))}
         </div>
         <div className="row" style={{ gap: 'var(--space-3)' }}>
-          <button className="btn" type="submit" disabled={pending}>
+          <button className="btn" type="submit" disabled={pending || exhausted}>
             {pending ? 'Applying…' : 'Apply'}
           </button>
           {/*
@@ -136,8 +141,20 @@ export function StoryboardPanel({
           <button className="btn btn--secondary" type="submit" form="preview-timing" disabled={previewing}>
             {previewing ? 'Building…' : 'Preview the cut'}
           </button>
-          <span className="hint">Only the scenes this affects are re-rendered.</span>
+          <span className="hint">
+            {revisions.limit < 0
+              ? 'Unlimited revisions on your plan. Only the scenes this affects are re-rendered.'
+              : `${revisions.used} of ${revisions.limit} revision${revisions.limit === 1 ? '' : 's'} used on your plan. Only the scenes this affects are re-rendered.`}
+          </span>
         </div>
+        {exhausted ? (
+          <p className="secondary" style={{ fontSize: '0.88rem' }} role="status">
+            {revisions.reason}{' '}
+            <Link href="/app/billing" style={{ color: 'var(--accent-text)' }}>
+              See plans →
+            </Link>
+          </p>
+        ) : null}
         {state.message ? (
           <p className="secondary" style={{ fontSize: '0.88rem' }} role="status">
             {state.message}

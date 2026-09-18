@@ -38,6 +38,8 @@ export const PlanLimits = z.object({
   /** -1 means unlimited. */
   projectsPerMonth: z.number().int().default(1),
   rendersPerProject: z.number().int().default(1),
+  /** Changes asked for after the storyboard exists. -1 means unlimited. */
+  revisionsPerProject: z.number().int().default(1),
   maxMasterDurationSeconds: z.number().int().default(60),
   maxSeats: z.number().int().default(1),
   maxBrands: z.number().int().default(1),
@@ -92,6 +94,7 @@ export const DEFAULT_PLANS: Plan[] = [
        * than none it could use.
        */
       rendersPerProject: 1,
+      revisionsPerProject: 1,
       maxMasterDurationSeconds: 30,
       maxSeats: 1,
       maxBrands: 1,
@@ -126,6 +129,7 @@ export const DEFAULT_PLANS: Plan[] = [
     limits: {
       projectsPerMonth: 1,
       rendersPerProject: 3,
+      revisionsPerProject: 3,
       maxMasterDurationSeconds: 75,
       maxSeats: 3,
       maxBrands: 1,
@@ -166,6 +170,7 @@ export const DEFAULT_PLANS: Plan[] = [
     limits: {
       projectsPerMonth: 4,
       rendersPerProject: 10,
+      revisionsPerProject: -1,
       maxMasterDurationSeconds: 120,
       maxSeats: 8,
       maxBrands: 3,
@@ -187,6 +192,7 @@ export const DEFAULT_PLANS: Plan[] = [
     limits: {
       projectsPerMonth: -1,
       rendersPerProject: -1,
+      revisionsPerProject: -1,
       maxMasterDurationSeconds: 180,
       maxSeats: 25,
       maxBrands: 15,
@@ -208,6 +214,7 @@ export const DEFAULT_PLANS: Plan[] = [
     limits: {
       projectsPerMonth: -1,
       rendersPerProject: -1,
+      revisionsPerProject: -1,
       maxMasterDurationSeconds: 600,
       maxSeats: -1,
       maxBrands: -1,

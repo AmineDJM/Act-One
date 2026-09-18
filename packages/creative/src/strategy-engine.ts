@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { briefDirectionLines } from './brief-lines.ts';
 import {
   CreativeSystemId,
   NarrativeStructure,
@@ -293,6 +294,7 @@ export class CreativeStrategyEngine {
             `That system suits: ${system.suitsWhen.join('; ')}`,
             `That system forbids: ${system.prohibitions.join('; ')}`,
             `Target runtime: about ${duration} seconds`,
+            ...briefDirectionLines(input.brief),
             `Channels must be chosen from: ${Channel.options.join(', ')}`,
             hasRealFootage
               ? `We have real captured footage of the product. Use it for anything that shows the product working.`

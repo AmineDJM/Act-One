@@ -275,7 +275,7 @@ describe('pipeline', () => {
       latestRenderId: null, stage: 'created',
       brief: {
         targetAudience: null, goal: null, keyMessage: null, durationSeconds: 45, channels: [],
-        creativeMode: 'studio', voiceStrategy: null, formats: [], excludedClaims: [], realMediaOnly: false,
+        creativeMode: 'studio', voiceStrategy: null, formats: [], excludedClaims: [], realMediaOnly: false, language: null, tone: null,
       },
       productCredentialId: null, costUsd: 0, creditsSpent: 0, archivedAt: null,
       createdAt: now, updatedAt: now,
