@@ -41,11 +41,14 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ ok: true, store: 'postgres' });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const hostname = (error as { hostname?: string } | null)?.hostname ?? '';
     const reason = /does not exist/.test(message)
       ? 'The database has no schema. Run `npm run migrate` against it.'
-      : /ECONNREFUSED|ENOTFOUND|timeout|password|authentication|ssl/i.test(message)
-        ? 'The database cannot be reached with the configured DATABASE_URL.'
-        : 'The database returned an error.';
+      : /ENOTFOUND/.test(message) && /^dpg-[a-z0-9]+-a$/.test(hostname)
+        ? "The database's internal hostname does not resolve: it is in a different Render region than this service. Put both in the same region."
+        : /ECONNREFUSED|ENOTFOUND|timeout|password|authentication|ssl/i.test(message)
+          ? 'The database cannot be reached with the configured DATABASE_URL.'
+          : 'The database returned an error.';
     console.error(`[health] ${reason} ${message}`);
     return NextResponse.json({ ok: false, store: 'postgres', reason }, { status: 503 });
   }

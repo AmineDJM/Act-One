@@ -185,7 +185,11 @@ Three things the worker host needs, all installed by the build:
   `ACT_ONE_FFMPEG_PATH`.
 
 The Postgres plan in `render.yaml` is `basic-1gb`: films live in object
-storage, so the database grows with customers, not with render volume.
+storage, so the database grows with customers, not with render volume. The
+database is pinned to the services' region, because Render's internal database
+hostname only resolves inside one region: a database elsewhere fails every
+connection with `ENOTFOUND dpg-…-a`, and `npm run migrate` and `/api/health`
+both say so in those words.
 
 Migrations run as the web service's pre-deploy command, once per deploy,
 before the new version takes traffic — nothing else runs them, and a database

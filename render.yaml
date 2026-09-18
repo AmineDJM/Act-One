@@ -30,6 +30,13 @@ databases:
     # not with the render volume.
     plan: basic-1gb
     postgresMajorVersion: '16'
+    # The same region as the two services, and not by taste: Render hands
+    # services the database's internal hostname (dpg-…-a), which only resolves
+    # inside one region. Left unset, the database went to Oregon while the
+    # services ran in Frankfurt, and every connection failed with ENOTFOUND —
+    # migrations, sign-up, sign-in, all of it. A region cannot be changed on a
+    # database that exists: delete the empty one and sync the Blueprint again.
+    region: frankfurt
 
 services:
   # ---------------------------------------------------------------------------
