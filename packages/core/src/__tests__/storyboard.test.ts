@@ -4,6 +4,7 @@ import {
   storyboardDuration,
   visualMix,
   sceneAt,
+  posterMoment,
   storyboardEstimatedCost,
   type Scene,
   type Storyboard,
@@ -146,5 +147,36 @@ describe('storyboardEstimatedCost', () => {
       scene({ id: 'b', duration: 2, visualType: 'logo_reveal', estimatedCostUsd: 0.05 }),
     ]);
     expect(storyboardEstimatedCost(b)).toBeCloseTo(1.55);
+  });
+});
+
+describe('the frame that represents a film', () => {
+  it('waits for the motion to settle rather than taking a fixed moment', () => {
+    // A fixed 1.5s lands inside the opening animation, so the poster showed
+    // type still arriving and a counter still counting.
+    const at = posterMoment([
+      scene({ id: 'a', duration: 4, startTime: 0, visualType: 'kinetic_typography', onScreenText: ['Hello'] }),
+    ]);
+    expect(at).toBeGreaterThan(2);
+    expect(at).toBeLessThan(4);
+  });
+
+  it('skips an opening with nothing composed on it', () => {
+    const at = posterMoment([
+      scene({ id: 'a', duration: 2, startTime: 0, visualType: 'transition' }),
+      scene({ id: 'b', duration: 4, startTime: 2, visualType: 'kinetic_typography', onScreenText: ['The point'] }),
+    ]);
+    expect(at).toBeGreaterThan(2);
+  });
+
+  it('falls back to a scene carried by a capture', () => {
+    const at = posterMoment([
+      scene({ id: 'a', duration: 3, startTime: 0, visualType: 'screenshot_motion', assetRefs: ['ast_1'] }),
+    ]);
+    expect(at).toBeCloseTo(1.8, 5);
+  });
+
+  it('survives a storyboard with no scenes at all', () => {
+    expect(posterMoment([])).toBe(0);
   });
 });

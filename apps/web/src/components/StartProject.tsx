@@ -44,6 +44,11 @@ export function StartProject({ cta = 'Understand my product' }: { cta?: string }
         </label>
         <input
           id="website"
+          // Named as well as identified: without it the browser's autofill
+          // heuristics never see this as a URL field, and a password manager
+          // has nothing to key on. React's value binding works either way,
+          // which is why it went unnoticed.
+          name="website"
           className="input"
           type="url"
           inputMode="url"

@@ -61,6 +61,34 @@ export function sceneShowsSomething(scene: {
   return (scene.generativeNeeds?.length ?? 0) > 0;
 }
 
+/**
+ * When to grab the frame that represents a film.
+ *
+ * The poster is the first thing a customer sees of their own launch film, and
+ * it used to be taken at a fixed 1.5 seconds — which lands inside the opening
+ * scene's animation, so the frame showed type still arriving and a counter
+ * still counting. It looked like a page that had not finished loading.
+ *
+ * Instead: the first scene that actually has something composed on it, sixty
+ * percent of the way through, where the motion has settled and the frame has
+ * not started dissolving out. The same point vision QA inspects, for the same
+ * reason.
+ */
+export function posterMoment(scenes: readonly Scene[]): number {
+  const settled = (scene: Scene) => scene.startTime + scene.duration * 0.6;
+
+  const withCopy = scenes.find(
+    (scene) => scene.onScreenText.some((line) => line.trim().length > 0) && scene.duration >= 1,
+  );
+  if (withCopy) return settled(withCopy);
+
+  const shown = scenes.find((scene) => scene.assetRefs.length > 0 && scene.duration >= 1);
+  if (shown) return settled(shown);
+
+  const first = scenes[0];
+  return first ? settled(first) : 0;
+}
+
 export const MotionRecipeName = z.enum([
   'word_reveal',
   'editorial_headline',

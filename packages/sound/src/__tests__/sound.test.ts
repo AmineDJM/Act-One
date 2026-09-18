@@ -253,3 +253,28 @@ describe('loudness compliance', () => {
     expect(TRUE_PEAK_CEILING).toBeLessThanOrEqual(-1);
   });
 });
+
+describe('delivery colour', () => {
+  it('tags all three colour properties, not just the primaries', () => {
+    /*
+     * The encoder writes the primaries and leaves the transfer function and
+     * matrix unset, so the file reads as `bt709/unknown/unknown` and players
+     * guess the other two — differently from each other. These are metadata,
+     * so they cost nothing on a stream copy.
+     */
+    const args = muxArgs('/tmp/v.mp4', '/tmp/a.m4a', '/tmp/out.mp4');
+    const filter = args[args.indexOf('-bsf:v') + 1] ?? '';
+    // 1 is BT.709 in every one of the three enumerations.
+    expect(filter).toContain('colour_primaries=1');
+    expect(filter).toContain('transfer_characteristics=1');
+    expect(filter).toContain('matrix_coefficients=1');
+    expect(filter).toContain('video_full_range_flag=0');
+    /*
+     * In the bitstream rather than as `-color_*` output options, which FFmpeg
+     * applies only when encoding and silently ignores on a copy — and it must
+     * stay a copy, or tagging costs a generation of quality.
+     */
+    expect(args.join(' ')).toContain('-c:v copy');
+  });
+});
+

@@ -248,6 +248,18 @@ export function muxArgs(videoPath: string, audioPath: string, outputPath: string
     // Video is copied: it was already encoded at the quality we chose, and
     // re-encoding to attach audio costs time and a generation of quality.
     '-c:v', 'copy',
+    /*
+     * Colour tagged completely, in the bitstream, without re-encoding.
+     *
+     * The encoder writes the primaries and leaves the transfer function and the
+     * matrix unset, so the file reads as `bt709/unknown/unknown` and every
+     * player downstream guesses two of the three — differently from each other.
+     * FFmpeg's `-color_*` output options only apply when it is encoding, so on
+     * a stream copy they are silently ignored; rewriting the VUI in the
+     * bitstream is what actually sets them, and costs nothing.
+     */
+    '-bsf:v',
+    'h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0',
     '-c:a', 'aac', '-b:a', '256k',
     '-shortest',
     '-movflags', '+faststart',

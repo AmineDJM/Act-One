@@ -8,6 +8,7 @@ import {
   firstClause,
   isRealProductAsset,
   newId,
+  posterMoment,
   REAL_PRODUCT_VISUAL_TYPES,
   storyboardDuration,
   type AspectRatio,
@@ -251,7 +252,10 @@ export async function runRender(
 
     const posterPath = path.join(workDir, 'poster.jpg');
     const poster = await runFfmpeg(
-      posterArgs(masterPath, Math.min(1.5, storyboardDuration(current) * 0.2), posterPath),
+      // Chosen from the cut rather than from the clock: a fixed 1.5s lands
+      // inside the opening animation, and the poster showed type still
+      // arriving. See posterMoment.
+      posterArgs(masterPath, posterMoment(current.scenes), posterPath),
       { signal: context.signal, timeoutMs: 60_000 },
     );
     const posterAsset = poster.ok

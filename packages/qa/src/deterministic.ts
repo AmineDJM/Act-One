@@ -414,6 +414,39 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     });
   }
 
+  /*
+   * A line the film says twice.
+   *
+   * "Momentum, restored." appeared as scene 5 and again as scene 17 of a
+   * forty-eight second film. Each frame was fine; the film was not. Repetition
+   * at this distance is not a motif, it is a planner that lost track of what it
+   * had already said — and it is one of the clearest signals to a viewer that
+   * nobody watched this before they did.
+   *
+   * Compared after normalising case and punctuation, because "Momentum,
+   * restored." and "Momentum restored" are the same line to everyone but a
+   * string comparison.
+   */
+  const timesOnScreen = new Map<string, number>();
+  for (const scene of scenes) {
+    for (const line of scene.onScreenText) {
+      const key = line.toLowerCase().replace(/[^a-z0-9 ]+/g, '').replace(/\s+/g, ' ').trim();
+      // Single words repeat legitimately as a rhythmic device; a phrase does not.
+      if (key.split(' ').length < 2) continue;
+      timesOnScreen.set(key, (timesOnScreen.get(key) ?? 0) + 1);
+    }
+  }
+  for (const [line, count] of timesOnScreen) {
+    if (count < 2) continue;
+    add({
+      check: 'composition',
+      severity: 'major',
+      message: `"${line}" is on screen ${count} times. A film that repeats itself was not edited.`,
+      confidence: 1,
+      repair: 'rewrite_copy',
+    });
+  }
+
   // The opening. Three seconds is where viewers leave, on every platform that
   // publishes retention data, and a logo sting spends exactly that window.
   if (!opensOnSubject(scenes)) {

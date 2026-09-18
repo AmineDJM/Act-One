@@ -192,9 +192,16 @@ export async function loadProjectView(session: Session, projectId: string) {
   const variants = latestRender
     ? await store.variants.listForRender(session.organizationId, latestRender.id)
     : [];
-  const posters = latestRender
-    ? await store.assets.listForProject(session.organizationId, project.id, 'poster_frame')
-    : [];
+  /*
+   * The poster belonging to this render, not whichever one the project happens
+   * to hold. A project accumulates a poster per render, so taking the first
+   * from the list showed a frame from an older cut of the film beside the
+   * current one — the same mistake as scanning the render list for a master.
+   */
+  const poster =
+    latestRender?.posterAssetId
+      ? await store.assets.get(session.organizationId, latestRender.posterAssetId)
+      : null;
   const copyKit = await store.copy.getLatestForProject(session.organizationId, project.id);
   const access = await loadProductAccess(session, project.id);
   const notes = await loadComments(session, project.id);
@@ -206,7 +213,7 @@ export async function loadProjectView(session: Session, projectId: string) {
     latestRender,
     animatic,
     variants,
-    poster: posters[0] ?? null,
+    poster,
     project,
     understanding,
     brand,

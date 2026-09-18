@@ -119,6 +119,19 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
     // CRF 18 is visually lossless for screen content at these bitrates, which
     // matters because UI captures show banding long before photographic footage.
     crf: quality === 'uhd' ? 16 : 18,
+    /*
+     * Explicit delivery colour, rather than whatever the browser happened to
+     * hand the encoder.
+     *
+     * Left alone, these rendered as `yuvj420p` — deprecated full-range YUV. A
+     * player that honours the range flag shows it correctly; one that does not
+     * shows crushed blacks or grey ones, and a film that is almost entirely
+     * near-black with white type is the worst possible case for getting that
+     * wrong. Limited-range BT.709 is what HD delivery means everywhere else,
+     * and what every platform re-encoding this file will assume.
+     */
+    pixelFormat: 'yuv420p',
+    colorSpace: 'bt709',
     concurrency: options.concurrency ?? null,
     ...(browserExecutable ? { browserExecutable } : {}),
     onProgress: options.onProgress

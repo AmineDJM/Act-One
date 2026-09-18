@@ -106,7 +106,7 @@ describe('the standards themselves', () => {
     for (const group of ALL) {
       for (const [key, standard] of Object.entries(group)) {
         if (!standard.clause) continue;
-        const words = standard.source.split(/[\s/]+/).filter((w) => w.length > 1);
+        const words = standard.source.split(/[\s/]+/).filter((w: string) => w.length > 1);
         for (const word of words) {
           expect(standard.clause.startsWith(`${word} `), `${key}: ${cite(standard)}`).toBe(false);
         }

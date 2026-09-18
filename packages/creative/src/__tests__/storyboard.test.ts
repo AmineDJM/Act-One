@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { RECIPES_FOR_VISUAL, coherentRecipe, recipeSuitsVisual, type VisualType } from '@act-one/core';
 import { ScriptedLlmProvider } from '@act-one/providers';
-import { StoryboardEngine } from '../index.ts';
+import { StoryboardEngine, limitWords } from '../index.ts';
 import { brandFixture, briefFixture, conceptFixture, treatmentFixture, understandingFixture } from './fixtures.ts';
 
 const context = { organizationId: 'org_1', projectId: 'prj_1' };
@@ -103,5 +103,32 @@ describe('StoryboardEngine', () => {
     for (let i = 1; i < recipes.length; i += 1) {
       expect(recipes[i], `scenes ${i - 1} and ${i} share a treatment`).not.toBe(recipes[i - 1]);
     }
+  });
+});
+
+describe('copy longer than the archetype asked for', () => {
+  it('drops whole trailing lines before it touches the first one', () => {
+    expect(limitWords(['Order from chaos.', 'And then some more.'], 3)).toEqual([
+      'Order from chaos.',
+    ]);
+  });
+
+  it('never cuts a line into a fragment', () => {
+    /*
+     * The fallback used to return the first N words, which put "See how fast
+     * work" on screen in a finished film — a phrase ending nowhere. The word
+     * limit is guidance for the model, in the prompt; a line that overruns it
+     * is a fitting problem, and the type engine solves fitting by sizing.
+     */
+    const line = 'See how fast work moves with Linear.';
+    expect(limitWords([line], 4)).toEqual([line]);
+  });
+
+  it('leaves copy that already fits alone', () => {
+    expect(limitWords(['Order from chaos.'], 10)).toEqual(['Order from chaos.']);
+  });
+
+  it('returns nothing when nothing is allowed', () => {
+    expect(limitWords(['Anything'], 0)).toEqual([]);
   });
 });

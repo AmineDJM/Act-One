@@ -618,3 +618,47 @@ describe('copy that stops mid-thought', () => {
   });
 });
 
+describe('a film that repeats itself', () => {
+  it('catches the same line twice', () => {
+    // "Momentum, restored." was scene 5 and scene 17 of a 48s film. Every
+    // frame was fine; the film was not.
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Momentum, restored.'] }),
+        scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Order from chaos'] }),
+        scene({ id: 'c', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Momentum restored'] }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+
+    const issue = issues.find((i) => /is on screen 2 times/.test(i.message));
+    expect(issue).toBeDefined();
+    expect(issue!.severity).toBe('major');
+  });
+
+  it('allows a single word to repeat as a rhythmic device', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 2, visualType: 'kinetic_typography', onScreenText: ['Faster.'] }),
+        scene({ id: 'b', duration: 2, visualType: 'kinetic_typography', onScreenText: ['Faster.'] }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+    expect(issues.some((i) => /is on screen/.test(i.message))).toBe(false);
+  });
+
+  it('leaves a film that says each thing once alone', () => {
+    const issues = runDeterministicChecks({
+      storyboard: board([
+        scene({ id: 'a', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Order from chaos'] }),
+        scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Chaos from order'] }),
+      ]),
+      brand,
+      aspect: '16:9',
+    });
+    expect(issues.some((i) => /is on screen/.test(i.message))).toBe(false);
+  });
+});
+

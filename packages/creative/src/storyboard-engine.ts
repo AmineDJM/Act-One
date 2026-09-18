@@ -707,10 +707,11 @@ function soundCuesFor(
   return cues;
 }
 
-function limitWords(lines: string[], maxWords: number): string[] {
+export function limitWords(lines: string[], maxWords: number): string[] {
   if (maxWords <= 0) return [];
   const words = lines.join(' ').split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) return lines;
+
   // Truncating mid-sentence looks broken; drop whole trailing lines first.
   const kept: string[] = [];
   let used = 0;
@@ -720,7 +721,22 @@ function limitWords(lines: string[], maxWords: number): string[] {
     kept.push(line);
     used += count;
   }
-  return kept.length > 0 ? kept : [words.slice(0, maxWords).join(' ')];
+  if (kept.length > 0) return kept;
+
+  /*
+   * Even the first line is over budget.
+   *
+   * This used to hand back the first N words, which is the exact mid-sentence
+   * cut the comment above rules out: it put "See how fast work" on screen, a
+   * phrase ending nowhere, in a finished film.
+   *
+   * The line is kept whole instead. The archetype's word limit is guidance for
+   * the model — it is in the prompt, and the model usually respects it — not a
+   * guillotine to run over the words afterwards. A line that is one word long
+   * is a fitting problem, and the type engine solves fitting problems by
+   * sizing; there is nothing that solves a sentence with its end cut off.
+   */
+  return [lines[0] ?? words.join(' ')];
 }
 
 function evidenceFor(claimText: string, understanding: ProductUnderstanding): string[] {
