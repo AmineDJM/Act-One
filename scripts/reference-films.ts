@@ -15,14 +15,26 @@
  *
  *   npm run reference-films
  */
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { neutralRamp } from '@act-one/design';
 import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
 import { renderFilm, type FilmProps } from '@act-one/motion';
 import { runDeterministicChecks } from '@act-one/qa';
+import { getSystem } from '@act-one/creative';
+import {
+  DEFAULT_LIBRARY,
+  buildMix,
+  directSound,
+  masterLoudness,
+  mixArgs,
+  muxArgs,
+  runFfmpeg,
+} from '@act-one/sound';
 
 const OUT = path.resolve(process.cwd(), 'apps/web/public/work');
+const STORAGE = process.env['ACT_ONE_STORAGE_DIR'] ?? path.resolve('.act-one-demo/storage');
 
 function brand(over: Partial<BrandSystem> & Pick<BrandSystem, 'id' | 'name' | 'primaryColor'>): BrandSystem {
   return {
@@ -204,9 +216,9 @@ const halyard: FilmProps = {
 };
 
 export const FILMS = [
-  { slug: 'northwind', props: northwind, posterAt: 1.2 },
-  { slug: 'meridian', props: meridian, posterAt: 0.9 },
-  { slug: 'halyard', props: halyard, posterAt: 1.4 },
+  { slug: 'northwind', props: northwind, posterAt: 1.2, system: 'cinematic_black' },
+  { slug: 'meridian', props: meridian, posterAt: 0.9, system: 'kinetic_product' },
+  { slug: 'halyard', props: halyard, posterAt: 1.4, system: 'editorial_tech' },
 ] as const;
 
 const browserExecutable = process.env['ACT_ONE_CHROME_HEADLESS_SHELL'];
@@ -255,13 +267,71 @@ await mkdir(OUT, { recursive: true });
 for (const film of FILMS) {
   const started = Date.now();
 
+  /*
+   * Picture first, then the real sound chain.
+   *
+   * These used to ship with no audio stream at all — three silent films as the
+   * shop window for a product whose sound design is half of what it makes. The
+   * chain below is the pipeline's, not an approximation of it: the same Sound
+   * Director reading the same creative system, the same mix graph with its
+   * sidechain, and the same two-pass master. If the sound here is wrong, a
+   * customer's film is wrong too, which is the whole point of these existing.
+   */
+  const silentPath = path.join(OUT, `${film.slug}.silent.mp4`);
   await renderFilm({
     props: film.props,
     aspect: '16:9',
     quality: 'hd',
-    outputPath: path.join(OUT, `${film.slug}.mp4`),
+    outputPath: silentPath,
     ...(browserExecutable ? { browserExecutable } : {}),
   });
+
+  const design = directSound({
+    storyboard: film.props.storyboard,
+    behaviour: getSystem(film.system).sound,
+    channel: 'web',
+    hasVoiceOver: false,
+  });
+
+  const resolvedPaths = Object.fromEntries(
+    [...DEFAULT_LIBRARY.music, ...DEFAULT_LIBRARY.sfx]
+      .map((item) => [item.storageKey, path.join(STORAGE, item.storageKey)] as const)
+      .filter(([, file]) => existsSync(file)),
+  );
+
+  const missing = [design.music?.storageKey, ...design.cues.map((cue) => cue.storageKey)]
+    .filter((key): key is string => Boolean(key))
+    .filter((key) => !resolvedPaths[key]);
+  if (missing.length > 0) {
+    console.error(`\n${film.slug} has no sound library to score with. Run \`npm run sound-library\`.`);
+    process.exit(1);
+  }
+
+  const plan = buildMix({
+    design,
+    resolvedPaths,
+    durationSeconds: film.props.storyboard.scenes.reduce((sum, scene) => sum + scene.duration, 0),
+  });
+
+  const premaster = path.join(OUT, `${film.slug}.premix.wav`);
+  const mixed = await runFfmpeg(mixArgs(plan, premaster), { timeoutMs: 5 * 60_000 });
+  if (!mixed.ok) throw new Error(`${film.slug} mix failed: ${mixed.stderr.slice(-400)}`);
+
+  const mastered = path.join(OUT, `${film.slug}.mix.wav`);
+  await masterLoudness({
+    source: premaster,
+    target: mastered,
+    lufs: design.targetLufs,
+    outputArgs: ['-c:a', 'pcm_s24le'],
+  });
+
+  const muxed = await runFfmpeg(
+    muxArgs(silentPath, mastered, path.join(OUT, `${film.slug}.mp4`)),
+    { timeoutMs: 5 * 60_000 },
+  );
+  if (!muxed.ok) throw new Error(`${film.slug} mux failed: ${muxed.stderr.slice(-400)}`);
+
+  await Promise.all([rm(silentPath, { force: true }), rm(premaster, { force: true }), rm(mastered, { force: true })]);
 
   // A poster held a beat after the first cut, so the card shows the film
   // composed rather than the frame before anything has moved.

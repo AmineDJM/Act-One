@@ -1,4 +1,5 @@
-import { TRUE_PEAK_CEILING } from '@act-one/core';
+import { rename } from 'node:fs/promises';
+import { LUFS_TOLERANCE, TRUE_PEAK_CEILING } from '@act-one/core';
 import { runFfmpeg } from './ffmpeg.ts';
 
 /**
@@ -33,7 +34,36 @@ export type MasterOptions = {
   timeoutMs?: number;
 };
 
-export async function masterLoudness(options: MasterOptions): Promise<void> {
+/** What a BS.1770 meter says about a file. */
+export type LoudnessMeasurement = { integratedLufs: number; truePeakDb: number; lra: number };
+
+/**
+ * Measures a file, through the same meter that normalises it.
+ *
+ * `loudnorm`'s analysis pass reports the input's own figures, so running it
+ * against a finished master is how we find out what we actually shipped rather
+ * than what we asked for.
+ */
+export async function measureLoudness(
+  source: string,
+  options: { timeoutMs?: number } = {},
+): Promise<LoudnessMeasurement | null> {
+  const result = await runFfmpeg(
+    ['-i', source, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
+    { timeoutMs: options.timeoutMs ?? 5 * 60_000 },
+  );
+  if (!result.ok) return null;
+
+  const analysis = parseLoudnormJson(result.stderr);
+  if (!analysis) return null;
+  return {
+    integratedLufs: Number(analysis.input_i),
+    truePeakDb: Number(analysis.input_tp),
+    lra: Number(analysis.input_lra),
+  };
+}
+
+export async function masterLoudness(options: MasterOptions): Promise<LoudnessMeasurement | null> {
   const truePeak = options.truePeak ?? TRUE_PEAK_CEILING - 0.5;
   const timeoutMs = options.timeoutMs ?? 10 * 60_000;
   const common = `I=${options.lufs}:TP=${truePeak}:LRA=11`;
@@ -70,24 +100,49 @@ export async function masterLoudness(options: MasterOptions): Promise<void> {
    * peaks sit above sample peaks and AAC adds its own. The margin is verified
    * by measuring the finished file, not assumed.
    */
-  const ceiling = dbToAmplitude(truePeak - 0.5);
-  const filter = `${normalise},alimiter=limit=${ceiling.toFixed(4)}:attack=5:release=50:level=disabled`;
+  const filter = `${normalise},${limiter(truePeak)}`;
 
-  const written = await runFfmpeg(
-    [
-      '-y',
-      '-i', options.source,
-      '-af', filter,
-      '-ar', '48000',
-      '-ac', '2',
-      ...(options.outputArgs ?? ['-c:a', 'pcm_s16le']),
-      options.target,
-    ],
-    { ...signal, timeoutMs },
-  );
-  if (!written.ok) {
-    throw new Error(`Mastering ${options.target} failed: ${written.stderr.slice(-400)}`);
-  }
+  const outputArgs = options.outputArgs ?? ['-c:a', 'pcm_s16le'];
+  const write = async (from: string, to: string, chain: string) => {
+    const result = await runFfmpeg(
+      ['-y', '-i', from, '-af', chain, '-ar', '48000', '-ac', '2', ...outputArgs, to],
+      { ...signal, timeoutMs },
+    );
+    if (!result.ok) {
+      throw new Error(`Mastering ${to} failed: ${result.stderr.slice(-400)}`);
+    }
+  };
+
+  await write(options.source, options.target, filter);
+
+  /*
+   * Then check what actually landed, and correct it if it missed.
+   *
+   * `loudnorm` cannot honour `linear=true` when the source's own loudness range
+   * exceeds the range it is asked for: it falls back to dynamic mode without
+   * saying so, and lands wherever that puts it. A nineteen-second film came out
+   * at −14.2 LUFS against a −16 target — nearly two decibels out, which is
+   * twice the tolerance EBU R 128 allows for a whole programme.
+   *
+   * The correction is a flat gain, so it cannot change the loudness range or
+   * undo the normalisation; it only finishes it. The limiter runs again behind
+   * it because a positive correction would otherwise lift the peaks back over
+   * the ceiling.
+   */
+  const landed = await measureLoudness(options.target, { timeoutMs });
+  const drift = correctionFor(landed, options.lufs);
+  if (drift === null) return landed;
+
+  const corrected = `${options.target}.corrected${options.target.slice(options.target.lastIndexOf('.'))}`;
+  await write(options.target, corrected, `volume=${drift.toFixed(2)}dB,${limiter(truePeak)}`);
+  await rename(corrected, options.target);
+
+  return await measureLoudness(options.target, { timeoutMs });
+}
+
+/** The ceiling, below the true-peak target: see masterLoudness. */
+function limiter(truePeakDb: number): string {
+  return `alimiter=limit=${dbToAmplitude(truePeakDb - 0.5).toFixed(4)}:attack=5:release=50:level=disabled`;
 }
 
 export type LoudnormAnalysis = {
@@ -192,4 +247,23 @@ export function parseVolumeDetect(stderr: string): { meanDb: number; maxDb: numb
 /** dBFS to linear amplitude, for filters that take a 0..1 limit. */
 export function dbToAmplitude(db: number): number {
   return Math.pow(10, db / 20);
+}
+
+/**
+ * The gain that would put a measured master on target, or null when it already is.
+ *
+ * Separated from the mastering itself so the rule is legible: a master inside
+ * EBU R 128's tolerance is left alone, and one outside it is corrected by
+ * exactly the difference. An unmeasurable result — silence, a meter that
+ * failed — is left alone too, because guessing at a correction for a file we
+ * could not measure is how a quiet film becomes a loud one.
+ */
+export function correctionFor(
+  measured: LoudnessMeasurement | null,
+  targetLufs: number,
+  tolerance = LUFS_TOLERANCE,
+): number | null {
+  if (!measured || !Number.isFinite(measured.integratedLufs)) return null;
+  const drift = targetLufs - measured.integratedLufs;
+  return Math.abs(drift) <= tolerance ? null : drift;
 }

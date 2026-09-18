@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resequence, type Scene, type Storyboard } from '@act-one/core';
 import { LUFS_BROADCAST, LUFS_WEB, TRUE_PEAK_CEILING } from '@act-one/core';
-import { directSound, buildMix, mixArgs, muxArgs, DEFAULT_LIBRARY, validateLibrary, findSfx } from '../index.ts';
+import { directSound, buildMix, mixArgs, muxArgs, correctionFor, DEFAULT_LIBRARY, validateLibrary, findSfx } from '../index.ts';
 
 function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualType'>): Scene {
   return {
@@ -303,3 +303,30 @@ describe('how many times the audio is encoded', () => {
   });
 });
 
+
+describe('a master that missed its target', () => {
+  const measured = (integratedLufs: number) => ({ integratedLufs, truePeakDb: -2, lra: 8 });
+
+  it('leaves a master inside EBU R 128 tolerance alone', () => {
+    expect(correctionFor(measured(-16.4), -16)).toBeNull();
+    expect(correctionFor(measured(-15.6), -16)).toBeNull();
+  });
+
+  it('corrects one outside it by exactly the difference', () => {
+    /*
+     * `loudnorm` cannot honour `linear=true` when the source's loudness range
+     * exceeds the range it is asked for — it falls back to dynamic without
+     * saying so. A nineteen-second film landed at −14.2 against a −16 target,
+     * twice the tolerance the standard allows for a whole programme.
+     */
+    expect(correctionFor(measured(-14.2), -16)).toBeCloseTo(-1.8, 5);
+    expect(correctionFor(measured(-19), -16)).toBeCloseTo(3, 5);
+  });
+
+  it('never guesses at a correction for a file it could not measure', () => {
+    // Guessing here is how a quiet film becomes a very loud one.
+    expect(correctionFor(null, -16)).toBeNull();
+    expect(correctionFor(measured(Number.NEGATIVE_INFINITY), -16)).toBeNull();
+    expect(correctionFor(measured(Number.NaN), -16)).toBeNull();
+  });
+});
