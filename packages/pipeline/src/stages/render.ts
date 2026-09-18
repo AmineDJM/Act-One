@@ -4,6 +4,7 @@ import path from 'node:path';
 import {
   AppError,
   DEFAULT_FPS,
+  dimensionsFor,
   displayHost,
   firstClause,
   isRealProductAsset,
@@ -42,6 +43,7 @@ import {
   relativeLuminance,
   runDeterministicChecks,
   selectFramesToInspect,
+  verifyMaster,
 } from '@act-one/qa';
 import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planFor } from '../entitlements.ts';
@@ -235,6 +237,33 @@ export async function runRender(
       const applied = applyRepairs(current, plan);
       current = applied.storyboard;
       await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
+    }
+
+    await context.progress(0.93, 'Checking the file will play');
+
+    /*
+     * The last gate, on the bytes that will be delivered.
+     *
+     * The container has to say the right things — avc1 in a known brand, a
+     * profile and level every decoder covers, 4:2:0 8-bit, BT.709 tagged in
+     * the bitstream, AAC-LC, the index ahead of the media — and the decoder
+     * has to get through every frame without complaint. Nobody on this project
+     * had ever watched a master play in a browser, because the development
+     * Chromium has no H.264; this is what stands in for that, on every render.
+     * A master that would not play is not delivered, and the job says why.
+     */
+    const target = dimensionsFor(aspect, quality);
+    const playable = await verifyMaster(
+      masterPath,
+      { width: target.width, height: target.height },
+      { ...(context.signal ? { signal: context.signal } : {}) },
+    );
+    if (playable.issues.length > 0) {
+      throw new AppError(
+        'internal',
+        `The master would not play: ${playable.issues.join(' ')}`,
+        { publicMessage: 'The film did not come out of the encoder in a form every player accepts. We have stopped rather than deliver it; try again.' },
+      );
     }
 
     await context.progress(0.95, 'Saving your film');

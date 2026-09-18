@@ -21,7 +21,7 @@ import path from 'node:path';
 import { neutralRamp } from '@act-one/design';
 import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
 import { renderFilm, type FilmProps } from '@act-one/motion';
-import { runDeterministicChecks } from '@act-one/qa';
+import { runDeterministicChecks, verifyMaster } from '@act-one/qa';
 import { getSystem } from '@act-one/creative';
 import {
   DEFAULT_LIBRARY,
@@ -330,6 +330,16 @@ for (const film of FILMS) {
     { timeoutMs: 5 * 60_000 },
   );
   if (!muxed.ok) throw new Error(`${film.slug} mux failed: ${muxed.stderr.slice(-400)}`);
+
+  // The same gate every customer's master passes: the file has to say the
+  // right things and decode end to end, or the shop window shows a film that
+  // some visitors' browsers would refuse.
+  const playable = await verifyMaster(path.join(OUT, `${film.slug}.mp4`), { width: 1920, height: 1080 });
+  if (playable.issues.length > 0) {
+    console.error(`\n${film.slug} would not play everywhere:`);
+    for (const issue of playable.issues) console.error(`  ${issue}`);
+    process.exit(1);
+  }
 
   await Promise.all([rm(silentPath, { force: true }), rm(premaster, { force: true }), rm(mastered, { force: true })]);
 
