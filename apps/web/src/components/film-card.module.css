@@ -62,3 +62,22 @@
 }
 .sound:hover { border-color: var(--line-strong); color: var(--text); }
 .sound[aria-pressed='true'] { color: var(--accent-text); border-color: var(--accent); }
+
+/* The public card links to the film's page: same frame, as a link. */
+a.frame { text-decoration: none; color: inherit; }
+.card h3 a { color: inherit; }
+.card h3 a:hover { color: var(--accent-text); }
+.mark {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

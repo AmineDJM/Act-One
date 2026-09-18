@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { RSC_BUFFER_SCRIPT } from '@/lib/rsc-buffer.ts';
 import './globals.css';
 
 /*
@@ -64,6 +65,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
+        {/* Server-component payloads arrive whole: see lib/rsc-buffer.ts for the why. */}
+        <script dangerouslySetInnerHTML={{ __html: RSC_BUFFER_SCRIPT }} />
         {/* Organisation and product structured data, once, at the root. */}
         <script
           type="application/ld+json"

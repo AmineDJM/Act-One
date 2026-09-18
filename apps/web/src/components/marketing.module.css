@@ -375,3 +375,120 @@
   .navInner :global(.btn) { height: 38px; padding: 0 var(--space-4); font-size: 0.88rem; }
   .navInner { gap: var(--space-3); }
 }
+
+/* --- Collections ------------------------------------------------------------------ */
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.crumbs a { color: var(--text-secondary); }
+.crumbs a:hover { color: var(--text); }
+.crumbs [aria-current='page'] { color: var(--text); }
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-3)) 0 var(--space-6);
+}
+.chips a {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  transition: border-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+.chips a:hover { border-color: var(--line-strong); color: var(--text); }
+.chips a[data-active='true'] { border-color: var(--accent); color: var(--accent-text); }
+
+.emptyGallery {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  justify-items: center;
+}
+.emptyGallery > :global(.dots) { position: absolute; inset: 0; z-index: 0; }
+.emptyGallery > :not(:global(.dots)) { position: relative; z-index: 1; }
+
+/* The launch of the week: the film large on the left, its words on the right. */
+.lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: var(--space-6);
+  align-items: center;
+  margin-bottom: var(--space-7);
+}
+.leadFrame {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+}
+.leadFrame video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.leadMark {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.leadCopy { display: grid; gap: var(--space-3); }
+.leadCopy h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); letter-spacing: -0.03em; }
+.leadCopy h2 a { color: inherit; }
+.leadCopy .btn { justify-self: start; margin-top: var(--space-2); }
+@media (max-width: 900px) { .lead { grid-template-columns: 1fr; } }
+
+/* A film's own page. */
+.filmHead { display: grid; gap: var(--space-3); max-width: 70ch; margin-bottom: var(--space-5); }
+.filmPlayer {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+.filmPlayer video { width: 100%; height: 100%; display: block; }
+.filmFacts {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 1.6fr);
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+  align-items: start;
+}
+.factList { display: grid; gap: var(--space-3); margin: 0; }
+.factList > div { display: grid; grid-template-columns: 96px 1fr; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+.factList dt { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding-top: 2px; }
+.factList dd { margin: 0; font-size: 0.95rem; }
+.factList dd a { color: var(--text); }
+.credit { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-text); }
+.concept { display: grid; gap: var(--space-3); }
+.concept p:last-child { font-size: 1.05rem; line-height: 1.6; color: var(--text-secondary); max-width: 60ch; }
+.stills { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); margin-top: var(--space-6); }
+.stills img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: block; }
+@media (max-width: 800px) { .filmFacts { grid-template-columns: 1fr; } }

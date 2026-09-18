@@ -28,6 +28,8 @@ import { AudioEditionPanel } from './AudioEditionPanel.tsx';
 import { ResearchSources } from './ResearchSources.tsx';
 import { ProjectAssets } from './ProjectAssets.tsx';
 import { loadProjectAssets } from '@/server/library.ts';
+import { CONSENT_STATEMENT, loadSubmission } from '@/server/collections.ts';
+import { CollectionsSubmit } from './CollectionsSubmit.tsx';
 import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
@@ -81,10 +83,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
    * campaign. Anything in flight is a reason to watch, whatever the stage says.
    */
   const cta = activeJob ? 'watch_progress' : primaryCtaFor(project.stage);
-  const [permission, revisions, library] = await Promise.all([
+  const [permission, revisions, library, submission] = await Promise.all([
     renderPermission(session, project),
     revisionAllowance(session, project),
     loadProjectAssets(session, project.id),
+    latestRender ? loadSubmission(session, project) : null,
   ]);
 
   return (
@@ -152,6 +155,22 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             canProduce={can(session.actor, 'project:update')}
             hasStoryboard={Boolean(project.activeStoryboardId)}
           />
+          {/* The film may be put forward for the public gallery; a person selects. */}
+          {submission ? (
+            <CollectionsSubmit
+              projectId={project.id}
+              card={{
+                status: submission.entry?.status ?? null,
+                label: submission.label,
+                next: submission.next,
+                eligible: submission.eligible,
+                reason: submission.reason,
+                publicPath: submission.publicPath,
+                canSubmit: submission.canSubmit,
+                consentStatement: CONSENT_STATEMENT,
+              }}
+            />
+          ) : null}
         </div>
       ) : null}
 

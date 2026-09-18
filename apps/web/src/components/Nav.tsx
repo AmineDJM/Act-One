@@ -18,6 +18,7 @@ export function Nav({ policy }: { policy?: SignUpPolicy }) {
         <Wordmark tag={policy?.tag ?? undefined} />
         <div className={styles.navLinks}>
           <Link href="/how-it-works">How it works</Link>
+          <Link href="/collections">Collections</Link>
           <Link href="/work">Work</Link>
           <Link href="/pricing">Pricing</Link>
         </div>

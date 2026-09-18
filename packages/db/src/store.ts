@@ -6,6 +6,9 @@ import type {
   AssetSource,
   BetaApplication,
   BetaApplicationStatus,
+  CollectionCategory,
+  CollectionEntry,
+  CollectionStatus,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -86,6 +89,7 @@ export interface Store {
   readonly researchSources: ResearchSourceRepo;
   readonly invites: InviteRepo;
   readonly applications: BetaApplicationRepo;
+  readonly collections: CollectionRepo;
   readonly brandVoices: BrandVoiceRepo;
   readonly voiceConsents: VoiceConsentRepo;
   readonly voiceSettings: VoiceSettingsRepo;
@@ -526,6 +530,21 @@ export interface InviteRepo {
   listRedemptions(codeId: string): Promise<InviteRedemption[]>;
   /** The code a person came in on, if any. */
   redemptionFor(userId: string): Promise<InviteRedemption | null>;
+}
+
+/** The curated public gallery, and every film offered for it. */
+export type CollectionQuery = { status?: CollectionStatus; category?: CollectionCategory; featured?: boolean; limit?: number };
+
+export interface CollectionRepo {
+  create(entry: CollectionEntry): Promise<CollectionEntry>;
+  get(id: string): Promise<CollectionEntry | null>;
+  getBySlug(slug: string): Promise<CollectionEntry | null>;
+  /** The latest entry for a project, whatever its state. */
+  getForProject(organizationId: string, projectId: string): Promise<CollectionEntry | null>;
+  /** Editorial order first, then newest published. */
+  list(query?: CollectionQuery): Promise<CollectionEntry[]>;
+  update(id: string, patch: Partial<CollectionEntry>): Promise<CollectionEntry>;
+  countByStatus(): Promise<Record<string, number>>;
 }
 
 /** Requests for access while the product is by invitation. */

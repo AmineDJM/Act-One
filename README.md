@@ -127,6 +127,28 @@ their interface may carry a product beat, and a generated shot is anchored
 to an approved product still and records it as its parent. Versions point
 at their original.
 
+### Collections
+
+The public gallery of launch films made here, at `/collections`, with a page
+per film at `/collections/{slug}` and a page per category. A film enters it in
+exactly two ways. A customer with a finished, clean master clicks *Submit for
+selection* on the project page and ticks a consent statement that is shown in
+full and stored with the entry; the film waits *Under consideration* until a
+person selects it. Or staff publish a film themselves from the console, and
+attest, in their own words, to the written consent they hold; that attestation
+is stored with the entry too. Nothing becomes public on its own: no job, no
+schedule, no default.
+
+Everything shown is decided in the console under *Collections*: select,
+decline, unpublish, feature, name the launch of the week (one at a time), mark
+an *Act One Original*, choose the poster frame and stills from the film's own
+frames, set the category, the title, the tagline, the address and the order.
+A customer can withdraw at any time, which takes the film off the site at
+once and closes the staff door until they submit again. The public film route
+`/api/collections/{slug}/film` serves bytes only while the entry is published,
+and the sitemap, the landing page's *Selected work* and the structured data
+(`VideoObject`, `BreadcrumbList`) read the same list.
+
 ## The pipeline
 
 ```

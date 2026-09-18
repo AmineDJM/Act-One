@@ -1,4 +1,4 @@
-import { Asset as AssetSchema, BrandSystem as BrandSystemSchema } from '@act-one/core';
+import { Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema } from '@act-one/core';
 import {
   AppError,
   newId,
@@ -24,6 +24,7 @@ import type {
   AssetInput,
   BetaApplication,
   BetaApplicationStatus,
+  CollectionEntry,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -60,7 +61,7 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { AssetProjectLink, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -2353,6 +2354,92 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly collections = {
+    create: async (entry: CollectionEntry) =>
+      this.asPlatform(async (c) => {
+        try {
+          await c.query(
+            `INSERT INTO collection_entries
+               (id, slug, organization_id, project_id, render_id, status, category, featured, launch_of_the_week, original,
+                position, published_at, submitted_at, data, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+            [
+              entry.id, entry.slug, entry.organizationId, entry.projectId, entry.renderId, entry.status, entry.category,
+              entry.featured, entry.launchOfTheWeek, entry.original, entry.position, entry.publishedAt, entry.submittedAt,
+              entry, entry.createdAt, entry.updatedAt,
+            ],
+          );
+        } catch (error) {
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That address is taken.');
+          throw error;
+        }
+        return entry;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM collection_entries WHERE id = $1', [id]);
+        return r.rows[0] ? collectionFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getBySlug: async (slug: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM collection_entries WHERE slug = $1', [slug]);
+        return r.rows[0] ? collectionFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getForProject: async (organizationId: string, projectId: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          'SELECT data FROM collection_entries WHERE organization_id = $1 AND project_id = $2 ORDER BY submitted_at DESC LIMIT 1',
+          [organizationId, projectId],
+        );
+        return r.rows[0] ? collectionFromRow(r.rows[0]['data']) : null;
+      }),
+
+    list: async (query: CollectionQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const where: string[] = [];
+        const params: unknown[] = [];
+        const bind = (value: unknown) => `$${params.push(value)}`;
+        if (query.status) where.push(`status = ${bind(query.status)}`);
+        if (query.category) where.push(`category = ${bind(query.category)}`);
+        if (query.featured !== undefined) where.push(`featured = ${bind(query.featured)}`);
+        const r = await c.query(
+          `SELECT data FROM collection_entries ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+           ORDER BY position ASC, COALESCE(published_at, submitted_at) DESC
+           LIMIT ${Math.min(Math.max(query.limit ?? 200, 1), 1000)}`,
+          params,
+        );
+        return r.rows.map((row) => collectionFromRow(row['data']));
+      }),
+
+    update: async (id: string, patch: Partial<CollectionEntry>) =>
+      this.asPlatform(async (c) => {
+        const current = await c.query('SELECT data FROM collection_entries WHERE id = $1 FOR UPDATE', [id]);
+        if (!current.rows[0]) throw notFound('Collection entry');
+        const next: CollectionEntry = { ...collectionFromRow(current.rows[0]['data']), ...patch, id, updatedAt: new Date().toISOString() };
+        try {
+          await c.query(
+            `UPDATE collection_entries SET slug = $2, status = $3, category = $4, featured = $5, launch_of_the_week = $6, original = $7,
+               position = $8, published_at = $9, data = $10, updated_at = now()
+             WHERE id = $1`,
+            [id, next.slug, next.status, next.category, next.featured, next.launchOfTheWeek, next.original, next.position, next.publishedAt, next],
+          );
+        } catch (error) {
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That address is taken.');
+          throw error;
+        }
+        return next;
+      }),
+
+    countByStatus: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ status: string; count: number }>('SELECT status, COUNT(*)::int AS count FROM collection_entries GROUP BY status');
+        return Object.fromEntries(r.rows.map((row) => [row.status, num(row.count)]));
+      }),
+  };
+
   readonly applications = {
     create: async (application: BetaApplication) =>
       this.asPlatform(async (c) => {
@@ -2635,6 +2722,11 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
  */
 function brandFromRow(data: unknown): BrandSystem {
   return BrandSystemSchema.parse(data);
+}
+
+/** An entry as stored, brought up to the current shape. */
+function collectionFromRow(data: unknown): CollectionEntry {
+  return CollectionEntrySchema.parse(data);
 }
 
 function toInviteCode(row: Row): InviteCode {

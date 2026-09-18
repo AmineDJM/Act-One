@@ -1104,3 +1104,8 @@
 .brandCardLinks a { color: var(--text-secondary); }
 .brandCardLinks a:hover { color: var(--text); }
 .brandCardLinks a[data-tone='attention'] { color: var(--accent-text); }
+
+/* --- submitting to Collections --------------------------------------------------- */
+.submitForm { display: grid; gap: var(--space-4); }
+.submitGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 640px) { .submitGrid { grid-template-columns: 1fr; } }

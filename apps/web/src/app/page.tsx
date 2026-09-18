@@ -9,6 +9,8 @@ import { HeroFilm } from '@/components/HeroFilm.tsx';
 import { FilmCard } from '@/components/FilmCard.tsx';
 import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
 import { getProductConfig } from '@/server/product.ts';
+import { listPublicFilms } from '@/server/collections.ts';
+import { PublicFilmCard } from '@/components/PublicFilmCard.tsx';
 import { site, absoluteUrl } from '@/lib/site.ts';
 import { REFERENCE_FILMS } from '@/lib/reference-films.ts';
 import styles from '@/components/marketing.module.css';
@@ -106,6 +108,13 @@ export default async function HomePage() {
   const launch = DEFAULT_PLANS.find((plan) => plan.id === 'launch');
   const config = await getProductConfig();
   const policy = signUpPolicy(config);
+  /*
+   * Real launches first. Once Collections has selected films, they lead the
+   * page and the reference films fill the remaining places; before that, the
+   * reference films stand alone, labelled as the fictional work they are.
+   */
+  const selected = await listPublicFilms({ limit: 3 }).catch(() => []);
+  const references = REFERENCE_FILMS.slice(0, Math.max(0, 3 - selected.length));
 
   return (
     <>
@@ -145,12 +154,28 @@ export default async function HomePage() {
             </h2>
             <span className={styles.quiet}>Built to be published.</span>
             <hr className={styles.rule} />
-            <Link href="/work" className={styles.moreLink}>
-              All work →
+            <Link href={selected.length > 0 ? '/collections' : '/work'} className={styles.moreLink}>
+              {selected.length > 0 ? 'Collections →' : 'All work →'}
             </Link>
           </div>
           <div className={styles.filmGrid}>
-            {REFERENCE_FILMS.map((film) => (
+            {selected.map((film) => (
+              <PublicFilmCard
+                key={film.slug}
+                href={film.path}
+                videoSrc={film.videoPath}
+                posterSrc={film.posterPath}
+                company={film.company}
+                title={film.title}
+                tagline={film.tagline}
+                categoryLabel={film.categoryLabel}
+                credit={film.credit}
+                durationSeconds={film.durationSeconds}
+                featured={film.featured}
+                launchOfTheWeek={film.launchOfTheWeek}
+              />
+            ))}
+            {references.map((film) => (
               <FilmCard key={film.slug} {...film} />
             ))}
           </div>

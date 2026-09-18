@@ -26,6 +26,7 @@ import type {
   AssetInput,
   BetaApplication,
   BetaApplicationStatus,
+  CollectionEntry,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -61,7 +62,7 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { AssetProjectLink, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
+import type { AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -94,6 +95,7 @@ export class MemoryStore implements Store {
     invites: new Map<string, InviteCode>(),
     redemptions: new Map<string, InviteRedemption>(),
     applications: new Map<string, BetaApplication>(),
+    collections: new Map<string, CollectionEntry>(),
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
@@ -158,6 +160,45 @@ export class MemoryStore implements Store {
     listRedemptions: async (codeId: string) =>
       [...this.tables.redemptions.values()].filter((entry) => entry.codeId === codeId).sort((a, b) => a.at.localeCompare(b.at)),
     redemptionFor: async (userId: string) => [...this.tables.redemptions.values()].find((entry) => entry.userId === userId) ?? null,
+  };
+
+  readonly collections = {
+    create: async (entry: CollectionEntry) => {
+      for (const existing of this.tables.collections.values()) {
+        if (existing.slug === entry.slug) throw new AppError('conflict', 'That address is taken.');
+      }
+      this.tables.collections.set(entry.id, entry);
+      return entry;
+    },
+    get: async (id: string) => this.tables.collections.get(id) ?? null,
+    getBySlug: async (slug: string) => [...this.tables.collections.values()].find((entry) => entry.slug === slug) ?? null,
+    getForProject: async (organizationId: string, projectId: string) =>
+      [...this.tables.collections.values()]
+        .filter((entry) => entry.organizationId === organizationId && entry.projectId === projectId)
+        .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))[0] ?? null,
+    list: async (query: CollectionQuery = {}) =>
+      [...this.tables.collections.values()]
+        .filter((entry) => !query.status || entry.status === query.status)
+        .filter((entry) => !query.category || entry.category === query.category)
+        .filter((entry) => query.featured === undefined || entry.featured === query.featured)
+        .sort((a, b) => a.position - b.position || (b.publishedAt ?? b.submittedAt).localeCompare(a.publishedAt ?? a.submittedAt))
+        .slice(0, query.limit ?? 200),
+    update: async (id: string, patch: Partial<CollectionEntry>) => {
+      const existing = this.require(this.tables.collections.get(id), 'Collection entry');
+      if (patch.slug && patch.slug !== existing.slug) {
+        for (const other of this.tables.collections.values()) {
+          if (other.id !== id && other.slug === patch.slug) throw new AppError('conflict', 'That address is taken.');
+        }
+      }
+      const next = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
+      this.tables.collections.set(id, next);
+      return next;
+    },
+    countByStatus: async () => {
+      const counts: Record<string, number> = {};
+      for (const entry of this.tables.collections.values()) counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+      return counts;
+    },
   };
 
   readonly applications = {
