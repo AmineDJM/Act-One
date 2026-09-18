@@ -220,6 +220,19 @@ export async function ingestAsset(
 }
 
 /** Resolves asset ids to URLs the renderer can read. */
+/**
+ * Which of these assets move.
+ *
+ * The renderer is handed signed URLs, which carry no type: a clip and a still
+ * look identical to it, and getting it wrong produces an empty frame either
+ * way. Asked here, from what the asset actually is.
+ */
+export async function footageAmong(context: StageContext, assetIds: string[]): Promise<string[]> {
+  if (assetIds.length === 0) return [];
+  const assets = await context.store.assets.getMany(context.organizationId, [...new Set(assetIds)]);
+  return assets.filter((asset) => asset.contentType.startsWith('video/')).map((asset) => asset.id);
+}
+
 export async function resolveAssetUrls(
   context: StageContext,
   assetIds: string[],

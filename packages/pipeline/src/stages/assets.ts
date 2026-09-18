@@ -6,8 +6,12 @@ import {
   type GenerativeNeed,
   type Scene,
 } from '@act-one/core';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { framesToVideoArgs, runFfmpeg } from '@act-one/sound';
 import { planThreeDScene, renderThreeDScene, isBlenderAvailable } from '@act-one/three-d';
-import { ingestAsset, resolveAssetUrls, type StageContext } from '../context.ts';
+import { ingestAsset, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 
 /**
  * Scene asset generation.
@@ -255,12 +259,57 @@ async function renderThreeD(
     aspect: '16:9',
   });
 
+  /*
+   * Frames land where the caller can reach them.
+   *
+   * They used to land in a temporary directory inside the renderer, which
+   * nothing ever read: Blender ran, produced its frames, and the result was
+   * reduced to the word "generated". Minutes of render, thrown away, and the
+   * scene fell back to type.
+   */
+  const frameDir = path.join(await mkdtemp(path.join(tmpdir(), 'act-one-3d-')), 'frames');
   const result = await renderThreeDScene({
     scene: threeD,
+    outputDir: frameDir,
     ...(context.signal ? { signal: context.signal } : {}),
   });
+  if (!result.ok || result.frameCount === 0) return 'failed';
 
-  return result.ok ? 'generated' : 'failed';
+  const clipPath = path.join(frameDir, 'shot.mp4');
+  const encoded = await runFfmpeg(
+    framesToVideoArgs(path.join(frameDir, 'frame_%04d.png'), threeD.fps, clipPath),
+    { signal: context.signal, timeoutMs: 300_000 },
+  );
+  if (!encoded.ok) {
+    console.error('[assets] 3D frames would not encode:', encoded.stderr.slice(-300));
+    return 'failed';
+  }
+
+  const stored = await storeAsset(context, {
+    data: new Uint8Array(await readFile(clipPath)),
+    kind: 'threed_render',
+    origin: 'rendered',
+    // Our own engine composited the customer's own capture. Not generated.
+    rights: 'customer_owned',
+    extension: 'mp4',
+    contentType: 'video/mp4',
+    sceneId: scene.id,
+    durationSeconds: threeD.durationSeconds,
+    name: `3D shot, scene ${scene.index + 1}`,
+    metadata: { frames: result.frameCount, fps: threeD.fps, elapsedMs: result.elapsedMs },
+  });
+
+  /*
+   * The clip goes first and the screens it was built from stay behind it. The
+   * film plays the first thing that moves, and the captures are what the
+   * library shows this shot was made of.
+   */
+  await context.store.storyboards.updateScene(context.organizationId, scene.id, {
+    assetRefs: [stored.asset.id, ...scene.assetRefs],
+    status: 'ready',
+  });
+
+  return 'generated';
 }
 
 /**

@@ -29,6 +29,14 @@ export type FilmProps = {
    * sidecar track, which is the copy a viewer can turn off.
    */
   captions?: CaptionCue[];
+  /**
+   * Which of the assets are moving footage rather than stills.
+   *
+   * The renderer cannot tell from a signed URL, and playing a still or showing
+   * a clip both produce an empty frame. Told explicitly, it can fall back
+   * correctly when a generated shot did not arrive.
+   */
+  footageAssetIds?: string[];
 };
 
 export function filmDurationInFrames(storyboard: Storyboard, fps: number): number {

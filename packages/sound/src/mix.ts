@@ -303,6 +303,36 @@ export function muxArgs(videoPath: string, audioPath: string, outputPath: string
   ];
 }
 
+/**
+ * A sequence of rendered frames into a clip the film can play.
+ *
+ * Used by the 3D renderer, whose output is a numbered directory of PNGs. The
+ * settings match what the film itself is encoded with, so a shot cut into the
+ * master is not a second generation of a different encoder's decisions: yuv420p
+ * because that is what every player decodes, a high-quality constant rate
+ * factor because this clip will be re-encoded once more in the master and the
+ * losses compound, and the index at the front so it can be streamed.
+ */
+export function framesToVideoArgs(pattern: string, fps: number, outputPath: string): string[] {
+  return [
+    '-y', '-hide_banner', '-loglevel', 'error',
+    '-framerate', String(fps),
+    '-start_number', '1',
+    '-i', pattern,
+    '-an',
+    '-c:v', 'libx264',
+    '-preset', 'slow',
+    '-crf', '16',
+    '-pix_fmt', 'yuv420p',
+    '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
+    // An odd dimension is not encodable in 4:2:0, and a renderer that produced
+    // one would otherwise fail here rather than where the size was chosen.
+    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    '-movflags', '+faststart',
+    outputPath,
+  ];
+}
+
 /** Extracts a poster frame. */
 export function posterArgs(videoPath: string, atSeconds: number, outputPath: string): string[] {
   return [

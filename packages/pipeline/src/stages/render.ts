@@ -59,7 +59,7 @@ import {
   selectFramesToInspect,
   verifyMaster,
 } from '@act-one/qa';
-import { resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
+import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
 import { narrate } from '../narration.ts';
 import { captionFilm, NO_CAPTIONS, type FilmCaptions } from './captions.ts';
@@ -563,10 +563,14 @@ async function renderOnce(
     status: 'active',
   });
 
-  const assetUrls = await resolveAssetUrls(
-    context,
-    storyboard.scenes.flatMap((scene) => scene.assetRefs),
-  );
+  const referenced = storyboard.scenes.flatMap((scene) => scene.assetRefs);
+  const assetUrls = await resolveAssetUrls(context, referenced);
+  /*
+   * Which of them play. A generated shot and a 3D render are clips; everything
+   * else the film draws is a still, and handing one to the other is how a
+   * commissioned shot ends up as an empty frame.
+   */
+  const footageAssetIds = await footageAmong(context, referenced);
 
   const silentPath = path.join(params.workDir, `film-${params.attempt}.mp4`);
   await renderFilm({
@@ -602,6 +606,7 @@ async function renderOnce(
        * controls is better than type nailed to the frame. Both get the track.
        */
       ...(params.burnCaptions && captions.cues.length > 0 ? { captions: captions.cues } : {}),
+      ...(footageAssetIds.length > 0 ? { footageAssetIds } : {}),
     },
     aspect: params.aspect,
     quality: params.quality,

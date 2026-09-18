@@ -112,6 +112,8 @@ export const MotionRecipeName = z.enum([
   'window_explosion',
   'command_bar_collapse',
   'photo_hold',
+  /* Moving footage: a generated shot or a 3D render, played rather than shown. */
+  'footage',
   'hard_cut',
   'hold',
 ]);
@@ -137,12 +139,21 @@ export const RECIPES_FOR_VISUAL: Record<VisualType, readonly MotionRecipeName[]>
   logo_reveal: ['logo_reveal', 'cta_end_card'],
   transition: ['depth_transition', 'hard_cut', 'hold'],
   product_ui: ['product_window', 'product_sequence', 'floating_ui', 'feature_stack', 'cursor_sequence'],
-  product_ui_3d: ['product_window', 'spatial_cards', 'window_explosion'],
+  product_ui_3d: ['footage', 'product_window', 'spatial_cards', 'window_explosion'],
   screenshot_motion: ['product_zoom', 'product_window', 'image_wall'],
   real_media: ['photo_hold', 'image_wall', 'spatial_cards'],
-  cinematic_3d: ['depth_transition', 'spatial_cards'],
-  generated_broll: ['image_wall', 'depth_transition', 'hold'],
-  mixed_media: ['window_explosion', 'split_screen', 'spatial_cards'],
+  /*
+   * Footage first, for the two types that produce it.
+   *
+   * These used to route to `image_wall`, which draws its assets in an image
+   * tag: a generated shot was commissioned, paid for, stored and then handed
+   * to a component that cannot play it, so the scene fell back to type and
+   * nobody ever saw the shot. The engine's own techniques for texture are the
+   * whole reason a film reads as made rather than assembled.
+   */
+  cinematic_3d: ['footage', 'depth_transition', 'spatial_cards'],
+  generated_broll: ['footage', 'image_wall', 'hold'],
+  mixed_media: ['footage', 'window_explosion', 'split_screen', 'spatial_cards'],
 };
 
 /** True when a recipe can be rendered by the visual type carrying it. */

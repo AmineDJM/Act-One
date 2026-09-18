@@ -16,6 +16,7 @@ import {
 import { resolveTokens, watermark as watermarkSvg, type DesignTokens } from '@act-one/design';
 import { WordReveal, KineticHeadline, EditorialHeadline, MetricReveal, QuoteScene } from './components/Type.tsx';
 import { ProductWindow, ProductZoom, SpatialCards, CursorSequence, PhotoHold } from './components/Product.tsx';
+import { Footage } from './components/Footage.tsx';
 import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './components/Brand.tsx';
 
 /**
@@ -36,6 +37,7 @@ export const Film: React.FC<FilmProps> = ({
   cta,
   tagline,
   captions,
+  footageAssetIds,
 }) => {
   const { fps, width, height } = useVideoConfig();
   const aspect = aspectFor(width, height);
@@ -70,6 +72,7 @@ export const Film: React.FC<FilmProps> = ({
               */
             cta={cta ?? ''}
             tagline={tagline ?? ''}
+            footage={new Set(footageAssetIds ?? [])}
           />
         </Sequence>
       ))}
@@ -167,12 +170,16 @@ type SceneRendererProps = {
   assetUrls: Record<string, string>;
   cta: string;
   tagline: string;
+  /** Asset ids that are clips. Everything else in `assetUrls` is a still. */
+  footage: Set<string>;
 };
 
-const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, assetUrls, cta, tagline }) => {
+const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, assetUrls, cta, tagline, footage }) => {
   const text = scene.onScreenText.join(' ');
   const easing = scene.motionRecipe.easing;
   const assets = scene.assetRefs.map((id) => assetUrls[id]).filter((url): url is string => Boolean(url));
+  /** The first clip this scene has, if any. A shot plays one thing. */
+  const clip = scene.assetRefs.find((id) => footage.has(id) && assetUrls[id]);
   const logoUrl = brand.logo?.assetId ? assetUrls[brand.logo.assetId] ?? brand.logo.url : brand.logo?.url ?? null;
 
   const body = (() => {
@@ -304,6 +311,53 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             src={assets[0]}
             tokens={tokens}
             focus={focusFrom(scene)}
+            durationSeconds={scene.duration}
+            easing={easing}
+            delaySeconds={scene.motionRecipe.delay}
+          />
+        ) : (
+          typeFallback()
+        );
+
+      case 'footage':
+        /*
+         * A generated shot or a 3D render, playing.
+         *
+         * Falls through to the still treatment when the asset turned out to be
+         * one, and to type when generation produced nothing at all — which is
+         * the honest outcome, because a scene with no picture is a scene with
+         * words in it rather than a hole.
+         */
+        return clip ? (
+          <Footage
+            src={assetUrls[clip]!}
+            tokens={tokens}
+            camera={scene.cameraRecipe}
+            durationSeconds={scene.duration}
+            easing={easing}
+            delaySeconds={scene.motionRecipe.delay}
+          >
+            {text ? (
+              <Framed tokens={tokens} placement="lower_third">
+                <WordReveal
+                  text={text}
+                  token={tokens.type.statement}
+                  color="#ffffff"
+                  tokens={tokens}
+                  maxWidth={tokens.grid.safe.width * 0.7}
+                  maxLines={2}
+                  easing={easing}
+                  durationSeconds={scene.duration}
+                  delaySeconds={0.4}
+                />
+              </Framed>
+            ) : null}
+          </Footage>
+        ) : assets[0] ? (
+          <PhotoHold
+            src={assets[0]}
+            tokens={tokens}
+            camera={scene.cameraRecipe}
             durationSeconds={scene.duration}
             easing={easing}
             delaySeconds={scene.motionRecipe.delay}
