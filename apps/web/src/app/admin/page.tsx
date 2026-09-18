@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { creditsToUsd } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
-import { listProviderState } from '@/server/platform.ts';
+import { PROVIDER_SLOTS, listProviderState } from '@/server/platform.ts';
 import { BreakdownBars, Sparkline } from '@/components/Chart.tsx';
 import styles from './admin.module.css';
 
@@ -40,7 +40,22 @@ export default async function AdminOverview() {
   const marginPct = revenue > 0 ? (margin / revenue) * 100 : 0;
   const failures = summary.byProvider.reduce((sum, p) => sum + p.failures, 0);
   const calls = summary.byProvider.reduce((sum, p) => sum + p.calls, 0);
+  /*
+   * Required and optional counted apart.
+   *
+   * This used to announce "5 integrations not configured", which makes a
+   * platform one key away from working look broken — and contradicted the
+   * integrations page, which correctly said one required integration was
+   * missing. Only OpenAI is genuinely required; without the rest, research
+   * falls back to a direct fetch, generative shots are skipped, and billing is
+   * off. Those are configuration states, not failures.
+   */
+  const requiredSlots = new Set<string>(
+    PROVIDER_SLOTS.filter((slot) => slot.required).map((slot) => slot.id),
+  );
   const unconfigured = providers.filter((p) => !p.configured);
+  const missingRequired = unconfigured.filter((p) => requiredSlots.has(p.id));
+  const missingOptional = unconfigured.filter((p) => !requiredSlots.has(p.id));
 
   const usd = (value: number) => `$${value.toFixed(2)}`;
   const plain = (value: number) => value.toLocaleString('en-US');
@@ -52,14 +67,30 @@ export default async function AdminOverview() {
         <p className="lede">The last {WINDOW_DAYS} days.</p>
       </header>
 
-      {unconfigured.length > 0 ? (
+      {missingRequired.length > 0 ? (
+        <div className={styles.notice} data-tone="danger">
+          <strong>
+            {missingRequired.length === 1
+              ? `${missingRequired[0]!.id} is not configured`
+              : `${missingRequired.length} required integrations are not configured`}
+          </strong>{' '}
+          — nothing can be made until it is.{' '}
+          <Link href="/admin/providers" style={{ color: 'var(--accent-text)' }}>
+            Configure it →
+          </Link>
+        </div>
+      ) : null}
+
+      {missingOptional.length > 0 ? (
         <div className={styles.notice}>
           <strong>
-            {unconfigured.length} integration{unconfigured.length === 1 ? '' : 's'} not configured
+            {missingOptional.length} optional integration{missingOptional.length === 1 ? '' : 's'}{' '}
+            unset
           </strong>{' '}
-          ({unconfigured.map((p) => p.id).join(', ')}).{' '}
+          ({missingOptional.map((p) => p.id).join(', ')}) — the platform runs without{' '}
+          {missingOptional.length === 1 ? 'it' : 'them'}, with those features off.{' '}
           <Link href="/admin/providers" style={{ color: 'var(--accent-text)' }}>
-            Configure them →
+            Review →
           </Link>
         </div>
       ) : null}
