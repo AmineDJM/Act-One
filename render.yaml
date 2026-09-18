@@ -43,8 +43,16 @@ services:
     # --include=dev: NODE_ENV=production is set for the build as well, and a
     # production install skips the TypeScript and bundler the build itself needs.
     buildCommand: npm ci --include=dev && npm run build
+    # Migrations run here, once per deploy, before the new version takes
+    # traffic. Nothing ran them before: the first deploy served a site whose
+    # database had no tables, and the first sign-up failed with "Something
+    # went wrong on our side."
+    preDeployCommand: npm run migrate
     startCommand: npm run start --workspace @act-one/web
-    healthCheckPath: /
+    # Checks the database and its schema, not just that the process answers.
+    # A deploy whose database is behind its code is marked failed here, with
+    # the reason in the logs, instead of going live unable to sign anyone up.
+    healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: NODE_VERSION

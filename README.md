@@ -187,6 +187,19 @@ Three things the worker host needs, all installed by the build:
 The Postgres plan in `render.yaml` is `basic-1gb`: films live in object
 storage, so the database grows with customers, not with render volume.
 
+Migrations run as the web service's pre-deploy command, once per deploy,
+before the new version takes traffic — nothing else runs them, and a database
+with no schema fails every sign-up with "Something went wrong on our side."
+The health check at `/api/health` reports the database and its schema, so a
+deploy whose database is behind its code is marked failed with the reason in
+the logs rather than going live. On any other host: run `npm run migrate`
+against `DATABASE_URL` before starting the web service, and point the health
+check at `/api/health`.
+
+**The first account created becomes staff.** Sign up at `/auth/sign-up` as
+soon as the deploy answers, before sharing the address; the console is at
+`/admin`, and other staff are granted from `/admin/staff`.
+
 ### The vault key
 
 Nothing to type on Render: the Blueprint has Render generate
