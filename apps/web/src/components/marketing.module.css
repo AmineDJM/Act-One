@@ -517,3 +517,19 @@
 .sources ol { display: grid; gap: var(--space-2); padding-left: 1.2em; font-size: 0.92rem; color: var(--text-secondary); }
 .sources a { color: var(--text-secondary); }
 .sources a:hover { color: var(--text); }
+
+/* The page that is not there: a way back in, not a dead end. */
+.notFound {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.notFound > :global(.dots) { position: absolute; inset: 0; z-index: 0; }
+.notFound > :not(:global(.dots)) { position: relative; z-index: 1; }
+.notFoundLinks { display: flex; flex-wrap: wrap; gap: var(--space-4); font-size: 0.95rem; }
+.notFoundLinks a { color: var(--text-secondary); }
+.notFoundLinks a:hover { color: var(--text); }

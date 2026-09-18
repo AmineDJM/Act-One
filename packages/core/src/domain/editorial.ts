@@ -49,6 +49,14 @@ export type ArticleSection = z.infer<typeof ArticleSection>;
 export const Article = z.object({
   id: z.string(),
   slug: z.string().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  /**
+   * Addresses this article used to have.
+   *
+   * A published page that changes its address and forgets the old one throws
+   * away every link to it. These are kept so the old address answers with a
+   * permanent redirect rather than a 404.
+   */
+  previousSlugs: z.array(z.string().min(2).max(120)).max(20).default([]),
   title: nonEmpty(160),
   /** The line under the title on the page and in search results. */
   dek: z.string().max(300).default(''),

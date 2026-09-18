@@ -10,6 +10,7 @@ import styles from '../auth.module.css';
 
 export const metadata: Metadata = {
   title: 'Create your account',
+  alternates: { canonical: '/auth/sign-up' },
   robots: { index: false, follow: true },
 };
 

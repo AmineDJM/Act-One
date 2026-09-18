@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Nav } from '@/components/Nav.tsx';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { Prose } from '@/components/Prose.tsx';
 import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
 import { getProductConfig, getSignUpPolicy } from '@/server/product.ts';
-import { getPublicArticle, listPublicArticles } from '@/server/blog.ts';
+import { articleMovedTo, getPublicArticle, listPublicArticles } from '@/server/blog.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { addresses, socialImage } from '@/lib/seo.ts';
 import styles from '@/components/marketing.module.css';
 
 export const revalidate = 300;
@@ -16,13 +17,13 @@ export const revalidate = 300;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const article = await getPublicArticle((await params).slug);
   if (!article) return { title: 'Not found', robots: { index: false } };
-  const image = article.heroPath ? absoluteUrl(article.heroPath) : null;
+  const image = socialImage(article.heroPath ? { url: absoluteUrl(article.heroPath), alt: article.heroAlt || article.title } : null);
   return {
     title: article.seoTitle,
     description: article.seoDescription,
     // A piece first published elsewhere points at the original; everything
     // written here points at itself.
-    alternates: { canonical: article.canonicalUrl || article.path },
+    alternates: addresses(article.path, article.canonicalUrl),
     authors: [{ name: article.authorName }],
     openGraph: {
       type: 'article',
@@ -30,13 +31,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description: article.seoDescription,
       url: absoluteUrl(article.path),
       siteName: site.name,
+      locale: site.locale,
       publishedTime: article.publishedAt,
       modifiedTime: article.updatedAt,
       authors: [article.authorName],
       tags: article.tags,
-      ...(image ? { images: [{ url: image, alt: article.heroAlt || article.title }] } : {}),
+      images: [image],
     },
-    twitter: { card: 'summary_large_image', title: article.title, description: article.seoDescription, ...(image ? { images: [image] } : {}) },
+    twitter: { card: 'summary_large_image', title: article.title, description: article.seoDescription, images: [image.url] },
   };
 }
 
@@ -50,7 +52,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [article, policy, config] = await Promise.all([getPublicArticle(slug), getSignUpPolicy(), getProductConfig()]);
-  if (!article) notFound();
+  if (!article) {
+    // The piece may simply have been renamed. A permanent redirect keeps
+    // every link anyone ever made to it, and tells search engines to move
+    // the page rather than drop it.
+    const moved = await articleMovedTo(slug);
+    if (moved) permanentRedirect(moved);
+    notFound();
+  }
   const more = (await listPublicArticles(8)).filter((other) => other.slug !== article.slug).slice(0, 3);
 
   const structured = {

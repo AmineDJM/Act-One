@@ -4,11 +4,19 @@ import { absoluteUrl } from '@/lib/site.ts';
 import { listPublicFilms } from '@/server/collections.ts';
 import { listPublicArticles } from '@/server/blog.ts';
 
+/*
+ * Rewritten when something is published — every action that changes a public
+ * page revalidates this path — and, failing that, every five minutes. The
+ * timer is the safety net: a build that could not reach the database would
+ * otherwise serve a map of the fixed pages alone until the next publication.
+ */
+export const revalidate = 300;
+
 /**
  * Only pages that can actually rank. Authenticated routes are never listed.
  *
- * Collections entries are read at request time, so a film published a
- * minute ago is in the map; a withdrawn one is out of it as fast.
+ * A film published a minute ago is in the map; a withdrawn one is out of it
+ * as fast, because both go through an action that rewrites this.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

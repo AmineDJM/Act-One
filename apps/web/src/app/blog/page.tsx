@@ -7,16 +7,16 @@ import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
 import { getProductConfig, getSignUpPolicy } from '@/server/product.ts';
 import { listPublicArticles } from '@/server/blog.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { breadcrumbs, itemList, jsonLd, pageMetadata } from '@/lib/seo.ts';
 import styles from '@/components/marketing.module.css';
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Journal',
   description: `How software launches earn attention: what a launch film has to do, what separates one from a demo, and what founders get wrong on launch day. Written by ${site.name}.`,
-  alternates: { canonical: '/blog' },
-  openGraph: { title: `Journal · ${site.name}`, url: absoluteUrl('/blog'), type: 'website' },
-};
+  path: '/blog',
+});
 
 /**
  * The journal's index.
@@ -104,6 +104,16 @@ export default async function BlogIndex() {
         </section>
       </main>
       <Footer />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd(
+            { '@type': 'Blog', '@id': `${site.url}/blog#blog`, name: `${site.name} Journal`, url: `${site.url}/blog`, publisher: { '@id': `${site.url}/#organization` }, inLanguage: 'en' },
+            breadcrumbs([{ name: 'Journal', path: '/blog' }]),
+            itemList('Articles', articles.map((article) => ({ name: article.title, path: article.path }))),
+          ),
+        }}
+      />
     </>
   );
 }

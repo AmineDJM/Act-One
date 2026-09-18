@@ -199,6 +199,40 @@ so the journal's model calls land in the same cost ledger as a customer's:
 "what does the journal cost?" is answered by the same query as "what does
 this customer cost?".
 
+### What search engines see
+
+Every public page describes itself the same way, through one helper: a title,
+a description written to be clicked, a canonical, a social card with a real
+picture, `hreflang` entries ready for a translation that does not exist yet,
+and the right indexing rule — sign-up, invitations and the console are never
+indexed. A page cannot forget one of them, because it does not assemble them
+itself.
+
+Structured data says only what the page shows: the landing page's FAQ is the
+questions actually on it, the work page's videos are the films it plays, and
+every gallery, article and film page carries its own breadcrumb trail. The
+sitemap is generated from the same code the pages use, so a film published a
+minute ago is in it and a withdrawn one is out. A missing page is a real page
+with a way back in rather than a dead end.
+
+Addresses are permanent even when they change. Renaming a published article
+or film keeps the old address on the record, and the old link answers with a
+permanent redirect to the new one instead of a 404 — for a reader, for a
+crawler, and for the poster picture in a social card somebody cached last
+month. A draft renamed before it ever went live records nothing, because
+nobody could have linked to it.
+
+The console's *Search* page answers the only questions worth asking: is this
+deployment indexable at all, what is in the map, and what is standing in the
+way — a description search will cut, a picture nobody can hear, a film with
+no poster frame. It carries the few search decisions that are genuinely a
+person's: the sentence the landing page shows in results, the switch that
+holds the whole site back from search for the window between a domain going
+live and the site being ready to be found, and the two tokens a search
+console hands you to prove the site is yours. Canonicals, structured data
+and the sitemap are not settings — getting them wrong is a bug, not a
+preference — so they are not there.
+
 ## The pipeline
 
 ```

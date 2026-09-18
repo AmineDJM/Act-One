@@ -6,6 +6,7 @@ import { StartProject } from '@/components/StartProject.tsx';
 import { PublicFilmCard } from '@/components/PublicFilmCard.tsx';
 import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { breadcrumbs, jsonLd } from '@/lib/seo.ts';
 import type { PublicFilm } from '@/server/collections.ts';
 import styles from '@/components/marketing.module.css';
 
@@ -145,15 +146,28 @@ export function CollectionsIndex({ films, category, policy, cta }: { films: Publ
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'CollectionPage',
-            '@id': absoluteUrl(category ? `/collections/category/${category}#page` : '/collections#page'),
-            name: category ? `${COLLECTION_CATEGORY_LABELS[category]} launch films` : 'Act One Collections',
-            url: absoluteUrl(category ? `/collections/category/${category}` : '/collections'),
-            isPartOf: { '@id': absoluteUrl('/#website') },
-            hasPart: films.slice(0, 50).map((film) => ({ '@type': 'VideoObject', '@id': absoluteUrl(`${film.path}#video`), name: `${film.company}: ${film.title}`, url: absoluteUrl(film.path) })),
-          }),
+          __html: jsonLd(
+            {
+              '@type': 'CollectionPage',
+              '@id': absoluteUrl(category ? `/collections/category/${category}#page` : '/collections#page'),
+              name: category ? `${COLLECTION_CATEGORY_LABELS[category]} launch films` : 'Act One Collections',
+              url: absoluteUrl(category ? `/collections/category/${category}` : '/collections'),
+              isPartOf: { '@id': absoluteUrl('/#website') },
+              hasPart: films.slice(0, 50).map((film) => ({
+                '@type': 'VideoObject',
+                '@id': absoluteUrl(`${film.path}#video`),
+                name: `${film.company}: ${film.title}`,
+                url: absoluteUrl(film.path),
+                ...(film.posterPath ? { thumbnailUrl: [absoluteUrl(film.posterPath)] } : {}),
+                uploadDate: film.publishedAt,
+              })),
+            },
+            breadcrumbs(
+              category
+                ? [{ name: 'Collections', path: '/collections' }, { name: COLLECTION_CATEGORY_LABELS[category], path: `/collections/category/${category}` }]
+                : [{ name: 'Collections', path: '/collections' }],
+            ),
+          ),
         }}
       />
     </>

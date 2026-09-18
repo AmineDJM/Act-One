@@ -178,6 +178,8 @@ export class MemoryStore implements Store {
     },
     get: async (id: string) => this.tables.collections.get(id) ?? null,
     getBySlug: async (slug: string) => [...this.tables.collections.values()].find((entry) => entry.slug === slug) ?? null,
+    getByFormerSlug: async (slug: string) =>
+      [...this.tables.collections.values()].find((entry) => entry.previousSlugs.includes(slug)) ?? null,
     getForProject: async (organizationId: string, projectId: string) =>
       [...this.tables.collections.values()]
         .filter((entry) => entry.organizationId === organizationId && entry.projectId === projectId)
@@ -254,6 +256,8 @@ export class MemoryStore implements Store {
     },
     get: async (id: string) => this.tables.articles.get(id) ?? null,
     getBySlug: async (slug: string) => [...this.tables.articles.values()].find((article) => article.slug === slug) ?? null,
+    getByFormerSlug: async (slug: string) =>
+      [...this.tables.articles.values()].find((article) => article.previousSlugs.includes(slug)) ?? null,
     list: async (query: ArticleQuery = {}) =>
       [...this.tables.articles.values()]
         .filter((article) => !query.status || article.status === query.status)

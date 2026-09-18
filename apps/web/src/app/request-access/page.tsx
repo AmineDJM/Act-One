@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Request access',
+  alternates: { canonical: '/request-access' },
   robots: { index: false, follow: true },
 };
 

@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Nav } from '@/components/Nav.tsx';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { PublicFilmCard } from '@/components/PublicFilmCard.tsx';
 import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
 import { getProductConfig, getSignUpPolicy } from '@/server/product.ts';
-import { getPublicFilm, listPublicFilms } from '@/server/collections.ts';
+import { filmMovedTo, getPublicFilm, listPublicFilms } from '@/server/collections.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { addresses, socialImage } from '@/lib/seo.ts';
 import { monthYear } from '../CollectionsIndex.tsx';
 import styles from '@/components/marketing.module.css';
 
@@ -21,25 +22,28 @@ export const revalidate = 300;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const film = await getPublicFilm((await params).slug);
   if (!film) return { title: 'Not found', robots: { index: false } };
-  const poster = film.posterPath ? absoluteUrl(film.posterPath) : null;
+  const poster = socialImage(
+    film.posterPath ? { url: absoluteUrl(film.posterPath), width: 1920, height: 1080, alt: `${film.company}: ${film.title}` } : null,
+  );
   return {
     title: film.seoTitle,
     description: film.seoDescription,
-    alternates: { canonical: film.path },
+    alternates: addresses(film.path),
     openGraph: {
       type: 'video.other',
       title: `${film.company}: ${film.title}`,
       description: film.seoDescription,
       url: absoluteUrl(film.path),
       siteName: site.name,
-      ...(poster ? { images: [{ url: poster, width: 1920, height: 1080, alt: `${film.company}: ${film.title}` }] } : {}),
+      locale: site.locale,
+      images: [poster],
       videos: [{ url: absoluteUrl(film.videoPath), type: 'video/mp4', width: 1920, height: 1080 }],
     },
     twitter: {
-      card: 'summary_large_image',
+      card: 'player',
       title: `${film.company}: ${film.title}`,
       description: film.seoDescription,
-      ...(poster ? { images: [poster] } : {}),
+      images: [poster.url],
     },
   };
 }
@@ -47,7 +51,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function CollectionFilmPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [film, policy, config] = await Promise.all([getPublicFilm(slug), getSignUpPolicy(), getProductConfig()]);
-  if (!film) notFound();
+  if (!film) {
+    // A film whose address changed keeps answering at the old one.
+    const moved = await filmMovedTo(slug);
+    if (moved) permanentRedirect(moved);
+    notFound();
+  }
   const more = (await listPublicFilms({ limit: 12 })).filter((other) => other.slug !== film.slug).slice(0, 3);
 
   const video = {

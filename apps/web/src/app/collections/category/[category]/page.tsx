@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { COLLECTION_CATEGORY_LABELS, CollectionCategory } from '@act-one/core';
 import { getProductConfig, getSignUpPolicy } from '@/server/product.ts';
 import { listPublicFilms } from '@/server/collections.ts';
-import { site, absoluteUrl } from '@/lib/site.ts';
+import { site } from '@/lib/site.ts';
+import { pageMetadata } from '@/lib/seo.ts';
 import { CollectionsIndex } from '../../CollectionsIndex.tsx';
 
 export const revalidate = 300;
@@ -14,14 +15,13 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ category: string }> }): Promise<Metadata> {
   const parsed = CollectionCategory.safeParse((await params).category);
-  if (!parsed.success) return {};
+  if (!parsed.success) return { title: 'Not found', robots: { index: false, follow: true } };
   const label = COLLECTION_CATEGORY_LABELS[parsed.data];
-  return {
+  return pageMetadata({
     title: `${label} launch films · Collections`,
-    description: `${label} products launched with a film made by ${site.name}, selected by a person.`,
-    alternates: { canonical: `/collections/category/${parsed.data}` },
-    openGraph: { title: `${label} launch films · ${site.name}`, url: absoluteUrl(`/collections/category/${parsed.data}`), type: 'website' },
-  };
+    description: `${label} products launched with a film made by ${site.name} and selected by a person. Watch the launch, then see how your own product would be directed.`,
+    path: `/collections/category/${parsed.data}`,
+  });
 }
 
 export default async function CollectionsCategoryPage({ params }: { params: Promise<{ category: string }> }) {

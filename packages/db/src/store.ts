@@ -547,6 +547,8 @@ export interface CollectionRepo {
   create(entry: CollectionEntry): Promise<CollectionEntry>;
   get(id: string): Promise<CollectionEntry | null>;
   getBySlug(slug: string): Promise<CollectionEntry | null>;
+  /** An address this film used to have, so an old link redirects rather than breaking. */
+  getByFormerSlug(slug: string): Promise<CollectionEntry | null>;
   /** The latest entry for a project, whatever its state. */
   getForProject(organizationId: string, projectId: string): Promise<CollectionEntry | null>;
   /** Editorial order first, then newest published. */
@@ -580,6 +582,8 @@ export interface ArticleRepo {
   create(article: Article): Promise<Article>;
   get(id: string): Promise<Article | null>;
   getBySlug(slug: string): Promise<Article | null>;
+  /** An address this article used to have, so an old link redirects rather than breaking. */
+  getByFormerSlug(slug: string): Promise<Article | null>;
   /** Newest published first for the public list; newest touched first otherwise. */
   list(query?: ArticleQuery): Promise<Article[]>;
   update(id: string, patch: Partial<Article>): Promise<Article>;

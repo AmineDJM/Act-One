@@ -50,6 +50,7 @@ export async function saveProductConfig(patch: Partial<ProductConfig>, updatedBy
     ...current,
     ...patch,
     landing: { ...current.landing, ...(patch.landing ?? {}) },
+    seo: { ...current.seo, ...(patch.seo ?? {}) },
     invites: { ...current.invites, ...(patch.invites ?? {}) },
   });
   await savePlatformConfig({ product: next }, updatedBy);

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { GENERATION_STEPS, jobIsTerminal, type GenerationCost, type JobEvent } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
 import { LogRow } from '../../logs/LogRow.tsx';
-import { badgeFor, took } from '../page.tsx';
+import { badgeFor, took } from '../format.ts';
 import styles from '../../admin.module.css';
 
 export const dynamic = 'force-dynamic';

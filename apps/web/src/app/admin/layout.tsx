@@ -26,6 +26,7 @@ const NAV = [
   { href: '/admin/collections', label: 'Collections' },
   { href: '/admin/referrals', label: 'Referrals' },
   { href: '/admin/blog', label: 'Journal' },
+  { href: '/admin/seo', label: 'Search' },
   { href: '/admin/jobs', label: 'Jobs' },
   { href: '/admin/providers', label: 'Integrations' },
   { href: '/admin/voice', label: 'Voice' },

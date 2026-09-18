@@ -41,6 +41,14 @@ export function absoluteUrl(path = '/'): string {
 }
 
 /**
+ * The landing page's description in search results, when nobody has written
+ * one in the console. Kept here rather than in the page, because the console
+ * shows it as the placeholder it will fall back to.
+ */
+export const LANDING_DESCRIPTION =
+  'Act One turns a product URL into a launch film: it understands the product, measures the brand, develops three creative directions and produces the master and every cut — the way a studio would, at the pace of a launch.';
+
+/**
  * Keyword clusters the public pages are written against.
  *
  * Not stuffed into a meta tag — meta keywords have been ignored by search

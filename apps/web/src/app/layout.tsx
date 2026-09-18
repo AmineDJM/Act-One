@@ -22,9 +22,13 @@ export const metadata: Metadata = {
   },
   description: site.subline,
   applicationName: site.name,
-  // Canonical on every page. Without it, query strings and trailing slashes
-  // split ranking signal across duplicates of the same page.
-  alternates: { canonical: '/' },
+  /*
+   * No canonical here on purpose. A canonical inherited from the root would
+   * make every page that forgot to set one claim to be the landing page,
+   * which is worse than having none: it tells a search engine to drop the
+   * page. Public pages set their own through lib/seo.ts; the pages behind
+   * the door say `noindex` instead.
+   */
   openGraph: {
     type: 'website',
     siteName: site.name,

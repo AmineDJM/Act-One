@@ -8,6 +8,7 @@ import styles from '../auth.module.css';
 
 export const metadata: Metadata = {
   title: 'Sign in',
+  alternates: { canonical: '/auth/sign-in' },
   robots: { index: false, follow: true },
 };
 

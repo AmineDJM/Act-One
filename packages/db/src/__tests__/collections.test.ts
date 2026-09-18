@@ -41,7 +41,7 @@ function entry(organizationId: string, projectId: string, userId: string, over: 
   tick += 1;
   const at = new Date(Date.UTC(2026, 0, 1, 0, 0, tick)).toISOString();
   return {
-    id: newId('col'), slug: `acme-${newId('col').slice(-6).toLowerCase()}`, organizationId, projectId, renderId: newId('rnd'), masterAssetId: newId('ast'),
+    id: newId('col'), slug: `acme-${newId('col').slice(-6).toLowerCase()}`, previousSlugs: [], organizationId, projectId, renderId: newId('rnd'), masterAssetId: newId('ast'),
     posterAssetId: null, stillAssetIds: [], company: 'Acme', productUrl: 'https://acme.example/', title: 'One run', tagline: '', concept: '',
     category: 'saas', launchDate: null, durationSeconds: 19, status: 'pending', featured: false, launchOfTheWeek: false, original: false, position: 0,
     consent: { grantedByUserId: userId, grantedAt: at, statement: 'I consent.', byStaff: false },
@@ -64,6 +64,13 @@ for (const kase of storeCases()) {
         expect((await store.collections.getForProject(acme.id, launch.id))?.id).toBe(second.id);
         expect((await store.collections.getBySlug(first.slug))?.id).toBe(first.id);
         expect(await store.collections.getBySlug('nobody')).toBeNull();
+
+        // A film that moved keeps answering at the address it used to have.
+        const after = `moved-${newId('col').slice(-8).toLowerCase()}`;
+        await store.collections.update(first.id, { slug: after, previousSlugs: [first.slug] });
+        expect(await store.collections.getBySlug(first.slug)).toBeNull();
+        expect((await store.collections.getByFormerSlug(first.slug))?.id).toBe(first.id);
+        expect(await store.collections.getByFormerSlug(after)).toBeNull();
       } finally {
         await kase.close(store);
       }

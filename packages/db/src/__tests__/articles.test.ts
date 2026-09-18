@@ -49,6 +49,24 @@ for (const kase of storeCases()) {
       }
     });
 
+    it('answers at an address the article used to have', async () => {
+      const store: Store = await kase.open();
+      try {
+        const moved = await store.articles.create(article({ slug: `was-${newId('art').slice(-8).toLowerCase()}` }));
+        const before = moved.slug;
+        const after = `now-${newId('art').slice(-8).toLowerCase()}`;
+        await store.articles.update(moved.id, { slug: after, previousSlugs: [before] });
+
+        expect((await store.articles.getBySlug(after))?.id).toBe(moved.id);
+        expect(await store.articles.getBySlug(before)).toBeNull();
+        expect((await store.articles.getByFormerSlug(before))?.id).toBe(moved.id);
+        expect(await store.articles.getByFormerSlug(after)).toBeNull();
+        expect(await store.articles.getByFormerSlug('never-used')).toBeNull();
+      } finally {
+        await kase.close(store);
+      }
+    });
+
     it('lists what is published and hands over what is due', async () => {
       const store: Store = await kase.open();
       try {

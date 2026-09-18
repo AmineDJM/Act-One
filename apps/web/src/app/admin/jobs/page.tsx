@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { JobKind, JobState, jobIsTerminal, type Job } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
+import { badgeFor, took } from './format.ts';
 import styles from '../admin.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -158,18 +159,4 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       )}
     </>
   );
-}
-
-export function badgeFor(state: Job['state']): string {
-  return state === 'completed' ? 'badge--ok' : state === 'failed' || state === 'canceled' ? 'badge--bad' : state === 'queued' ? '' : 'badge--warn';
-}
-
-export function took(job: Pick<Job, 'startedAt' | 'updatedAt' | 'state'>): string {
-  if (!job.startedAt) return '—';
-  const end = !jobIsTerminal(job.state) && job.state !== 'queued' ? Date.now() : Date.parse(job.updatedAt);
-  const ms = Math.max(0, end - Date.parse(job.startedAt));
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60_000);
-  return `${minutes}m ${Math.round((ms % 60_000) / 1000)}s`;
 }

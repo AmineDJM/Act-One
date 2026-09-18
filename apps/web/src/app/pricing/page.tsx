@@ -6,20 +6,16 @@ import { getSignUpPolicy } from '@/server/product.ts';
 import { Footer } from '@/components/Footer.tsx';
 import { getPlatformConfig } from '@/server/platform.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { breadcrumbs, jsonLd, pageMetadata } from '@/lib/seo.ts';
 import styles from '@/components/marketing.module.css';
 import pricing from './pricing.module.css';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Pricing',
   description:
     'Research, brand extraction and three creative concepts are free. You pay when you render. Plans from one launch film to an ongoing campaign programme.',
-  alternates: { canonical: '/pricing' },
-  openGraph: {
-    title: `Pricing · ${site.name}`,
-    description: 'Free until you render. Plans from a single launch film to an ongoing programme.',
-    url: absoluteUrl('/pricing'),
-  },
-};
+  path: '/pricing',
+});
 
 // Prices come from Super Admin, so a pricing experiment is a form submission
 // rather than a deploy.
@@ -163,22 +159,24 @@ export default async function PricingPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Product',
-            name: site.name,
-            description: site.subline,
-            brand: { '@type': 'Brand', name: site.name },
-            offers: visible.map((plan) => ({
-              '@type': 'Offer',
-              name: plan.name,
-              price: (plan.monthlyPriceCents / 100).toFixed(2),
-              priceCurrency: 'EUR',
-              url: absoluteUrl('/pricing'),
-              availability: 'https://schema.org/InStock',
-              description: plan.description,
-            })),
-          }),
+          __html: jsonLd(
+            {
+              '@type': 'Product',
+              name: site.name,
+              description: site.subline,
+              brand: { '@type': 'Brand', name: site.name },
+              offers: visible.map((plan) => ({
+                '@type': 'Offer',
+                name: plan.name,
+                price: (plan.monthlyPriceCents / 100).toFixed(2),
+                priceCurrency: 'EUR',
+                url: absoluteUrl('/pricing'),
+                availability: 'https://schema.org/InStock',
+                description: plan.description,
+              })),
+            },
+            breadcrumbs([{ name: 'Pricing', path: '/pricing' }]),
+          ),
         }}
       />
       <span className="sr-only">{free.name} includes {free.entitlements.length} capabilities.</span>

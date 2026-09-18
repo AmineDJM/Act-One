@@ -4,20 +4,16 @@ import { Nav } from '@/components/Nav.tsx';
 import { getSignUpPolicy } from '@/server/product.ts';
 import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
-import { site, absoluteUrl } from '@/lib/site.ts';
+import { site } from '@/lib/site.ts';
+import { pageMetadata } from '@/lib/seo.ts';
 import styles from '@/components/marketing.module.css';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'How it works',
   description:
     'From a URL to a finished launch film: product research with cited evidence, measured brand extraction, three creative directions, a storyboard you can argue with, then motion, sound and every channel cut.',
-  alternates: { canonical: '/how-it-works' },
-  openGraph: {
-    title: `How it works · ${site.name}`,
-    description: 'Research, brand measurement, creative direction, storyboard, film.',
-    url: absoluteUrl('/how-it-works'),
-  },
-};
+  path: '/how-it-works',
+});
 
 const STAGES = [
   {

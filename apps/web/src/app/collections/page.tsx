@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getProductConfig, getSignUpPolicy } from '@/server/product.ts';
 import { listPublicFilms } from '@/server/collections.ts';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { pageMetadata } from '@/lib/seo.ts';
 import { CollectionsIndex } from './CollectionsIndex.tsx';
 
 /*
@@ -11,17 +12,11 @@ import { CollectionsIndex } from './CollectionsIndex.tsx';
  */
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Collections',
   description: `Real product launch films, made by ${site.name} and selected by a person. SaaS, AI, developer tools and more, each with the product behind it.`,
-  alternates: { canonical: '/collections' },
-  openGraph: {
-    title: `Collections · ${site.name}`,
-    description: `Real product launch films, made by ${site.name} and selected by a person.`,
-    url: absoluteUrl('/collections'),
-    type: 'website',
-  },
-};
+  path: '/collections',
+});
 
 export default async function CollectionsPage() {
   const [films, policy, config] = await Promise.all([listPublicFilms(), getSignUpPolicy(), getProductConfig()]);

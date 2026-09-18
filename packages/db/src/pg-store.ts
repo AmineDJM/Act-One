@@ -2391,6 +2391,16 @@ export class PgStore implements Store {
         return r.rows[0] ? collectionFromRow(r.rows[0]['data']) : null;
       }),
 
+    getByFormerSlug: async (slug: string) =>
+      this.asPlatform(async (c) => {
+        // Containment against the GIN index, not a scan of every document.
+        const r = await c.query(
+          `SELECT data FROM collection_entries WHERE data -> 'previousSlugs' @> to_jsonb($1::text) LIMIT 1`,
+          [slug],
+        );
+        return r.rows[0] ? collectionFromRow(r.rows[0]['data']) : null;
+      }),
+
     getForProject: async (organizationId: string, projectId: string) =>
       this.asPlatform(async (c) => {
         const r = await c.query(
@@ -2554,6 +2564,15 @@ export class PgStore implements Store {
     getBySlug: async (slug: string) =>
       this.asPlatform(async (c) => {
         const r = await c.query('SELECT data FROM articles WHERE slug = $1', [slug]);
+        return r.rows[0] ? articleFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getByFormerSlug: async (slug: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `SELECT data FROM articles WHERE data -> 'previousSlugs' @> to_jsonb($1::text) LIMIT 1`,
+          [slug],
+        );
         return r.rows[0] ? articleFromRow(r.rows[0]['data']) : null;
       }),
 

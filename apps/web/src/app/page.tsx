@@ -11,21 +11,30 @@ import { DotMatrix } from '@/components/ui/DotMatrix.tsx';
 import { getProductConfig } from '@/server/product.ts';
 import { listPublicFilms } from '@/server/collections.ts';
 import { PublicFilmCard } from '@/components/PublicFilmCard.tsx';
-import { site, absoluteUrl } from '@/lib/site.ts';
+import { site, LANDING_DESCRIPTION } from '@/lib/site.ts';
+import { breadcrumbs, faqPage, itemList, jsonLd, pageMetadata } from '@/lib/seo.ts';
 import { REFERENCE_FILMS } from '@/lib/reference-films.ts';
 import styles from '@/components/marketing.module.css';
 
-export const metadata: Metadata = {
-  title: `${PRODUCT_NAME} — Your product. Directed.`,
-  description:
-    'Act One turns a product URL into a launch film: it understands the product, measures the brand, develops three creative directions and produces the master and every cut — the way a studio would, at the pace of a launch.',
-  alternates: { canonical: '/' },
-  openGraph: {
-    title: `${PRODUCT_NAME} — Your product. Directed.`,
-    description: 'Launch films for software companies. Give us your product; we understand it, direct it and produce the film.',
-    url: absoluteUrl('/'),
-  },
-};
+/**
+ * The one page an operator may want to word themselves, and the one page a
+ * search console looks at to confirm the site belongs to whoever says so.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await getProductConfig().catch(() => null);
+  const verification = {
+    ...(config?.seo.googleVerification ? { google: config.seo.googleVerification } : {}),
+    ...(config?.seo.bingVerification ? { other: { 'msvalidate.01': config.seo.bingVerification } } : {}),
+  };
+  return {
+    ...pageMetadata({
+      title: `${PRODUCT_NAME} — Your product. Directed.`,
+      description: config?.seo.description || LANDING_DESCRIPTION,
+      path: '/',
+    }),
+    ...(Object.keys(verification).length > 0 ? { verification } : {}),
+  };
+}
 
 /**
  * The workflow as the customer lives it: five verbs, in order. Each one is
@@ -371,6 +380,27 @@ export default async function HomePage() {
         </section>
       </main>
       <Footer />
+      {/*
+        The questions on this page, said again for machines, and the work it
+        shows. Nothing here is invisible to a reader: structured data that
+        describes something the page does not contain is a penalty waiting to
+        happen.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd(
+            faqPage(FAQ.map((item) => ({ question: item.q, answer: item.a }))),
+            itemList(
+              'Selected work',
+              [
+                ...selected.map((film) => ({ name: `${film.company}: ${film.title}`, path: film.path })),
+                ...references.map((film) => ({ name: `${film.company}: ${film.concept}`, path: '/work' })),
+              ],
+            ),
+          ),
+        }}
+      />
     </>
   );
 }

@@ -49,6 +49,8 @@ export const CollectionEntry = z.object({
   id: z.string(),
   /** The public address: /collections/{slug}. */
   slug: z.string().min(2).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  /** Addresses this film used to have, so an old link redirects rather than breaking. */
+  previousSlugs: z.array(z.string().min(2).max(80)).max(20).default([]),
   organizationId: z.string(),
   projectId: z.string(),
   renderId: z.string(),

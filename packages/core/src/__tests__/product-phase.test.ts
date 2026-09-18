@@ -50,3 +50,26 @@ describe('invitation codes', () => {
     expect(inviteCodeRefusal(base)).toBeNull();
   });
 });
+
+describe('search settings', () => {
+  it('start as nothing chosen, so the code decides', () => {
+    const config = ProductConfig.parse({});
+    expect(config.seo).toEqual({ description: '', discourageIndexing: false, googleVerification: '', bingVerification: '' });
+  });
+
+  it('survive a configuration written before they existed', () => {
+    // A record stored by an earlier version has no seo block at all; reading it
+    // must not throw and must not silently turn indexing off.
+    const stored = { phase: 'production', landing: { headline: 'Your product. Directed.' } };
+    const config = ProductConfig.parse(stored);
+    expect(config.seo.discourageIndexing).toBe(false);
+    expect(config.seo.description).toBe('');
+    expect(config.landing.headline).toBe('Your product. Directed.');
+  });
+
+  it('keep the door itself out of it', () => {
+    // Holding the site back from search says nothing about who may sign up.
+    const held = ProductConfig.parse({ phase: 'production', seo: { discourageIndexing: true } });
+    expect(signUpPolicy(held).open).toBe(true);
+  });
+});

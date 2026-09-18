@@ -12,6 +12,7 @@ import {
   articleWordCount,
   editorialFindings,
   newId,
+  rememberAddress,
   type EditorialFinding,
 } from '@act-one/core';
 import { site } from '@/lib/site.ts';
@@ -101,10 +102,22 @@ export async function getPublicArticle(slug: string): Promise<PublicArticle | nu
   return article && article.status === 'published' ? publicArticleOf(article) : null;
 }
 
+/**
+ * Where the article that used to answer at this address answers now.
+ *
+ * Null when no article ever had it, or when the one that did is not public.
+ */
+export async function articleMovedTo(slug: string): Promise<string | null> {
+  const moved = await getStore().articles.getByFormerSlug(slug);
+  return moved && moved.status === 'published' ? `/blog/${moved.slug}` : null;
+}
+
 /** The hero picture of a published article, by the article's own address. */
 export async function publicArticleHero(slug: string): Promise<{ organizationId: string; assetId: string } | null> {
   const store = getStore();
-  const article = await store.articles.getBySlug(slug);
+  // An old address still serves the picture: a social card cached under the
+  // previous link keeps working instead of turning into a broken box.
+  const article = (await store.articles.getBySlug(slug)) ?? (await store.articles.getByFormerSlug(slug));
   if (!article || article.status !== 'published' || !article.heroAssetId) return null;
   // A hero is chosen in the console from the platform's own library; the id
   // carries its workspace so the bytes can be read without a session.
@@ -151,11 +164,19 @@ export async function updateArticle(id: string, patch: ArticlePatch, userId: str
   if (!current) throw new AppError('not_found', 'Article not found.');
   const parsed = Article.safeParse({ ...current, ...patch, updatedByUserId: userId, updatedAt: new Date().toISOString() });
   if (!parsed.success) throw new AppError('validation_failed', parsed.error.issues[0]?.message ?? 'That does not look right.');
+  let previousSlugs = parsed.data.previousSlugs;
   if (parsed.data.slug !== current.slug) {
     const taken = await store.articles.getBySlug(parsed.data.slug);
     if (taken && taken.id !== id) throw new AppError('conflict', 'That address is taken.');
+    // Only an address the public could have linked to is worth keeping: a
+    // draft renamed before it ever went live was never anywhere.
+    previousSlugs = current.publishedAt ? rememberAddress(current.previousSlugs, current.slug, parsed.data.slug) : parsed.data.previousSlugs;
   }
-  return store.articles.update(id, { ...parsed.data, origin: current.origin === 'generated' ? 'assisted' : current.origin });
+  return store.articles.update(id, {
+    ...parsed.data,
+    previousSlugs,
+    origin: current.origin === 'generated' ? 'assisted' : current.origin,
+  });
 }
 
 export type PublishDecision = 'publish' | 'schedule' | 'unpublish' | 'review';

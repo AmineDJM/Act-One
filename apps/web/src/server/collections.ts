@@ -11,6 +11,7 @@ import {
   creditLine,
   newId,
   orderForPublic,
+  rememberAddress,
   submissionNext,
   type Asset,
   type CollectionStatus,
@@ -259,9 +260,12 @@ export async function editEntry(id: string, patch: EditorialPatch, staffUserId: 
   const parsed = CollectionEntry.safeParse({ ...entry, ...patch, updatedAt: new Date().toISOString() });
   if (!parsed.success) throw new AppError('validation_failed', parsed.error.issues[0]?.message ?? 'That does not look right.');
 
+  let previousSlugs = parsed.data.previousSlugs;
   if (parsed.data.slug !== entry.slug) {
     const taken = await store.collections.getBySlug(parsed.data.slug);
     if (taken && taken.id !== entry.id) throw new AppError('conflict', 'That address is taken.');
+    // Keep the old address only if the film was ever public under it.
+    previousSlugs = entry.publishedAt ? rememberAddress(entry.previousSlugs, entry.slug, parsed.data.slug) : parsed.data.previousSlugs;
   }
   if (patch.launchOfTheWeek === true && !entry.launchOfTheWeek) {
     for (const other of await store.collections.list({ limit: 500 })) {
@@ -269,7 +273,7 @@ export async function editEntry(id: string, patch: EditorialPatch, staffUserId: 
     }
   }
 
-  const updated = await store.collections.update(entry.id, { ...parsed.data, decidedByUserId: entry.decidedByUserId ?? staffUserId });
+  const updated = await store.collections.update(entry.id, { ...parsed.data, previousSlugs, decidedByUserId: entry.decidedByUserId ?? staffUserId });
   revalidatePublic(entry.slug);
   if (updated.slug !== entry.slug) revalidatePublic(updated.slug);
   return updated;
@@ -477,6 +481,16 @@ export async function getPublicFilm(slug: string): Promise<PublicFilm | null> {
   return entry && entry.status === 'published' ? publicFilmOf(entry) : null;
 }
 
+/**
+ * Where the film that used to answer at this address answers now.
+ *
+ * Null when no film ever had it, or when the one that did is no longer public.
+ */
+export async function filmMovedTo(slug: string): Promise<string | null> {
+  const moved = await getStore().collections.getByFormerSlug(slug);
+  return moved && moved.status === 'published' ? `/collections/${moved.slug}` : null;
+}
+
 export function publicFilmOf(entry: CollectionEntry): PublicFilm {
   const base = `/api/collections/${entry.slug}`;
   return {
@@ -517,7 +531,9 @@ export type PublicPart = 'film' | 'poster' | `still-${number}`;
  */
 export async function publicFilmAsset(slug: string, part: string): Promise<Asset | null> {
   const store = getStore();
-  const entry = await store.collections.getBySlug(slug);
+  // An old address still serves the bytes, so a poster embedded in somebody
+  // else's page or a cached social card survives a rename.
+  const entry = (await store.collections.getBySlug(slug)) ?? (await store.collections.getByFormerSlug(slug));
   if (!entry || entry.status !== 'published') return null;
   let assetId: string | null = null;
   if (part === 'film') assetId = entry.masterAssetId;

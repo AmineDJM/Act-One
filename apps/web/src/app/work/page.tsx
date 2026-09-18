@@ -5,20 +5,16 @@ import { Footer } from '@/components/Footer.tsx';
 import { StartProject } from '@/components/StartProject.tsx';
 import { FilmCard } from '@/components/FilmCard.tsx';
 import { site, absoluteUrl } from '@/lib/site.ts';
+import { breadcrumbs, itemList, jsonLd, pageMetadata } from '@/lib/seo.ts';
 import { REFERENCE_FILMS } from '@/lib/reference-films.ts';
 import styles from '@/components/marketing.module.css';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Work',
   description:
     'Reference films across an AI agent product, a SaaS analytics platform and a developer tool — each shown with the creative direction behind it.',
-  alternates: { canonical: '/work' },
-  openGraph: {
-    title: `Work · ${site.name}`,
-    description: 'Reference launch films and the creative direction behind each one.',
-    url: absoluteUrl('/work'),
-  },
-};
+  path: '/work',
+});
 
 /**
  * Reference films.
@@ -61,6 +57,29 @@ export default async function WorkPage() {
         </section>
       </main>
       <Footer />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd(
+            breadcrumbs([{ name: 'Work', path: '/work' }]),
+            itemList('Reference films', DEMOS.map((demo) => ({ name: `${demo.company}: ${demo.concept}`, path: '/work' }))),
+            ...DEMOS.map((demo) => ({
+              '@type': 'VideoObject',
+              '@id': absoluteUrl(`/work#${demo.slug}`),
+              name: `${demo.company}: ${demo.concept}`,
+              description: demo.idea,
+              thumbnailUrl: [absoluteUrl(`/work/${demo.slug}.png`)],
+              contentUrl: absoluteUrl(`/work/${demo.slug}.mp4`),
+              uploadDate: '2026-01-01T00:00:00.000Z',
+              // Stated plainly: these are our own demonstrations for invented
+              // companies, and the page says so where a reader can see it.
+              creditText: `${site.name} reference film`,
+              publisher: { '@id': absoluteUrl('/#organization') },
+              inLanguage: 'en',
+            })),
+          ),
+        }}
+      />
     </>
   );
 }

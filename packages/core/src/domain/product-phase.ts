@@ -45,6 +45,33 @@ export const LandingConfig = z.object({
 });
 export type LandingConfig = z.infer<typeof LandingConfig>;
 
+/**
+ * The handful of search settings an operator actually owns.
+ *
+ * Everything else about how this site presents itself to search engines is
+ * code — canonicals, structured data, the sitemap — because those are
+ * correctness, not preference. What is left is genuinely a decision: the
+ * sentence the landing page shows in results, whether this deployment may be
+ * indexed at all, and the tokens a search console hands you to prove the site
+ * is yours.
+ */
+export const SeoConfig = z.object({
+  /** The landing page's description in search results. Empty means the written one. */
+  description: z.string().max(240).default(''),
+  /**
+   * Keep the whole site out of search even on its real address.
+   *
+   * For the window between a domain going live and the site being ready to be
+   * found. A deployment that is not on its real address is already excluded.
+   */
+  discourageIndexing: z.boolean().default(false),
+  /** The token from Google Search Console's HTML tag method, if that is how it was verified. */
+  googleVerification: z.string().max(200).default(''),
+  /** The same, for Bing Webmaster Tools. */
+  bingVerification: z.string().max(200).default(''),
+});
+export type SeoConfig = z.infer<typeof SeoConfig>;
+
 export const InviteConfig = z.object({
   /** Whether an invitation code opens the door in a private beta. */
   codesEnabled: z.boolean().default(true),
@@ -59,6 +86,7 @@ export const ProductConfig = z.object({
   phase: ProductPhase.default('private_beta'),
   trademarkStatus: TrademarkStatus.default('none'),
   landing: LandingConfig.default(() => LandingConfig.parse({})),
+  seo: SeoConfig.default(() => SeoConfig.parse({})),
   invites: InviteConfig.default(() => InviteConfig.parse({})),
   /** The referral programme's rules; see domain/referral.ts. */
   referrals: ReferralProgram.default(() => ReferralProgram.parse({})),
