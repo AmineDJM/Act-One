@@ -20,6 +20,7 @@ import path from 'node:path';
 import { neutralRamp } from '@act-one/design';
 import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
 import { renderFilm, type FilmProps } from '@act-one/motion';
+import { runDeterministicChecks } from '@act-one/qa';
 
 const OUT = path.resolve(process.cwd(), 'apps/web/public/work');
 
@@ -117,10 +118,10 @@ const northwind: FilmProps = {
     'northwind',
     [
       { duration: 3.4, visualType: 'kinetic_typography', purpose: 'Open on the problem', onScreenText: ['Forty unmatched rows.'], motionRecipe: recipe('kinetic_headline', 'in_out_quart', 0.45, 0.06) },
-      { duration: 3.0, visualType: 'kinetic_typography', purpose: 'Name the cost', onScreenText: ['Every Monday.'], motionRecipe: recipe('word_reveal', 'in_out_quart', 0.45, 0.08) },
-      { duration: 2.8, visualType: 'transition', purpose: 'Turn', onScreenText: ['Then stop doing it.'], motionRecipe: recipe('mask_reveal', 'in_out_quart', 0.5, 0) },
-      { duration: 3.2, visualType: 'kinetic_typography', purpose: 'State the shift', onScreenText: ['One run.'], motionRecipe: recipe('editorial_headline', 'in_out_quart', 0.5, 0) },
-      { duration: 3.4, visualType: 'statistic', purpose: 'Land the proof', onScreenText: ['0', 'unmatched rows remaining'], motionRecipe: recipe('metric_reveal', 'out_quint', 0.5, 0) },
+      { duration: 2.2, visualType: 'kinetic_typography', purpose: 'Name the cost', onScreenText: ['Every Monday.'], motionRecipe: recipe('word_reveal', 'in_out_quart', 0.45, 0.08) },
+      { duration: 4.0, visualType: 'transition', purpose: 'Turn', onScreenText: ['Then stop doing it.'], motionRecipe: recipe('mask_reveal', 'in_out_quart', 0.5, 0) },
+      { duration: 1.9, visualType: 'kinetic_typography', purpose: 'State the shift', onScreenText: ['One run.'], motionRecipe: recipe('editorial_headline', 'in_out_quart', 0.5, 0) },
+      { duration: 4.4, visualType: 'statistic', purpose: 'Land the proof', onScreenText: ['0', 'unmatched rows remaining'], claimEvidenceIds: ['evd_northwind_close'], motionRecipe: recipe('metric_reveal', 'out_quint', 0.5, 0) },
       { duration: 3.6, visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Close the books while you sleep.'], motionRecipe: recipe('cta_end_card', 'out_quint', 0.45, 0) },
     ],
     'Sparse, sub-heavy, one impact on the turn.',
@@ -149,12 +150,12 @@ const meridian: FilmProps = {
   storyboard: storyboard(
     'meridian',
     [
-      { duration: 1.6, visualType: 'kinetic_typography', purpose: 'Hook', onScreenText: ['You have a question.'], motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03) },
-      { duration: 1.5, visualType: 'kinetic_typography', purpose: 'Escalate', onScreenText: ['The data team has forty.'], motionRecipe: recipe('word_reveal', 'out_expo', 0.85, 0.03) },
-      { duration: 1.4, visualType: 'kinetic_typography', purpose: 'The wait', onScreenText: ['Yours is number forty-one.'], motionRecipe: recipe('editorial_headline', 'out_expo', 0.8, 0) },
-      { duration: 2.0, visualType: 'transition', purpose: 'Break', onScreenText: ['Ask it here instead.'], motionRecipe: recipe('mask_reveal', 'out_expo', 0.8, 0) },
-      { duration: 2.2, visualType: 'statistic', purpose: 'Proof', onScreenText: ['1.4s', 'from question to answer'], motionRecipe: recipe('metric_reveal', 'out_expo', 0.8, 0) },
-      { duration: 1.8, visualType: 'kinetic_typography', purpose: 'Reframe', onScreenText: ['No ticket. No queue.'], motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03) },
+      { duration: 2.1, visualType: 'kinetic_typography', purpose: 'Hook', onScreenText: ['You have a question.'], motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03) },
+      { duration: 2.4, visualType: 'kinetic_typography', purpose: 'Escalate', onScreenText: ['The data team has forty.'], motionRecipe: recipe('word_reveal', 'out_expo', 0.85, 0.03) },
+      { duration: 1.7, visualType: 'kinetic_typography', purpose: 'The wait', onScreenText: ['Yours is forty-one.'], motionRecipe: recipe('editorial_headline', 'out_expo', 0.8, 0) },
+      { duration: 2.1, visualType: 'transition', purpose: 'Break', onScreenText: ['Ask it here instead.'], motionRecipe: recipe('mask_reveal', 'out_expo', 0.8, 0) },
+      { duration: 2.5, visualType: 'statistic', purpose: 'Proof', onScreenText: ['1.4s', 'from question to answer'], claimEvidenceIds: ['evd_meridian_latency'], motionRecipe: recipe('metric_reveal', 'out_expo', 0.8, 0) },
+      { duration: 2.1, visualType: 'kinetic_typography', purpose: 'Reframe', onScreenText: ['No ticket. No queue.'], motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03) },
       { duration: 3.0, visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Stop asking the data team.'], motionRecipe: recipe('cta_end_card', 'out_expo', 0.7, 0) },
     ],
     'Driving pulse, hard cut on every line.',
@@ -187,10 +188,10 @@ const halyard: FilmProps = {
     'halyard',
     [
       { duration: 3.0, visualType: 'kinetic_typography', purpose: 'Open flat', onScreenText: ['Nothing happened last night.'], motionRecipe: recipe('editorial_headline', 'out_quint', 0.4, 0) },
-      { duration: 2.8, visualType: 'kinetic_typography', purpose: 'Or the night before', onScreenText: ['Or the night before that.'], motionRecipe: recipe('word_reveal', 'out_quint', 0.4, 0.05) },
-      { duration: 3.2, visualType: 'quote', purpose: 'The turn', onScreenText: ['We have not been paged in eleven months.', 'Infrastructure lead, 200-person team'], motionRecipe: recipe('quote_hold', 'out_quint', 0.4, 0) },
-      { duration: 3.0, visualType: 'statistic', purpose: 'Proof', onScreenText: ['11', 'months since the last page'], motionRecipe: recipe('metric_reveal', 'out_quint', 0.4, 0) },
-      { duration: 2.8, visualType: 'kinetic_typography', purpose: 'The argument', onScreenText: ['Boring on purpose.'], motionRecipe: recipe('kinetic_headline', 'out_quint', 0.45, 0.04) },
+      { duration: 2.4, visualType: 'kinetic_typography', purpose: 'Or the night before', onScreenText: ['Or the night before that.'], motionRecipe: recipe('word_reveal', 'out_quint', 0.4, 0.05) },
+      { duration: 5.2, visualType: 'quote', purpose: 'The turn', onScreenText: ['We have not been paged in eleven months.', 'Infrastructure lead, 200-person team'], claimEvidenceIds: ['evd_halyard_pages'], motionRecipe: recipe('quote_hold', 'out_quint', 0.4, 0) },
+      { duration: 3.0, visualType: 'statistic', purpose: 'Proof', onScreenText: ['11', 'months since the last page'], claimEvidenceIds: ['evd_halyard_pages'], motionRecipe: recipe('metric_reveal', 'out_quint', 0.4, 0) },
+      { duration: 2.0, visualType: 'kinetic_typography', purpose: 'The argument', onScreenText: ['Boring on purpose.'], motionRecipe: recipe('kinetic_headline', 'out_quint', 0.45, 0.04) },
       { duration: 3.4, visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Infrastructure that stays quiet.'], motionRecipe: recipe('cta_end_card', 'out_quint', 0.4, 0) },
     ],
     'Almost none. Room tone and one soft mark.',
@@ -202,13 +203,52 @@ const halyard: FilmProps = {
   theme: 'light',
 };
 
-const FILMS = [
+export const FILMS = [
   { slug: 'northwind', props: northwind, posterAt: 1.2 },
   { slug: 'meridian', props: meridian, posterAt: 0.9 },
   { slug: 'halyard', props: halyard, posterAt: 1.4 },
 ] as const;
 
 const browserExecutable = process.env['ACT_ONE_CHROME_HEADLESS_SHELL'];
+
+/*
+ * Our own shop window is held to our own standards.
+ *
+ * These are hand-written rather than generated, which makes it easy for them
+ * to quietly fall behind the rules every customer's film is checked against —
+ * and a reference film that would fail QA is an advertisement for work we
+ * would refuse to deliver. So they are checked before they are rendered, and a
+ * failure stops the build rather than shipping to the marketing page.
+ */
+for (const film of FILMS) {
+  const issues = runDeterministicChecks({
+    storyboard: film.props.storyboard,
+    brand: film.props.brand,
+    aspect: '16:9',
+    cta: film.props.cta,
+    /*
+     * The figures in these films cite evidence the way a real project's would.
+     * The evidence is invented, because the companies are — and they are
+     * labelled as fictional everywhere they appear, which is the difference
+     * between a demonstration and a fabrication. Stripping the numbers instead
+     * would make the shop window less like the product, and passing them
+     * uncited would mean exempting ourselves from the rule we hold every
+     * customer's film to.
+     */
+    knownEvidenceIds: new Set([
+      'evd_northwind_close',
+      'evd_meridian_latency',
+      'evd_halyard_pages',
+    ]),
+  }).filter((issue) => issue.severity === 'blocker' || issue.severity === 'major');
+
+  if (issues.length > 0) {
+    console.error(`\n${film.slug} would not pass our own QA:`);
+    for (const issue of issues) console.error(`  ${issue.severity} ${issue.check}: ${issue.message}`);
+    process.exit(1);
+  }
+}
+console.log(`${FILMS.length} reference films pass deterministic QA`);
 
 await mkdir(OUT, { recursive: true });
 
