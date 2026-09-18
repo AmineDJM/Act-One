@@ -112,11 +112,19 @@ export function AssetCard({ card, projects }: { card: LibraryCard; projects: { i
             ))}
           </select>
           <span aria-hidden="true">·</span>
-          <button type="button" className={styles.assetProjects} onClick={() => setChooser((open) => !open)} title="Which projects use it">
-            {card.projects.length === 0 ? 'ALL PROJECTS' : card.projects.map((project) => project.name).join(', ')}
+          <button type="button" className={styles.assetProjects} onClick={() => setChooser((open) => !open)} title="Which productions use it">
+            {card.projects.length === 0 ? 'EVERY PRODUCTION' : card.projects.map((project) => project.name).join(', ')}
           </button>
           <span aria-hidden="true">·</span>
-          <span className={styles.assetSource}>{card.sourceLabel.toUpperCase()}</span>
+          {/* Where it came from. A picture with no provenance is a picture
+              nobody can vouch for, and this archive keeps things for years. */}
+          {card.sourceUrl ? (
+            <a className={styles.assetSource} href={card.sourceUrl} target="_blank" rel="noreferrer" title={card.sourceUrl}>
+              {card.sourceLabel.toUpperCase()} · {hostOf(card.sourceUrl)}
+            </a>
+          ) : (
+            <span className={styles.assetSource}>{card.sourceLabel.toUpperCase()}</span>
+          )}
           {card.parentAssetId ? <span className={styles.assetVersion}>VERSION</span> : null}
         </div>
 
@@ -162,7 +170,7 @@ export function AssetCard({ card, projects }: { card: LibraryCard; projects: { i
         <div className={styles.chooser} role="group" aria-label="Use in">
           <label className={styles.chip} data-on={chosen.size === 0 || undefined}>
             <input type="radio" className="sr-only" name={`scope-${card.id}`} checked={chosen.size === 0} onChange={() => setChosen(new Set())} />
-            All projects
+            All productions
           </label>
           {projects.map((project) => (
             <label key={project.id} className={styles.chip} data-on={chosen.has(project.id) || undefined}>
@@ -201,4 +209,13 @@ export function AssetCard({ card, projects }: { card: LibraryCard; projects: { i
       ) : null}
     </article>
   );
+}
+
+/** The host of a source address, for a card that has no room for the rest. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'source';
+  }
 }

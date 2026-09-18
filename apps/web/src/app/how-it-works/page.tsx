@@ -17,28 +17,28 @@ export const metadata: Metadata = pageMetadata({
 
 const STAGES = [
   {
-    eyebrow: 'Stage one',
+    eyebrow: 'Discovery',
     title: 'Research, with receipts',
     body: 'A browser agent reads your homepage, pricing, product and use-case pages the way a strategist would before a pitch, and keeps the verbatim excerpt behind every fact. Anything we cannot trace to your own material is dropped and reported back to you rather than repeated — including any figure that appears nowhere on your site.',
   },
   {
-    eyebrow: 'Stage two',
+    eyebrow: 'Identity',
     title: 'Your brand, measured',
     body: 'We do not ask a model what your brand looks like; we measure the rendered page. Colour is ranked by painted area and consistency across pages, type by ink weight, and your corner radius is the one you actually use rather than the average of your outliers. When a brand genuinely has two candidate colours, we show you both and ask.',
   },
   {
-    eyebrow: 'Stage three',
+    eyebrow: 'Direction',
     title: 'Three arguments, not three fonts',
     body: 'Each direction is assigned a different narrative structure and a different creative language before a word is written, then measured for divergence — if two come back as the same idea reworded, one is regenerated. One leads with the problem, one with the product, one with what becomes possible.',
   },
   {
-    eyebrow: 'Stage four',
+    eyebrow: 'Storyboard',
     title: 'A storyboard you can argue with',
     body: 'Everything expensive happens after this, so this is where composition, timing, legibility and budget are settled. On-screen text is checked against real type metrics before anything renders. You change things by writing a sentence — "the opening is too slow" — and only the scenes that changes get re-rendered.',
   },
   {
-    eyebrow: 'Stage five',
-    title: 'Production',
+    eyebrow: 'Production',
+    title: 'Shot, scored, mastered',
     body: 'Your real product interface staged as an object, typography set by a type engine on a real grid, sound designed against the cut, and a mix mastered for where the film will actually be watched. Then the campaign: vertical, square, fifteen-second ads that argue differently, a bumper and a homepage loop.',
   },
 ];

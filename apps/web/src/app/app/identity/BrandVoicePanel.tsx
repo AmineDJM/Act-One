@@ -162,8 +162,8 @@ function Casting({ library }: { library: boolean }) {
       </form>
       {!library ? (
         <p className="hint">
-          The engine reading finals has no library on this platform, so the six directed voices are
-          offered; each speaks your language natively.
+          The engine reading finals has no named voices on this platform, so the six directed ones
+          are offered instead; each speaks your language natively.
         </p>
       ) : null}
       {search.error ? <p className="error">{search.error}</p> : null}

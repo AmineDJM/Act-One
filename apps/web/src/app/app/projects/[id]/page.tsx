@@ -401,7 +401,7 @@ function bodyFor(cta: PrimaryCta, watermarked: boolean, reason: string): string 
     case 'retry':
       return 'We kept everything we had. Picking this up resumes from where it stopped.';
     default:
-      return 'Free until you render.';
+      return 'Free until we produce.';
   }
 }
 

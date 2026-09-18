@@ -29,7 +29,7 @@ export function ProjectCta(props: {
   body: string;
   /** The work in flight, as steps with timing. Null when nothing is running. */
   run: RunView | null;
-  /** The generation as nine steps, read off the jobs and their activity. */
+  /** The production as nine steps, read off the jobs and their activity. */
   timeline: Timeline | null;
   disabled: boolean;
   /** What to do about it when the action is blocked by the plan. */

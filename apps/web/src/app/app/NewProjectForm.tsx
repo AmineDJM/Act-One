@@ -180,7 +180,7 @@ export function NewProjectForm({ maxDurationSeconds, autoFocus = false }: { maxD
                   </div>
                 </div>
                 <p className="hint">
-                  Optional. Every one of these can be changed on the project until the film is rendered.
+                  Optional. Every one of these can be changed on the production until the master exists.
                 </p>
               </>
             ) : null}

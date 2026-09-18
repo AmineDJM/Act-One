@@ -37,7 +37,10 @@ export default async function BillingPage() {
             {subscription.status}
           </span>
         ) : (
-          <span className="badge">free</span>
+          // A paid plan with no subscription behind it is not "free": it is a
+          // workspace somebody put on a plan by hand, and saying free beside
+          // €4,490/mo reads as a bug.
+          <span className="badge">{plan.monthlyPriceCents === 0 ? 'free' : 'not billed'}</span>
         )}
       </div>
 

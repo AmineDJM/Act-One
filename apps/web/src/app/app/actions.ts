@@ -591,7 +591,7 @@ export async function updateBriefAction(_previous: FormState, formData: FormData
     const projectId = String(formData.get('projectId') ?? '');
     const project = await getProjectOr404(session, projectId);
     if (stageReached(project.stage, 'rendering')) {
-      return { error: 'The film is rendered; the brief is fixed. Start a new project to change it.' };
+      return { error: 'The master exists; the brief is fixed. Start a new production to change it.' };
     }
     const { updateBrief } = await import('@/server/projects.ts');
     await updateBrief(session, project, {

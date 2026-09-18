@@ -67,8 +67,8 @@ export function Notes({
         <p className="hint">
           Notes for the edit. Anyone on the team can leave one — &ldquo;the opening holds too
           long&rdquo;, &ldquo;lead with the dashboard&rdquo; — and the next revision is made
-          against them. Before a render, it is the cheapest place to disagree; once there is a
-          film, a note can point at a moment of it.
+          against them. Before the master exists, it is the cheapest place to disagree; once
+          there is a film, a note can point at a moment of it.
         </p>
       ) : (
         <ol className={styles.noteList}>

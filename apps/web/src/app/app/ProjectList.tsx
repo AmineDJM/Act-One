@@ -99,7 +99,7 @@ export function ProjectList({ projects }: { projects: ProjectCard[] }) {
           <span className={styles.newProjectPlus} aria-hidden="true">
             +
           </span>
-          <strong>Start a new project</strong>
+          <strong>Start a new production</strong>
           <span>A new launch, a new story.</span>
         </a>
       </div>

@@ -48,7 +48,7 @@ export default async function ReferPage() {
             <div className={styles.kvRow}>
               <dt>You receive</dt>
               <dd>
-                {program.inviterCredits} credits when they {program.qualifyOn === 'paid' ? 'start paying' : 'produce their first film'}
+                {program.inviterCredits} production credits when they {program.qualifyOn === 'paid' ? 'start paying' : 'produce their first film'}
                 {program.paidBonusCredits > 0 ? `, and ${program.paidBonusCredits} more the first time they pay` : ''}.
               </dd>
             </div>

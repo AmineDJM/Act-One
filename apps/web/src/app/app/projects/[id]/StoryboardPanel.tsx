@@ -161,7 +161,7 @@ export function StoryboardPanel({
                         {confirming
                           ? 'Starting…'
                           : exchange.rerender
-                            ? 'Yes, apply it and re-render the film'
+                            ? 'Yes, apply it and produce the film again'
                             : 'Yes, apply it'}
                       </button>
                     </form>

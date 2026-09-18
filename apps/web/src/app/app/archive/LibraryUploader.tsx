@@ -165,15 +165,15 @@ export function LibraryUploader({ projects, defaultProjectIds }: { projects: { i
             <label className={styles.useInOption}>
               <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} />
               <span>
-                <strong>All projects</strong>
-                <span>Every project, now and later.</span>
+                <strong>All productions</strong>
+                <span>Every production, now and later.</span>
               </span>
             </label>
             <label className={styles.useInOption}>
               <input type="radio" name="scope" checked={scope === 'some'} onChange={() => setScope('some')} disabled={projects.length === 0} />
               <span>
-                <strong>Select projects</strong>
-                <span>{projects.length === 0 ? 'No projects yet.' : 'Only the ones you tick.'}</span>
+                <strong>Select productions</strong>
+                <span>{projects.length === 0 ? 'No productions yet.' : 'Only the ones you tick.'}</span>
               </span>
             </label>
             {scope === 'some' ? (

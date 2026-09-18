@@ -370,7 +370,7 @@ export default async function HomePage() {
             <h2 style={{ maxWidth: '18ch' }}>See what it understands about your product.</h2>
             <p className="lede">
               Free to research, free to see your brand, free to read three concepts.
-              {launch ? ` Rendering starts at €${(launch.monthlyPriceCents / 100).toLocaleString('en-US')}.` : ''}
+              {launch ? ` Production starts at €${(launch.monthlyPriceCents / 100).toLocaleString('en-US')}.` : ''}
             </p>
             <StartProject cta={config.landing.ctaLabel} policy={policy} idPrefix="website-cta" />
             <Link href="/pricing" className="btn btn--secondary">

@@ -51,8 +51,8 @@ export const ReferralProgram = z.object({
   maxRewardedPerInviter: z.number().int().min(1).max(10_000).nullable().default(25),
   tiers: z.array(ReferralTier).max(10).default([]),
   /** What the customer's referral page says above their link. */
-  headline: z.string().max(120).default('Bring a founder. Both of you get credits.'),
-  terms: z.string().max(600).default('Credits land when the person you invited produces their first film. One reward per person invited.'),
+  headline: z.string().max(120).default('Bring a founder. Both of you get production credits.'),
+  terms: z.string().max(600).default('Production credits land when the person you invited produces their first film. One reward per person invited.'),
 });
 export type ReferralProgram = z.infer<typeof ReferralProgram>;
 export const DEFAULT_REFERRAL_PROGRAM: ReferralProgram = ReferralProgram.parse({});

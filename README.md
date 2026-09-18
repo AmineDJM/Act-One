@@ -125,6 +125,18 @@ retried at all. The media allowance belongs to the production rather than to
 the attempt, so three automatic retries cannot spend three times what the
 customer agreed to.
 
+### The words, checked rather than audited
+
+A microcopy pass is worth exactly as long as it takes somebody to add one more
+sentence, so the rules that were actually broken before are checked on every
+run: no provider, model or piece of our machinery named on a customer's
+screen, nothing called AI-generated, "project" where the product says
+production, "library" after the archive was named. The test reads the prose
+out of every customer-facing page and fails on a match. The console is exempt
+on purpose — staff surfaces name providers, models, queues and raw errors,
+and softening them would make the platform harder to operate for nobody's
+benefit.
+
 ### The product's phase, and the door
 
 Where the product is in its life is one setting in the console, under

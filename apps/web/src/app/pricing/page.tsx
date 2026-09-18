@@ -65,7 +65,7 @@ export default async function PricingPage() {
         <section className={`shell ${styles.section}`} style={{ paddingTop: 'var(--space-8)' }}>
           <div className={styles.sectionHead}>
             <p className="eyebrow">Pricing</p>
-            <h1 style={{ fontSize: 'clamp(2.2rem, 4.6vw, 3.4rem)' }}>Free until you render.</h1>
+            <h1 style={{ fontSize: 'clamp(2.2rem, 4.6vw, 3.4rem)' }}>Free until we produce.</h1>
             <p className="lede">
               Reading your product, measuring your brand and developing three creative directions
               costs nothing. You decide whether the work is good before you decide whether to pay
@@ -102,7 +102,7 @@ export default async function PricingPage() {
 
                   <dl className={pricing.limits}>
                     <div>
-                      <dt>Projects</dt>
+                      <dt>Productions</dt>
                       <dd>{plan.limits.projectsPerMonth < 0 ? 'Unlimited' : `${plan.limits.projectsPerMonth}/mo`}</dd>
                     </div>
                     <div>
@@ -114,7 +114,7 @@ export default async function PricingPage() {
                       <dd>
                         {plan.entitlements.includes('revisions.unlimited') || plan.limits.revisionsPerProject < 0
                           ? 'Unlimited'
-                          : `${plan.limits.revisionsPerProject}/project`}
+                          : `${plan.limits.revisionsPerProject}/production`}
                       </dd>
                     </div>
                     <div>
@@ -122,7 +122,7 @@ export default async function PricingPage() {
                       <dd>{plan.limits.maxSeats < 0 ? 'Unlimited' : plan.limits.maxSeats}</dd>
                     </div>
                     <div>
-                      <dt>Credits</dt>
+                      <dt>Production credits</dt>
                       <dd>{plan.limits.monthlyCredits.toLocaleString('en-US')}/mo</dd>
                     </div>
                   </dl>
@@ -142,13 +142,13 @@ export default async function PricingPage() {
           <div className={pricing.credits}>
             <div>
               <h2 style={{ fontSize: '1.2rem', marginBottom: 'var(--space-3)' }}>
-                Credits, not invoices you cannot read
+                Production credits, not invoices you cannot read
               </h2>
               <p className="secondary" style={{ fontSize: '0.95rem', maxWidth: '70ch' }}>
-                Expensive work — generated cinematography, 3D renders, extra versions, extra
-                languages — draws on creative credits. Your plan includes a monthly allowance and
-                you can top up at €{(CREDIT_USD_VALUE * 100).toFixed(0)} cents per credit. You never
-                see a vendor bill, and we never mark up something you did not ask for.
+                Expensive work — cinematography, 3D staging, extra cuts, extra languages — draws on
+                production credits. Your plan includes a monthly allowance and you can top up at
+                €{(CREDIT_USD_VALUE * 100).toFixed(0)} cents each. You never see a vendor bill, and
+                we never mark up something you did not ask for.
               </p>
             </div>
           </div>
