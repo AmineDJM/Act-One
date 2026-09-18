@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@act-one/core": "*",
+    "@higgsfield/client": "^0.2.6",
     "playwright-core": "^1.49.1",
     "undici": "^8.10.2",
     "zod": "^4.0.0"

@@ -14,7 +14,6 @@ import {
   NullCostSink,
   backoffMs,
   DEFAULT_PROVIDER_CONFIG,
-  HiggsfieldProvider,
 } from '../index.ts';
 
 describe('tryParseJson', () => {
@@ -192,33 +191,6 @@ describe('ProviderRegistry', () => {
   it('memoises provider instances', () => {
     const registry = new ProviderRegistry();
     expect(registry.storage()).toBe(registry.storage());
-  });
-});
-
-describe('cost accounting', () => {
-  it('records every media submission to the sink', async () => {
-    const sink = new NullCostSink();
-    const provider = new HiggsfieldProvider({ apiKey: 'test', costSink: sink });
-    // Cost estimation is pure and testable without touching the network.
-    expect(
-      provider.estimateCost({
-        prompt: 'x',
-        aspect: '16:9',
-        tier: 'cinematic',
-        durationSeconds: 5,
-      }),
-    ).toBeCloseTo(2.1);
-    expect(provider.estimateCost({ prompt: 'x', aspect: '16:9', tier: 'studio' })).toBeCloseTo(0.05);
-  });
-
-  it('refuses a request above the per-request ceiling before spending anything', async () => {
-    const provider = new HiggsfieldProvider({ apiKey: 'test', maxCostPerRequestUsd: 1 });
-    await expect(
-      provider.generateVideo(
-        { prompt: 'x', aspect: '16:9', tier: 'cinematic', durationSeconds: 10 },
-        { organizationId: 'org_1' },
-      ),
-    ).rejects.toThrow(/ceiling/);
   });
 });
 

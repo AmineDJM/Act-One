@@ -60,5 +60,6 @@ export interface GenerativeMediaProvider extends Provider {
   getJob(jobId: string, context: CallContext): Promise<MediaJob>;
   /** Polls until terminal or the budget/timeout is spent. */
   waitForJob(jobId: string, context: CallContext, timeoutMs?: number): Promise<MediaJob>;
-  estimateCost(request: ImageRequest | VideoRequest | EditRequest): number;
+  /** What the request will cost, in USD: the vendor's own figure where it offers one. */
+  estimateCost(request: ImageRequest | VideoRequest | EditRequest): Promise<number>;
 }

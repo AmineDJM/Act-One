@@ -95,7 +95,7 @@ export async function runSceneAssets(
         continue;
       }
 
-      const estimate = media.estimateCost({
+      const estimate = await media.estimateCost({
         prompt: need.brief,
         aspect: need.aspect,
         tier: tierFor(project.brief.creativeMode),

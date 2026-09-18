@@ -245,3 +245,25 @@ Everything else — design, motion, 3D, sound, storage, queue, QA — is ours. T
 four are replaceable infrastructure; the moat is product understanding, creative
 strategy, art direction, premium motion systems, real product cinematography,
 Brand DNA, automated QA and the revision system.
+
+### Higgsfield
+
+Generated shots come from **Seedance 2.5** through the official SDK:
+text-to-video, and image-to-video when a scene has a reference still to hold
+the brand's palette. Stills come from **Soul 2**. The credential is one value,
+`KEY_ID:KEY_SECRET`, issued at [console.higgsfield.ai](https://console.higgsfield.ai);
+paste it in **Integrations**, or set `HF_CREDENTIALS` to bootstrap a deploy.
+Saving it prices a four-second shot, which proves the key and shows today's cost
+without generating anything. Every shot is priced by the vendor's estimate
+before it is sent, and sent only under the per-request ceiling. A moderated or
+failed request is recorded at zero, because that is what the vendor charges.
+
+To make one request outside the product:
+
+```bash
+echo 'HF_CREDENTIALS=key-id:key-secret' > .env.local   # ignored by git
+npm run higgsfield:example                              # spends credits
+```
+
+It generates a five-second clip from a fixed prompt and prints the URL, or says
+why there is none.

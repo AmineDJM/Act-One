@@ -58,14 +58,20 @@ export const PROVIDER_SLOTS = [
   {
     id: 'higgsfield',
     label: 'Higgsfield',
-    purpose: 'Generated cinematic shots, used sparingly for mood and metaphor.',
+    purpose:
+      'Generated cinematic shots with Seedance 2.5, used sparingly for mood and metaphor. Saving prices a four-second shot to prove the key.',
     required: false,
     fields: [
-      { key: 'apiKey', label: 'API key', placeholder: 'hf_…', secret: true, envVar: 'HIGGSFIELD_API_KEY' },
-      { key: 'apiSecret', label: 'API secret', placeholder: 'optional', secret: true, envVar: 'HIGGSFIELD_API_SECRET' },
+      {
+        key: 'credentials',
+        label: 'API credentials',
+        placeholder: 'KEY_ID:KEY_SECRET',
+        secret: true,
+        envVar: 'HF_CREDENTIALS',
+      },
     ],
-    envFallback: 'HIGGSFIELD_API_KEY',
-    docsUrl: 'https://higgsfield.ai',
+    envFallback: 'HF_CREDENTIALS',
+    docsUrl: 'https://console.higgsfield.ai',
   },
   {
     id: 'stripe',
@@ -259,6 +265,8 @@ export async function testProvider(id: ProviderSlotId): Promise<ProviderHealth> 
       }).health();
     case 'higgsfield':
       return new HiggsfieldProvider({
+        credentials: credentials['credentials'],
+        // Entries saved before the console asked for the single credential.
         apiKey: credentials['apiKey'],
         apiSecret: credentials['apiSecret'],
       }).health();
@@ -403,9 +411,10 @@ export async function buildRegistry(scope: {
             costSink,
           })
         : new LocalChromiumProvider({ costSink }),
-      ...(higgsfield['apiKey']
+      ...(higgsfield['credentials'] || (higgsfield['apiKey'] && higgsfield['apiSecret'])
         ? {
             media: new HiggsfieldProvider({
+              credentials: higgsfield['credentials'],
               apiKey: higgsfield['apiKey'],
               apiSecret: higgsfield['apiSecret'],
               costSink,

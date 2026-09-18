@@ -52,7 +52,7 @@ export default async function ProvidersPage() {
         label: 'Higgsfield',
         ready: Boolean(state('higgsfield')?.configured),
         note: state('higgsfield')?.configured
-          ? 'Generated shots are available for mood and metaphor.'
+          ? 'Seedance 2.5 shots are available for mood and metaphor.'
           : 'Films are rendered entirely by our own engine and real capture.',
       },
       {

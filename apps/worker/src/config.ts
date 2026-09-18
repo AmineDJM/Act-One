@@ -98,9 +98,11 @@ export async function buildRegistry(
               costSink,
             })
           : new LocalChromiumProvider({ costSink }),
-      ...(higgsfield['apiKey']
+      ...(higgsfield['credentials'] || (higgsfield['apiKey'] && higgsfield['apiSecret'])
         ? {
             media: new HiggsfieldProvider({
+              credentials: higgsfield['credentials'],
+              // Entries saved before the console asked for the single credential.
               apiKey: higgsfield['apiKey'],
               apiSecret: higgsfield['apiSecret'],
               costSink,
@@ -157,7 +159,7 @@ function fromEnv(provider: string): Record<string, string> {
     case 'browserbase':
       return clean({ apiKey: pick('BROWSERBASE_API_KEY'), projectId: pick('BROWSERBASE_PROJECT_ID') });
     case 'higgsfield':
-      return clean({ apiKey: pick('HIGGSFIELD_API_KEY'), apiSecret: pick('HIGGSFIELD_API_SECRET') });
+      return clean({ credentials: pick('HF_CREDENTIALS') ?? pick('HF_KEY') });
     case 'supabase':
       return clean({
         url: pick('SUPABASE_URL'),
