@@ -15,6 +15,7 @@ export const AUDIO_STANDARDS = {
     source: 'ITU-R BS.1770-4',
     clause: 'Algorithms to measure audio programme loudness and true-peak level',
     authority: 'normative',
+    enforcement: 'designed_in',
     because:
       'It is the only measurement that corresponds to what people hear, and it is what ' +
       'every broadcaster and streaming platform normalises against.',
@@ -25,6 +26,7 @@ export const AUDIO_STANDARDS = {
     source: 'EBU R 128',
     clause: 'Programme Loudness target',
     authority: 'normative',
+    enforcement: 'designed_in',
     because: 'European broadcast requires it. A film delivered louder will be turned down for you.',
   },
   truePeak: {
@@ -33,6 +35,7 @@ export const AUDIO_STANDARDS = {
     source: 'EBU R 128',
     clause: 'Maximum Permitted True Peak Level',
     authority: 'normative',
+    enforcement: 'designed_in',
     because:
       'Inter-sample peaks exceed sample peaks after encoding, so a mix that peaks at 0 dBFS ' +
       'distorts once it is an AAC file. The one decibel is the headroom that lossy encoding eats.',
@@ -42,6 +45,7 @@ export const AUDIO_STANDARDS = {
     rule: 'A film for the web sits near −16 LUFS.',
     source: 'Common streaming normalisation targets (−14 LUFS)',
     authority: 'guidance',
+    enforcement: 'designed_in',
     because:
       'Web players normalise toward −14, and a launch film usually plays next to a page ' +
       'rather than inside a broadcast chain. Slightly under the platform target leaves the ' +
@@ -52,6 +56,7 @@ export const AUDIO_STANDARDS = {
     rule: 'Voice sits 4 to 6 LU above the music bed while it is speaking.',
     source: 'Standard dubbing-stage practice',
     authority: 'convention',
+    enforcement: 'documented',
     because:
       'Below about 4 LU the words stop carrying over a bed; above about 6 the music stops ' +
       'doing anything. Automated mixes fail on the first side almost every time.',
@@ -61,6 +66,7 @@ export const AUDIO_STANDARDS = {
     rule: 'Music ducks under voice by sidechain, not by a fade drawn in advance.',
     source: 'Standard dubbing-stage practice',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'A sidechain follows the actual envelope of the voice, so it releases in the gaps ' +
       'between phrases. A drawn fade holds the music down through the whole line.',
@@ -70,6 +76,7 @@ export const AUDIO_STANDARDS = {
     rule: 'A film may be silent. It may not have music because a film is expected to.',
     source: 'Act One house rule',
     authority: 'house',
+    enforcement: 'designed_in',
     because:
       'Library music underneath something that did not ask for it is the sound of a template. ' +
       'The same is true of narration: a voice reading text already on screen adds nothing.',

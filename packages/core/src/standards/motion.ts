@@ -15,6 +15,7 @@ export const MOTION_STANDARDS = {
     source: 'WCAG 2.2',
     clause: 'SC 2.3.1 (Three Flashes or Below Threshold)',
     authority: 'normative',
+    enforcement: 'checked',
     because:
       'Above it, content can trigger seizures in people with photosensitive epilepsy. ' +
       'This is the one rule in the system that is about harm rather than quality, ' +
@@ -24,8 +25,9 @@ export const MOTION_STANDARDS = {
     id: 'motion.red_flash',
     rule: 'Saturated red does not flash at all.',
     source: 'WCAG 2.2 SC 2.3.1, and ITU-R BT.1702',
-    clause: 'BT.1702 guidance on harmful flashing',
+    clause: 'guidance on harmful flashing',
     authority: 'normative',
+    enforcement: 'documented',
     because: 'Saturated red transitions are more provocative than luminance flashes of the same rate.',
   },
   minimumShot: {
@@ -33,6 +35,7 @@ export const MOTION_STANDARDS = {
     rule: 'No shot is shorter than half a second.',
     source: 'Act One house rule, after standard commercial practice',
     authority: 'house',
+    enforcement: 'checked',
     because:
       'Below roughly 12 frames the viewer registers a disturbance rather than an image. ' +
       'It is a glitch, not a cut — and it is what an automated editor produces when it ' +
@@ -43,6 +46,7 @@ export const MOTION_STANDARDS = {
     rule: 'Shot lengths vary. A film of equal shots is a slideshow.',
     source: 'Act One house rule, after Murch, In the Blink of an Eye',
     authority: 'house',
+    enforcement: 'checked',
     because:
       'Rhythm is the difference between an edit and an assembly. Equal shots are the single ' +
       'clearest sign that no one decided where the cuts go.',
@@ -52,6 +56,7 @@ export const MOTION_STANDARDS = {
     rule: 'Successive shots of the same subject change angle by at least thirty degrees.',
     source: 'Classical continuity editing',
     authority: 'convention',
+    enforcement: 'documented',
     because: 'A smaller change reads as a jump cut — the image twitches instead of moving on.',
   },
   axisOfAction: {
@@ -59,6 +64,7 @@ export const MOTION_STANDARDS = {
     rule: 'Screen direction is kept: elements do not cross the line between shots.',
     source: 'Classical continuity editing — the 180-degree rule',
     authority: 'convention',
+    enforcement: 'documented',
     because:
       'Reversing direction across a cut disorients the viewer even in abstract motion graphics, ' +
       'where there is no subject to be confused about.',
@@ -68,6 +74,7 @@ export const MOTION_STANDARDS = {
     rule: 'Nothing starts or stops at constant velocity.',
     source: 'Thomas & Johnston, The Illusion of Life — slow in and slow out',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'Linear motion is the most recognisable signature of animation done by a computer ' +
       'rather than by an animator. Physical things accelerate.',
@@ -77,6 +84,7 @@ export const MOTION_STANDARDS = {
     rule: 'Transitions run roughly 200 to 500ms, scaled to the distance travelled.',
     source: 'Material Design motion guidance',
     authority: 'guidance',
+    enforcement: 'designed_in',
     because:
       'Faster reads as a glitch, slower reads as a wait. Larger movements need longer ' +
       'or they appear to teleport.',
@@ -86,6 +94,7 @@ export const MOTION_STANDARDS = {
     rule: 'One idea moves at a time.',
     source: 'Thomas & Johnston, The Illusion of Life — staging',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'Two simultaneous animations compete and the viewer resolves neither. ' +
       'It is the most common way an otherwise good frame becomes unreadable.',
@@ -95,6 +104,7 @@ export const MOTION_STANDARDS = {
     rule: 'Synthesised motion blur matches a 180-degree shutter: exposure of half a frame.',
     source: 'Cinematographic convention, from the rotary shutter',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'It is the blur every filmed image has had for a century, so its absence reads as ' +
       'video-game footage and its excess reads as a smear.',
@@ -104,6 +114,7 @@ export const MOTION_STANDARDS = {
     rule: 'The same treatment does not run for three consecutive scenes.',
     source: 'Act One house rule',
     authority: 'house',
+    enforcement: 'checked',
     because:
       'A template repeats. An edit varies. Since our recipes are finite, this is the ' +
       'rule that stops a finite set from looking like a small one.',

@@ -15,6 +15,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'A film carries one idea. Everything in it serves that idea.',
     source: 'Ogilvy, Confessions of an Advertising Man; standard positioning practice',
     authority: 'convention',
+    enforcement: 'documented',
     because:
       'A viewer retains one thing. A film that says four things is a film that says nothing, ' +
       'and listing features is the default an automated system falls into.',
@@ -24,6 +25,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'The first three seconds establish the problem or the product, not the brand.',
     source: 'Platform creative guidance (Meta, TikTok, YouTube)',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       'It is where viewers leave, consistently, across every platform that publishes retention ' +
       'data. A logo sting in the opening seconds spends the only attention you are given.',
@@ -33,6 +35,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'A film for social reads with the sound off.',
     source: 'Platform creative guidance (Meta, TikTok)',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       'Most feed playback starts muted. A film whose meaning is carried by narration is a ' +
       'film most of its audience will not understand.',
@@ -42,6 +45,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'One call to action, specific, at the end.',
     source: 'Standard direct-response practice',
     authority: 'convention',
+    enforcement: 'checked',
     because:
       'Two actions compete and neither gets taken. "Learn more" is not an action; ' +
       'it is what you write when nobody decided what the viewer should do.',
@@ -51,6 +55,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'Evidence goes after the claim it supports, not at the end in a block.',
     source: 'Standard narrative and direct-response practice',
     authority: 'convention',
+    enforcement: 'documented',
     because:
       'A claim carries doubt until it is answered. Collecting all proof into a logo wall ' +
       'at the end answers doubts the viewer stopped holding two scenes ago.',
@@ -60,6 +65,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'Cut to the length the channel actually plays.',
     source: 'Platform specifications',
     authority: 'guidance',
+    enforcement: 'designed_in',
     because:
       'A 60-second hero film posted as a 6-second bumper is a 60-second film with 54 ' +
       'seconds missing. Each length is a different edit, not a different trim.',
@@ -69,6 +75,7 @@ export const CONVERSION_STANDARDS = {
     rule: 'No invented scarcity, countdowns or deadlines.',
     source: 'Advertising standards practice (ASA/CAP Code; FTC)',
     authority: 'guidance',
+    enforcement: 'documented',
     because:
       'Fabricated urgency is a regulated deceptive practice, and it is the first thing an ' +
       'automated copywriter reaches for.',

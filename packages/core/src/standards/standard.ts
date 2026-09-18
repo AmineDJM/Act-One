@@ -27,6 +27,22 @@ export type Authority =
   /** Ours. Reasoned, defensible, and open to argument. */
   | 'house';
 
+/**
+ * How a rule is actually kept.
+ *
+ * Stated separately from what the rule says, because the two are different
+ * claims and conflating them is how a document comes to describe a system
+ * nobody built. A reader — an operator, a customer, whoever inherits this —
+ * can see exactly what the platform guarantees and what it merely intends.
+ */
+export type Enforcement =
+  /** A check runs on every film and a failure is a finding. */
+  | 'checked'
+  /** The engines cannot produce a film that breaks it. */
+  | 'designed_in'
+  /** Stated so the system has one answer to the question. Not yet mechanised. */
+  | 'documented';
+
 export type Standard = {
   /** Stable id, used in QA messages so a finding can be looked up. */
   id: string;
@@ -37,6 +53,7 @@ export type Standard = {
   /** Clause, section or page, when the source has one. */
   clause?: string;
   authority: Authority;
+  enforcement: Enforcement;
   /** Why it exists. Not decoration: a rule nobody understands gets waived. */
   because: string;
 };

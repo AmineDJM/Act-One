@@ -587,3 +587,31 @@
   white-space: nowrap;
 }
 .customerFigures dd { font-size: 0.92rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+/* --- standards ------------------------------------------------------------ */
+
+.standardList {
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+}
+.standard {
+  display: grid;
+  gap: 6px;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.standard:last-child { border-bottom: none; padding-bottom: 0; }
+.standardRule {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.standardRule strong { font-weight: 550; }
+.standardSource {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}

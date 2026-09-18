@@ -15,6 +15,7 @@ export const TYPE_STANDARDS = {
     source: 'Bringhurst, The Elements of Typographic Style',
     clause: '§2.1.2',
     authority: 'convention',
+    enforcement: 'checked',
     because:
       'Shorter and the eye jumps back too often; longer and it loses the line it was on. ' +
       'For a held frame in a film the short end of the range is right, because the reader ' +
@@ -26,6 +27,7 @@ export const TYPE_STANDARDS = {
     source: 'Bringhurst, after the musical intervals',
     clause: '§3.1',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'Sizes chosen individually look almost related, which reads as a mistake. ' +
       'Sizes from a ratio look deliberate even when the viewer cannot name the ratio.',
@@ -35,6 +37,7 @@ export const TYPE_STANDARDS = {
     rule: 'Leading tightens as type grows: about 1.5 at body size, 1.0 to 1.1 at display.',
     source: 'Bringhurst §2.2, and standard practice in motion design',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'Leading is proportional to the eye’s need to find the next line, not to the type size. ' +
       'Display type set at body leading falls apart into separate lines.',
@@ -44,6 +47,7 @@ export const TYPE_STANDARDS = {
     rule: 'Display type is tracked in; small and uppercase type is tracked out.',
     source: 'Standard practice, after the optical sizes of metal type',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'Digital fonts are drawn once and scaled, so spacing correct at 16px is loose at 120px. ' +
       'Metal type was cut separately per size and did this for you.',
@@ -53,6 +57,7 @@ export const TYPE_STANDARDS = {
     rule: 'Two families at most in one film, and only when they do different jobs.',
     source: 'Act One house rule',
     authority: 'house',
+    enforcement: 'checked',
     because:
       'A third typeface almost never adds a distinction the viewer can use, ' +
       'and reliably adds one they can feel.',
@@ -62,6 +67,7 @@ export const TYPE_STANDARDS = {
     rule: 'Never synthesise a weight or an italic the family does not have.',
     source: 'Act One house rule, after long-standing print practice',
     authority: 'house',
+    enforcement: 'designed_in',
     because:
       'A browser faking bold by smearing the outline, or italic by shearing it, produces letterforms ' +
       'the designer never drew. It is one of the most recognisable signs of automated typesetting.',
@@ -71,6 +77,7 @@ export const TYPE_STANDARDS = {
     rule: 'Nothing on screen is smaller than 2% of the frame height.',
     source: 'After broadcast subtitle practice (BBC Subtitle Guidelines)',
     authority: 'guidance',
+    enforcement: 'designed_in',
     because:
       'A film is watched on a phone at arm’s length as often as on a desk. ' +
       'Below this, type survives the render and does not survive the viewing.',
@@ -80,6 +87,7 @@ export const TYPE_STANDARDS = {
     rule: 'On-screen copy holds long enough to be read at about 2.6 words per second, plus arrival time.',
     source: 'After subtitle timing practice (BBC, Netflix TTSG)',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       'Subtitle standards are the closest measured analogue: text the viewer cannot pause. ' +
       'The arrival allowance covers the animation before the words are stable enough to read.',

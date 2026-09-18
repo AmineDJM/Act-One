@@ -14,6 +14,7 @@ export const LAYOUT_STANDARDS = {
     source: 'EBU R 95 / SMPTE ST 2046-1',
     clause: 'R 95 text safe area',
     authority: 'normative',
+    enforcement: 'checked',
     because:
       'Overscan, platform chrome and player controls all eat the edge of a frame, ' +
       'and none of them tell you in advance.',
@@ -24,6 +25,7 @@ export const LAYOUT_STANDARDS = {
     source: 'EBU R 95 / SMPTE ST 2046-1',
     clause: 'R 95 graphics safe area',
     authority: 'normative',
+    enforcement: 'designed_in',
     because: 'The looser of the two areas: a logo may touch it, a caption may not.',
   },
   platformChrome: {
@@ -31,6 +33,7 @@ export const LAYOUT_STANDARDS = {
     rule: 'Vertical cuts keep copy clear of the bottom third and the right edge.',
     source: 'Platform guidance (TikTok, Instagram, YouTube Shorts)',
     authority: 'guidance',
+    enforcement: 'designed_in',
     because:
       'Captions, handles, the follow button and the action rail sit there. The exact boxes move ' +
       'between app versions, so the margin is generous rather than pixel-fitted.',
@@ -40,6 +43,7 @@ export const LAYOUT_STANDARDS = {
     rule: 'One grid for the whole film. Margins do not move between scenes.',
     source: 'Müller-Brockmann, Grid Systems in Graphic Design',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'A margin that shifts by a few pixels between cuts reads as carelessness to people ' +
       'who could not tell you what changed.',
@@ -49,6 +53,7 @@ export const LAYOUT_STANDARDS = {
     rule: 'Vertical positions land on a baseline derived from the frame, not on round pixel values.',
     source: 'Müller-Brockmann, and the 8pt grid convention',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'Deriving the rhythm from frame height is what makes a 1080p render and a 4K render ' +
       'of the same film identical rather than merely similar.',
@@ -58,6 +63,7 @@ export const LAYOUT_STANDARDS = {
     rule: 'Centred content sits slightly above the geometric centre.',
     source: 'Long-standing typographic practice',
     authority: 'convention',
+    enforcement: 'designed_in',
     because:
       'The eye reads the centre of a frame as higher than it is. Geometrically centred text ' +
       'looks like it is sliding off the bottom.',
@@ -67,6 +73,7 @@ export const LAYOUT_STANDARDS = {
     rule: 'A subject that is not centred sits near a third, not near the middle.',
     source: 'Photographic and cinematographic convention',
     authority: 'convention',
+    enforcement: 'documented',
     because:
       'The failure mode is the accidental near-centre: close enough to look like a miss ' +
       'rather than a choice.',

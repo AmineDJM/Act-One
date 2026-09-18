@@ -64,6 +64,31 @@ describe('the standards themselves', () => {
     expect(index.size).toBe(declared);
   });
 
+  it('says how every rule is actually kept', () => {
+    // Stated separately from what the rule says, because the two are different
+    // claims: a document that quietly describes checks nobody wrote is worse
+    // than one that admits which rules are only written down.
+    for (const group of ALL) {
+      for (const [key, standard] of Object.entries(group)) {
+        expect(['checked', 'designed_in', 'documented'], key).toContain(standard.enforcement);
+      }
+    }
+  });
+
+  it('checks the rule that is about harm, not only the ones about taste', () => {
+    // Everything else here is quality. This one can hurt somebody, so being
+    // merely documented is not good enough for it.
+    expect(MOTION_STANDARDS.flashRate.enforcement).toBe('checked');
+  });
+
+  it('checks what a customer would be held to legally', () => {
+    // Superlatives and unsourced figures are objective claims in advertising
+    // law, made in the customer's name. They are not stylistic preferences.
+    expect(EDITORIAL_STANDARDS.superlatives.enforcement).toBe('checked');
+    expect(EDITORIAL_STANDARDS.numbers.enforcement).toBe('checked');
+    expect(EDITORIAL_STANDARDS.attribution.enforcement).toBe('checked');
+  });
+
   it('never claims a published clause for a house rule', () => {
     // The distinction is the whole point: a rule we invented must not be
     // dressed up as one somebody standardised.
@@ -71,6 +96,20 @@ describe('the standards themselves', () => {
       for (const [key, standard] of Object.entries(group)) {
         if (standard.authority !== 'house') continue;
         expect(standard.source, key).toMatch(/Act One|house/i);
+      }
+    }
+  });
+
+  it('never repeats the source inside the clause', () => {
+    // A citation reading "EBU R 103 R 103 signal tolerance" looks like a
+    // transcription error, which is the opposite of what a citation is for.
+    for (const group of ALL) {
+      for (const [key, standard] of Object.entries(group)) {
+        if (!standard.clause) continue;
+        const words = standard.source.split(/[\s/]+/).filter((w) => w.length > 1);
+        for (const word of words) {
+          expect(standard.clause.startsWith(`${word} `), `${key}: ${cite(standard)}`).toBe(false);
+        }
       }
     }
   });

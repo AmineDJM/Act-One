@@ -14,6 +14,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'Every factual claim on screen traces to something we read on the product.',
     source: 'Basic verification practice (Reuters Handbook; AP Stylebook)',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       'A number in a film reads as fact whoever put it there. If we cannot point at where ' +
       'it came from, we are inventing evidence for a customer who will be held to it.',
@@ -23,6 +24,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'Nothing is stated that the product does not say about itself.',
     source: 'Act One house rule',
     authority: 'house',
+    enforcement: 'checked',
     because:
       'A language model asked for launch copy will supply plausible specifics — customer counts, ' +
       'percentages, funding — because plausible specifics are what launch copy contains. ' +
@@ -33,6 +35,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'No unqualified superlative or first-in-the-world claim.',
     source: 'Advertising standards practice (ASA/CAP Code; FTC endorsement guidance)',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       '"The best" and "the only" are objective claims in advertising law, and they need ' +
       'substantiation the customer usually does not have.',
@@ -42,6 +45,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'A statistic on screen carries its basis, or it does not go on screen.',
     source: 'Reuters Handbook, on the use of statistics',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       '"3x faster" means nothing without knowing than what. A number with no basis is ' +
       'either meaningless or misleading, and there is no third case.',
@@ -51,6 +55,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'No hedges that imply evidence without providing it.',
     source: 'Plain-language and editorial practice',
     authority: 'convention',
+    enforcement: 'checked',
     because:
       '"Studies show", "industry-leading", "up to" and "helps you" are constructions for ' +
       'sounding substantiated while being unfalsifiable.',
@@ -60,6 +65,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'One idea per line, in the words the audience uses.',
     source: 'Plain-language guidance (plainlanguage.gov)',
     authority: 'guidance',
+    enforcement: 'checked',
     because:
       'On-screen text is read once, at a pace the viewer does not control. ' +
       'A subordinate clause is a line nobody finishes.',
@@ -69,6 +75,7 @@ export const EDITORIAL_STANDARDS = {
     rule: 'No real person is depicted, voiced or imitated without their explicit consent.',
     source: 'Act One house rule; right-of-publicity law in most jurisdictions',
     authority: 'normative',
+    enforcement: 'documented',
     because:
       'Cloning a founder’s voice or face for a film they did not approve is both unlawful ' +
       'in most places and the single fastest way to destroy trust in an automated system.',

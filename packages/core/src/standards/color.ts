@@ -15,6 +15,7 @@ export const COLOR_STANDARDS = {
     source: 'WCAG 2.2',
     clause: 'SC 1.4.3 (Contrast Minimum, AA)',
     authority: 'normative',
+    enforcement: 'checked',
     because:
       'It is the ratio at which text stays readable for low vision and in poor viewing conditions — ' +
       'which, for a film, includes a phone in daylight.',
@@ -25,6 +26,7 @@ export const COLOR_STANDARDS = {
     source: 'WCAG 2.2',
     clause: 'SC 1.4.3, large-scale definition',
     authority: 'normative',
+    enforcement: 'checked',
     because: 'Larger glyphs carry more of their own contrast through stroke weight.',
   },
   nonTextContrast: {
@@ -33,6 +35,7 @@ export const COLOR_STANDARDS = {
     source: 'WCAG 2.2',
     clause: 'SC 1.4.11 (Non-text Contrast, AA)',
     authority: 'normative',
+    enforcement: 'documented',
     because: 'A chart nobody can see is a decoration.',
   },
   accentRestraint: {
@@ -40,6 +43,7 @@ export const COLOR_STANDARDS = {
     rule: 'One accent, used structurally. Two at most, and never as a gradient between them.',
     source: 'Act One house rule',
     authority: 'house',
+    enforcement: 'designed_in',
     because:
       'The purple-to-blue gradient is the visual signature of automated design. ' +
       "Restraint is what makes a frame read as a decision rather than a default.",
@@ -49,6 +53,7 @@ export const COLOR_STANDARDS = {
     rule: 'Roughly 60% canvas, 30% secondary, 10% accent across a frame.',
     source: 'Interior-design convention, adopted by graphic design',
     authority: 'convention',
+    enforcement: 'documented',
     because:
       'An accent stops working as an accent once it covers a third of the frame — ' +
       'it becomes the canvas, and whatever it was pointing at loses its emphasis.',
@@ -58,6 +63,7 @@ export const COLOR_STANDARDS = {
     rule: 'Colours are measured from the product, never invented near it.',
     source: 'Act One house rule',
     authority: 'house',
+    enforcement: 'designed_in',
     because:
       "A film in colours the customer has never used is a film about a company that does not exist. " +
       'When a measured colour fails contrast it is corrected along lightness, which keeps the hue.',
@@ -66,8 +72,9 @@ export const COLOR_STANDARDS = {
     id: 'color.broadcast_range',
     rule: 'Deliverables stay inside the studio range: no blacker than 16 and no whiter than 235 in 8-bit.',
     source: 'ITU-R BT.709 / EBU R 103',
-    clause: 'R 103 signal tolerance',
+    clause: 'signal tolerance',
     authority: 'normative',
+    enforcement: 'documented',
     because:
       'Values outside it are clipped somewhere in the chain, and the clipping is not ours to control. ' +
       'It matters the moment a film is played anywhere but a browser.',
