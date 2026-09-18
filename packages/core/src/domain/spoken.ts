@@ -22,13 +22,48 @@ export function adaptForSpeech(text: string, options: SpokenOptions): string {
   let out = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ').trim();
   if (!out) return '';
 
-  out = applyPronunciations(out, language, options.pronunciations ?? []);
+  // Addresses first, and apart: "linear.app" is "linear dot app", and no
+  // pronunciation rule reaches inside one — an engine handed "Lin-ee-ar.app"
+  // reads nothing at all, which the listen-back then finds.
+  const { text: withoutAddresses, addresses } = holdAddresses(out, language);
+  out = applyPronunciations(withoutAddresses, language, options.pronunciations ?? []);
   out = expandAbbreviations(out, language);
   out = spellSymbols(out, language);
   out = spellNumbers(out, language);
   out = spellInitialisms(out);
+  out = releaseAddresses(out, addresses);
   out = spokenPunctuation(out);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Addresses
+// ---------------------------------------------------------------------------
+
+const ADDRESS = /\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|app|io|ai|co|net|org|dev|fr|de|es|it|nl|se|dk|no|fi|pl|tr|jp|kr|cn|uk|eu|xyz|so|me|tv|tech|studio|design|agency|cloud|digital))(\/[\w\-./?=&%#]*)?\b/giu;
+
+const DOT: Record<string, string> = { fr: 'point', de: 'Punkt', es: 'punto', it: 'punto', pt: 'ponto', nl: 'punt' };
+const SLASH: Record<string, string> = { fr: 'slash', de: 'Schrägstrich', es: 'barra', it: 'barra', pt: 'barra', nl: 'slash' };
+
+/** Lifts web addresses out of the text, said the way a narrator says them, so nothing else rewrites them. */
+function holdAddresses(text: string, language: string): { text: string; addresses: string[] } {
+  const addresses: string[] = [];
+  const dot = DOT[language] ?? 'dot';
+  const slash = SLASH[language] ?? 'slash';
+  const held = text.replace(ADDRESS, (whole, host: string, path?: string) => {
+    // A decimal or a version is not an address: "3.5" has no letters, "v2.app" is unlikely enough to leave.
+    if (!/[a-z]/i.test(host.split('.')[0] ?? '')) return whole;
+    const spokenHost = host.toLowerCase().split('.').join(` ${dot} `);
+    const spokenPath = path && path !== '/' ? ` ${slash} ${path.replace(/^\//, '').replace(/[\/]+/g, ` ${slash} `).replace(/[-_]/g, ' ')}` : '';
+    addresses.push(`${spokenHost}${spokenPath}`.replace(/\s+/g, ' ').trim());
+    // Letters, not digits, mark the place: the number steps would spell a digit out.
+    return `\u0000${'x'.repeat(addresses.length)}\u0000`;
+  });
+  return { text: held, addresses };
+}
+
+function releaseAddresses(text: string, addresses: string[]): string {
+  return text.replace(/\u0000(x+)\u0000/g, (_, mark: string) => addresses[mark.length - 1] ?? '');
 }
 
 // ---------------------------------------------------------------------------

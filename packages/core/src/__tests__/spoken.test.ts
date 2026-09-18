@@ -52,6 +52,21 @@ describe('numbers in English', () => {
     ).toBe('Welcome to Or-nee-car, by Ah-meen.');
   });
 
+  it('says a web address the way a narrator does, and keeps pronunciations out of it', () => {
+    expect(
+      adaptForSpeech('Start building with Linear. Visit linear.app.', {
+        language: 'en',
+        pronunciations: [{ term: 'Linear', say: 'Lin-ee-ar', language: null }],
+      }),
+    ).toBe('Start building with Lin-ee-ar. Visit linear dot app.');
+    expect(adaptForSpeech('See https://www.northwind.example.com/pricing today.', { language: 'en' })).toBe(
+      'See northwind dot example dot com slash pricing today.',
+    );
+    expect(adaptForSpeech('Rendez-vous sur ornikar.com.', { language: 'fr' })).toBe('Rendez-vous sur ornikar point com.');
+    // A version number is not an address.
+    expect(adaptForSpeech('Version 3.5 shipped.', { language: 'en' })).toBe('Version three point five shipped.');
+  });
+
   it('turns dashes into breaths and closes the sentence', () => {
     expect(adaptForSpeech('One idea — one film', { language: 'en' })).toBe('One idea, one film.');
     expect(adaptForSpeech('Design/build in a day', { language: 'en' })).toBe('Design or build in a day.');
