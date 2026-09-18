@@ -12,6 +12,7 @@ import {
   type User,
 } from '@act-one/core';
 import { getStore } from './store.ts';
+import { clientAddress, enforceAttempt } from './rate-limit.ts';
 
 /**
  * promisify() picks scrypt's no-options overload, which silently drops the cost
@@ -271,6 +272,10 @@ export async function signUp(input: SignUpInput): Promise<Session> {
   const store = getStore();
   const email = input.email.trim().toLowerCase();
 
+  // Before the password is hashed: hashing is the expensive step, and a
+  // limit that runs after it is a limit on nothing.
+  await enforceAttempt('sign_up', { address: await clientAddress() });
+
   if (input.password.length < 10) {
     throw new AppError('validation_failed', 'Use at least 10 characters.');
   }
@@ -323,6 +328,10 @@ export async function signUp(input: SignUpInput): Promise<Session> {
 
 export async function signIn(email: string, password: string): Promise<Session> {
   const store = getStore();
+  // Counted before the lookup and the hash, so a refused attempt costs the
+  // server nothing and tells the caller nothing about whether the account
+  // exists — the refusal reads the same for every email.
+  await enforceAttempt('sign_in', { address: await clientAddress(), account: email });
   const record = await store.users.getByEmail(email.trim().toLowerCase());
   const valid = await verifyPassword(password, record?.passwordHash ?? null);
 

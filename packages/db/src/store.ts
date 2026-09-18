@@ -10,6 +10,8 @@ import type {
   CredentialAuditEvent,
   CopyKit,
   GenerationCost,
+  RateLimitRule,
+  RateLimitVerdict,
   Invitation,
   LogLevel,
   LogQuery,
@@ -75,6 +77,7 @@ export interface Store {
   readonly revisions: RevisionRepo;
   readonly credentials: CredentialRepo;
   readonly platform: PlatformRepo;
+  readonly rateLimits: RateLimitRepo;
   close(): Promise<void>;
 }
 
@@ -132,6 +135,17 @@ export interface InvitationRepo {
   findByTokenHash(tokenHash: string): Promise<Invitation | null>;
   markAccepted(id: string, at: string): Promise<Invitation>;
   revoke(organizationId: string, id: string): Promise<void>;
+}
+
+/**
+ * Fixed-window attempt counters. One call counts one attempt and says whether
+ * it was within the rule; there is no separate "check" because a check that
+ * does not count is a race between two requests.
+ */
+export interface RateLimitRepo {
+  hit(key: string, rule: RateLimitRule, nowMs?: number): Promise<RateLimitVerdict>;
+  /** Drops windows that ended before the given moment. Returns rows removed. */
+  prune(olderThanMs: number): Promise<number>;
 }
 
 export interface SessionRepo {

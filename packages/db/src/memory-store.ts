@@ -8,6 +8,9 @@ import {
   redactDetail,
   redactMessage,
   retryDelayMs,
+  verdictFor,
+  windowStartMs,
+  type RateLimitRule,
 } from '@act-one/core';
 import type {
   CopyKit,
@@ -269,6 +272,28 @@ export class MemoryStore implements Store {
     revoke: async (organizationId: string, id: string) => {
       const existing = this.tables.invitations.get(id);
       if (existing?.organizationId === organizationId) this.tables.invitations.delete(id);
+    },
+  };
+
+  private readonly rateWindows = new Map<string, { windowStart: number; count: number }>();
+
+  readonly rateLimits = {
+    hit: async (key: string, rule: RateLimitRule, nowMs = Date.now()) => {
+      const windowStart = windowStartMs(nowMs, rule);
+      const current = this.rateWindows.get(key);
+      const count = current && current.windowStart === windowStart ? current.count + 1 : 1;
+      this.rateWindows.set(key, { windowStart, count });
+      return verdictFor(count, nowMs, rule);
+    },
+    prune: async (olderThanMs: number) => {
+      let removed = 0;
+      for (const [key, entry] of this.rateWindows) {
+        if (entry.windowStart < olderThanMs) {
+          this.rateWindows.delete(key);
+          removed += 1;
+        }
+      }
+      return removed;
     },
   };
 

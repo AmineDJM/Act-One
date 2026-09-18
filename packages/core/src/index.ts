@@ -14,6 +14,7 @@ export * from './standards/index.ts';
 
 export * from './domain/evidence.ts';
 export * from './domain/product.ts';
+export * from './domain/rate-limit.ts';
 export * from './domain/brand.ts';
 export * from './domain/creative.ts';
 export * from './domain/storyboard.ts';

@@ -6,6 +6,9 @@ import {
   redactDetail,
   redactMessage,
   resequence,
+  verdictFor,
+  windowStartMs,
+  type RateLimitRule,
 } from '@act-one/core';
 import type {
   CopyKit,
@@ -415,6 +418,29 @@ export class PgStore implements Store {
           id,
           organizationId,
         ]);
+      }),
+  };
+
+  readonly rateLimits = {
+    hit: async (key: string, rule: RateLimitRule, nowMs = Date.now()) =>
+      this.asPlatform(async (c) => {
+        const windowStart = new Date(windowStartMs(nowMs, rule)).toISOString();
+        // One statement, one row, one count: the upsert is what makes two
+        // instances agree without a lock.
+        const r = await c.query<{ count: number }>(
+          `INSERT INTO rate_limits (key, window_start, count) VALUES ($1, $2, 1)
+           ON CONFLICT (key, window_start) DO UPDATE SET count = rate_limits.count + 1
+           RETURNING count`,
+          [key, windowStart],
+        );
+        return verdictFor(Number(r.rows[0]?.count ?? 1), nowMs, rule);
+      }),
+    prune: async (olderThanMs: number) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('DELETE FROM rate_limits WHERE window_start < $1', [
+          new Date(olderThanMs).toISOString(),
+        ]);
+        return r.rowCount ?? 0;
       }),
   };
 

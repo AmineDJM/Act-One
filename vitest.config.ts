@@ -9,9 +9,13 @@ export default defineConfig({
     include: ['packages/**/*.test.ts', 'apps/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
     testTimeout: 20_000,
+    // Stands in for the Next.js request scope so the web app's server
+    // modules — sessions, permissions, rate limits — run under test.
+    setupFiles: ['./apps/web/src/server/__tests__/request-scope.ts'],
   },
   resolve: {
     alias: {
+      '@': r('./apps/web/src'),
       '@act-one/core': r('./packages/core/src/index.ts'),
       '@act-one/db': r('./packages/db/src/index.ts'),
       '@act-one/providers': r('./packages/providers/src/index.ts'),
