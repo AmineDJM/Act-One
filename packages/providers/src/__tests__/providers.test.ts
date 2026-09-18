@@ -44,6 +44,41 @@ describe('estimateNarrationSeconds', () => {
   });
 });
 
+describe('LocalFsStorageProvider signed URLs', () => {
+  it('serves a stored object to a browser on this machine, for as long as the grant lasts', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'act-one-serve-'));
+    const storage = new LocalFsStorageProvider({ root });
+    try {
+      const data = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+      await storage.put('org/org_1/project/prj_1/ast_1.png', data, { contentType: 'image/png' });
+
+      // A renderer page is served over HTTP and cannot load file:// — which is
+      // exactly what this used to return.
+      const url = await storage.signedUrl('org/org_1/project/prj_1/ast_1.png', 60);
+      expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/[A-Za-z0-9_-]+\/ast_1\.png$/);
+
+      const response = await fetch(url);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('image/png');
+      expect(new Uint8Array(await response.arrayBuffer())).toEqual(data);
+
+      // The token is the whole secret: a guessed one gets nothing, and a
+      // grant that has expired gets nothing.
+      const origin = new URL(url).origin;
+      expect((await fetch(`${origin}/not-a-token/ast_1.png`)).status).toBe(404);
+      const expired = await storage.signedUrl('org/org_1/project/prj_1/ast_1.png', -1);
+      expect((await fetch(expired)).status).toBe(404);
+    } finally {
+      await storage.close();
+    }
+  });
+
+  it('defers to a configured public base URL', async () => {
+    const storage = new LocalFsStorageProvider({ root: tmpdir(), publicBaseUrl: 'https://cdn.example/' });
+    expect(await storage.signedUrl('a/b.png')).toBe('https://cdn.example/a/b.png');
+  });
+});
+
 describe('LocalFsStorageProvider', () => {
   it('stores and reads bytes back', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'act-one-store-'));

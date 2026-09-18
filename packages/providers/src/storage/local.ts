@@ -1,6 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile, rm, readdir, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import { AppError } from '@act-one/core';
 import { httpRequest } from '../http.ts';
@@ -18,6 +19,10 @@ export class LocalFsStorageProvider implements StorageProvider {
 
   private readonly root: string;
   private readonly publicBaseUrl: string | null;
+  private server: Server | null = null;
+  private origin: Promise<string> | null = null;
+  /** Token -> what it may read, and until when. */
+  private readonly grants = new Map<string, { key: string; expiresAt: number }>();
 
   constructor(options: { root?: string; publicBaseUrl?: string } = {}) {
     this.root = path.resolve(
@@ -80,9 +85,89 @@ export class LocalFsStorageProvider implements StorageProvider {
     await rm(this.resolve(key), { force: true });
   }
 
-  async signedUrl(key: string): Promise<string> {
+  /**
+   * A URL a browser on this machine can load, for as long as it is valid.
+   *
+   * This returned `file://` paths, and the first film with a real product
+   * capture in it failed to render: the renderer's page is served over HTTP,
+   * and a page served over HTTP is not allowed to load a local file, so the
+   * browser refused the image. Nothing had ever noticed because no film had
+   * ever carried an asset. The provider now serves its own directory on a
+   * loopback port, with a random token per grant that expires with the URL —
+   * the same contract the object-storage provider gives the renderer.
+   */
+  async signedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
     if (this.publicBaseUrl) return `${this.publicBaseUrl.replace(/\/$/, '')}/${key}`;
-    return `file://${this.resolve(key)}`;
+    const origin = await this.serve();
+    const token = randomBytes(18).toString('base64url');
+    this.grants.set(token, { key, expiresAt: Date.now() + expiresInSeconds * 1000 });
+    if (this.grants.size > 2000) this.sweepGrants();
+    return `${origin}/${token}/${encodeURIComponent(path.basename(key))}`;
+  }
+
+  /** Stops serving. Grants already issued stop working; nothing else changes. */
+  async close(): Promise<void> {
+    const server = this.server;
+    this.server = null;
+    this.origin = null;
+    this.grants.clear();
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+
+  private serve(): Promise<string> {
+    if (this.origin) return this.origin;
+    this.origin = new Promise<string>((resolve, reject) => {
+      const server = createServer((request, response) => this.handle(request, response));
+      // Never the reason the process stays up: a worker draining its last job
+      // should exit, and a test should not hang on an idle listener.
+      server.unref();
+      server.once('error', (error) => {
+        this.origin = null;
+        reject(error);
+      });
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          reject(new Error('Local storage server did not bind to a port.'));
+          return;
+        }
+        this.server = server;
+        resolve(`http://127.0.0.1:${address.port}`);
+      });
+    });
+    return this.origin;
+  }
+
+  private handle(request: IncomingMessage, response: ServerResponse): void {
+    const token = (request.url ?? '').split('/')[1] ?? '';
+    const grant = this.grants.get(token);
+    if (!grant || grant.expiresAt < Date.now() || (request.method !== 'GET' && request.method !== 'HEAD')) {
+      response.writeHead(404).end();
+      return;
+    }
+    const file = this.resolve(grant.key);
+    stat(file).then(
+      (info) => {
+        response.writeHead(200, {
+          'content-type': contentTypeFor(file),
+          'content-length': String(info.size),
+          'cache-control': 'private, max-age=0',
+        });
+        if (request.method === 'HEAD') {
+          response.end();
+          return;
+        }
+        createReadStream(file).on('error', () => response.destroy()).pipe(response);
+      },
+      () => response.writeHead(404).end(),
+    );
+  }
+
+  private sweepGrants(): void {
+    const now = Date.now();
+    for (const [token, grant] of this.grants) {
+      if (grant.expiresAt < now) this.grants.delete(token);
+    }
   }
 
   async list(prefix: string): Promise<string[]> {
@@ -122,4 +207,25 @@ export class LocalFsStorageProvider implements StorageProvider {
 
 function checksum(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
+}
+
+function contentTypeFor(file: string): string {
+  const types: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mov': 'video/quicktime',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.aac': 'audio/aac',
+    '.m4a': 'audio/mp4',
+    '.json': 'application/json',
+    '.woff2': 'font/woff2',
+  };
+  return types[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
 }
