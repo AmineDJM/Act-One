@@ -38,6 +38,23 @@ export type ResearchInput = {
   capturedMoments?: ProductMoment[];
   maxPages?: number;
   onProgress?: (progress: { fraction: number; message: string }) => void;
+  /** Called as each page is read, so the customer can watch the research happen. */
+  onPage?: (page: VisitedPage) => void;
+};
+
+/** One page the crawl read, with what it gave and the capture of it. */
+export type VisitedPage = {
+  index: number;
+  url: string;
+  title: string;
+  intent: PageIntent;
+  reason: string;
+  statusCode: number;
+  capturedAt: string;
+  /** The capture, when the page answered: full page for the homepage, the fold for the rest. */
+  screenshot: Uint8Array | null;
+  /** The visible text, trimmed to what a reader needs to recognise the page. */
+  excerpt: string;
 };
 
 /** A public capture attached to a moment, with the bytes the caller stores. */
@@ -68,6 +85,10 @@ export type ResearchResult = {
    */
   captureNotes: string[];
   pagesVisited: string[];
+  /** Every page read, in the order it was read: the trail behind the brief. */
+  pages: VisitedPage[];
+  /** How many verbatim excerpts each page contributed, by URL. */
+  evidenceByUrl: Record<string, number>;
   confidence: ReturnType<typeof understandingConfidence>;
 };
 
@@ -130,7 +151,7 @@ export class ProductResearchAgent {
     const progress = input.onProgress ?? (() => undefined);
     progress({ fraction: 0.02, message: 'Opening a browser' });
 
-    const { captures, visited } = await withFallback(
+    const { captures, visited, pages } = await withFallback(
       this.browser,
       this.browserFallback,
       (provider) =>
@@ -143,6 +164,7 @@ export class ProductResearchAgent {
           projectId: input.projectId,
           context,
           progress,
+          onPage: input.onPage ?? (() => undefined),
         }),
     );
 
@@ -196,6 +218,9 @@ export class ProductResearchAgent {
 
     progress({ fraction: 0.98, message: 'Done' });
 
+    const evidenceByUrl: Record<string, number> = {};
+    for (const item of evidence) evidenceByUrl[item.sourceUrl] = (evidenceByUrl[item.sourceUrl] ?? 0) + 1;
+
     return {
       understanding: filmable,
       brand,
@@ -203,6 +228,8 @@ export class ProductResearchAgent {
       momentCaptures,
       captureNotes,
       pagesVisited: [...visited],
+      pages,
+      evidenceByUrl,
       confidence: understandingConfidence(filmable),
     };
   }
@@ -393,8 +420,9 @@ export class ProductResearchAgent {
       projectId: string;
       context: CallContext;
       progress: (p: { fraction: number; message: string }) => void;
+      onPage: (page: VisitedPage) => void;
     },
-  ): Promise<{ captures: PageCapture[]; visited: Set<string> }> {
+  ): Promise<{ captures: PageCapture[]; visited: Set<string>; pages: VisitedPage[] }> {
     const session: BrowserSession = await provider.createSession(
       {
         projectId: params.projectId,
@@ -407,6 +435,7 @@ export class ProductResearchAgent {
 
     const captures: PageCapture[] = [];
     const visited = new Set<string>();
+    const pages: VisitedPage[] = [];
 
     try {
       let plan: PlannedPage[] = initialPlan(params.root, {
@@ -433,6 +462,19 @@ export class ProductResearchAgent {
             // to be the product: not on the blog, not on the about page.
             productImages: IMAGERY_INTENTS.includes(next.intent) ? PRODUCT_IMAGES_PER_PAGE : 0,
           });
+          const page: VisitedPage = {
+            index: pages.length,
+            url: capture.url || next.url,
+            title: capture.title,
+            intent: next.intent,
+            reason: next.reason,
+            statusCode: capture.statusCode,
+            capturedAt: capture.capturedAt,
+            screenshot: capture.statusCode >= 400 ? null : capture.screenshot,
+            excerpt: excerptOf(capture.text),
+          };
+          pages.push(page);
+          params.onPage(page);
           // A 404 or a 500 has text, and that text is not evidence about the
           // product. The page stays visited so it is not planned again.
           if (capture.statusCode >= 400) continue;
@@ -463,8 +505,17 @@ export class ProductResearchAgent {
       await session.close();
     }
 
-    return { captures, visited };
+    return { captures, visited, pages };
   }
+}
+
+/** The first few lines a reader would recognise the page by, without the navigation. */
+function excerptOf(text: string): string {
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 24 && line.length <= 400);
+  return lines.slice(0, 4).join(' ').slice(0, 600);
 }
 
 function labelFor(page: PlannedPage): string {

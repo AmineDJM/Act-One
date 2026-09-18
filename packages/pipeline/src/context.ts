@@ -5,6 +5,7 @@ import {
   type AssetKind,
   type AssetOrigin,
   type AssetRights,
+  type JobEventInput,
   type Project,
 } from '@act-one/core';
 import type { Store } from '@act-one/db';
@@ -25,6 +26,12 @@ export type StageContext = {
   jobId: string;
   /** Reports progress back to the job so the customer's panel moves. */
   progress: (fraction: number, message: string) => Promise<void>;
+  /**
+   * Writes one curated line of activity — a page read, a step begun or
+   * finished, a scene rendered — for the customer to watch. Never a log
+   * line. Failures to write are swallowed: activity must never fail a job.
+   */
+  activity: (event: JobEventInput) => Promise<void>;
   signal?: AbortSignal;
 };
 

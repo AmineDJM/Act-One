@@ -153,7 +153,7 @@ async function setup(options: { planId: string; llm: ScriptedLlmProvider; brandV
   const context: StageContext = {
     store, registry, organizationId,
     project: (await store.projects.get(organizationId, project.id))!,
-    jobId: newId('job'), progress: async () => {},
+    jobId: newId('job'), progress: async () => {}, activity: async () => {},
   };
   return { store, context, voice, organizationId, project, brandVoiceId };
 }

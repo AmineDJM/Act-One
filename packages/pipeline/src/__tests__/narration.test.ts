@@ -144,6 +144,7 @@ async function contextWith(voice: SpeechProvider, ear: SpeechRecognizer | null, 
     project,
     jobId: newId('job'),
     progress: async () => {},
+    activity: async () => {},
   };
 }
 

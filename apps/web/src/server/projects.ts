@@ -20,6 +20,7 @@ import {
   type Project,
   type ProjectStage,
   type Entitlement,
+  timelineFor,
 } from '@act-one/core';
 import { getStore } from './store.ts';
 import { loadProductAccess } from './credentials.ts';
@@ -150,7 +151,7 @@ export async function loadProjectView(session: Session, projectId: string) {
   const store = getStore();
   const project = await getProjectOr404(session, projectId);
 
-  const [understanding, brand, concepts, storyboards, renders, jobs, organization, editions] =
+  const [understanding, brand, concepts, storyboards, renders, jobs, organization, editions, sources, events] =
     await Promise.all([
       project.productUnderstandingId
         ? store.understandings.get(session.organizationId, project.productUnderstandingId)
@@ -162,6 +163,8 @@ export async function loadProjectView(session: Session, projectId: string) {
       store.jobs.listForProject(session.organizationId, project.id),
       store.organizations.get(session.organizationId),
       store.audioEditions.listForProject(session.organizationId, project.id),
+      store.researchSources.listForProject(session.organizationId, project.id),
+      store.jobEvents.listForProject(session.organizationId, project.id),
     ]);
 
   const { plan, entitlements } = organization
@@ -226,6 +229,28 @@ export async function loadProjectView(session: Session, projectId: string) {
     jobs.find((job) => !jobIsTerminal(job.state) && jobAdvancesProject(job.kind)) ?? null;
   const run = activeJob ? await runViewFor(jobs, activeJob) : null;
 
+  /*
+   * The generation as nine steps, read off the jobs and the activity they
+   * wrote, with what the brief knows added under the research step.
+   */
+  const timeline = timelineFor({
+    jobs: jobs.filter((job) => jobAdvancesProject(job.kind)),
+    events,
+    filmReady: Boolean(latestRender),
+    details: understanding
+      ? {
+          research: [
+            ...(understanding.differentiators.length > 0
+              ? [`${understanding.differentiators.length} core differentiator${understanding.differentiators.length === 1 ? '' : 's'} found`]
+              : []),
+            ...(understanding.productMoments.filter((moment) => moment.screenshots.length > 0).length > 0
+              ? [`${understanding.productMoments.filter((moment) => moment.screenshots.length > 0).length} useful product screens captured`]
+              : []),
+          ],
+        }
+      : {},
+  });
+
   // The revision conversation on the storyboard in play, with names.
   const activeBoard =
     storyboards.find((board) => board.id === project.activeStoryboardId) ?? storyboards[0] ?? null;
@@ -282,6 +307,9 @@ export async function loadProjectView(session: Session, projectId: string) {
     /** The timing preview being built right now, reported where it was asked for. */
     animaticJob:
       jobs.find((job) => job.kind === 'render_animatic' && !jobIsTerminal(job.state)) ?? null,
+    /** The trail behind the brief, and the nine steps of the generation. */
+    sources,
+    timeline,
     /** The newest audio version, and the job reading one right now. */
     audioEdition: editions[0] ?? null,
     audioJob: jobs.find((job) => job.kind === 'produce_audio' && !jobIsTerminal(job.state)) ?? null,

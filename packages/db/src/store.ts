@@ -34,7 +34,7 @@ import type {
   Storyboard,
   Subscription,
   User,
-  Variant, AudioEdition, BrandVoice, VoiceConsentRecord, VoiceSettings,} from '@act-one/core';
+  Variant, AudioEdition, BrandVoice, VoiceConsentRecord, VoiceSettings, JobEvent, ResearchSource,} from '@act-one/core';
 
 /**
  * The persistence contract.
@@ -74,6 +74,8 @@ export interface Store {
   readonly comments: CommentRepo;
   readonly approvals: ApprovalRepo;
   readonly revisions: RevisionRepo;
+  readonly jobEvents: JobEventRepo;
+  readonly researchSources: ResearchSourceRepo;
   readonly brandVoices: BrandVoiceRepo;
   readonly voiceConsents: VoiceConsentRepo;
   readonly voiceSettings: VoiceSettingsRepo;
@@ -357,6 +359,21 @@ export interface ApprovalRepo {
   create(approval: Approval): Promise<Approval>;
   listForProject(organizationId: string, projectId: string): Promise<Approval[]>;
   has(organizationId: string, projectId: string, gate: ApprovalGate, targetId: string): Promise<boolean>;
+}
+
+/** The curated activity a worker writes as it works, shown live and kept. */
+export interface JobEventRepo {
+  record(event: JobEvent): Promise<JobEvent>;
+  listForJob(organizationId: string, jobId: string): Promise<JobEvent[]>;
+  /** The project's events, oldest first, since a moment when given. */
+  listForProject(organizationId: string, projectId: string, since?: string): Promise<JobEvent[]>;
+}
+
+/** The pages the research read, kept per project as the trail behind the brief. */
+export interface ResearchSourceRepo {
+  /** Replaces the trail of one research run: the pages of a rerun supersede the last. */
+  replaceForProject(organizationId: string, projectId: string, sources: ResearchSource[]): Promise<ResearchSource[]>;
+  listForProject(organizationId: string, projectId: string): Promise<ResearchSource[]>;
 }
 
 /** One narrator kept across everything an organisation makes. */

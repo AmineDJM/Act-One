@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { PrimaryCta, RunView } from '@act-one/core';
+import type { GenerationTimeline as Timeline, PrimaryCta, RunView } from '@act-one/core';
+import { GenerationTimeline } from './GenerationTimeline.tsx';
 import {
   createCampaignAction,
   retryProjectAction,
@@ -28,6 +29,8 @@ export function ProjectCta(props: {
   body: string;
   /** The work in flight, as steps with timing. Null when nothing is running. */
   run: RunView | null;
+  /** The generation as nine steps, read off the jobs and their activity. */
+  timeline: Timeline | null;
   disabled: boolean;
   /** What to do about it when the action is blocked by the plan. */
   remedy?: 'none' | 'upgrade' | 'wait' | 'billing' | 'contact';
@@ -78,7 +81,11 @@ export function ProjectCta(props: {
     <section className={styles.cta}>
       <div className={styles.ctaCopy}>
         <h2>{props.headline}</h2>
-        {working && props.run ? <RunProgress run={props.run} /> : <p>{props.body}</p>}
+        {working && props.run ? (
+          <RunProgress run={props.run} timeline={props.timeline} />
+        ) : (
+          <p>{props.body}</p>
+        )}
         {result ? (
           <p role="alert" style={{ color: 'var(--danger)', fontSize: '0.88rem' }}>
             {result}
@@ -126,8 +133,10 @@ export function ProjectCta(props: {
  * no history yet. The bar never goes backwards: it is the whole run, and it
  * only ever climbs.
  */
-function RunProgress({ run }: { run: RunView }) {
-  const [now, setNow] = useState(() => Date.now());
+function RunProgress({ run, timeline }: { run: RunView; timeline: Timeline | null }) {
+  // The clock starts at the moment the server computed the view, so the first
+  // client render matches the server's markup to the second; it ticks from there.
+  const [now, setNow] = useState(() => Date.parse(run.asOf));
   // The furthest the bar has been for this run. A refresh that computes a
   // slightly lower figure — a step's weight revised, a worker restart —
   // must not be seen as the work undoing itself.
@@ -137,9 +146,10 @@ function RunProgress({ run }: { run: RunView }) {
   const overall = peak.current.overall;
 
   useEffect(() => {
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [run.asOf]);
 
   const sinceView = Math.max(0, now - Date.parse(run.asOf));
   const elapsed = run.elapsedMs + sinceView;
@@ -148,7 +158,8 @@ function RunProgress({ run }: { run: RunView }) {
 
   return (
     <div className={styles.run}>
-      <ol className={styles.runSteps}>
+      {timeline ? <GenerationTimeline timeline={timeline} message={run.waiting ? 'waiting for a free worker' : run.message} /> : null}
+      <ol className={styles.runSteps} data-hidden={Boolean(timeline)} style={timeline ? { display: 'none' } : undefined}>
         {run.steps.map((step) => (
           <li key={step.key} data-state={step.state}>
             <span className={styles.runTick} aria-hidden="true">
@@ -170,7 +181,7 @@ function RunProgress({ run }: { run: RunView }) {
           </li>
         ))}
       </ol>
-      {run.message ? (
+      {timeline ? null : run.message ? (
         <p className={styles.runMessage}>{run.message}</p>
       ) : current ? (
         <p className={styles.runMessage}>{current.label}…</p>

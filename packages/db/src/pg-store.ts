@@ -30,6 +30,7 @@ import type {
   CredentialAuditEvent,
   GenerationCost,
   Job,
+  JobEvent,
   JobKind,
   JobState,
   Membership,
@@ -41,6 +42,7 @@ import type {
   ProjectStage,
   QaReport,
   Render,
+  ResearchSource,
   RevisionRequest,
   Scene,
   Storyboard,
@@ -1799,6 +1801,58 @@ export class PgStore implements Store {
         );
         if (!r.rows[0]) throw notFound('Revision request');
         return toRevision(r.rows[0]);
+      }),
+  };
+
+  // --- activity and the research trail ------------------------------------
+
+  readonly jobEvents = {
+    record: async (event: JobEvent) =>
+      this.tenant(event.organizationId, async (c) => {
+        await c.query(
+          'INSERT INTO job_events (id, organization_id, project_id, job_id, at, data) VALUES ($1,$2,$3,$4,$5,$6)',
+          [event.id, event.organizationId, event.projectId, event.jobId, event.at, event],
+        );
+        return event;
+      }),
+
+    listForJob: async (organizationId: string, jobId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query('SELECT data FROM job_events WHERE organization_id = $1 AND job_id = $2 ORDER BY at, id', [organizationId, jobId]);
+        return r.rows.map((row) => row['data'] as JobEvent);
+      }),
+
+    listForProject: async (organizationId: string, projectId: string, since?: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM job_events WHERE organization_id = $1 AND project_id = $2 ${since ? 'AND at >= $3' : ''} ORDER BY at, id LIMIT 2000`,
+          since ? [organizationId, projectId, since] : [organizationId, projectId],
+        );
+        return r.rows.map((row) => row['data'] as JobEvent);
+      }),
+  };
+
+  readonly researchSources = {
+    replaceForProject: async (organizationId: string, projectId: string, sources: ResearchSource[]) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query('DELETE FROM research_sources WHERE organization_id = $1 AND project_id = $2', [organizationId, projectId]);
+        for (const source of sources) {
+          await c.query(
+            'INSERT INTO research_sources (id, organization_id, project_id, job_id, visited_at, data) VALUES ($1,$2,$3,$4,$5,$6)',
+            [source.id, organizationId, projectId, source.jobId, source.visitedAt, { ...source, organizationId, projectId }],
+          );
+        }
+        return sources.map((source) => ({ ...source, organizationId, projectId }));
+      }),
+
+    listForProject: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM research_sources WHERE organization_id = $1 AND project_id = $2
+           ORDER BY COALESCE((data->>'position')::int, 0), visited_at, id`,
+          [organizationId, projectId],
+        );
+        return r.rows.map((row) => row['data'] as ResearchSource);
       }),
   };
 

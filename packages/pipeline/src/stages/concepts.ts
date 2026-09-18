@@ -16,6 +16,7 @@ export async function runConcepts(
   const { store, registry, project, organizationId } = context;
 
   await context.progress(0.05, 'Reading the brief');
+  await context.activity({ step: 'strategy', kind: 'step', label: 'reading the brief', status: 'active' });
 
   const understanding = project.productUnderstandingId
     ? await store.understandings.get(organizationId, project.productUnderstandingId)
@@ -36,6 +37,7 @@ export async function runConcepts(
     : [];
 
   await context.progress(0.2, 'Developing three directions');
+  await context.activity({ step: 'strategy', kind: 'step', label: 'developing three directions', status: 'active' });
 
   const engine = new CreativeStrategyEngine(registry.llm());
   const result = await engine.generate(
@@ -50,10 +52,19 @@ export async function runConcepts(
   );
 
   await context.progress(0.9, 'Writing them up');
+  await context.activity({ step: 'strategy', kind: 'step', label: 'three structurally different directions', status: 'done' });
+  await context.activity({ step: 'concepts', kind: 'step', label: 'writing the concepts up', status: 'active' });
 
   await store.concepts.createMany(result.concepts, organizationId);
   await store.projects.setStage(organizationId, project.id, 'concepts_ready');
 
+  await context.activity({
+    step: 'concepts',
+    kind: 'step',
+    label: `${result.concepts.length} concepts ready`,
+    detail: `divergence ${Math.round(result.divergence * 100)}%`,
+    status: 'done',
+  });
   await context.progress(1, 'Ready');
   return {
     conceptIds: result.concepts.map((concept) => concept.id),

@@ -52,6 +52,7 @@ export async function runSceneAssets(
   const organization = await store.organizations.get(organizationId);
   const blenderReady = await isBlenderAvailable();
 
+  await context.activity({ step: 'captures', kind: 'step', label: `preparing ${scenes.length} scenes`, status: 'active' });
   for (const [index, scene] of scenes.entries()) {
     await context.progress(index / Math.max(1, scenes.length), `Preparing scene ${scene.index + 1}`);
 
@@ -138,6 +139,12 @@ export async function runSceneAssets(
     }
   }
 
+  await context.activity({
+    step: 'captures',
+    kind: 'step',
+    label: `${result.generated} shot${result.generated === 1 ? '' : 's'} generated, ${result.skipped} scene${result.skipped === 1 ? '' : 's'} on real capture`,
+    status: 'done',
+  });
   await context.progress(1, `${result.generated} generated, ${result.skipped} skipped`);
   return result;
 }

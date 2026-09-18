@@ -1,4 +1,5 @@
 import {
+  newId,
   jobIsTerminal,
   retryDelayMs,
   toAppError,
@@ -95,6 +96,25 @@ export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): 
         progress: Math.max(0, Math.min(1, fraction)),
         statusMessage: message.slice(0, 240),
       });
+    },
+    activity: async (event) => {
+      try {
+        await store.jobEvents.record({
+          id: newId('jev'),
+          organizationId: job.organizationId,
+          projectId: job.projectId!,
+          jobId: job.id,
+          at: event.at ?? new Date().toISOString(),
+          step: event.step ?? null,
+          kind: event.kind,
+          label: event.label.slice(0, 200),
+          detail: event.detail?.slice(0, 400) ?? null,
+          status: event.status ?? 'done',
+          index: event.index ?? null,
+        });
+      } catch (error) {
+        console.error('[runner] activity not recorded:', (error as Error).message.slice(0, 160));
+      }
     },
     ...(signal ? { signal } : {}),
   };

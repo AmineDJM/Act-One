@@ -32,6 +32,7 @@ import type {
   CredentialAuditEvent,
   GenerationCost,
   Job,
+  JobEvent,
   JobKind,
   JobState,
   Membership,
@@ -43,6 +44,7 @@ import type {
   ProjectStage,
   QaReport,
   Render,
+  ResearchSource,
   RevisionRequest,
   VoiceConsentRecord,
   VoiceSettings,
@@ -92,6 +94,8 @@ export class MemoryStore implements Store {
     comments: new Map<string, Comment>(),
     approvals: new Map<string, Approval>(),
     revisions: new Map<string, RevisionRequest & { organizationId: string }>(),
+    jobEvents: new Map<string, JobEvent>(),
+    researchSources: new Map<string, ResearchSource>(),
     brandVoices: new Map<string, BrandVoice>(),
     voiceConsents: new Map<string, VoiceConsentRecord>(),
     voiceSettings: new Map<string, VoiceSettings>(),
@@ -937,6 +941,37 @@ export class MemoryStore implements Store {
         { applied: true, appliedAt: new Date().toISOString(), affectedSceneIds },
         'Revision request',
       ),
+  };
+
+  readonly jobEvents = {
+    record: async (event: JobEvent) => {
+      this.tables.jobEvents.set(event.id, event);
+      return event;
+    },
+    listForJob: async (organizationId: string, jobId: string) =>
+      this.scoped(this.tables.jobEvents, organizationId)
+        .filter((e) => e.jobId === jobId)
+        .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)),
+    listForProject: async (organizationId: string, projectId: string, since?: string) =>
+      this.scoped(this.tables.jobEvents, organizationId)
+        .filter((e) => e.projectId === projectId && (!since || e.at >= since))
+        .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+        .slice(0, 2000),
+  };
+
+  readonly researchSources = {
+    replaceForProject: async (organizationId: string, projectId: string, sources: ResearchSource[]) => {
+      for (const existing of this.scoped(this.tables.researchSources, organizationId)) {
+        if (existing.projectId === projectId) this.tables.researchSources.delete(existing.id);
+      }
+      const stored = sources.map((source) => ({ ...source, organizationId, projectId }));
+      for (const source of stored) this.tables.researchSources.set(source.id, source);
+      return stored;
+    },
+    listForProject: async (organizationId: string, projectId: string) =>
+      this.scoped(this.tables.researchSources, organizationId)
+        .filter((s) => s.projectId === projectId)
+        .sort((a, b) => a.position - b.position || a.visitedAt.localeCompare(b.visitedAt) || a.id.localeCompare(b.id)),
   };
 
   readonly brandVoices = {

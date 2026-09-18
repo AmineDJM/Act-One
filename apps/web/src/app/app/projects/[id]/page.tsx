@@ -24,6 +24,7 @@ import { Notes } from './Notes.tsx';
 import { BriefPanel } from './BriefPanel.tsx';
 import { Prompt, Status } from '@/components/ui/Prompt.tsx';
 import { AudioEditionPanel } from './AudioEditionPanel.tsx';
+import { ResearchSources } from './ResearchSources.tsx';
 import { CorrectWebsite } from './CorrectWebsite.tsx';
 import styles from '../../app.module.css';
 
@@ -55,6 +56,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     animaticJob,
     audioEdition,
     audioJob,
+    sources,
+    timeline,
     variants,
     poster,
     copyKit,
@@ -110,6 +113,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         headline={headlineFor(cta, project.name, failure)}
         body={bodyFor(cta, permission.watermarked, permission.reason, failure)}
         run={run}
+        timeline={timeline}
         disabled={!permission.allowed && cta === 'render_film'}
         remedy={permission.remedy}
       />
@@ -143,6 +147,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             canProduce={can(session.actor, 'project:update')}
             hasStoryboard={Boolean(project.activeStoryboardId)}
           />
+        </div>
+      ) : null}
+
+      {/* What the research read, kept with the project for good. */}
+      {sources.length > 0 ? (
+        <div className={styles.panels} style={{ marginBottom: 'var(--space-5)' }}>
+          <ResearchSources sources={sources} />
         </div>
       ) : null}
 

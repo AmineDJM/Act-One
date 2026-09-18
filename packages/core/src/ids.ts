@@ -33,6 +33,8 @@ export type IdPrefix =
   | 'sec'
   | 'cmt'
   | 'aed'
+  | 'jev'
+  | 'src'
   | 'bvc'
   | 'vcs'
   | 'inv'

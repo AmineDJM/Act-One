@@ -1,5 +1,5 @@
 import { AppError, newId, secretContextFor } from '../shared.ts';
-import { credentialIsUsable, stageReached } from '@act-one/core';
+import { ResearchPageType, credentialIsUsable, stageReached, type ProductUnderstanding, type ResearchSource } from '@act-one/core';
 import { ProductResearchAgent, ProductExplorer } from '@act-one/research';
 import type { SecretVault } from '@act-one/providers';
 import { policyForAuthenticatedProduct } from '@act-one/providers';
@@ -26,6 +26,7 @@ export async function runResearch(
   assertResearchable(project.websiteUrl);
 
   await context.progress(0.02, 'Opening a browser');
+  await context.activity({ step: 'research', kind: 'step', label: 'understanding product', status: 'active' });
 
   const capturedMoments = await exploreProduct(context, options.vault);
 
@@ -48,13 +49,33 @@ export async function runResearch(
       },
       capturedMoments: capturedMoments.moments,
       maxPages: 12,
-      onProgress: ({ fraction, message }) =>
-        void context.progress(0.15 + fraction * 0.7, message),
+      onProgress: ({ fraction, message }) => {
+        void context.progress(0.15 + fraction * 0.7, message);
+        const step = RESEARCH_STEP_LINES[message];
+        if (step) void context.activity({ step: step.step, kind: 'step', label: step.label, status: 'active' });
+      },
+      // Each page, as it is read: the customer watches the research happen.
+      onPage: (page) =>
+        void context.activity({
+          step: 'research',
+          kind: 'page',
+          index: page.index,
+          label: pageLine(page.url, project.websiteUrl),
+          detail: page.title.slice(0, 120) || null,
+          status: page.statusCode >= 400 ? 'failed' : 'done',
+        }),
     },
     call,
   );
 
   await context.progress(0.9, 'Saving what we found');
+  await context.activity({
+    step: 'research',
+    kind: 'step',
+    label: `${result.pages.filter((page) => page.statusCode < 400).length} pages read`,
+    status: 'done',
+  });
+  await context.activity({ step: 'brand', kind: 'step', label: 'analyzing visual identity', status: 'active' });
 
   // The homepage capture becomes the brand confirmation screen's evidence.
   if (result.heroScreenshot) {
@@ -135,6 +156,13 @@ export async function runResearch(
     organizationId,
   );
 
+  /*
+   * The trail: every page read, with its screenshot as our own asset and
+   * what the brief took from it. Kept so the customer can inspect what the
+   * system actually used, and so a later run has the same ground to stand on.
+   */
+  await keepResearchTrail(context, result, understanding);
+
   // Why the film will or will not show the product, in the log an operator
   // reads — not in the customer's brief, which says only what it shows.
   store.log.recordSafely({
@@ -163,6 +191,13 @@ export async function runResearch(
   const existingBrands = await store.brands.list(organizationId);
   const existing = existingBrands.find((brand) => brand.confirmedByUser);
   const brand = existing ?? (await store.brands.create(result.brand));
+  await context.activity({
+    step: 'brand',
+    kind: 'step',
+    label: existing ? 'brand already confirmed for this workspace' : `brand measured from ${result.brand.sources.length} pages`,
+    detail: `${brand.primaryColor} · ${brand.typography.find((font) => font.role === 'display')?.family ?? 'system type'} · ${brand.visualStyle}`,
+    status: 'done',
+  });
 
   /*
    * The stage only moves forward. This same stage runs again when a customer
@@ -293,4 +328,114 @@ function assertResearchable(websiteUrl: string): void {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     throw new AppError('validation_failed', 'A product lives at an http or https address.');
   }
+}
+
+/** The research agent's progress lines, as the steps the customer sees them as. */
+const RESEARCH_STEP_LINES: Record<string, { step: 'research' | 'brand'; label: string }> = {
+  'Reading the brand': { step: 'brand', label: 'analyzing visual identity' },
+  'Gathering evidence': { step: 'research', label: 'extracting positioning' },
+  'Understanding the product': { step: 'research', label: 'identifying target audience' },
+  'Choosing what to show': { step: 'research', label: 'finding product moments' },
+};
+
+/** "homepage", "/pricing", "linkedin.com/company/…": the page as a line of activity. */
+function pageLine(url: string, websiteUrl: string): string {
+  try {
+    const page = new URL(url);
+    const home = new URL(websiteUrl);
+    const path = page.pathname.replace(/\/$/, '');
+    if (page.hostname.replace(/^www\./, '') === home.hostname.replace(/^www\./, '')) {
+      return path.length > 1 ? path : 'homepage';
+    }
+    return `${page.hostname.replace(/^www\./, '')}${path.length > 1 ? path : ''}`.slice(0, 80);
+  } catch {
+    return url.slice(0, 80);
+  }
+}
+
+function pageTypeOf(intent: string, url: string): ResearchSource['pageType'] {
+  if (/linkedin\.com|twitter\.com|x\.com|youtube\.com|instagram\.com/i.test(url)) return 'social';
+  if (/producthunt\.com/i.test(url)) return 'launch_profile';
+  return (ResearchPageType.options as readonly string[]).includes(intent) ? (intent as ResearchSource['pageType']) : 'other';
+}
+
+async function keepResearchTrail(
+  context: StageContext,
+  result: Awaited<ReturnType<ProductResearchAgent['research']>>,
+  understanding: ProductUnderstanding,
+): Promise<void> {
+  const { store, project, organizationId } = context;
+  // What each page gave the brief: the claims that cite evidence found on it.
+  const evidenceUrl = new Map(understanding.evidence.map((item) => [item.id, item.sourceUrl] as const));
+  const claims = [
+    ...understanding.keyBenefits,
+    ...understanding.differentiators,
+    ...understanding.proofPoints,
+    ...understanding.painPoints,
+    ...understanding.coreFeatures,
+  ];
+  const findingsFor = (url: string): string[] => {
+    const found: string[] = [];
+    for (const claim of claims) {
+      if (claim.evidenceIds.some((id) => evidenceUrl.get(id) === url) && !found.includes(claim.text)) found.push(claim.text);
+      if (found.length >= 4) break;
+    }
+    return found;
+  };
+
+  const sources: ResearchSource[] = [];
+  for (const page of result.pages) {
+    let screenshotAssetId: string | null = null;
+    if (page.screenshot && page.statusCode < 400) {
+      try {
+        const stored = await storeAsset(context, {
+          data: page.screenshot,
+          kind: 'screenshot',
+          origin: 'captured',
+          rights: 'customer_owned',
+          extension: 'png',
+          contentType: 'image/png',
+          sourceUrl: page.url,
+          metadata: {
+            role: 'research',
+            source: 'browser_research',
+            pageUrl: page.url,
+            pageTitle: page.title,
+            pageType: pageTypeOf(page.intent, page.url),
+            capturedAt: page.capturedAt,
+          },
+        });
+        screenshotAssetId = stored.asset.id;
+      } catch (error) {
+        console.error('[research] page screenshot not kept:', (error as Error).message.slice(0, 160));
+      }
+    }
+    let domain = page.url;
+    try {
+      domain = new URL(page.url).hostname.replace(/^www\./, '');
+    } catch {
+      // Keep the URL as the domain.
+    }
+    const pageType = pageTypeOf(page.intent, page.url);
+    sources.push({
+      id: newId('src'),
+      organizationId,
+      projectId: project.id,
+      jobId: context.jobId,
+      position: page.index,
+      url: page.url,
+      title: page.title.slice(0, 300),
+      domain: domain.slice(0, 200),
+      pageType,
+      reason: page.reason.slice(0, 300),
+      visitedAt: page.capturedAt,
+      screenshotAssetId,
+      excerpt: page.excerpt.slice(0, 800),
+      findings: findingsFor(page.url).map((text) => text.slice(0, 300)),
+      evidenceCount: result.evidenceByUrl[page.url] ?? 0,
+      statusCode: page.statusCode,
+      useful: page.statusCode < 400,
+    });
+  }
+  await store.researchSources.replaceForProject(organizationId, project.id, sources);
 }

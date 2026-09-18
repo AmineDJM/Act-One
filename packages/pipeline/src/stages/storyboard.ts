@@ -34,6 +34,7 @@ export async function runStoryboard(
   if (!brand) throw new AppError('conflict', 'No brand system for this project.');
 
   await context.progress(0.1, 'Writing the treatment');
+  await context.activity({ step: 'storyboard', kind: 'step', label: 'writing the treatment', status: 'active' });
 
   // Reuse an existing treatment for this concept rather than writing a second
   // one: a customer revising a storyboard must not silently get a new film.
@@ -49,6 +50,7 @@ export async function runStoryboard(
     ));
 
   await context.progress(0.4, 'Building the storyboard');
+  await context.activity({ step: 'storyboard', kind: 'step', label: 'building the storyboard', status: 'active' });
 
   const version = await store.storyboards.nextVersion(organizationId, project.id);
 
@@ -84,6 +86,7 @@ export async function runStoryboard(
   );
 
   await context.progress(0.85, 'Checking it will actually work');
+  await context.activity({ step: 'storyboard', kind: 'step', label: 'checking timing, legibility and budget', status: 'active' });
 
   // Legibility, timing and budget, decided on paper.
   const issues = runDeterministicChecks({
@@ -118,6 +121,12 @@ export async function runStoryboard(
     stage: 'storyboard_ready',
   });
 
+  await context.activity({
+    step: 'storyboard',
+    kind: 'step',
+    label: `${storyboard.scenes.length} scenes, ${Math.round(storyboard.scenes.reduce((sum, scene) => sum + scene.duration, 0))} seconds`,
+    status: 'done',
+  });
   await context.progress(1, 'Ready for review');
 
   return {

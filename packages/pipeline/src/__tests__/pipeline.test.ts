@@ -307,6 +307,24 @@ describe('pipeline', () => {
     const updated = await store.projects.get(org.id, project.id);
     expect(updated!.stage).toBe('understanding_ready');
     expect(updated!.brandId).toBe(brands[0]!.id);
+
+    // The trail: every page read, kept with its screenshot and what it gave.
+    const sources = await store.researchSources.listForProject(org.id, project.id);
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources[0]).toMatchObject({ pageType: 'home', domain: 'northwind.example', useful: true, statusCode: 200 });
+    expect(sources[0]!.screenshotAssetId).toMatch(/^ast_/);
+    expect(sources[0]!.findings.length).toBeGreaterThan(0);
+    const kept = await store.assets.get(org.id, sources[0]!.screenshotAssetId!);
+    expect(kept).toMatchObject({ kind: 'screenshot', origin: 'captured' });
+    expect(kept!.metadata).toMatchObject({ role: 'research', source: 'browser_research', pageType: 'home' });
+
+    // The activity the customer watched: pages as they were read, then the steps.
+    const events = await store.jobEvents.listForProject(org.id, project.id);
+    const pages = events.filter((event) => event.kind === 'page');
+    expect(pages.length).toBe(sources.length);
+    expect(pages[0]).toMatchObject({ step: 'research', label: 'homepage', status: 'done', index: 0 });
+    expect(events.some((event) => event.step === 'brand' && event.status === 'done')).toBe(true);
+    expect(events.some((event) => event.kind === 'step' && event.label === 'extracting positioning')).toBe(true);
   });
 
   it('chains straight into concepts without waiting for another button', async () => {

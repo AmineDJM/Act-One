@@ -355,6 +355,12 @@ export async function runRender(
           {},
     );
 
+    await context.activity({
+      step: 'composition',
+      kind: 'step',
+      label: blocked ? 'finished, with issues to look at' : 'film mastered and saved',
+      status: 'done',
+    });
     await context.progress(1, blocked ? 'Finished with issues' : 'Done');
     // The honest QA result, not the delivery decision above: an animatic that
     // completes with blockers still has blockers, and the caller is told so.
@@ -430,6 +436,12 @@ async function renderOnce(
   const { storyboard, brand, system } = params;
 
   await context.progress(0.15, params.attempt === 0 ? 'Rendering the film' : 'Re-rendering repaired scenes');
+  await context.activity({
+    step: 'motion',
+    kind: 'step',
+    label: params.attempt === 0 ? `rendering ${storyboard.scenes.length} scenes` : 're-rendering the repaired scenes',
+    status: 'active',
+  });
 
   const assetUrls = await resolveAssetUrls(
     context,
@@ -469,7 +481,15 @@ async function renderOnce(
     onProgress: ({ progress }) => void context.progress(0.15 + progress * 0.45, 'Rendering'),
   });
 
+  await context.activity({
+    step: 'motion',
+    kind: 'step',
+    label: `${storyboard.scenes.length} scenes rendered`,
+    detail: `${params.aspect} · ${params.quality}`,
+    status: 'done',
+  });
   await context.progress(0.62, 'Designing the sound');
+  await context.activity({ step: 'voice', kind: 'step', label: 'reading the narration', status: 'active' });
 
   const design = directSound({
     storyboard,
@@ -483,6 +503,18 @@ async function renderOnce(
   const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
   const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
   const voiceTracks = narration.tracks;
+  await context.activity({
+    step: 'voice',
+    kind: 'step',
+    label:
+      voiceTracks.length > 0
+        ? `${voiceTracks.length} passage${voiceTracks.length === 1 ? '' : 's'} read`
+        : storyboard.voiceStrategy === 'none'
+          ? 'no voice-over on this film'
+          : 'nothing to read',
+    status: voiceTracks.length > 0 || storyboard.voiceStrategy === 'none' ? 'done' : 'skipped',
+  });
+  await context.activity({ step: 'composition', kind: 'step', label: 'designing the sound', status: 'active' });
 
   /*
    * The voice has to lead the bed by the standard's four LU, measured, not
@@ -543,6 +575,7 @@ async function renderOnce(
   }
 
   await context.progress(0.72, 'Mixing');
+  await context.activity({ step: 'composition', kind: 'step', label: 'mixing and mastering', status: 'active' });
 
   /*
    * The master, in two passes, by the same code that masters the sound library.
@@ -716,6 +749,7 @@ async function inspect(
 ): Promise<QaIssue[]> {
   const { registry, project, organizationId } = context;
   await context.progress(0.78, 'Checking the film');
+  await context.activity({ step: 'composition', kind: 'step', label: 'checking the film frame by frame', status: 'active' });
 
   const { understanding } = params;
 

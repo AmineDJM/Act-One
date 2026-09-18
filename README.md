@@ -33,6 +33,28 @@ that.
 
 ---
 
+## What the customer sees while it works
+
+The interface is near-black and quiet, with one accent and a grid of dots
+for a signature. The terminal is an influence, not a costume: a prompt in
+front of a label, a two-digit index, a status in capitals — `ANALYSIS
+FAILED`, `FILM READY` — and otherwise modern type and generous space.
+
+While the system works, the project page shows the generation as nine
+steps — product research, brand extraction, creative strategy, concepts,
+storyboard, product captures, voice, motion, final composition — each
+`COMPLETE`, `BUILDING` or `WAITING`, and the step in progress carries the
+curated lines the worker writes as it goes: each page read with a tick, then
+`> extracting positioning`, `> identifying target audience`, `> finding
+product moments`. Only meaningful activity, never a log line; the log is the
+console's.
+
+Nothing the research read is thrown away. Every page becomes a research
+source kept with the project — its address, title, type, why the agent went
+there, the screenshot as our own asset, the excerpt, the claims the brief
+took from it — and stays inspectable after the film exists, under **Research
+sources** on the project page.
+
 ## The pipeline
 
 ```
