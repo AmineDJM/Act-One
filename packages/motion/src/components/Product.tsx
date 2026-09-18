@@ -26,6 +26,8 @@ export type ProductWindowProps = {
   /** Browser chrome around the capture. Off for in-app screens. */
   chrome?: boolean;
   label?: string;
+  /** Width over height of the capture. Staged at its own shape, so nothing is cropped away. */
+  aspect?: number;
 };
 
 export const ProductWindow: React.FC<ProductWindowProps> = ({
@@ -37,6 +39,7 @@ export const ProductWindow: React.FC<ProductWindowProps> = ({
   easing,
   chrome = true,
   label,
+  aspect = 16 / 9,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -49,14 +52,19 @@ export const ProductWindow: React.FC<ProductWindowProps> = ({
   const camT = ease(camera.easing, progress(frame, fps, { durationSeconds }));
   const exit = exitProgress(frame, fps, durationSeconds, 0.35);
 
-  const box = stageProduct(tokens.grid, 16 / 9, { inset: chrome ? 0.86 : 0.92 });
+  // The chrome bar is part of the object: the box is sized so image plus bar
+  // fit the stage, rather than the bar eating the bottom of the image.
+  const chromeShare = chrome ? 0.052 : 0;
+  const box = stageProduct(tokens.grid, aspect / (1 + chromeShare * aspect), {
+    inset: chrome ? 0.86 : 0.92,
+  });
   const scale = interpolate(camT, camera.fromScale, camera.toScale) * interpolate(entrance, 0.965, 1);
   const x = interpolate(camT, camera.fromX, camera.toX) * tokens.frame.width * 0.08;
   const y =
     interpolate(camT, camera.fromY, camera.toY) * tokens.frame.height * 0.08 +
     interpolate(entrance, tokens.frame.height * 0.025, 0);
 
-  const chromeHeight = chrome ? Math.round(box.height * 0.052) : 0;
+  const chromeHeight = chrome ? Math.round(box.width * chromeShare) : 0;
 
   return (
     <div

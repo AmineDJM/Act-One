@@ -23,6 +23,9 @@ export type LaunchContext = z.infer<typeof LaunchContext>;
  * launch film from a screen recording: we do not film "the dashboard", we film
  * "the moment 40 rows of manual triage collapse into one agent run".
  */
+export const CaptureKind = z.enum(['in_app', 'product_image', 'public_page']);
+export type CaptureKind = z.infer<typeof CaptureKind>;
+
 export const ProductMoment = z.object({
   id: z.string(),
   title: nonEmpty(120),
@@ -45,8 +48,33 @@ export const ProductMoment = z.object({
     .object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
     .nullable()
     .default(null),
+  /**
+   * The evidence a suggested moment was inferred from. Kept because it is how
+   * a public capture finds its moment: the page the evidence came from is the
+   * page that shows what the moment describes.
+   */
+  evidenceIds: z.array(z.string()).default([]),
+  /**
+   * What the screenshots actually show, so nothing downstream can mistake a
+   * capture of the pricing page for the product in use.
+   *
+   *   in_app        — the real product, signed in, observed by the browser agent
+   *   product_image — a screenshot of the product the company published on its
+   *                   own site, captured as displayed
+   *   public_page   — one of the company's public pages, as a page
+   */
+  captureKind: CaptureKind.nullable().default(null),
+  /** One line saying what the capture is, for the director and the customer. */
+  captureLabel: z.string().max(200).default(''),
+  /** Width over height of the first screenshot, so it is staged at its own shape. */
+  captureAspect: z.number().positive().nullable().default(null),
 });
 export type ProductMoment = z.infer<typeof ProductMoment>;
+
+/** A moment the film can actually put on screen. */
+export function momentIsFilmable(moment: Pick<ProductMoment, 'screenshots'>): boolean {
+  return moment.screenshots.length > 0;
+}
 
 /** Ranking used by the storyboard engine when choosing what to put on screen. */
 export function momentStrength(moment: ProductMoment): number {

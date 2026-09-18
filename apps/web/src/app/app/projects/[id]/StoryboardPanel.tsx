@@ -12,6 +12,8 @@ import styles from './storyboard.module.css';
  * internal accounting, and exposing it to a customer turns an edit into a
  * negotiation.
  */
+const PRODUCT_TYPES = new Set(['product_ui', 'product_ui_3d', 'screenshot_motion']);
+
 const SUGGESTIONS = [
   'The opening is too slow.',
   'Use less text.',
@@ -53,6 +55,19 @@ export function StoryboardPanel({
               <span className={styles.sceneType}>{scene.visualType.replace(/_/g, ' ')}</span>
               <span className={styles.sceneTime}>{scene.duration.toFixed(1)}s</span>
             </div>
+
+            {/* The capture this scene is built on — the founder sees what the
+                product beat will show before a frame is rendered, instead of
+                a count of "assets". Product scenes only: a statistic that
+                cites a moment draws a figure, not the capture. */}
+            {scene.assetRefs[0] && PRODUCT_TYPES.has(scene.visualType) ? (
+              <img
+                className={styles.sceneThumb}
+                src={`/api/assets/${scene.assetRefs[0]}`}
+                alt=""
+                loading="lazy"
+              />
+            ) : null}
 
             <div className={styles.sceneBody}>
               {scene.onScreenText.length > 0 ? (

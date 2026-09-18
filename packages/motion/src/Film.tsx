@@ -208,7 +208,11 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             durationSeconds={scene.duration}
             delaySeconds={scene.motionRecipe.delay}
             easing={easing}
-            chrome={scene.visualType !== 'product_ui_3d'}
+            // A published product image is shown as published: it often
+            // carries its own frame, and a browser bar around a browser bar
+            // is the tell of a template.
+            chrome={scene.visualType !== 'product_ui_3d' && scene.motionRecipe.params['frame'] !== 'bare'}
+            aspect={captureAspect(scene)}
           />
         ) : (
           typeFallback()
@@ -301,6 +305,8 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
                 camera={scene.cameraRecipe}
                 durationSeconds={scene.duration}
                 easing={easing}
+                chrome={scene.motionRecipe.params['frame'] !== 'bare'}
+                aspect={captureAspect(scene)}
               />
             ) : (
               typeFallback()
@@ -360,6 +366,12 @@ const Framed: React.FC<{
     </div>
   );
 };
+
+/** The capture's own shape, when the storyboard recorded it; a window otherwise. */
+function captureAspect(scene: Scene): number {
+  const aspect = Number(scene.motionRecipe.params['aspect']);
+  return Number.isFinite(aspect) && aspect > 0.5 && aspect < 3 ? aspect : 16 / 9;
+}
 
 /** Region of interest for a zoom, from the moment's measured element bounds. */
 function focusFrom(scene: Scene): { x: number; y: number; width: number; height: number } {

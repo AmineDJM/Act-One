@@ -1,5 +1,7 @@
+import { z } from 'zod';
 import {
   type BrandSystem,
+  type CaptureKind,
   type Evidence,
   type LaunchContext,
   type ProductMoment,
@@ -17,6 +19,8 @@ import { expandPlan, initialPlan, type PageIntent, type PlannedPage } from './cr
 import { dedupeEvidence, extractEvidence, extractMeta } from './evidence.ts';
 import { extractBrandSystem } from './brand-extractor.ts';
 import { synthesiseUnderstanding, understandingConfidence } from './understanding.ts';
+import { assessCapture, cropToFold, previewForModel } from './capture-quality.ts';
+import { attachPublicCaptures, pageLabel, type CaptureCandidate } from './public-captures.ts';
 import { normalizeUrl } from './url.ts';
 
 export type ResearchInput = {
@@ -36,14 +40,54 @@ export type ResearchInput = {
   onProgress?: (progress: { fraction: number; message: string }) => void;
 };
 
+/** A public capture attached to a moment, with the bytes the caller stores. */
+export type MomentCaptureBytes = {
+  bytes: Uint8Array;
+  kind: CaptureKind;
+  pageUrl: string;
+  label: string;
+  width: number;
+  height: number;
+};
+
 export type ResearchResult = {
   understanding: ProductUnderstanding;
   brand: BrandSystem;
   /** Homepage screenshot bytes, used for the brand confirmation screen. */
   heroScreenshot: Uint8Array | null;
+  /**
+   * Public captures attached to the understanding's moments, keyed by moment
+   * id. Bytes travel beside the understanding, not inside it: the moment holds
+   * asset ids once the caller has stored these.
+   */
+  momentCaptures: Map<string, MomentCaptureBytes>;
+  /**
+   * What was considered and why it was refused, one line each, for the
+   * operational log. A film with no product in it should be explainable
+   * from the log, not a mystery to reproduce.
+   */
+  captureNotes: string[];
   pagesVisited: string[];
   confidence: ReturnType<typeof understandingConfidence>;
 };
+
+/** How many product images to look for, per page and per crawl. */
+const PRODUCT_IMAGES_PER_PAGE = 2;
+const PRODUCT_IMAGES_PER_CRAWL = 8;
+/** Pages whose imagery is likely to be the product rather than the company. */
+const IMAGERY_INTENTS: readonly PageIntent[] = ['home', 'product', 'use_case', 'pricing', 'launch_profile'];
+
+/**
+ * What a model says a capture is. One schema for pages and product images so
+ * both get a label the director can write against.
+ */
+const CaptureReading = z.object({
+  kind: z.enum(['interface', 'web_page', 'photograph', 'illustration', 'other']),
+  /** A dialog, cookie wall or overlay covering the content. */
+  obstructed: z.boolean().default(false),
+  /** What is on screen, in one plain sentence. */
+  shows: z.string().max(240).default(''),
+});
 
 /**
  * The Product Research Agent.
@@ -141,15 +185,201 @@ export class ProductResearchAgent {
       context,
     );
 
+    progress({ fraction: 0.9, message: 'Choosing what to show' });
+
+    const { understanding: filmable, momentCaptures, captureNotes } = await this.attachCaptures(
+      understanding,
+      captures,
+      root,
+      context,
+    );
+
     progress({ fraction: 0.98, message: 'Done' });
 
     return {
-      understanding,
+      understanding: filmable,
       brand,
       heroScreenshot: homepage.screenshot,
+      momentCaptures,
+      captureNotes,
       pagesVisited: [...visited],
-      confidence: understandingConfidence(understanding),
+      confidence: understandingConfidence(filmable),
     };
+  }
+
+  /**
+   * Gives the moments we could not observe something real to show.
+   *
+   * Candidates are the crawl's own page captures and the product imagery on
+   * them. Each is measured (blank and photographic captures are dropped) and
+   * then read by a model, which both confirms what it is and says what it
+   * shows — the sentence the storyboard director writes copy against. The
+   * assignment itself is pure and lives in `attachPublicCaptures`.
+   */
+  private async attachCaptures(
+    understanding: ProductUnderstanding,
+    captures: PageCapture[],
+    root: string,
+    context: CallContext,
+  ): Promise<{
+    understanding: ProductUnderstanding;
+    momentCaptures: Map<string, MomentCaptureBytes>;
+    captureNotes: string[];
+  }> {
+    const momentCaptures = new Map<string, MomentCaptureBytes>();
+    const captureNotes: string[] = [];
+    const unfilmed = understanding.productMoments.filter((moment) => moment.screenshots.length === 0);
+    if (unfilmed.length === 0) {
+      captureNotes.push('Every moment was observed in the product; no public capture needed.');
+      return { understanding, momentCaptures, captureNotes };
+    }
+
+    const candidates: CaptureCandidate[] = [];
+    let imagesTaken = 0;
+    const where = (capture: PageCapture) => pageLabel(capture.url, '').replace(/ \(.*\)$/, '');
+
+    for (const [pageIndex, capture] of captures.entries()) {
+      for (const [imageIndex, image] of (capture.productImages ?? []).entries()) {
+        if (imagesTaken >= PRODUCT_IMAGES_PER_CRAWL) break;
+        const quality = await assessCapture(image.bytes, { expect: 'interface' }).catch(() => null);
+        if (!quality || quality.verdict !== 'filmable') {
+          captureNotes.push(
+            `image ${imageIndex + 1} on ${where(capture)}: refused, ${quality?.verdict ?? 'unreadable'}`,
+          );
+          continue;
+        }
+        const reading = await this.readCapture(image.bytes, 'product image', context);
+        if (reading && (reading.kind !== 'interface' || reading.obstructed)) {
+          captureNotes.push(
+            `image ${imageIndex + 1} on ${where(capture)}: refused, ` +
+              `${reading.obstructed ? 'obstructed' : reading.kind}${reading.shows ? ` (${reading.shows})` : ''}`,
+          );
+          continue;
+        }
+        imagesTaken += 1;
+        candidates.push({
+          key: `${capture.url}#image${imageIndex}`,
+          kind: 'product_image',
+          pageUrl: capture.url,
+          label: productImageLabel(capture, image.alt, reading?.shows ?? ''),
+          bytes: image.bytes,
+          width: quality.width,
+          height: quality.height,
+          rank: imageIndex,
+        });
+      }
+
+      if (!capture.screenshot) {
+        captureNotes.push(`${where(capture)}: no screenshot`);
+        continue;
+      }
+      // The homepage was captured full-page for the brand; the film gets the fold.
+      const fold = await cropToFold(capture.screenshot).catch(() => null);
+      if (!fold) {
+        captureNotes.push(`${where(capture)}: screenshot unreadable`);
+        continue;
+      }
+      const quality = await assessCapture(fold.bytes, { expect: 'page' }).catch(() => null);
+      if (!quality || quality.verdict !== 'filmable') {
+        captureNotes.push(`${where(capture)}: page refused, ${quality?.verdict ?? 'unreadable'}`);
+        continue;
+      }
+      const reading = await this.readCapture(fold.bytes, 'web page', context);
+      if (reading?.obstructed) {
+        captureNotes.push(`${where(capture)}: page refused, obstructed (${reading.shows})`);
+        continue;
+      }
+      candidates.push({
+        key: `${capture.url}#page`,
+        kind: 'public_page',
+        pageUrl: capture.url,
+        label: reading?.shows
+          ? `${pageLabel(capture.url, capture.title)} — ${reading.shows}`
+          : pageLabel(capture.url, capture.title),
+        bytes: fold.bytes,
+        width: quality.width,
+        height: quality.height,
+        // The homepage first, then the crawl's own order, which is best-first.
+        rank: 100 + pageIndex,
+      });
+    }
+
+    const attached = attachPublicCaptures(understanding.productMoments, understanding.evidence, candidates, {
+      homepageUrl: root,
+    });
+    for (const attachment of attached.attachments) {
+      momentCaptures.set(attachment.momentId, {
+        bytes: attachment.candidate.bytes,
+        kind: attachment.candidate.kind,
+        pageUrl: attachment.candidate.pageUrl,
+        label: attachment.candidate.label,
+        width: attachment.candidate.width,
+        height: attachment.candidate.height,
+      });
+    }
+
+    const images = attached.attachments.filter((a) => a.candidate.kind === 'product_image').length;
+    const pages = attached.attachments.length - images;
+    captureNotes.unshift(
+      `${attached.attachments.length} of ${unfilmed.length} unobserved moments given a public capture ` +
+        `(${images} product image${images === 1 ? '' : 's'}, ${pages} page${pages === 1 ? '' : 's'}) ` +
+        `from ${candidates.length} candidate${candidates.length === 1 ? '' : 's'}.`,
+    );
+    for (const moment of attached.moments) {
+      if (moment.screenshots.length === 0 && !momentCaptures.has(moment.id)) {
+        captureNotes.push(`"${moment.title}": nothing left to show it with; it will be typography.`);
+      }
+    }
+
+    return {
+      understanding: { ...understanding, productMoments: attached.moments },
+      momentCaptures,
+      captureNotes,
+    };
+  }
+
+  /**
+   * Asks a model what a capture is. Null when the call fails: the pixel
+   * measurements already passed, and losing a label is not a reason to lose
+   * the capture.
+   */
+  private async readCapture(
+    bytes: Uint8Array,
+    what: 'product image' | 'web page',
+    context: CallContext,
+  ): Promise<z.infer<typeof CaptureReading> | null> {
+    try {
+      const url = await previewForModel(bytes);
+      const { value } = await this.llm.completeJson(
+        [
+          {
+            role: 'system',
+            content:
+              'You classify captures for a film about a software product. ' +
+              '"interface" means a screenshot of software: an application window, dashboard, editor, ' +
+              'console or app screen, with or without a browser or device frame around it. ' +
+              '"web_page" means a marketing or documentation page. A photograph of people, places or ' +
+              'objects is "photograph"; drawn or abstract graphics are "illustration". ' +
+              '"obstructed" is true when a dialog, cookie banner, sign-up wall or overlay covers the content. ' +
+              '"shows" is one plain sentence naming what is on screen, in the product\'s own words where visible. ' +
+              'Return JSON only.',
+          },
+          { role: 'user', content: `This capture is expected to be a ${what}. Classify it.` },
+        ],
+        {
+          schema: CaptureReading,
+          schemaName: 'CaptureReading',
+          tier: 'fast',
+          temperature: 0,
+          maxOutputTokens: 200,
+          images: [{ url, detail: 'low' }],
+        },
+        context,
+      );
+      return value;
+    } catch {
+      return null;
+    }
   }
 
   private async crawl(
@@ -199,7 +429,13 @@ export class ProductResearchAgent {
             // fold is where the positioning lives and full-page captures of
             // long marketing pages are slow and mostly footer.
             fullPage: captures.length === 0,
+            // The product imagery the company published, where it is likely
+            // to be the product: not on the blog, not on the about page.
+            productImages: IMAGERY_INTENTS.includes(next.intent) ? PRODUCT_IMAGES_PER_PAGE : 0,
           });
+          // A 404 or a 500 has text, and that text is not evidence about the
+          // product. The page stays visited so it is not planned again.
+          if (capture.statusCode >= 400) continue;
           captures.push(capture);
           visitedIntents.set(next.intent, (visitedIntents.get(next.intent) ?? 0) + 1);
 
@@ -257,6 +493,12 @@ function labelFor(page: PlannedPage): string {
   // Two pages can share an intent, and "Read pricing" twice in the progress
   // panel reads like the system is stuck.
   return path ? `${label} (${path})` : label;
+}
+
+function productImageLabel(capture: PageCapture, alt: string, shows: string): string {
+  const where = pageLabel(capture.url, '').replace(/ \(.*\)$/, '');
+  const detail = shows || alt;
+  return detail ? `product image on ${where} — ${detail.slice(0, 160)}` : `product image on ${where}`;
 }
 
 function hostLabel(url: string): string {

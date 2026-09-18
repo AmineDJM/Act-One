@@ -402,6 +402,15 @@ export class ProductExplorer {
         interactionSteps: recordedSteps,
         requiresAuth: true,
         elementBounds: bounds,
+        evidenceIds: [],
+        captureKind: 'in_app',
+        captureLabel: `${options.productName}, signed in: ${target.path}`,
+        // An element capture has the element's shape; a full capture has the
+        // viewport's.
+        captureAspect:
+          bounds && bounds.height > 0
+            ? Math.round((bounds.width / bounds.height) * 1000) / 1000
+            : 16 / 9,
       });
 
       captures.set(moments[moments.length - 1]!.id, { before: startShot, after: endShot });

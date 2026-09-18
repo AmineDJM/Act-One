@@ -75,7 +75,29 @@ export async function runResearch(
   const momentsWithAssets = await Promise.all(
     result.understanding.productMoments.map(async (moment) => {
       const bytes = capturedMoments.captures.get(moment.id);
-      if (!bytes) return moment;
+      if (!bytes) {
+        // Not observed in the product, but the public site showed it: the page
+        // or the product image the research agent matched to this moment.
+        const publicCapture = result.momentCaptures.get(moment.id);
+        if (!publicCapture) return moment;
+        const stored = await storeAsset(context, {
+          data: publicCapture.bytes,
+          kind: 'screenshot',
+          origin: 'captured',
+          rights: 'customer_owned',
+          extension: 'png',
+          contentType: 'image/png',
+          sourceUrl: publicCapture.pageUrl,
+          width: publicCapture.width,
+          height: publicCapture.height,
+          metadata: {
+            momentId: moment.id,
+            captureKind: publicCapture.kind,
+            label: publicCapture.label,
+          },
+        });
+        return { ...moment, screenshots: [stored.asset.id] };
+      }
 
       const before = await storeAsset(context, {
         data: bytes.before,
@@ -112,6 +134,28 @@ export async function runResearch(
     { ...result.understanding, productMoments: momentsWithAssets },
     organizationId,
   );
+
+  // Why the film will or will not show the product, in the log an operator
+  // reads — not in the customer's brief, which says only what it shows.
+  store.log.recordSafely({
+    level: 'info',
+    source: 'worker',
+    event: 'research.captures',
+    message: result.captureNotes[0] ?? 'No capture decisions recorded.',
+    organizationId,
+    projectId: project.id,
+    jobId: context.jobId,
+    actorUserId: null,
+    durationMs: null,
+    detail: {
+      notes: result.captureNotes.slice(1),
+      moments: momentsWithAssets.map((moment) => ({
+        title: moment.title,
+        captureKind: moment.captureKind,
+        screenshots: moment.screenshots.length,
+      })),
+    },
+  });
 
   // One brand per organisation, reused across projects. A second project for
   // the same company should not re-measure and land somewhere slightly

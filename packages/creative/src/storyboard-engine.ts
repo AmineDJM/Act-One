@@ -4,6 +4,7 @@ import {
   findMoment,
   newId,
   coherentRecipe,
+  REAL_PRODUCT_VISUAL_TYPES,
   resequence,
   round3,
   sceneShowsSomething,
@@ -15,6 +16,7 @@ import {
   type EasingName,
   type MotionRecipe,
   type MotionRecipeName,
+  type ProductMoment,
   type ProductUnderstanding,
   type ProjectBrief,
   type Scene,
@@ -70,6 +72,8 @@ Rules:
 - On-screen text is short. Most scenes carry a few words or none. If a scene's archetype allows 4 words, do not write 12.
 - Never write on-screen text that repeats the narration. If both exist, they must do different work.
 - Only set "momentId" when the scene genuinely films that product moment.
+- Each moment says what we can actually show. A capture of a public page shows that page, not an interaction: write that scene's on-screen text about what the page proves, never "watch it happen". Product images and in-product captures can carry feature beats. A moment marked NOT captured cannot carry a product scene at all.
+- Never film the same moment in two consecutive scenes. Two shots of one capture in a row is the same picture twice; put a different beat between them or use a different moment.
 - Only write "generativeBrief" for atmospheric, metaphorical or environmental scenes. Never describe a product interface in a generative brief — generated footage must never stand in for the real product.
 - "claimText" must be copied verbatim from the supported claims you are given, or left empty. Never invent a claim.
 - Every line of on-screen text is a complete thought on its own. Never end a line expecting the next thing to finish it — the end card is composed separately and will not complete your sentence.
@@ -252,12 +256,12 @@ export class StoryboardEngine {
                 `max ${a.maxWords} words on screen${a.requiresProductAsset ? ', needs real product capture' : ''})`,
             ),
             ``,
-            `# Product moments available (id — what happens)`,
+            `# Product moments available (id — what happens — what we can actually show)`,
             ...(moments.length > 0
               ? moments.map(
                   (m) =>
-                    `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'}` +
-                    `${m.screenshots.length > 0 ? ' [real capture]' : ' [NOT captured — cannot be filmed in detail]'}`,
+                    `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'} ` +
+                    captureNote(m),
                 )
               : ['- none']),
             ``,
@@ -350,7 +354,12 @@ export class StoryboardEngine {
         input.treatment.voiceStrategy === 'none' ? '' : planned.narration.trim();
 
       const sceneId = newId('scn');
-      const motionRecipe = motionFor(archetype, input.brand, system, visualType, previousRecipe);
+      const motionRecipe = stagedForCapture(
+        motionFor(archetype, input.brand, system, visualType, previousRecipe),
+        moment,
+        visualType,
+        previousRecipe,
+      );
       previousRecipe = motionRecipe.name;
 
       const scene: Scene = {
@@ -510,6 +519,53 @@ export class StoryboardEngine {
     );
     return fuzzy ?? system.archetypes[index % system.archetypes.length]!;
   }
+}
+
+/** What the director is told a moment can show. */
+function captureNote(moment: ProductMoment): string {
+  if (moment.screenshots.length === 0) return '[NOT captured — cannot be filmed in detail]';
+  switch (moment.captureKind) {
+    case 'in_app':
+      return `[captured in the product${moment.captureLabel ? `: ${moment.captureLabel}` : ''}]`;
+    case 'product_image':
+      return `[real product image the company published${moment.captureLabel ? `: ${moment.captureLabel}` : ''}]`;
+    case 'public_page':
+      return `[capture of ${moment.captureLabel || 'a public page of the site'}]`;
+    default:
+      return '[real capture]';
+  }
+}
+
+/**
+ * Adjusts a product scene's recipe to what its capture actually is.
+ *
+ * A published product image is shown as published — no second browser frame
+ * around an image that often carries its own — and at its own shape rather
+ * than cropped to 16:9. A cursor sequence replays an interaction; on a
+ * capture where no interaction happened it would invent one, so a scene
+ * backed by a public capture never gets it.
+ */
+export function stagedForCapture(
+  recipe: MotionRecipe,
+  moment: ProductMoment | undefined,
+  visualType: VisualType,
+  avoid: MotionRecipeName | null,
+): MotionRecipe {
+  // Only a scene that shows the capture stages it: a statistic that happens
+  // to cite a moment draws a figure, and carries no frame to shape.
+  if (!moment || moment.screenshots.length === 0 || !REAL_PRODUCT_VISUAL_TYPES.includes(visualType)) {
+    return recipe;
+  }
+  const params: MotionRecipe['params'] = { ...recipe.params };
+  if (moment.captureAspect) params['aspect'] = moment.captureAspect;
+  if (moment.captureKind === 'product_image') params['frame'] = 'bare';
+
+  let name = recipe.name;
+  if (moment.captureKind !== 'in_app' && name === 'cursor_sequence') {
+    name = coherentRecipe(visualType, 'product_window', avoid);
+    if (name === 'cursor_sequence') name = 'product_window';
+  }
+  return { ...recipe, name, params };
 }
 
 function purposeFor(

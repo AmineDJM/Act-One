@@ -160,6 +160,7 @@ export async function synthesiseUnderstanding(
   };
 
   const capturedMoments = input.capturedMoments ?? [];
+  const knownEvidence = new Set(input.evidence.map((item) => item.id));
   const suggestedMoments: ProductMoment[] = value.suggestedMoments
     // A suggested moment that duplicates something we genuinely captured is
     // noise: the real capture always wins.
@@ -180,6 +181,12 @@ export async function synthesiseUnderstanding(
       interactionSteps: [],
       requiresAuth: false,
       elementBounds: null,
+      // Kept: the research agent uses these to find the page that shows what
+      // the moment describes, and attach a capture of it.
+      evidenceIds: suggestion.evidenceIds.filter((id) => knownEvidence.has(id)),
+      captureKind: null,
+      captureLabel: '',
+      captureAspect: null,
     }));
 
   const allMoments = [...capturedMoments, ...suggestedMoments];
@@ -187,7 +194,12 @@ export async function synthesiseUnderstanding(
 
   const gaps = [...value.gaps];
   if (capturedMoments.length === 0) {
-    gaps.push('No authenticated product access, so no real product footage was captured.');
+    // Worded for what the film will actually do about it. The public captures
+    // the research agent attaches afterwards are real, but they are the site
+    // and the imagery on it, not the product in use.
+    gaps.push(
+      'No authenticated product access: the film shows your public site and the product imagery on it, not the product in use.',
+    );
   }
   const fabricated = [...new Set(reports.flatMap((r) => r.fabricatedFigures))];
   if (fabricated.length > 0) {

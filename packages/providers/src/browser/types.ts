@@ -13,6 +13,33 @@ export type CaptureOptions = {
   freezeAnimations?: boolean;
   /** Wait for network to settle before capturing. */
   settleMs?: number;
+  /**
+   * Also capture up to this many product images the page displays — the
+   * screenshots of the product a company publishes on its own site. Off by
+   * default: only the research crawl wants them, and each one is another
+   * scroll and another screenshot.
+   */
+  productImages?: number;
+};
+
+/**
+ * A product image as the company published it, captured as displayed.
+ *
+ * Not downloaded: an element screenshot of what the page rendered. That keeps
+ * the capture inside the navigation policy (no fetch of a CDN origin we were
+ * not asked to visit), and it captures what a visitor actually sees, which is
+ * the honest version of the image.
+ */
+export type ProductImageCapture = {
+  bytes: Uint8Array;
+  alt: string;
+  /** Rendered size on the page, in CSS pixels. */
+  width: number;
+  height: number;
+  /** Distance from the top of the document, in CSS pixels. Hero imagery is near 0. */
+  top: number;
+  /** Where the image came from, for provenance. Empty for inline media. */
+  src: string;
 };
 
 export type PageCapture = {
@@ -27,6 +54,8 @@ export type PageCapture = {
   links: { href: string; text: string }[];
   statusCode: number;
   capturedAt: string;
+  /** Present only when the capture asked for them. */
+  productImages?: ProductImageCapture[];
 };
 
 /**

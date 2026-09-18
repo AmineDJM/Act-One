@@ -1,6 +1,12 @@
 import type { Browser, BrowserContext, Page } from 'playwright-core';
 import { newId } from '@act-one/core';
-import { CLEAN_CAPTURE_CSS, probeDocument } from './page-probe.ts';
+import {
+  CLEAN_CAPTURE_CSS,
+  findProductImagery,
+  probeDocument,
+  shieldCapture,
+  unshieldCapture,
+} from './page-probe.ts';
 import { checkInteraction, checkNavigation, PolicyViolation, type NavigationPolicy } from './policy.ts';
 import type {
   BrowserSession,
@@ -8,6 +14,7 @@ import type {
   ElementBounds,
   InteractionStep,
   PageCapture,
+  ProductImageCapture,
   RecordingResult,
 } from './types.ts';
 
@@ -35,6 +42,8 @@ export class PlaywrightSession implements BrowserSession {
   private readonly ownsBrowser: boolean;
   private pagesVisited = 0;
   private closed = false;
+  /** HTTP status of the last navigation. A capture of a 404 page is not evidence. */
+  private lastStatus = 200;
 
   constructor(params: {
     browser: Browser;
@@ -70,10 +79,13 @@ export class PlaywrightSession implements BrowserSession {
     this.pagesVisited += 1;
     this.audit?.({ action: 'navigate', detail: url });
 
-    await this.page.goto(url, {
+    const response = await this.page.goto(url, {
       waitUntil: options.waitUntil ?? 'domcontentloaded',
       timeout: 45_000,
     });
+    // Null for same-document navigations and about:blank, neither of which is
+    // an error.
+    this.lastStatus = response?.status() ?? 200;
     // networkidle is unreliable on sites with long-polling; a bounded settle is
     // more predictable and much faster.
     await this.page.waitForTimeout(600);
@@ -112,6 +124,11 @@ export class PlaywrightSession implements BrowserSession {
 
     this.audit?.({ action: 'capture', detail: this.page.url() });
 
+    const productImages =
+      options.productImages && options.productImages > 0
+        ? await this.captureProductImages(options.productImages)
+        : undefined;
+
     return {
       url: this.page.url(),
       title: fallback.title,
@@ -120,9 +137,56 @@ export class PlaywrightSession implements BrowserSession {
       screenshot,
       styleProfile: probed?.styleProfile ?? null,
       links: fallback.links,
-      statusCode: 200,
+      statusCode: this.lastStatus,
       capturedAt: new Date().toISOString(),
+      ...(productImages ? { productImages } : {}),
     };
+  }
+
+  /**
+   * Element screenshots of the product imagery the page displays.
+   *
+   * Each candidate is scrolled into view (so a lazy image has loaded), shielded
+   * from anything fixed over it, and captured at device scale. One failing
+   * candidate is skipped, not fatal: the page capture already succeeded.
+   */
+  private async captureProductImages(max: number): Promise<ProductImageCapture[]> {
+    let found: ReturnType<typeof findProductImagery> = [];
+    try {
+      found = await this.page.evaluate(findProductImagery, max);
+    } catch (error) {
+      this.audit?.({
+        action: 'blocked',
+        detail: `Product imagery probe failed on ${this.page.url()}: ${(error as Error).message.slice(0, 200)}`,
+      });
+      return [];
+    }
+
+    const captured: ProductImageCapture[] = [];
+    for (const candidate of found) {
+      try {
+        const locator = this.page.locator(candidate.selector).first();
+        await locator.scrollIntoViewIfNeeded({ timeout: 5_000 });
+        await this.page.waitForTimeout(250);
+        await this.page.evaluate(shieldCapture, candidate.selector).catch(() => 0);
+        const bytes = await locator.screenshot({ type: 'png', animations: 'disabled', timeout: 10_000 });
+        captured.push({
+          bytes,
+          alt: candidate.alt,
+          width: candidate.width,
+          height: candidate.height,
+          top: candidate.top,
+          src: candidate.src,
+        });
+      } catch {
+        continue;
+      } finally {
+        await this.page.evaluate(unshieldCapture).catch(() => undefined);
+      }
+    }
+
+    await this.page.evaluate(() => window.scrollTo(0, 0)).catch(() => undefined);
+    return captured;
   }
 
   /** Minimal, maximally-robust extraction for when the full probe fails. */

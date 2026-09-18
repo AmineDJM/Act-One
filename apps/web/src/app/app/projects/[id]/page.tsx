@@ -180,6 +180,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 <dt>Audience</dt>
                 <dd>{understanding.targetAudience.slice(0, 2).join(', ') || '—'}</dd>
               </div>
+              <div className={styles.kvRow}>
+                <dt>On screen</dt>
+                <dd>{describeCaptures(understanding.productMoments)}</dd>
+              </div>
             </dl>
 
             {understanding.keyBenefits.length > 0 ? (
@@ -317,4 +321,27 @@ function safeHost(url: string): string {
   } catch {
     return url;
   }
+}
+
+
+/**
+ * What the film can actually show, in one line.
+ *
+ * The brief used to say nothing about this, and a founder found out what the
+ * film showed by watching it. In-product captures, the product imagery they
+ * published, and their pages are different things, and the line says which.
+ */
+function describeCaptures(moments: { screenshots: string[]; captureKind: string | null }[]): string {
+  const shown = moments.filter((moment) => moment.screenshots.length > 0);
+  if (moments.length === 0) return 'Nothing yet.';
+  if (shown.length === 0) return 'Nothing captured yet — the film would be typography alone.';
+  const count = (kind: string) => shown.filter((moment) => moment.captureKind === kind).length;
+  const parts = [
+    [count('in_app'), 'captured inside your product'],
+    [count('product_image'), 'product image', 'product images'],
+    [count('public_page'), 'page of your site', 'pages of your site'],
+  ]
+    .filter(([n]) => (n as number) > 0)
+    .map(([n, one, many]) => `${n} ${n === 1 || !many ? one : many}`);
+  return `${shown.length} of ${moments.length} moments have real captures: ${parts.join(', ')}.`;
 }

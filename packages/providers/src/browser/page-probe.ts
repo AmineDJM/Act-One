@@ -259,6 +259,150 @@ export function probeDocument(): {
   };
 }
 
+/**
+ * Finds the product imagery a page displays: the screenshots of the product
+ * the company itself published, as rendered.
+ *
+ * Runs inside the page, like `probeDocument`, and follows the same rule — no
+ * outside helpers. It does not decide whether an image is a photograph or an
+ * interface; that is measured from the pixels afterwards. It decides what is
+ * worth measuring: large, landscape, visible, in the body of the page, and not
+ * a logo, an avatar or a headshot by its own labelling.
+ *
+ * Chosen elements are tagged with a `data-actone-capture` attribute so the
+ * caller can screenshot each one by a selector that cannot collide with the
+ * page's own.
+ */
+export function findProductImagery(max: number): {
+  selector: string;
+  alt: string;
+  width: number;
+  height: number;
+  top: number;
+  src: string;
+}[] {
+  const NOISE =
+    /logo|avatar|icon|badge|portrait|headshot|team|founder|award|partner|testimonial|profile|emoji|flag|photo|people|person|author|map/i;
+
+  const hidden = (element: Element): boolean => {
+    const style = getComputedStyle(element);
+    return (
+      style.visibility === 'hidden' || style.display === 'none' || parseFloat(style.opacity) < 0.2
+    );
+  };
+
+  type Candidate = {
+    node: HTMLElement;
+    alt: string;
+    width: number;
+    height: number;
+    top: number;
+    src: string;
+    score: number;
+  };
+  const candidates: Candidate[] = [];
+  const seen = new Set<string>();
+
+  for (const node of Array.from(document.querySelectorAll<HTMLElement>('img, video'))) {
+    // The chrome of the site is not the product.
+    if (node.closest('header, footer, nav, [role="banner"], [role="contentinfo"], [role="navigation"]')) {
+      continue;
+    }
+    const rect = node.getBoundingClientRect();
+    const { width, height } = rect;
+    // Below this the image is an illustration beside a paragraph, and a
+    // 4K frame would show every pixel of it.
+    if (width < 560 || height < 300) continue;
+    const aspect = width / height;
+    // Software is landscape. Portrait imagery here is a phone mockup or a
+    // person, and neither stages as a window.
+    if (aspect < 1.15 || aspect > 2.6) continue;
+    const top = rect.top + window.scrollY;
+    if (top > 7000 || hidden(node)) continue;
+
+    const src =
+      node instanceof HTMLImageElement
+        ? node.currentSrc || node.src
+        : (node as HTMLVideoElement).poster || (node as HTMLVideoElement).currentSrc || '';
+    const key = src || `${Math.round(top)}:${Math.round(width)}`;
+    if (seen.has(key)) continue;
+
+    const alt = node.getAttribute('alt') ?? node.getAttribute('aria-label') ?? '';
+    const haystack = [alt, node.className, node.id, src, node.closest('figure')?.className ?? '']
+      .map((value) => String(value ?? ''))
+      .join(' ');
+    if (NOISE.test(haystack)) continue;
+
+    if (node instanceof HTMLImageElement) {
+      // Not yet loaded, or upscaled from a thumbnail: soft on a big frame.
+      if (!node.complete || (node.naturalWidth > 0 && node.naturalWidth < 720)) continue;
+    } else {
+      const video = node as HTMLVideoElement;
+      if (!video.poster && video.readyState < 2) continue;
+    }
+
+    seen.add(key);
+    candidates.push({
+      node,
+      alt: alt.slice(0, 200),
+      width: Math.round(width),
+      height: Math.round(height),
+      top: Math.round(top),
+      src: src.slice(0, 500),
+      // Big and high on the page: the hero product shot, which is the one the
+      // company chose to lead with.
+      score: (width * height) / (1 + top / 1500),
+    });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  const chosen = candidates.slice(0, Math.max(0, max));
+  chosen.forEach((candidate, index) => {
+    candidate.node.setAttribute('data-actone-capture', String(index));
+  });
+  return chosen.map((candidate, index) => ({
+    selector: `[data-actone-capture="${index}"]`,
+    alt: candidate.alt,
+    width: candidate.width,
+    height: candidate.height,
+    top: candidate.top,
+    src: candidate.src,
+  }));
+}
+
+/**
+ * Hides fixed and sticky elements that overlap an element about to be
+ * captured, and returns how many it hid.
+ *
+ * An element screenshot is a crop of the page, so a sticky header or a
+ * floating chat button sitting over the product image ends up in the film.
+ * Marked rather than removed, and `unshieldCapture` restores the page.
+ */
+export function shieldCapture(selector: string): number {
+  const target = document.querySelector(selector);
+  if (!target) return 0;
+  const box = target.getBoundingClientRect();
+  let hidden = 0;
+  for (const element of Array.from(document.body.querySelectorAll<HTMLElement>('*'))) {
+    if (element === target || element.contains(target)) continue;
+    const position = getComputedStyle(element).position;
+    if (position !== 'fixed' && position !== 'sticky') continue;
+    const rect = element.getBoundingClientRect();
+    const overlaps =
+      rect.left < box.right && rect.right > box.left && rect.top < box.bottom && rect.bottom > box.top;
+    if (!overlaps) continue;
+    element.setAttribute('data-actone-shield', '');
+    hidden += 1;
+  }
+  return hidden;
+}
+
+export function unshieldCapture(): void {
+  for (const element of Array.from(document.querySelectorAll('[data-actone-shield]'))) {
+    element.removeAttribute('data-actone-shield');
+  }
+}
+
 /** Injected before capture so screenshots are clean and reproducible. */
 export const CLEAN_CAPTURE_CSS = `
   *, *::before, *::after {
@@ -271,9 +415,14 @@ export const CLEAN_CAPTURE_CSS = `
   [class*="gdpr" i], [id*="gdpr" i],
   [class*="intercom" i], [id*="intercom" i],
   [class*="drift" i], [class*="crisp" i], [class*="hubspot-messages" i],
-  [class*="banner-notice" i], [aria-label*="cookie" i] {
+  [class*="banner-notice" i], [aria-label*="cookie" i],
+  [role="dialog"], [aria-modal="true"],
+  [class*="modal" i], [id*="modal" i],
+  [class*="popup" i], [id*="popup" i],
+  [class*="newsletter" i] {
     display: none !important;
   }
+  [data-actone-shield] { visibility: hidden !important; }
   ::-webkit-scrollbar { display: none !important; }
   html { scrollbar-width: none !important; }
 `;
