@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { newId, retryDelayMs, type Job, type Organization } from '@act-one/core';
-import { MemoryStore } from '../memory-store.ts';
+import type { Store } from '../store.ts';
+import { storeCases, uniqueSlug } from './stores.ts';
 
 function job(organizationId: string, over: Partial<Job> = {}): Job {
   const now = new Date().toISOString();
@@ -26,16 +27,21 @@ function job(organizationId: string, over: Partial<Job> = {}): Job {
   };
 }
 
-describe('job queue', () => {
-  let store: MemoryStore;
+describe.each(storeCases())('job queue ($name)', ({ open, close, clearJobs }) => {
+  let store: Store;
   let org: Organization;
 
+  afterEach(async () => {
+    await close(store);
+  });
+
   beforeEach(async () => {
-    store = new MemoryStore();
+    store = await open();
+    await clearJobs(store);
     org = await store.organizations.create({
       id: newId('org'),
       name: 'Acme',
-      slug: 'acme',
+      slug: uniqueSlug('acme'),
       planId: 'free',
       stripeCustomerId: null,
       creditBalance: 0,
@@ -118,7 +124,7 @@ describe('job queue', () => {
     const other = await store.organizations.create({
       id: newId('org'),
       name: 'Globex',
-      slug: 'globex',
+      slug: uniqueSlug('globex'),
       planId: 'free',
       stripeCustomerId: null,
       creditBalance: 0,

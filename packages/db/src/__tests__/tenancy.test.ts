@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   newId,
   type Asset,
@@ -7,8 +7,9 @@ import {
   type Project,
   type User,
 } from '@act-one/core';
-import { MemoryStore } from '../memory-store.ts';
+import type { PgStore } from '../pg-store.ts';
 import type { Store } from '../store.ts';
+import { postgresAvailable, storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
 
 /**
  * Tenant isolation conformance suite.
@@ -23,7 +24,7 @@ function makeOrg(name: string): Organization {
   return {
     id: newId('org'),
     name,
-    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    slug: uniqueSlug(name),
     planId: 'free',
     stripeCustomerId: null,
     creditBalance: 100,
@@ -34,9 +35,10 @@ function makeOrg(name: string): Organization {
 }
 
 function makeUser(email: string): User {
+  const [local = 'someone', domain = 'example.com'] = email.split('@');
   return {
     id: newId('usr'),
-    email,
+    email: uniqueEmail(local, domain),
     name: email.split('@')[0]!,
     avatarUrl: null,
     isSuperAdmin: false,
@@ -132,7 +134,7 @@ function makeAsset(organizationId: string, projectId: string): Asset {
   };
 }
 
-describe('Store tenant isolation (MemoryStore)', () => {
+describe.each(storeCases())('Store tenant isolation ($name)', ({ open, close }) => {
   let store: Store;
   let orgA: Organization;
   let orgB: Organization;
@@ -140,8 +142,12 @@ describe('Store tenant isolation (MemoryStore)', () => {
   let userB: User;
   let projectA: Project;
 
+  afterEach(async () => {
+    await close(store);
+  });
+
   beforeEach(async () => {
-    store = new MemoryStore();
+    store = await open();
     orgA = await store.organizations.create(makeOrg('Acme'));
     orgB = await store.organizations.create(makeOrg('Globex'));
     userA = await store.users.create(makeUser('a@acme.com'));
@@ -275,20 +281,25 @@ describe('Store tenant isolation (MemoryStore)', () => {
   });
 });
 
-describe('credit accounting', () => {
+describe.each(storeCases())('credit accounting ($name)', ({ open, close }) => {
   it('refuses to go negative and reports it distinctly from an error', async () => {
-    const store = new MemoryStore();
-    const org = await store.organizations.create(makeOrg('Acme'));
+    const store = await open();
+    try {
+      const org = await store.organizations.create(makeOrg('Acme'));
 
-    expect((await store.organizations.adjustCredits(org.id, -40))?.creditBalance).toBe(60);
-    expect(await store.organizations.adjustCredits(org.id, -1000)).toBeNull();
-    expect((await store.organizations.get(org.id))?.creditBalance).toBe(60);
+      expect((await store.organizations.adjustCredits(org.id, -40))?.creditBalance).toBe(60);
+      expect(await store.organizations.adjustCredits(org.id, -1000)).toBeNull();
+      expect((await store.organizations.get(org.id))?.creditBalance).toBe(60);
+    } finally {
+      await close(store);
+    }
   });
 });
 
-describe('concept selection', () => {
+describe.each(storeCases())('concept selection ($name)', ({ open, close }) => {
   it('leaves exactly one concept selected', async () => {
-    const store = new MemoryStore();
+    const store = await open();
+    try {
     const org = await store.organizations.create(makeOrg('Acme'));
     const user = await store.users.create(makeUser('a@acme.com'));
     const project = await store.projects.create(makeProject(org.id, user.id, 'Launch'));
@@ -305,16 +316,23 @@ describe('concept selection', () => {
     await store.concepts.select(org.id, project.id, concepts[2]!.id);
     stored = await store.concepts.listForProject(org.id, project.id);
     expect(stored.filter((c) => c.selected).map((c) => c.name)).toEqual(['C']);
+    } finally {
+      await close(store);
+    }
   });
 });
 
-describe('project quota accounting', () => {
-  let store: MemoryStore;
+describe.each(storeCases())('project quota accounting ($name)', ({ open, close }) => {
+  let store: Store;
   let org: Organization;
   let user: User;
 
+  afterEach(async () => {
+    await close(store);
+  });
+
   beforeEach(async () => {
-    store = new MemoryStore();
+    store = await open();
     org = makeOrg('Quota');
     user = makeUser('founder@quota.com');
     await store.organizations.create(org);
@@ -339,7 +357,13 @@ describe('project quota accounting', () => {
   it('charges a failed project once research produced an understanding', async () => {
     const failed = await project('failed');
     await store.understandings.create(
-      { id: newId('pun'), projectId: failed.id } as Parameters<typeof store.understandings.create>[0],
+      // The in-memory store accepted a bare id; Postgres, rightly, wants the
+      // row's own timestamp. The conformance run is what surfaced the drift.
+      {
+        id: newId('pun'),
+        projectId: failed.id,
+        createdAt: new Date().toISOString(),
+      } as Parameters<typeof store.understandings.create>[0],
       org.id,
     );
 
@@ -357,5 +381,69 @@ describe('project quota accounting', () => {
     await project('film_ready');
     const future = new Date(Date.now() + 86_400_000).toISOString();
     expect(await store.projects.countTowardQuotaSince(org.id, future)).toBe(0);
+  });
+});
+
+
+/**
+ * Row-level security itself, with the WHERE clauses taken away.
+ *
+ * Every repository method scopes by organisation, and the suites above prove
+ * that. This proves the second lock: a tenant-scoped connection that runs a
+ * bare SELECT gets its own rows and nothing else, because the policy decides,
+ * not the query. It only means something against a role that is not a
+ * superuser — Postgres never applies a policy to one — which is the role the
+ * test database URL must name.
+ */
+describe.skipIf(!postgresAvailable)('row level security (PgStore)', () => {
+  it('shows a tenant only its own rows even with no WHERE clause', async () => {
+    const [pg] = storeCases().filter((c) => c.name === 'PgStore');
+    const store = (await pg!.open()) as PgStore;
+    try {
+      const role = await store.raw((c) =>
+        c.query<{ rolsuper: boolean; rolbypassrls: boolean }>(
+          'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user',
+        ),
+      );
+      expect(role.rows[0], 'the test role must not be a superuser, or RLS is never applied').toMatchObject({
+        rolsuper: false,
+        rolbypassrls: false,
+      });
+
+      const orgA = await store.organizations.create(makeOrg('Acme'));
+      const orgB = await store.organizations.create(makeOrg('Globex'));
+      const userA = await store.users.create(makeUser('a@acme.com'));
+      const userB = await store.users.create(makeUser('b@globex.com'));
+      const projectA = await store.projects.create(makeProject(orgA.id, userA.id, 'Acme launch'));
+      await store.projects.create(makeProject(orgB.id, userB.id, 'Globex launch'));
+
+      const seenByB = await store.asTenant(orgB.id, (c) =>
+        c.query<{ id: string; organization_id: string }>('SELECT id, organization_id FROM projects'),
+      );
+      expect(seenByB.rows.every((row) => row.organization_id === orgB.id)).toBe(true);
+      expect(seenByB.rows.some((row) => row.id === projectA.id)).toBe(false);
+
+      // Writes are policed too: a tenant cannot insert a row into another
+      // organisation, whatever the application code asked for.
+      await expect(
+        store.asTenant(orgB.id, (c) =>
+          c.query(
+            `INSERT INTO projects (id, organization_id, created_by_user_id, name, website_url, supplemental_urls,
+               stage, brief, cost_usd, credits_spent, created_at, updated_at)
+             VALUES ($1, $2, $3, 'Planted', 'https://acme.com', '[]', 'created', '{}', 0, 0, now(), now())`,
+            [newId('prj'), orgA.id, userB.id],
+          ),
+        ),
+      ).rejects.toThrow(/row-level security/i);
+
+      // And with no tenant set at all, the policies fail closed.
+      const unscoped = await store.raw(async (c) => {
+        await c.query("SELECT set_config('app.platform_access', 'off', true)");
+        return c.query('SELECT id FROM projects');
+      });
+      expect(unscoped.rows).toEqual([]);
+    } finally {
+      await store.close();
+    }
   });
 });

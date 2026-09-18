@@ -74,6 +74,22 @@ export class PgStore implements Store {
     await this.db.close();
   }
 
+  /**
+   * A platform-scoped query against the underlying database.
+   *
+   * For the conformance suite and for operations, which sometimes need a
+   * statement no repository offers. Not for application code: everything the
+   * product does has a repository method, and that is where tenancy lives.
+   */
+  raw<T>(fn: (client: QueryClient) => Promise<T>): Promise<T> {
+    return this.db.withPlatform(fn);
+  }
+
+  /** A tenant-scoped query, for tests that check what a tenant can see with no WHERE at all. */
+  asTenant<T>(organizationId: string, fn: (client: QueryClient) => Promise<T>): Promise<T> {
+    return this.db.withTenant(organizationId, fn);
+  }
+
   private tenant<T>(organizationId: string, fn: (c: QueryClient) => Promise<T>): Promise<T> {
     return this.db.withTenant(organizationId, fn);
   }

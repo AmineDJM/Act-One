@@ -1,0 +1,84 @@
+# Act One — continuous integration
+#
+# One job, in the order a contributor runs things locally: install, typecheck,
+# migrate a real Postgres, test, build. The test step runs the store
+# conformance suites against that Postgres as a role that is not a superuser,
+# so row-level security is exercised rather than bypassed, and runs the
+# browser tests in a real Chromium, because the capture code executes inside
+# the customer's page and a test of a copy of it proves nothing.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: actone
+          POSTGRES_PASSWORD: actone
+          POSTGRES_DB: actone
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U actone"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      # Migrations run as the database owner.
+      DATABASE_URL: postgresql://actone:actone@localhost:5432/actone
+      # Tests connect as the application role created below, which bypasses
+      # no policy — the only connection under which RLS is actually decided.
+      ACT_ONE_TEST_DATABASE_URL: postgresql://act_one_app:act_one_app@localhost:5432/actone
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: .cache/ms-playwright
+          key: chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Migrate
+        run: npm run migrate
+
+      - name: Create the application role
+        run: npm run db:app-role
+        env:
+          ACT_ONE_APP_ROLE: act_one_app
+          ACT_ONE_APP_ROLE_PASSWORD: act_one_app
+
+      - name: Test
+        run: npm test
+
+      - name: Build the web app
+        run: npm run build
+        env:
+          NODE_ENV: production
