@@ -232,7 +232,16 @@ export function mixArgs(plan: MixPlan, outputPath: string): string[] {
   }
   args.push('-filter_complex', plan.filterGraph);
   args.push('-map', `[${plan.outputLabel}]`);
-  args.push('-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2');
+  /*
+   * Lossless out of the mix.
+   *
+   * This wrote AAC, the master then wrote AAC again, and the mux wrote it a
+   * third time — three generations of lossy encoding on the way to one file.
+   * Each one raises inter-sample peaks, which is how a master aimed at
+   * −1.5 dBTP came out at −0.9, over the EBU R 128 ceiling. The premaster is
+   * an intermediate; the single encode that matters happens at the mux.
+   */
+  args.push('-c:a', 'pcm_s24le', '-ar', '48000', '-ac', '2');
   args.push('-t', String(plan.durationSeconds));
   args.push(outputPath);
   return args;

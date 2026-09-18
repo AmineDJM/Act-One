@@ -48,13 +48,30 @@ export async function masterLoudness(options: MasterOptions): Promise<void> {
   }
 
   const analysis = parseLoudnormJson(measured.stderr);
-  const filter = analysis
+  const normalise = analysis
     ? `loudnorm=${common}:linear=true:measured_I=${analysis.input_i}` +
       `:measured_TP=${analysis.input_tp}:measured_LRA=${analysis.input_lra}` +
       `:measured_thresh=${analysis.input_thresh}:offset=${analysis.target_offset}`
     : // No measurement to read back: one pass is still far better than none, and
       // failing because FFmpeg moved a JSON block is worse than half a decibel.
       `loudnorm=${common}`;
+
+  /*
+   * An explicit ceiling after the normaliser.
+   *
+   * `loudnorm` only limits true peak in its dynamic mode; `linear=true`, which
+   * is what preserves the dynamics of a piece written to have them, applies a
+   * flat gain and lets the peaks land where they land. A master aimed at
+   * −1.5 dBTP measured −0.9 — over EBU R 128's −1 dBTP — and stayed there
+   * however many encodes were removed from the chain, because nothing in it
+   * was limiting.
+   *
+   * Sample-peak limited a little under the true-peak target, since inter-sample
+   * peaks sit above sample peaks and AAC adds its own. The margin is verified
+   * by measuring the finished file, not assumed.
+   */
+  const ceiling = dbToAmplitude(truePeak - 0.5);
+  const filter = `${normalise},alimiter=limit=${ceiling.toFixed(4)}:attack=5:release=50:level=disabled`;
 
   const written = await runFfmpeg(
     [
@@ -170,4 +187,9 @@ export function parseVolumeDetect(stderr: string): { meanDb: number; maxDb: numb
   const maxDb = Number(max[1]);
   if (!Number.isFinite(meanDb) || !Number.isFinite(maxDb)) return null;
   return { meanDb, maxDb };
+}
+
+/** dBFS to linear amplitude, for filters that take a 0..1 limit. */
+export function dbToAmplitude(db: number): number {
+  return Math.pow(10, db / 20);
 }

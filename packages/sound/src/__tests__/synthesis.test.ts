@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { TRUE_PEAK_CEILING } from '@act-one/core';
 import {
   DEFAULT_LIBRARY,
   SAMPLE_RATE,
+  dbToAmplitude,
   encodeWav,
   parseLoudnormJson,
   parseVolumeDetect,
@@ -214,6 +216,27 @@ describe('reading FFmpeg back', () => {
 
   it('returns null when volumedetect said nothing useful', () => {
     expect(parseVolumeDetect('')).toBeNull();
+  });
+});
+
+describe('the ceiling', () => {
+  it('converts dB to the amplitude a filter takes', () => {
+    expect(dbToAmplitude(0)).toBeCloseTo(1, 6);
+    expect(dbToAmplitude(-6)).toBeCloseTo(0.5012, 4);
+    expect(dbToAmplitude(-1)).toBeCloseTo(0.8913, 4);
+  });
+
+  it('limits under the true-peak target rather than at it', () => {
+    /*
+     * `loudnorm` only limits true peak in its dynamic mode, and linear mode —
+     * which is what preserves the dynamics — lets peaks land where they land.
+     * A master aimed at −1.5 dBTP measured −0.9, over EBU R 128's ceiling,
+     * until an explicit limiter went in below it: inter-sample peaks sit above
+     * sample peaks, and AAC adds its own.
+     */
+    const target = TRUE_PEAK_CEILING - 0.5;
+    expect(dbToAmplitude(target - 0.5)).toBeLessThan(dbToAmplitude(target));
+    expect(dbToAmplitude(target - 0.5)).toBeLessThan(dbToAmplitude(TRUE_PEAK_CEILING));
   });
 });
 

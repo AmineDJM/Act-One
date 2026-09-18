@@ -434,7 +434,7 @@ async function renderOnce(
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
 
-  const premasterPath = path.join(params.workDir, `premix-${params.attempt}.m4a`);
+  const premasterPath = path.join(params.workDir, `premix-${params.attempt}.wav`);
   const mixed = await runFfmpeg(mixArgs(plan, premasterPath), {
     signal: context.signal,
     timeoutMs: 300_000,
@@ -456,13 +456,14 @@ async function renderOnce(
    * EBU R 128 allows for a whole programme, spent before the film is even
    * muxed. A measured pass costs seconds against a render that costs minutes.
    */
-  const audioPath = path.join(params.workDir, `mix-${params.attempt}.m4a`);
+  const audioPath = path.join(params.workDir, `mix-${params.attempt}.wav`);
   try {
     await masterLoudness({
       source: premasterPath,
       target: audioPath,
       lufs: design.targetLufs,
-      outputArgs: ['-c:a', 'aac', '-b:a', '192k'],
+      // Still lossless: the mux does the one AAC encode this file ever gets.
+      outputArgs: ['-c:a', 'pcm_s24le'],
       ...(context.signal ? { signal: context.signal } : {}),
       timeoutMs: 300_000,
     });

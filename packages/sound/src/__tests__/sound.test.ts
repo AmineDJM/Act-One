@@ -278,3 +278,28 @@ describe('delivery colour', () => {
   });
 });
 
+describe('how many times the audio is encoded', () => {
+  it('leaves the mix lossless', () => {
+    /*
+     * The mix wrote AAC, the master wrote AAC again and the mux wrote it a
+     * third time — three generations of lossy encoding on the way to one file.
+     * Inter-sample peaks rise on each pass, which is how a master aimed at
+     * −1.5 dBTP came out at −0.9, over the EBU R 128 ceiling.
+     */
+    const storyboard = board([scene({ id: 's1', duration: 5, visualType: 'kinetic_typography' })]);
+    const design = directSound({ storyboard, behaviour: cinematic });
+    const plan = buildMix({ design, resolvedPaths: {}, durationSeconds: 5 });
+    const args = mixArgs(plan, '/tmp/premix.wav').join(' ');
+
+    expect(args).toContain('pcm_');
+    expect(args).not.toContain('aac');
+  });
+
+  it('encodes once, at the mux', () => {
+    const args = muxArgs('/tmp/v.mp4', '/tmp/a.wav', '/tmp/out.mp4').join(' ');
+    expect(args).toContain('-c:a aac');
+    // And never re-encodes the picture to attach it.
+    expect(args).toContain('-c:v copy');
+  });
+});
+
