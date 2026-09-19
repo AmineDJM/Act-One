@@ -251,6 +251,39 @@ describe('the webhook', () => {
     expect(recorded.filter((payment) => payment.kind === 'subscription')).toHaveLength(3);
   });
 
+  it('lets a workspace back in when the retry collects', async () => {
+    await deliver(
+      eventPayload('customer.subscription.created', {
+        id: 'sub_retry',
+        object: 'subscription',
+        customer: 'cus_acme',
+        status: 'active',
+        metadata: { organizationId, planId: 'pro' },
+        current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
+        cancel_at_period_end: false,
+        items: { data: [{ quantity: 1 }] },
+      }),
+    );
+    await deliver(
+      eventPayload('invoice.payment_failed', { id: 'in_r1', object: 'invoice', customer: 'cus_acme' }),
+    );
+    expect((await store.subscriptions.getForOrganization(organizationId))?.status).toBe('past_due');
+
+    // Their card works on the second attempt. Waiting for a second webhook to
+    // say so leaves somebody who has paid on the free plan's entitlements.
+    await deliver(
+      eventPayload('invoice.payment_succeeded', {
+        id: 'in_r2',
+        object: 'invoice',
+        customer: 'cus_acme',
+        amount_paid: 149_000,
+        currency: 'eur',
+        billing_reason: 'subscription_cycle',
+      }),
+    );
+    expect((await store.subscriptions.getForOrganization(organizationId))?.status).toBe('active');
+  });
+
   it('refuses to trust an unsigned body when no webhook secret is configured', async () => {
     await saveProviderCredentials('stripe', { secretKey: SECRET_KEY }, 'usr_staff');
     const payload = eventPayload('checkout.session.completed', {

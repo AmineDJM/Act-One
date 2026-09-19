@@ -337,6 +337,23 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
         stripeObjectId: invoice.id ?? null,
       });
 
+      /*
+       * A payment that collected ends the past due.
+       *
+       * `customer.subscription.updated` normally says so too, but relying on
+       * it alone means a customer whose retry succeeded keeps the free plan's
+       * entitlements until a second webhook happens to arrive. Only from past
+       * due: a paid invoice is not a reason to resurrect a cancelled
+       * subscription.
+       */
+      if (existing && existing.status === 'past_due') {
+        await store.subscriptions.upsert({
+          ...existing,
+          status: 'active',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
       if (invoice.billing_reason !== 'subscription_cycle') {
         return { handled: true, note: 'Payment recorded.' };
       }
