@@ -149,7 +149,16 @@ export async function runSceneAssets(
           result.costUsd += estimate;
           remaining -= estimate;
           if (organization && !organization.isInternal) {
-            await store.organizations.adjustCredits(organizationId, -credits);
+            // Keyed by the scene and the attempt, so a job replayed after a
+            // crash charges the customer once for one shot.
+            await store.creditLedger.post({
+              organizationId,
+              kind: 'spend',
+              delta: -credits,
+              sourceKey: `shot:${scene.id}:${asset}`,
+              description: `Generated shot for scene ${scene.index + 1}`,
+              projectId: project.id,
+            });
           }
         } else {
           result.failed += 1;

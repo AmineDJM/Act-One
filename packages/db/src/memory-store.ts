@@ -62,6 +62,9 @@ import type {
   VoiceSettings,
   Scene,
   Storyboard,
+  CreditLedgerEntry,
+  CreditMovement,
+  CreditPosting,
   Payment,
   Subscription,
   User,
@@ -89,6 +92,7 @@ export class MemoryStore implements Store {
     >(),
     subscriptions: new Map<string, Subscription>(),
     payments: new Map<string, Payment>(),
+    creditLedger: new Map<string, CreditLedgerEntry>(),
     brands: new Map<string, BrandSystem>(),
     projects: new Map<string, Project>(),
     understandings: new Map<string, ProductUnderstanding & { organizationId: string }>(),
@@ -621,6 +625,48 @@ export class MemoryStore implements Store {
       [...this.tables.payments.values()]
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
         .slice(0, limit),
+  };
+
+  readonly creditLedger = {
+    post: async (movement: CreditMovement): Promise<CreditPosting> => {
+      const organization = this.require(this.tables.organizations.get(movement.organizationId), 'Organization');
+
+      // The key decides before anything moves: a retry must read as "already
+      // done", not as a second grant and not as an error.
+      if (movement.sourceKey) {
+        const seen = [...this.tables.creditLedger.values()].some(
+          (entry) => entry.sourceKey === movement.sourceKey,
+        );
+        if (seen) return { applied: false, reason: 'duplicate', balance: organization.creditBalance, entry: null };
+      }
+
+      const balance = organization.creditBalance + movement.delta;
+      if (balance < 0) {
+        return { applied: false, reason: 'insufficient', balance: organization.creditBalance, entry: null };
+      }
+
+      const entry: CreditLedgerEntry = {
+        planId: null, subscriptionId: null, periodKey: null, paymentId: null,
+        projectId: null, renderId: null, actorUserId: null, description: '', sourceKey: null,
+        ...movement,
+        id: movement.id ?? newId('cle'),
+        balanceAfter: balance,
+        createdAt: movement.createdAt ?? new Date().toISOString(),
+      };
+      this.tables.creditLedger.set(entry.id, entry);
+      this.tables.organizations.set(organization.id, { ...organization, creditBalance: balance });
+      return { applied: true, reason: 'applied', balance, entry };
+    },
+    listForOrganization: async (organizationId: string, limit = 100) =>
+      this.scoped(this.tables.creditLedger, organizationId)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, limit),
+    list: async (limit = 200) =>
+      [...this.tables.creditLedger.values()]
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, limit),
+    has: async (sourceKey: string) =>
+      [...this.tables.creditLedger.values()].some((entry) => entry.sourceKey === sourceKey),
   };
 
   readonly brands = {

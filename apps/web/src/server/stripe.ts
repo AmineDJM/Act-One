@@ -228,7 +228,17 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
 
       if (session.metadata?.['kind'] === 'credits') {
         const credits = Number(session.metadata['credits'] ?? 0);
-        if (credits > 0) await store.organizations.adjustCredits(organizationId, credits);
+        if (credits > 0) {
+          // Keyed by the checkout session: the event dedup above already stops
+          // a retry, and this stops anything else replaying the same purchase.
+          await store.creditLedger.post({
+            organizationId,
+            kind: 'purchase',
+            delta: credits,
+            sourceKey: `purchase:${session.id}`,
+            description: `${credits.toLocaleString('en-US')} credits bought`,
+          });
+        }
         await recordPayment({
           organizationId,
           kind: 'credits',
@@ -256,8 +266,23 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
       if (!organizationId) return { handled: false, note: 'No organisation on subscription.' };
 
       const now = new Date().toISOString();
+      const existing = await store.subscriptions.getForOrganization(organizationId);
+      const previousPlanId = existing?.planId ?? null;
+
+      /*
+       * How often this is collected, read off the price Stripe is charging.
+       *
+       * Not a guess and not the same question as how often the allowance
+       * lands: an annual subscription pays once a year and is still owed its
+       * credits every month.
+       */
+      const recurring = subscription.items.data[0]?.price?.recurring;
+      const billingInterval = recurring?.interval === 'year' ? 'annual' : 'monthly';
+
       await store.subscriptions.upsert({
-        id: newId('inv'),
+        // Kept, not minted: a subscription that changes plan is the same
+        // subscription, and its allowance keys are built from this id.
+        id: existing?.id ?? newId('inv'),
         organizationId,
         planId,
         status: mapStatus(subscription.status),
@@ -266,21 +291,38 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
         currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         seats: subscription.items.data[0]?.quantity ?? 1,
-        createdAt: now,
+        billingInterval,
+        // Carried forward, or the next accrual would re-grant every period.
+        allowanceGrantedThrough: existing?.allowanceGrantedThrough ?? null,
+        createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       });
       await store.organizations.update(organizationId, { planId });
 
-      // Monthly credit allowance lands with the subscription, not on a cron.
-      const { planById } = await import('@act-one/core');
       const { plans } = await import('./platform.ts').then((m) => m.getPlatformConfig());
-      const plan = planById(plans, planId);
-      if (event.type === 'customer.subscription.created' && plan.limits.monthlyCredits > 0) {
-        await store.organizations.adjustCredits(organizationId, plan.limits.monthlyCredits);
-      }
+      const { grantDueAllowances, grantUpgradeDifference } = await import('@act-one/db');
+
+      /*
+       * The allowance is owed by the plan, not by the invoice.
+       *
+       * This is the first period, so the accrual grants it here; from then on
+       * the same function runs on the renewal invoice and on the worker's
+       * clock, and the ledger's key means only one of the three can win.
+       */
+      const allowance = await grantDueAllowances({ store, organizationId, plans, now });
+
+      // Moving up mid-period earns the difference, once.
+      const upgrade = previousPlanId
+        ? await grantUpgradeDifference({ store, organizationId, plans, previousPlanId, now })
+        : { credited: 0 };
+
       if (event.type === 'customer.subscription.created') await rewardReferralFor(organizationId);
 
-      return { handled: true, note: `Subscription ${subscription.status}.` };
+      const added = allowance.creditsAdded + upgrade.credited;
+      return {
+        handled: true,
+        note: added > 0 ? `Subscription ${subscription.status}; ${added} credits.` : `Subscription ${subscription.status}.`,
+      };
     }
 
     case 'customer.subscription.deleted': {
@@ -358,12 +400,21 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
         return { handled: true, note: 'Payment recorded.' };
       }
 
-      const { planById, withGrants } = await import('@act-one/core');
+      /*
+       * A renewal is a good moment to check the allowance, not the thing that
+       * decides it.
+       *
+       * For a monthly subscriber this is the period's own invoice and the
+       * accrual grants exactly one period. For an annual one it fires once a
+       * year and finds at most one month due, because the worker's clock has
+       * been granting the other eleven all along. Same function, same keys,
+       * no double.
+       */
       const { plans } = await import('./platform.ts').then((m) => m.getPlatformConfig());
-      const plan = withGrants(planById(plans, planId), organization);
-      if (plan.limits.monthlyCredits > 0) {
-        await store.organizations.adjustCredits(organization.id, plan.limits.monthlyCredits);
-        return { handled: true, note: `Renewed: ${plan.limits.monthlyCredits} credits.` };
+      const { grantDueAllowances } = await import('@act-one/db');
+      const allowance = await grantDueAllowances({ store, organizationId: organization.id, plans });
+      if (allowance.creditsAdded > 0) {
+        return { handled: true, note: `Renewed: ${allowance.creditsAdded} credits.` };
       }
       return { handled: true, note: 'Renewed.' };
     }

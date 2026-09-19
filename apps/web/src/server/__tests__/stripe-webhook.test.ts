@@ -181,7 +181,7 @@ describe('the webhook', () => {
     });
   });
 
-  it('gives the month’s credits to the invoice that paid for the month, once', async () => {
+  it('grants the first period when the subscription opens, and the invoice for it adds nothing', async () => {
     await deliver(
       eventPayload('customer.subscription.created', {
         id: 'sub_renew',
@@ -191,14 +191,13 @@ describe('the webhook', () => {
         metadata: { organizationId, planId: 'pro' },
         current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
         cancel_at_period_end: false,
-        items: { data: [{ quantity: 1 }] },
+        items: { data: [{ quantity: 1, price: { recurring: { interval: 'month' } } }] },
       }),
     );
-    const firstMonth = (await store.organizations.get(organizationId))!.creditBalance;
-    expect(firstMonth).toBe(2000);
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
 
-    // The invoice that opened the subscription must not pay the allowance
-    // twice: the subscription event already did.
+    // The invoice that opened the subscription pays for the period the
+    // subscription event already granted. The period decides, not the invoice.
     const opening = await deliver(
       eventPayload('invoice.payment_succeeded', {
         id: 'in_open',
@@ -210,10 +209,35 @@ describe('the webhook', () => {
       }),
     );
     expect(await opening.json()).toMatchObject({ handled: true, note: 'Payment recorded.' });
-    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(firstMonth);
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
 
-    // Month two. This event was not handled at all before, so a customer sold
-    // "2,000 credits a month" was given them once and never again.
+    const ledger = await store.creditLedger.listForOrganization(organizationId);
+    expect(ledger.filter((entry) => entry.kind === 'allowance')).toHaveLength(1);
+  });
+
+  it('gives a month-old subscription its next month when the renewal collects', async () => {
+    /*
+     * Seeded a month old rather than opened and then aged: aging one lands on
+     * the same anniversary it was already granted for, and the ledger — rightly
+     * — refuses to pay the same period twice.
+     */
+    const monthAgo = new Date(Date.now() - 31 * 24 * 3600 * 1000).toISOString();
+    await store.subscriptions.upsert({
+      id: newId('inv'),
+      organizationId,
+      planId: 'pro',
+      status: 'active',
+      stripeSubscriptionId: 'sub_old',
+      stripeCustomerId: 'cus_acme',
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      seats: 1,
+      billingInterval: 'monthly',
+      allowanceGrantedThrough: monthAgo.slice(0, 10),
+      createdAt: monthAgo,
+      updatedAt: monthAgo,
+    });
+
     const renewal = await deliver(
       eventPayload('invoice.payment_succeeded', {
         id: 'in_month_2',
@@ -225,30 +249,64 @@ describe('the webhook', () => {
       }),
     );
     expect(await renewal.json()).toMatchObject({ handled: true, note: 'Renewed: 2000 credits.' });
-    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(firstMonth + 2000);
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
 
-    // And Stripe's retry of that same delivery pays nothing a second time.
-    const renewalPayload = eventPayload(
-      'invoice.payment_succeeded',
-      {
-        id: 'in_month_2',
+    // A second cycle invoice inside the same period adds nothing.
+    const early = await deliver(
+      eventPayload('invoice.payment_succeeded', {
+        id: 'in_month_2_again',
         object: 'invoice',
         customer: 'cus_acme',
         amount_paid: 149_000,
         currency: 'eur',
         billing_reason: 'subscription_cycle',
-      },
-      'evt_month_2_retry',
+      }),
     );
-    await deliver(renewalPayload);
-    const afterFirst = (await store.organizations.get(organizationId))!.creditBalance;
-    const retry = await deliver(renewalPayload);
-    expect(await retry.json()).toMatchObject({ handled: false, note: 'Already processed.' });
-    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(afterFirst);
+    expect(await early.json()).toMatchObject({ handled: true, note: 'Renewed.' });
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
 
-    // One receipt per month, and one for the invoice that opened it.
     const recorded = await store.payments.listForOrganization(organizationId);
-    expect(recorded.filter((payment) => payment.kind === 'subscription')).toHaveLength(3);
+    expect(recorded.filter((payment) => payment.kind === 'subscription')).toHaveLength(2);
+  });
+
+  it('gives an annual subscriber their credits every month, not once a year', async () => {
+    await deliver(
+      eventPayload('customer.subscription.created', {
+        id: 'sub_annual',
+        object: 'subscription',
+        customer: 'cus_acme',
+        status: 'active',
+        metadata: { organizationId, planId: 'pro' },
+        current_period_end: Math.floor(Date.now() / 1000) + 365 * 24 * 3600,
+        cancel_at_period_end: false,
+        items: { data: [{ quantity: 1, price: { recurring: { interval: 'year' } } }] },
+      }),
+    );
+    // Read off the price Stripe is charging, not guessed.
+    expect((await store.subscriptions.getForOrganization(organizationId))?.billingInterval).toBe('annual');
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
+
+    /*
+     * The other eleven months, in which Stripe sends nothing at all. The
+     * worker's clock is what notices, and it is the only reason this customer
+     * is not left with one month of credits for the year they paid for.
+     */
+    const elevenMonthsAgo = new Date(Date.now() - 335 * 24 * 3600 * 1000).toISOString();
+    const live = (await store.subscriptions.getForOrganization(organizationId))!;
+    await store.subscriptions.upsert({
+      ...live,
+      createdAt: elevenMonthsAgo,
+      allowanceGrantedThrough: elevenMonthsAgo.slice(0, 10),
+    });
+
+    const { grantAllowancesForEveryone } = await import('@act-one/db');
+    const { DEFAULT_PLANS } = await import('@act-one/core');
+    const outcome = await grantAllowancesForEveryone({ store, plans: DEFAULT_PLANS });
+
+    // Eleven anniversaries have passed; one of them is the period the opening
+    // already paid for, and the ledger refuses that one.
+    expect(outcome.creditsAdded).toBe(2000 * 10);
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000 * 11);
   });
 
   it('lets a workspace back in when the retry collects', async () => {

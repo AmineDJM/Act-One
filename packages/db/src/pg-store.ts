@@ -61,6 +61,9 @@ import type {
   RevisionRequest,
   Scene,
   Storyboard,
+  CreditLedgerEntry,
+  CreditMovement,
+  CreditPosting,
   Payment,
   Subscription,
   User,
@@ -531,8 +534,9 @@ export class PgStore implements Store {
         const r = await c.query(
           `INSERT INTO subscriptions
              (id, organization_id, plan_id, status, stripe_subscription_id, stripe_customer_id,
-              current_period_end, cancel_at_period_end, seats, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+              current_period_end, cancel_at_period_end, seats, billing_interval,
+              allowance_granted_through, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
            ON CONFLICT (organization_id) DO UPDATE SET
              plan_id = EXCLUDED.plan_id,
              status = EXCLUDED.status,
@@ -541,6 +545,8 @@ export class PgStore implements Store {
              current_period_end = EXCLUDED.current_period_end,
              cancel_at_period_end = EXCLUDED.cancel_at_period_end,
              seats = EXCLUDED.seats,
+             billing_interval = EXCLUDED.billing_interval,
+             allowance_granted_through = EXCLUDED.allowance_granted_through,
              updated_at = EXCLUDED.updated_at
            RETURNING *`,
           [
@@ -553,6 +559,8 @@ export class PgStore implements Store {
             s.currentPeriodEnd,
             s.cancelAtPeriodEnd,
             s.seats,
+            s.billingInterval,
+            s.allowanceGrantedThrough,
             s.createdAt,
             s.updatedAt,
           ],
@@ -630,6 +638,126 @@ export class PgStore implements Store {
       this.asPlatform(async (c) => {
         const r = await c.query('SELECT * FROM payments ORDER BY created_at DESC LIMIT $1', [limit]);
         return r.rows.map(toPayment);
+      }),
+  };
+
+  readonly creditLedger = {
+    /*
+     * The entry is written before the balance moves, and that order is the
+     * whole design.
+     *
+     * The unique index on `source_key` is the only thing that can decide a
+     * race. Moving the balance first and then discovering the key was taken
+     * would mean undoing a credit that another transaction had already
+     * committed; inserting first means the second arrival blocks on the index,
+     * finds nothing to do, and never touches the balance at all.
+     *
+     * Both statements are in one transaction, so a movement is either written
+     * and applied or neither. A refusal — the key is taken, or the balance
+     * would go negative — throws to roll the whole thing back, and is
+     * classified afterwards from what actually survived.
+     */
+    post: async (movement: CreditMovement): Promise<CreditPosting> => {
+      const id = movement.id ?? newId('cle');
+      const createdAt = movement.createdAt ?? new Date().toISOString();
+      try {
+        return await this.asPlatform(async (c) => {
+          /*
+           * Three statements, one transaction, in this order deliberately.
+           *
+           * The entry is written first because the unique index on
+           * `source_key` is the only thing that can decide a race: a second
+           * arrival blocks here until the first commits, then finds nothing to
+           * do and never touches the balance. Moving the balance first would
+           * mean undoing a credit another transaction had already committed.
+           *
+           * Not one statement with data-modifying CTEs, which was the first
+           * attempt and does not work: every sub-statement in a `WITH` runs
+           * against the same snapshot, so the update could not see the row the
+           * insert had just written and silently changed nothing.
+           */
+          const inserted = await c.query(
+            `INSERT INTO credit_ledger
+               (id, organization_id, kind, delta, balance_after, source_key, description,
+                plan_id, subscription_id, period_key, payment_id, project_id, render_id,
+                actor_user_id, created_at)
+             VALUES ($1,$2,$3,$4,0,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+             ON CONFLICT (source_key) DO NOTHING
+             RETURNING id`,
+            [
+              id,
+              movement.organizationId,
+              movement.kind,
+              movement.delta,
+              movement.sourceKey ?? null,
+              movement.description ?? '',
+              movement.planId ?? null,
+              movement.subscriptionId ?? null,
+              movement.periodKey ?? null,
+              movement.paymentId ?? null,
+              movement.projectId ?? null,
+              movement.renderId ?? null,
+              movement.actorUserId ?? null,
+              createdAt,
+            ],
+          );
+          if (!inserted.rows[0]) throw new LedgerNotApplied();
+
+          const moved = await c.query(
+            `UPDATE organizations
+                SET credit_balance = credit_balance + $2
+              WHERE id = $1 AND credit_balance + $2 >= 0
+              RETURNING credit_balance`,
+            [movement.organizationId, movement.delta],
+          );
+          // Would go negative: throwing rolls the entry back with it, so a
+          // refusal leaves nothing behind.
+          if (!moved.rows[0]) throw new LedgerNotApplied();
+
+          const balance = num(moved.rows[0]['credit_balance']);
+          const settled = await c.query(
+            'UPDATE credit_ledger SET balance_after = $2 WHERE id = $1 RETURNING *',
+            [id, balance],
+          );
+          const entry = toCreditEntry(settled.rows[0]!);
+          return { applied: true, reason: 'applied' as const, balance, entry };
+        });
+      } catch (error) {
+        if (!(error instanceof LedgerNotApplied)) throw error;
+      }
+
+      // Classified after the rollback, from what actually survived: a
+      // pre-existing row under this key means a duplicate, anything else means
+      // the balance could not take it.
+      const balance = (await this.organizations.get(movement.organizationId))?.creditBalance ?? 0;
+      if (movement.sourceKey && (await this.creditLedger.has(movement.sourceKey))) {
+        return { applied: false, reason: 'duplicate', balance, entry: null };
+      }
+      return { applied: false, reason: 'insufficient', balance, entry: null };
+    },
+
+    listForOrganization: async (organizationId: string, limit = 100) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT * FROM credit_ledger WHERE organization_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2',
+          [organizationId, limit],
+        );
+        return r.rows.map(toCreditEntry);
+      }),
+
+    list: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          'SELECT * FROM credit_ledger ORDER BY created_at DESC, id DESC LIMIT $1',
+          [limit],
+        );
+        return r.rows.map(toCreditEntry);
+      }),
+
+    has: async (sourceKey: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT 1 FROM credit_ledger WHERE source_key = $1', [sourceKey]);
+        return (r.rowCount ?? 0) > 0;
       }),
   };
 
@@ -2993,8 +3121,33 @@ function toSubscription(row: Row): Subscription {
     currentPeriodEnd: isoOrNull(row['current_period_end']),
     cancelAtPeriodEnd: Boolean(row['cancel_at_period_end']),
     seats: num(row['seats']),
+    billingInterval: (row['billing_interval'] as Subscription['billingInterval']) ?? 'monthly',
+    allowanceGrantedThrough: (row['allowance_granted_through'] as string) ?? null,
     createdAt: iso(row['created_at']),
     updatedAt: iso(row['updated_at']),
+  };
+}
+
+/** Thrown inside the ledger transaction to roll it back. Never escapes. */
+class LedgerNotApplied extends Error {}
+
+function toCreditEntry(row: Row): CreditLedgerEntry {
+  return {
+    id: row['id'] as string,
+    organizationId: row['organization_id'] as string,
+    kind: row['kind'] as CreditLedgerEntry['kind'],
+    delta: num(row['delta']),
+    balanceAfter: num(row['balance_after']),
+    sourceKey: (row['source_key'] as string) ?? null,
+    description: (row['description'] as string) ?? '',
+    planId: (row['plan_id'] as string) ?? null,
+    subscriptionId: (row['subscription_id'] as string) ?? null,
+    periodKey: (row['period_key'] as string) ?? null,
+    paymentId: (row['payment_id'] as string) ?? null,
+    projectId: (row['project_id'] as string) ?? null,
+    renderId: (row['render_id'] as string) ?? null,
+    actorUserId: (row['actor_user_id'] as string) ?? null,
+    createdAt: iso(row['created_at']),
   };
 }
 

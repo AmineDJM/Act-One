@@ -49,6 +49,9 @@ import type {
   RevisionRequest,
   Scene,
   Storyboard,
+  CreditLedgerEntry,
+  CreditMovement,
+  CreditPosting,
   Payment,
   Subscription,
   User,
@@ -76,6 +79,7 @@ export interface Store {
   readonly sessions: SessionRepo;
   readonly subscriptions: SubscriptionRepo;
   readonly payments: PaymentRepo;
+  readonly creditLedger: CreditLedgerRepo;
   readonly brands: BrandRepo;
   readonly projects: ProjectRepo;
   readonly understandings: UnderstandingRepo;
@@ -219,6 +223,23 @@ export interface PaymentRepo {
   listForOrganization(organizationId: string, limit?: number): Promise<Payment[]>;
   /** Every payment, newest first. Operator-facing. */
   list(limit?: number): Promise<Payment[]>;
+}
+
+/**
+ * Every movement of credits, append-only.
+ *
+ * `post` is the only way credits change hands. It writes the entry and moves
+ * the balance in one transaction, so a crash can never leave one without the
+ * other, and it refuses a movement whose `sourceKey` has already been written
+ * — which is what makes an allowance idempotent under a webhook that retries.
+ */
+export interface CreditLedgerRepo {
+  post(movement: CreditMovement): Promise<CreditPosting>;
+  listForOrganization(organizationId: string, limit?: number): Promise<CreditLedgerEntry[]>;
+  /** Every entry, newest first. Operator-facing. */
+  list(limit?: number): Promise<CreditLedgerEntry[]>;
+  /** Whether a movement under this key has already been written. */
+  has(sourceKey: string): Promise<boolean>;
 }
 
 export interface BrandRepo {

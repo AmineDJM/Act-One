@@ -64,8 +64,29 @@ export async function advanceReferral(store: Store, organizationId: string, reas
   const invitedCredits = first ? reward.invited : 0;
 
   const inviterOrganizationId = (await store.memberships.listForUser(referral.inviterUserId))[0]?.organizationId ?? null;
-  if (inviterCredits > 0 && inviterOrganizationId) await store.organizations.adjustCredits(inviterOrganizationId, inviterCredits);
-  if (invitedCredits > 0) await store.organizations.adjustCredits(referral.invitedOrganizationId, invitedCredits);
+  /*
+   * Keyed by the referral and the side it pays, so the programme cannot pay
+   * for the same introduction twice — a retried webhook, a second qualifying
+   * event, a replayed job all land on the key that is already taken.
+   */
+  if (inviterCredits > 0 && inviterOrganizationId) {
+    await store.creditLedger.post({
+      organizationId: inviterOrganizationId,
+      kind: 'referral',
+      delta: inviterCredits,
+      sourceKey: `referral:${referral.id}:inviter:${reason}`,
+      description: 'Referral reward',
+    });
+  }
+  if (invitedCredits > 0) {
+    await store.creditLedger.post({
+      organizationId: referral.invitedOrganizationId,
+      kind: 'referral',
+      delta: invitedCredits,
+      sourceKey: `referral:${referral.id}:invited:${reason}`,
+      description: 'Welcome credits from a referral',
+    });
+  }
 
   const updated = await store.referrals.update(referral.id, {
     stage: reason === 'paid' ? 'paid' : 'qualified',

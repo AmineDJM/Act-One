@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Organization } from './org.ts';
+import { PlanAllowance, BillingInterval, type AllowanceInterval } from './allowance.ts';
 
 /**
  * Entitlements, not plan-name checks.
@@ -98,6 +99,15 @@ export const Plan = z.object({
   stripeYearlyPriceId: z.string().nullable().default(null),
   entitlements: z.array(Entitlement).default([]),
   limits: PlanLimits,
+  /**
+   * What this plan gives and how often, as a product decision.
+   *
+   * Null on a plan configured before this existed, and read then as the old
+   * meaning — `limits.monthlyCredits`, monthly. Defaulting it to zero instead
+   * would have silently stopped the allowance for every plan an operator had
+   * already edited. See `planAllowance`.
+   */
+  allowance: PlanAllowance.nullable().default(null),
   isPublic: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
 });
@@ -140,6 +150,8 @@ export const DEFAULT_PLANS: Plan[] = [
       monthlyCredits: 0,
       maxGenerativeSecondsPerFilm: 0,
     },
+    // The promise, stated rather than inferred from how they pay.
+    allowance: { interval: 'monthly', amount: 0 },
     isPublic: true,
     sortOrder: 0,
   },
@@ -176,6 +188,8 @@ export const DEFAULT_PLANS: Plan[] = [
       monthlyCredits: 400,
       maxGenerativeSecondsPerFilm: 10,
     },
+    // The promise, stated rather than inferred from how they pay.
+    allowance: { interval: 'monthly', amount: 400 },
     isPublic: true,
     sortOrder: 1,
   },
@@ -222,6 +236,8 @@ export const DEFAULT_PLANS: Plan[] = [
       monthlyCredits: 2000,
       maxGenerativeSecondsPerFilm: 20,
     },
+    // The promise, stated rather than inferred from how they pay.
+    allowance: { interval: 'monthly', amount: 2000 },
     isPublic: true,
     sortOrder: 2,
   },
@@ -244,6 +260,8 @@ export const DEFAULT_PLANS: Plan[] = [
       monthlyCredits: 8000,
       maxGenerativeSecondsPerFilm: 40,
     },
+    // The promise, stated rather than inferred from how they pay.
+    allowance: { interval: 'monthly', amount: 8000 },
     isPublic: true,
     sortOrder: 3,
   },
@@ -266,6 +284,8 @@ export const DEFAULT_PLANS: Plan[] = [
       monthlyCredits: 40000,
       maxGenerativeSecondsPerFilm: 120,
     },
+    // The promise, stated rather than inferred from how they pay.
+    allowance: { interval: 'monthly', amount: 40000 },
     isPublic: false,
     sortOrder: 4,
   },
@@ -303,6 +323,16 @@ export const Subscription = z.object({
   currentPeriodEnd: z.string().nullable().default(null),
   cancelAtPeriodEnd: z.boolean().default(false),
   seats: z.number().int().min(1).default(1),
+  /**
+   * How often this is collected — monthly or annual.
+   *
+   * Recorded because it is not the same question as how often the plan's
+   * allowance lands, and treating it as the same is what gave an annual
+   * customer one month of credits for the year.
+   */
+  billingInterval: BillingInterval.default('monthly'),
+  /** The period start the allowance was last granted for. */
+  allowanceGrantedThrough: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -343,6 +373,17 @@ export const Payment = z.object({
   createdAt: z.string(),
 });
 export type Payment = z.infer<typeof Payment>;
+
+/**
+ * What this plan actually gives, and how often.
+ *
+ * One place, so nothing else has to know that a plan without an explicit
+ * allowance means the old monthly reading of `limits.monthlyCredits`.
+ */
+export function planAllowance(plan: Plan): { interval: AllowanceInterval; amount: number } {
+  if (plan.allowance) return plan.allowance;
+  return { interval: 'monthly', amount: plan.limits.monthlyCredits };
+}
 
 /** A plan grants entitlements only while the subscription is in good standing. */
 export function subscriptionIsLive(status: SubscriptionStatus): boolean {
@@ -413,9 +454,24 @@ export function withGrants(plan: Plan, organization: Partial<OrganizationGrants>
   );
   if (Object.keys(overrides).length === 0 && extra.length === 0) return plan;
 
+  const limits = { ...plan.limits, ...overrides };
+  /*
+   * A lifted monthly allowance has to reach the allowance, not only the limit.
+   *
+   * There is one control in the console and it must mean one thing: raising
+   * `monthlyCredits` for a workspace and then watching the accrual hand out
+   * the plan's number anyway is the kind of half-applied grant nobody can
+   * debug from the outside.
+   */
+  const allowance =
+    overrides.monthlyCredits === undefined
+      ? plan.allowance
+      : { interval: planAllowance(plan).interval, amount: overrides.monthlyCredits };
+
   return {
     ...plan,
-    limits: { ...plan.limits, ...overrides },
+    limits,
+    allowance,
     entitlements: [...new Set([...plan.entitlements, ...extra])],
   };
 }
@@ -452,6 +508,8 @@ export const INTERNAL_PLAN: Plan = {
     monthlyCredits: 0,
     maxGenerativeSecondsPerFilm: 600,
   },
+  // The promise, stated rather than inferred from how they pay.
+  allowance: { interval: 'monthly', amount: 0 },
   isPublic: false,
   sortOrder: 99,
 };

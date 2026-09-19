@@ -58,6 +58,7 @@ async function main(): Promise<void> {
   installSignalHandlers(state);
   startReaper(state);
   startEditor(state);
+  startAllowances(state);
 
   // The main loop. Claims up to `concurrency` jobs, then waits — either for a
   // slot to free up or for the poll interval, whichever comes first.
@@ -260,6 +261,40 @@ main().catch((error: unknown) => {
   console.error('[worker] fatal:', error);
   process.exit(1);
 });
+
+/**
+ * The allowance clock.
+ *
+ * An annual subscriber generates one Stripe event a year and is promised
+ * credits every month, so nothing event-driven would ever notice the other
+ * eleven are due. This notices. Every allocation is keyed by its period, so
+ * running beside the invoice that triggers the same grant is harmless — the
+ * ledger takes the first and refuses the rest.
+ */
+function startAllowances(state: WorkerState): void {
+  const tick = async () => {
+    if (state.shuttingDown) return;
+    try {
+      const { grantAllowancesForEveryone } = await import('@act-one/db');
+      const settings = await state.config.store.platform.getSettings();
+      const { DEFAULT_PLANS, Plan } = await import('@act-one/core');
+      const parsed = Plan.array().safeParse(settings.plans);
+      const plans = parsed.success && parsed.data.length > 0 ? parsed.data : DEFAULT_PLANS;
+      const outcome = await grantAllowancesForEveryone({ store: state.config.store, plans });
+      if (outcome.workspaces > 0) {
+        log(`allowances: ${outcome.creditsAdded} credits to ${outcome.workspaces} workspace(s)`);
+      }
+    } catch (error) {
+      log(`allowance tick failed: ${(error as Error).message}`);
+    }
+  };
+
+  // Hourly. A period is a month at its shortest, so being an hour late is
+  // invisible, and being cheap matters more than being instant.
+  const timer = setInterval(() => void tick(), 60 * 60_000);
+  timer.unref?.();
+  void tick();
+}
 
 /**
  * The journal's own clock.

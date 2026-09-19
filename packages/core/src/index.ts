@@ -20,6 +20,8 @@ export * from './domain/creative.ts';
 export * from './domain/pitch.ts';
 export * from './domain/storyboard.ts';
 export * from './domain/org.ts';
+export * from './domain/allowance.ts';
+export * from './domain/credit-ledger.ts';
 export * from './domain/billing.ts';
 export * from './domain/entitlement-policy.ts';
 export * from './domain/asset.ts';

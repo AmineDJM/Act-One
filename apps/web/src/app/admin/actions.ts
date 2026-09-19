@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import {
   CreativeBudget,
   Plan,
+  newId,
   parseEnvBlock,
   routeEnvEntries,
   type Entitlement,
@@ -554,8 +555,22 @@ export async function grantCreditsAction(
   const organization = await store.organizations.get(organizationId);
   if (!organization) return { ok: false, message: 'No such workspace.' };
 
-  const updated = await store.organizations.adjustCredits(organizationId, amount);
-  if (!updated) {
+  /*
+   * A unique key, deliberately.
+   *
+   * Every other movement in the ledger is keyed by what it is, so a retry
+   * cannot pay twice. This one is keyed by this press of the button, because
+   * an operator granting the same amount twice usually means it.
+   */
+  const posting = await store.creditLedger.post({
+    organizationId,
+    kind: 'grant',
+    delta: amount,
+    sourceKey: `grant:${newId('cle')}`,
+    description: `Granted by an operator`,
+    actorUserId: actor.id,
+  });
+  if (!posting.applied) {
     return { ok: false, message: `That would take ${organization.name} below zero credits.` };
   }
   revalidatePath('/admin/customers');
@@ -567,7 +582,7 @@ export async function grantCreditsAction(
     { organizationId, amount, balanceBefore: organization.creditBalance },
   );
 
-  return { ok: true, message: `${organization.name} now has ${updated.creditBalance} credits.` };
+  return { ok: true, message: `${organization.name} now has ${posting.balance} credits.` };
 }
 
 /**

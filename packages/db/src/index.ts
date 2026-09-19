@@ -8,3 +8,4 @@ export { MemoryStore } from './memory-store.ts';
 export { PgStore } from './pg-store.ts';
 export { DbCostSink } from './cost-sink.ts';
 export { advanceReferral, readReferralProgram, type ReferralOutcome, type ReferralReason } from './referrals.ts';
+export * from './allowances.ts';

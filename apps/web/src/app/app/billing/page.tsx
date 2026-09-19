@@ -13,10 +13,11 @@ export default async function BillingPage() {
   const session = await requireSessionForPage('/app/billing');
   const store = getStore();
 
-  const [organization, subscription, payments, { plans }] = await Promise.all([
+  const [organization, subscription, payments, ledger, { plans }] = await Promise.all([
     store.organizations.get(session.organizationId),
     store.subscriptions.getForOrganization(session.organizationId),
     store.payments.listForOrganization(session.organizationId, 24),
+    store.creditLedger.listForOrganization(session.organizationId, 12),
     getPlatformConfig(),
   ]);
   if (!organization) return null;
@@ -125,6 +126,29 @@ export default async function BillingPage() {
           </p>
         </section>
       </div>
+
+      {ledger.length > 0 ? (
+        <section className={styles.panel} style={{ marginTop: 'var(--space-6)' }}>
+          <div className={styles.panelHead}>
+            <h3>Credit statement</h3>
+            <span className="mono secondary">{organization.creditBalance.toLocaleString('en-US')}</span>
+          </div>
+          <dl className={styles.kv}>
+            {ledger.map((entry) => (
+              <div key={entry.id} className={styles.kvRow}>
+                <dt>
+                  {new Date(entry.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{' '}
+                  · {entry.description || entry.kind}
+                </dt>
+                <dd style={entry.delta < 0 ? { color: 'var(--text-secondary)' } : undefined}>
+                  {entry.delta > 0 ? '+' : ''}
+                  {entry.delta.toLocaleString('en-US')}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
       {payments.length > 0 ? (
         <section className={styles.panel} style={{ marginTop: 'var(--space-6)' }}>
