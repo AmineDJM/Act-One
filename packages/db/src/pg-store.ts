@@ -1587,6 +1587,22 @@ export class PgStore implements Store {
         return (r.rows[0]?.['data'] as QaReport) ?? null;
       }),
 
+    update: async (organizationId: string, id: string, patch: Partial<QaReport>) =>
+      this.tenant(organizationId, async (c) => {
+        const existing = await c.query('SELECT data FROM qa_reports WHERE id = $1 AND organization_id = $2', [
+          id,
+          organizationId,
+        ]);
+        const current = existing.rows[0]?.['data'] as QaReport | undefined;
+        if (!current) throw new AppError('not_found', 'QA report not found.');
+        const next = { ...current, ...patch };
+        await c.query(
+          'UPDATE qa_reports SET data = $3, passed = $4 WHERE id = $1 AND organization_id = $2',
+          [id, organizationId, next, next.passed],
+        );
+        return next;
+      }),
+
     getForRender: async (organizationId: string, renderId: string) =>
       this.tenant(organizationId, async (c) => {
         const r = await c.query(

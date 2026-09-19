@@ -3,6 +3,7 @@ import {
   BrandSystem as BrandSystemSchema,
   QaIssue,
   QaReport,
+  type RepairRecord,
   newId,
   resequence,
   type BrandSystem,
@@ -10,7 +11,16 @@ import {
   type Storyboard,
 } from '@act-one/core';
 import { neutralRamp } from '@act-one/design';
-import { runDeterministicChecks, factCheck, planRepairs, applyRepairs, selectFramesToInspect, extractProperNouns } from '../index.ts';
+import {
+  runDeterministicChecks,
+  factCheck,
+  planRepairs,
+  applyRepairs,
+  selectFramesToInspect,
+  extractProperNouns,
+  settleRepairs,
+  type SceneRepair,
+} from '../index.ts';
 
 const brand: BrandSystem = BrandSystemSchema.parse({
   id: 'brd_1', organizationId: 'org_1', name: 'Northwind', logo: null, logoVariants: [],
@@ -217,42 +227,179 @@ describe('repair planning', () => {
       ...over,
     });
 
+  const failed = (over: Partial<RepairRecord>): RepairRecord => ({
+    id: newId('evt'), issueId: 'evt_old', check: 'image_artifact', sceneId: 's1',
+    action: 'regenerate_shot', attempt: 0, outcome: 'unchanged', costUsd: 0, latencyMs: 0, note: '',
+    ...over,
+  });
+
   it('ships a clean film', () => {
-    const plan = planRepairs(report([]), 0);
-    expect(plan.shippable).toBe(true);
+    const plan = planRepairs({ report: report([]), attempt: 0 });
+    expect(plan).toMatchObject({ shippable: true, state: 'ready' });
     expect(plan.scenes).toEqual([]);
   });
 
   it('repairs only the scene that broke', () => {
-    const plan = planRepairs(report([issue({ sceneId: 's2' })]), 0);
+    const plan = planRepairs({ report: report([issue({ sceneId: 's2' })]), attempt: 0 });
     expect(plan.scenes).toHaveLength(1);
-    expect(plan.scenes[0]!.sceneId).toBe('s2');
+    expect(plan.scenes[0]).toMatchObject({ sceneId: 's2', escalated: false });
+    expect(plan.state).toBe('repairing');
   });
 
   it('takes the most severe instruction when one scene has two problems', () => {
-    const plan = planRepairs(
-      report([
+    const plan = planRepairs({
+      report: report([
         issue({ sceneId: 's1', severity: 'soft_fail', repair: 'recrop' }),
         issue({ sceneId: 's1', severity: 'hard_fail', repair: 'regenerate_shot' }),
       ]),
-      0,
-    );
+      attempt: 0,
+    });
     expect(plan.scenes).toHaveLength(1);
     expect(plan.scenes[0]!.action).toBe('regenerate_shot');
   });
 
+  it('repairs a soft fail too, which is the whole reason the level exists', () => {
+    const plan = planRepairs({
+      report: report([issue({ severity: 'soft_fail', check: 'still_frame_hold', repair: 'trim_hold' })]),
+      attempt: 0,
+    });
+    expect(plan.scenes[0]!.action).toBe('trim_hold');
+  });
+
+  it('sends a caption or an audio finding to the film, not to a scene', () => {
+    const plan = planRepairs({
+      report: report([
+        issue({ check: 'caption_onset', severity: 'soft_fail', repair: 'retime_captions', sceneId: 's1' }),
+        issue({ check: 'abrupt_music_end', severity: 'soft_fail', repair: 'refade_audio', sceneId: null }),
+      ]),
+      attempt: 0,
+    });
+    // Captions and the tail are properties of the track; before this they had
+    // nowhere to go, because a plan could only name shots.
+    expect(plan.film.map((repair) => repair.action).sort()).toEqual(['refade_audio', 'retime_captions']);
+    expect(plan.scenes).toEqual([]);
+  });
+
+  it('asks for one retime, not one per caption', () => {
+    const plan = planRepairs({
+      report: report([
+        issue({ check: 'caption_onset', severity: 'soft_fail', repair: 'retime_captions', sceneId: 's1' }),
+        issue({ check: 'caption_offset', severity: 'soft_fail', repair: 'retime_captions', sceneId: 's2' }),
+      ]),
+      attempt: 0,
+    });
+    // The second would undo the first.
+    expect(plan.film).toHaveLength(1);
+  });
+
+  it('escalates to another provider once the same repair has failed', () => {
+    const history = [failed({ action: 'regenerate_shot' })];
+    const plan = planRepairs({ report: report([issue({})]), attempt: 1, history });
+    expect(plan.scenes[0]).toMatchObject({ action: 'alternate_provider', escalated: true });
+  });
+
+  it('escalates again to another archetype, then to a person', () => {
+    const twice = [failed({ action: 'regenerate_shot' }), failed({ action: 'alternate_provider', attempt: 1 })];
+    expect(
+      planRepairs({ report: report([issue({})]), attempt: 2, maxAttempts: 4, history: twice }).scenes[0],
+    ).toMatchObject({ action: 'alternate_archetype' });
+
+    const thrice = [...twice, failed({ action: 'alternate_archetype', attempt: 2 })];
+    const exhausted = planRepairs({ report: report([issue({})]), attempt: 3, maxAttempts: 4, history: thrice });
+    expect(exhausted.scenes).toEqual([]);
+    expect(exhausted.manual).toHaveLength(1);
+  });
+
+  it('does not escalate a repair that worked', () => {
+    const history = [failed({ action: 'regenerate_shot', outcome: 'fixed' })];
+    const plan = planRepairs({ report: report([issue({})]), attempt: 1, history });
+    expect(plan.scenes[0]).toMatchObject({ action: 'regenerate_shot', escalated: false });
+  });
+
   it('stops rather than looping once the attempt budget is spent', () => {
-    const plan = planRepairs(report([issue({})]), 2, 2);
-    expect(plan.deadEnd).toBe(true);
+    const plan = planRepairs({ report: report([issue({})]), attempt: 2, maxAttempts: 2 });
+    expect(plan).toMatchObject({ deadEnd: true, state: 'needs_attention' });
     expect(plan.scenes).toEqual([]);
     expect(plan.manual.length).toBeGreaterThan(0);
   });
 
   it('routes what a model cannot fix to a person', () => {
-    const plan = planRepairs(report([issue({ repair: 'manual_review', check: 'composition' })]), 0);
+    const plan = planRepairs({
+      report: report([issue({ repair: 'manual_review', check: 'composition' })]),
+      attempt: 0,
+    });
     expect(plan.manual).toHaveLength(1);
+    expect(plan.state).toBe('needs_attention');
+  });
+
+  it('does not hold a draft the customer is still changing', () => {
+    const plan = planRepairs({ report: report([issue({})]), attempt: 0, deliverable: false });
+    expect(plan).toMatchObject({ shippable: true, state: 'ready' });
   });
 });
+
+describe('what a repair achieved', () => {
+  const record = (over: Partial<RepairRecord> = {}): RepairRecord => ({
+    id: newId('evt'), issueId: 'evt_1', check: 'still_frame_hold', sceneId: 's1',
+    action: 'trim_hold', attempt: 0, outcome: 'unchanged', costUsd: 0, latencyMs: 0, note: '',
+    ...over,
+  });
+  const finding = (check: QaIssue['check'], sceneId: string | null = 's1'): QaIssue =>
+    QaIssue.parse({ id: newId('evt'), check, severity: 'soft_fail', sceneId, message: 'x' });
+
+  it('calls it fixed when the finding does not come back', () => {
+    const [settled] = settleRepairs({
+      attempted: [record()],
+      before: [finding('still_frame_hold')],
+      after: [],
+      costUsd: 0.4,
+      latencyMs: 20_000,
+    });
+    expect(settled).toMatchObject({ outcome: 'fixed', costUsd: 0.4, latencyMs: 20_000 });
+  });
+
+  it('calls it unchanged when it does, which is what drives the escalation', () => {
+    const [settled] = settleRepairs({
+      attempted: [record()],
+      // A re-render gives the same defect a new id, so matching on the id
+      // would have reported every repair as a success.
+      before: [finding('still_frame_hold')],
+      after: [finding('still_frame_hold')],
+      costUsd: 0,
+      latencyMs: 0,
+    });
+    expect(settled).toMatchObject({ outcome: 'unchanged', note: 'The finding came back.' });
+  });
+
+  it('calls it worse when the pass fixed one thing and broke another', () => {
+    const [settled] = settleRepairs({
+      attempted: [record()],
+      before: [finding('still_frame_hold')],
+      after: [finding('text_overflow', 's2')],
+      costUsd: 0,
+      latencyMs: 0,
+    });
+    expect(settled!.outcome).toBe('worse');
+    expect(settled!.note).toMatch(/introduced 1 new finding/);
+  });
+
+  it('divides one render’s cost and wait across the repairs that shared it', () => {
+    const settled = settleRepairs({
+      attempted: [record(), record({ sceneId: 's2', check: 'text_overflow' })],
+      before: [],
+      after: [],
+      costUsd: 1,
+      latencyMs: 30_000,
+    });
+    expect(settled.map((entry) => entry.costUsd)).toEqual([0.5, 0.5]);
+    expect(settled.map((entry) => entry.latencyMs)).toEqual([15_000, 15_000]);
+  });
+});
+
+/** A scene repair with the bookkeeping the planner fills in. */
+function sceneRepair(over: { sceneId: string; action: SceneRepair['action']; reason: string }): SceneRepair {
+  return { issueId: 'evt_1', check: 'image_artifact', escalated: false, ...over };
+}
 
 describe('applyRepairs', () => {
   it('clears assets and marks the scene pending so new material is fetched', () => {
@@ -261,8 +408,8 @@ describe('applyRepairs', () => {
       scene({ id: 's2', duration: 4, visualType: 'product_ui', assetRefs: ['ast_ok'] }),
     ]);
     const { storyboard, needsProvider } = applyRepairs(original, {
-      scenes: [{ sceneId: 's1', action: 'regenerate_shot', reason: 'artifact' }],
-      manual: [], shippable: false, deadEnd: false,
+      scenes: [sceneRepair(sceneRepair({ sceneId: 's1', action: 'regenerate_shot', reason: 'artifact' }))],
+      film: [], manual: [], state: 'repairing', shippable: false, deadEnd: false,
     });
 
     expect(needsProvider).toEqual([{ sceneId: 's1', action: 'regenerate_shot' }]);
@@ -277,8 +424,8 @@ describe('applyRepairs', () => {
       scene({ id: 's1', duration: 2, visualType: 'kinetic_typography', onScreenText: ['Some words'] }),
     ]);
     const { storyboard } = applyRepairs(original, {
-      scenes: [{ sceneId: 's1', action: 'reduce_duration', reason: 'too short to read' }],
-      manual: [], shippable: false, deadEnd: false,
+      scenes: [sceneRepair(sceneRepair({ sceneId: 's1', action: 'reduce_duration', reason: 'too short to read' }))],
+      film: [], manual: [], state: 'repairing', shippable: false, deadEnd: false,
     });
     expect(storyboard.scenes[0]!.duration).toBeGreaterThan(2);
     expect(storyboard.scenes[0]!.onScreenText).toEqual(['Some words']);
@@ -291,8 +438,8 @@ describe('applyRepairs', () => {
       scene({ id: 's3', duration: 2, visualType: 'logo_reveal' }),
     ]);
     const { storyboard } = applyRepairs(original, {
-      scenes: [{ sceneId: 's2', action: 'remove_scene', reason: 'unfixable' }],
-      manual: [], shippable: false, deadEnd: false,
+      scenes: [sceneRepair({ sceneId: 's2', action: 'remove_scene', reason: 'unfixable' })],
+      film: [], manual: [], state: 'repairing', shippable: false, deadEnd: false,
     });
     expect(storyboard.scenes.map((s) => s.id)).toEqual(['s1', 's3']);
     expect(storyboard.scenes.map((s) => s.startTime)).toEqual([0, 3]);
@@ -562,8 +709,10 @@ describe('scenes that show nothing', () => {
     ]);
 
     const repaired = applyRepairs(storyboard, {
-      scenes: [{ sceneId: 'a', action: 'rewrite_copy', reason: 'unsupported claim' }],
+      scenes: [sceneRepair({ sceneId: 'a', action: 'rewrite_copy', reason: 'unsupported claim' })],
+      film: [],
       manual: [],
+      state: 'repairing',
       shippable: false,
       deadEnd: false,
     });
@@ -583,8 +732,10 @@ describe('scenes that show nothing', () => {
     ]);
 
     const repaired = applyRepairs(storyboard, {
-      scenes: [{ sceneId: 'a', action: 'rewrite_copy', reason: 'unsupported claim' }],
+      scenes: [sceneRepair({ sceneId: 'a', action: 'rewrite_copy', reason: 'unsupported claim' })],
+      film: [],
       manual: [],
+      state: 'repairing',
       shippable: false,
       deadEnd: false,
     });

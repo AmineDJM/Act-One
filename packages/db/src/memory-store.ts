@@ -1002,6 +1002,8 @@ export class MemoryStore implements Store {
       const found = this.tables.qaReports.get(id);
       return found && found.organizationId === organizationId ? found : null;
     },
+    update: async (organizationId: string, id: string, patch: Partial<QaReport>) =>
+      this.patch(this.tables.qaReports, organizationId, id, patch, 'QA report'),
     getForRender: async (organizationId: string, renderId: string) =>
       this.scoped(this.tables.qaReports, organizationId)
         .filter((r) => r.renderId === renderId)

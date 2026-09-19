@@ -33,6 +33,11 @@ import {
   type SpeechQuality,
   directVoice,
   type FilmCut,
+  type QaIssue,
+  type RepairRecord,
+  type RepairAction,
+  type ReleaseState,
+  releaseDecision,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
@@ -78,6 +83,9 @@ import {
   verdictIssues,
   verifyMaster,
   type SpokenLine,
+  beginRepair,
+  settleRepairs,
+  retimeCaptionsToSpeech,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
@@ -234,9 +242,29 @@ export async function runRender(
     let captions: FilmCaptions = NO_CAPTIONS;
     const maxAttempts = options.maxRepairAttempts ?? 2;
 
+    /*
+     * The repair record.
+     *
+     * What was wrong, what was tried, whether it worked, and what it cost in
+     * money and in the customer's waiting. None of this was kept before, so
+     * "did the loop help" and "what does a repair cost us" were both
+     * unanswerable, and the Quality page could only count defects rather than
+     * whether they were being fixed.
+     */
+    const repairs: RepairRecord[] = [];
+    let attempted: RepairRecord[] = [];
+    let previousFindings: QaIssue[] = [];
+    let filmRepairs: RepairAction[] = [];
+    let extraCostUsd = 0;
+    let extraLatencyMs = 0;
+    let releaseState: ReleaseState = 'generating';
+    let costBeforePass = await store.costs.totalForProject(organizationId, project.id);
+    let passStartedAt = Date.now();
+
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
       const rendered = await renderOnce(context, {
         render,
+        filmRepairs,
         storyboard: current,
         brand,
         system,
@@ -324,9 +352,44 @@ export async function runRender(
         organizationId,
       );
 
-      const plan = planRepairs(report, attempt, maxAttempts);
+      /*
+       * What the last pass's repairs actually achieved.
+       *
+       * Settled here rather than when they were applied, because the only
+       * evidence a repair worked is that its finding did not come back — and
+       * that is not knowable until the film has been rendered and inspected
+       * again. The cost and the wait are divided across the repairs of that
+       * pass, which is the honest attribution when they shared a render.
+       */
+      if (attempted.length > 0) {
+        const settled = settleRepairs({
+          attempted,
+          before: previousFindings,
+          after: findings,
+          costUsd: Math.max(0, (await store.costs.totalForProject(organizationId, project.id)) - costBeforePass),
+          latencyMs: Date.now() - passStartedAt,
+        });
+        repairs.push(...settled);
+        extraCostUsd += settled.reduce((sum, record) => sum + record.costUsd, 0);
+        extraLatencyMs += Date.now() - passStartedAt;
+        attempted = [];
+      }
+      previousFindings = findings;
+
+      const plan = planRepairs({ report, attempt, maxAttempts, history: repairs, deliverable: kind !== 'animatic' });
+
       if (plan.shippable || plan.deadEnd) {
-        await store.renders.update(organizationId, render.id, { qaReportId: report.id });
+        releaseState = plan.state;
+        await store.qaReports.update?.(organizationId, report.id, {
+          state: plan.state,
+          repairs,
+          extraCostUsd: round3(extraCostUsd),
+          extraLatencyMs,
+        });
+        await store.renders.update(organizationId, render.id, {
+          qaReportId: report.id,
+          status: plan.state === 'ready' ? 'qa' : 'needs_attention',
+        });
         // Whatever was being refined is finished, one way or the other.
         if (attempt > 0) {
           await context.activity({ step: 'motion', kind: 'refine', label: 'shots refined', status: 'done' });
@@ -335,24 +398,38 @@ export async function runRender(
       }
 
       /*
-       * Not a failure: the film was inspected, some shots did not meet the
-       * standard, and they are being directed again. The customer is told
-       * exactly that — "Refining this shot" — rather than nothing, and never
-       * an error.
+       * Not a failure: the film was inspected, some of it did not meet the
+       * standard, and it is being worked on again. The customer is told what
+       * is happening in the words of the work — "Repairing timing", "Improving
+       * the audio mix" — and never in the words of the checker.
        */
-      await context.progress(0.8, `Refining ${plan.scenes.length} shot${plan.scenes.length === 1 ? '' : 's'}`);
+      releaseState = 'repairing';
+      const total = plan.scenes.length + plan.film.length;
+      await store.renders.update(organizationId, render.id, { status: 'repairing' });
+      await context.progress(0.8, repairHeadline(plan));
       await context.activity({
         step: 'motion',
         kind: 'refine',
-        label: `refining ${plan.scenes.length} shot${plan.scenes.length === 1 ? '' : 's'}`,
-        detail: 'The shot did not meet the standard, so it is being directed again.',
+        label: `${repairHeadline(plan).toLowerCase()} (${total})`,
+        detail: 'It did not meet the standard, so it is being worked on again.',
         status: 'active',
       });
+
+      for (const repair of plan.scenes) {
+        attempted.push(beginRepair({ ...repair, attempt }));
+      }
+      for (const repair of plan.film) {
+        attempted.push(beginRepair({ ...repair, sceneId: null, attempt }));
+      }
+
       // Only what broke. Re-rendering everything would change scenes the
       // customer already approved.
-      const applied = applyRepairs(current, plan);
+      const applied = applyRepairs(current, plan, { issues: findings });
       current = applied.storyboard;
       await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
+      filmRepairs = plan.film.map((repair) => repair.action);
+      costBeforePass = await store.costs.totalForProject(organizationId, project.id);
+      passStartedAt = Date.now();
     }
 
     await context.progress(0.93, 'Checking the file will play');
@@ -449,16 +526,37 @@ export async function runRender(
      *
      * The issues are returned either way, and the storyboard shows them.
      */
-    const blocked = issues.some((issue) => issue.severity === 'hard_fail');
-    const passed = !blocked || kind === 'animatic';
+    /*
+     * The gate, on the bytes that are about to be delivered.
+     *
+     * One function decides this, the same one the loop consulted on every
+     * pass, so "may this ship" has exactly one answer in this codebase. Ready
+     * requires nothing hard or critical outstanding; a warning may remain, and
+     * a soft fail may remain only because the loop already tried and could not
+     * repair it, which is recorded rather than ignored.
+     */
+    const gate = releaseDecision({
+      issues: normalizeFindings(issues),
+      attempt: maxAttempts,
+      maxAttempts,
+      deliverable: kind !== 'animatic',
+    });
+    const passed = gate.state === 'ready';
     await store.renders.update(organizationId, render.id, {
-      status: passed ? 'completed' : 'failed',
+      /*
+       * `needs_attention`, not `failed`.
+       *
+       * The film exists and is not good enough, which is a different thing
+       * from the render throwing — and a customer can be told the difference.
+       * Both used to read as failed.
+       */
+      status: passed ? 'completed' : 'needs_attention',
       masterAssetId: master.asset.id,
       posterAssetId: posterAsset?.asset.id ?? null,
       captionsAssetId: captionAsset?.asset.id ?? null,
       durationSeconds: storyboardDuration(current),
       completedAt: new Date().toISOString(),
-      ...(passed ? {} : { error: 'Quality checks did not pass.' }),
+      ...(passed ? {} : { error: gate.reason || 'Quality checks did not pass.' }),
     });
 
     await store.projects.update(
@@ -486,13 +584,13 @@ export async function runRender(
     await context.activity({
       step: 'composition',
       kind: 'step',
-      label: blocked ? 'finished, with issues to look at' : 'film mastered and saved',
+      label: gate.blocking.length > 0 ? 'finished, with issues to look at' : 'film mastered and saved',
       status: 'done',
     });
-    await context.progress(1, blocked ? 'Finished with issues' : 'Done');
+    await context.progress(1, gate.blocking.length > 0 ? 'Finished with issues' : 'Done');
     // The honest QA result, not the delivery decision above: an animatic that
     // completes with blockers still has blockers, and the caller is told so.
-    return { renderId: render.id, assetId: master.asset.id, qaPassed: !blocked, issues };
+    return { renderId: render.id, assetId: master.asset.id, qaPassed: gate.blocking.length === 0, issues };
   } catch (error) {
     await store.renders.update(organizationId, render.id, {
       status: 'failed',
@@ -584,6 +682,49 @@ async function assertProductIsReal(context: StageContext, storyboard: Storyboard
   }
 }
 
+/**
+ * What the customer is told while a repair runs.
+ *
+ * In the words of the work, not the words of the checker. "Optimising
+ * captions" is something a post-production house says; "caption_onset
+ * soft_fail x2" is something only this codebase should ever see. The
+ * obsessiveness is internal — what reaches the person who paid is that their
+ * film is being looked after.
+ */
+function repairHeadline(plan: { scenes: { action: RepairAction }[]; film: { action: RepairAction }[] }): string {
+  const actions = [...plan.film.map((r) => r.action), ...plan.scenes.map((r) => r.action)];
+  const first = actions[0];
+  switch (first) {
+    case 'retime_captions':
+    case 'reposition_captions':
+      return 'Optimising the captions';
+    case 'retime_scene':
+    case 'trim_hold':
+    case 'reduce_duration':
+      return 'Repairing the timing';
+    case 'remix_audio':
+    case 'realign_audio':
+    case 'refade_audio':
+      return 'Improving the audio mix';
+    case 'replan_opening':
+      return 'Rebuilding the opening beat';
+    case 'alternate_provider':
+    case 'alternate_archetype':
+      return 'Trying a different approach to a shot';
+    default: {
+      const count = plan.scenes.length;
+      return `Refining ${count} shot${count === 1 ? '' : 's'}`;
+    }
+  }
+}
+
+/** How much of the tail the fade repair covers. */
+const TAIL_FADE_REPAIR_SECONDS = 0.25;
+
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
 async function renderOnce(
   context: StageContext,
   params: {
@@ -600,6 +741,8 @@ async function renderOnce(
     voice: VoiceTerms;
     /** Whether this cut wears its captions in the picture. */
     burnCaptions: boolean;
+    /** Film-level repairs this pass must carry out. Empty on the first pass. */
+    filmRepairs?: readonly RepairAction[];
   },
 ): Promise<{
   path: string;
@@ -652,12 +795,22 @@ async function renderOnce(
     status: voiceTracks.length > 0 || storyboard.voiceStrategy === 'none' ? 'done' : 'skipped',
   });
 
-  const captions = await captionFilm(context, {
+  const built = await captionFilm(context, {
     tracks: voiceTracks,
     language: storyboard.language ?? context.project.brief.language ?? null,
     filmSeconds: storyboardDuration(storyboard),
     boundaries: storyboard.scenes.map((scene) => scene.startTime).filter((at) => at > 0),
   });
+  /*
+   * The repair the timing checks ask for, carried out.
+   *
+   * Only when the loop asked: cues estimated from a script are usually right,
+   * and snapping every film's captions onto the measured speech would throw
+   * away good timing along with bad.
+   */
+  const captions: FilmCaptions = params.filmRepairs?.includes('retime_captions')
+    ? { ...built, cues: retimeCaptionsToSpeech({ cues: built.cues, spoken, fps: DEFAULT_FPS }) }
+    : built;
   if (captions.cues.length > 0) {
     await context.activity({
       step: 'voice',
@@ -740,12 +893,34 @@ async function renderOnce(
   });
   await context.progress(0.62, 'Designing the sound');
 
-  const design = directSound({
+  const directed = directSound({
     storyboard,
     behaviour: system.sound,
     channel: params.aspect === '9:16' ? 'social' : 'web',
     hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
   });
+
+  /*
+   * A film that ends rather than stops.
+   *
+   * The repair for `abrupt_music_end`, and it belongs to the bed rather than
+   * to a scene: the tail is a property of the track. A quarter second is long
+   * enough to read as an ending and short enough that nothing is lost.
+   *
+   * A film with no music cannot be repaired this way, and nothing here
+   * pretends otherwise — the finding comes back on the next pass, the loop
+   * escalates it, and a person is asked.
+   */
+  const design =
+    params.filmRepairs?.includes('refade_audio') && directed.music
+      ? {
+          ...directed,
+          music: {
+            ...directed.music,
+            fadeOutSeconds: Math.max(directed.music.fadeOutSeconds ?? 0, TAIL_FADE_REPAIR_SECONDS),
+          },
+        }
+      : directed;
 
   // A film with no whoosh is still a film, so a missing asset never fails the
   // render — but it is reported, and the caller turns it into a QA finding.

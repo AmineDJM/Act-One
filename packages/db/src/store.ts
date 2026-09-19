@@ -379,6 +379,14 @@ export interface QaReportRepo {
   get(organizationId: string, id: string): Promise<QaReport | null>;
   getForRender(organizationId: string, renderId: string): Promise<QaReport | null>;
   /**
+   * Settles a report once the pass it describes is over.
+   *
+   * A report is written when the findings are known and the repairs it
+   * provokes are only knowable afterwards, so the state, the attempts and what
+   * they cost are filled in at the end rather than guessed at the start.
+   */
+  update(organizationId: string, id: string, patch: Partial<QaReport>): Promise<QaReport>;
+  /**
    * Every report, newest first, across every workspace. Operator-facing: what
    * the product thinks of the films it has made, which is the only measurement
    * of the quality bar it exists to hold.

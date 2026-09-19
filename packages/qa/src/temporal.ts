@@ -363,6 +363,72 @@ export function abruptEndIssue(params: {
   ];
 }
 
+// --- repair --------------------------------------------------------------
+
+/**
+ * Snaps every caption onto the speech it captions.
+ *
+ * The deterministic repair for the onset and offset findings above: the cue
+ * keeps its words and takes its times from where the words actually are, with
+ * a frame of lead so it is never ahead of the line. A cue with no speech under
+ * it — a title card, an end plate — is left exactly as it was, because there
+ * is nothing to snap it to and moving it would be guessing.
+ *
+ * Pure, and it returns a new list: a repair that mutated the cues in place
+ * could not be compared against what it replaced.
+ */
+export function retimeCaptionsToSpeech(params: {
+  cues: readonly CaptionCue[];
+  spoken: readonly SpokenLine[];
+  fps: number;
+}): CaptionCue[] {
+  if (params.spoken.length === 0) return [...params.cues];
+  const frame = params.fps > 0 ? 1 / params.fps : 0.04;
+
+  const retimed = params.cues.map((cue) => {
+    const line = bestOverlapLine(params.spoken, cue);
+    if (!line) return cue;
+    // One frame early, deliberately: a caption level with the first syllable
+    // reads as late, and a whole frame is inside the published tolerance.
+    const start = Math.max(0, round3(line.startsAt - frame));
+    const end = round3(Math.max(start + MIN_CUE_SECONDS, line.endsAt));
+    return { ...cue, start, end };
+  });
+
+  /*
+   * Then the overlaps the snapping may have created.
+   *
+   * Two lines spoken close together can be snapped onto windows that touch,
+   * and an overlap is a hard fail — so the earlier cue gives way, never the
+   * later one, because the later one is sitting on speech that is happening.
+   */
+  const ordered = [...retimed].sort((left, right) => left.start - right.start);
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = ordered[index - 1]!;
+    const current = ordered[index]!;
+    if (previous.end > current.start) {
+      ordered[index - 1] = { ...previous, end: round3(Math.max(previous.start + MIN_CUE_SECONDS, current.start - frame)) };
+    }
+  }
+  return ordered;
+}
+
+/** Below this a cue is on screen too briefly to read at all. */
+const MIN_CUE_SECONDS = 0.7;
+
+function bestOverlapLine(lines: readonly SpokenLine[], cue: CaptionCue): SpokenLine | null {
+  let best: SpokenLine | null = null;
+  let bestOverlapSeconds = 0;
+  for (const line of lines) {
+    const overlap = Math.min(cue.end, line.endsAt) - Math.max(cue.start, line.startsAt);
+    if (overlap > bestOverlapSeconds) {
+      bestOverlapSeconds = overlap;
+      best = line;
+    }
+  }
+  return best;
+}
+
 // --- measurement ---------------------------------------------------------
 
 /**

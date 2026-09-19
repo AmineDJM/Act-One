@@ -27,6 +27,14 @@ export const RenderStatus = z.enum([
   'sound',
   'qa',
   'repairing',
+  /**
+   * The film exists and is not good enough to deliver.
+   *
+   * Distinct from `failed`, which is the render throwing. A customer can be
+   * told the difference between "something broke" and "we are not happy with
+   * this", and before this they could not: both read as failed.
+   */
+  'needs_attention',
   'completed',
   'failed',
   'canceled',
