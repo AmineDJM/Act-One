@@ -32,6 +32,7 @@ import {
   type Storyboard,
   type SpeechQuality,
   directVoice,
+  type FilmCut,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
@@ -49,26 +50,34 @@ import {
   DEFAULT_LIBRARY,
 } from '@act-one/sound';
 import {
+  abruptEndIssue,
   applyRepairs,
+  buildContactSheet,
+  captionSyncIssues,
+  colourShares,
+  deadAirIssues,
+  distributionIssues,
   factCheck,
   flashIssues,
+  heldFrameIssues,
   inspectFrame,
   isFullRange,
-  planRepairs,
-  relativeLuminance,
-  colourShares,
-  distributionIssues,
+  levelJumpIssues,
+  measureFilm,
   parseFrameStats,
+  planRepairs,
   rangeIssues,
   redFlashIssues,
-  redness,
-  buildContactSheet,
   redirectFor,
+  redness,
+  relativeLuminance,
   reviewCut,
   runDeterministicChecks,
   selectFramesToInspect,
+  speechDriftIssues,
   verdictIssues,
   verifyMaster,
+  type SpokenLine,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
@@ -252,6 +261,11 @@ export async function runRender(
         skipVision: options.skipVisionQa ?? false,
         understanding,
         attempt,
+        captions: rendered.captions,
+        spoken: rendered.spoken,
+        cut,
+        fps: DEFAULT_FPS,
+        durationSeconds: storyboardDuration(current),
       });
 
       /*
@@ -587,7 +601,14 @@ async function renderOnce(
     /** Whether this cut wears its captions in the picture. */
     burnCaptions: boolean;
   },
-): Promise<{ path: string; missingAudio: string[]; soundIssues: QaFinding[]; captions: FilmCaptions }> {
+): Promise<{
+  path: string;
+  missingAudio: string[];
+  soundIssues: QaFinding[];
+  captions: FilmCaptions;
+  /** Where each line landed in the finished file, for the temporal checks. */
+  spoken: SpokenLine[];
+}> {
   const { storyboard, brand, system } = params;
 
   /*
@@ -604,6 +625,21 @@ async function renderOnce(
   await context.activity({ step: 'voice', kind: 'step', label: 'reading the narration', status: 'active' });
   const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
   const voiceTracks = narration.tracks;
+  /*
+   * Where the words actually are, as opposed to where the plan put them.
+   *
+   * A track is placed at its scene's start, but the file begins with however
+   * much silence the engine left at the head, so the speech starts later than
+   * the track does. The temporal checks compare captions and cuts against
+   * this, not against the plan — the plan is what was intended, and the whole
+   * point of these checks is to catch the gap between the two.
+   */
+  const spoken: SpokenLine[] = voiceTracks.map((track) => ({
+    sceneId: track.sceneId,
+    startsAt: track.atSeconds + track.headSilenceSeconds,
+    endsAt: track.atSeconds + track.durationSeconds - track.tailSilenceSeconds,
+    text: track.text,
+  }));
   await context.activity({
     step: 'voice',
     kind: 'step',
@@ -827,7 +863,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -857,10 +893,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken };
 }
 
 /**
@@ -991,6 +1027,62 @@ async function mux(
   return { path: muxed.ok ? masterPath : silentPath, missingAudio };
 }
 
+/**
+ * The temporal pass.
+ *
+ * One measurement of the master, then the arithmetic. Everything here is a
+ * defect that the plan cannot contain and only the render can produce, which
+ * is why it runs on the file rather than on the storyboard.
+ *
+ * A measurement that fails reports nothing rather than failing the film: the
+ * checks exist to catch defects, not to become one.
+ */
+async function checkTiming(
+  context: StageContext,
+  params: {
+    storyboard: Storyboard;
+    masterPath: string;
+    workDir: string;
+    captions: FilmCaptions;
+    spoken: readonly SpokenLine[];
+    cut: FilmCut;
+    fps: number;
+    durationSeconds: number;
+  },
+): Promise<QaFinding[]> {
+  const issues: QaFinding[] = [
+    ...captionSyncIssues({ cues: params.captions.cues, spoken: params.spoken, fps: params.fps }),
+    ...speechDriftIssues({ spoken: params.spoken, scenes: params.storyboard.scenes }),
+  ];
+
+  try {
+    const measured = await measureFilm(params.masterPath, {
+      ...(context.signal ? { signal: context.signal } : {}),
+      workDir: params.workDir,
+    });
+    issues.push(
+      ...heldFrameIssues({
+        freezes: measured.freezes,
+        scenes: params.storyboard.scenes,
+        cut: params.cut,
+        fps: params.fps,
+      }),
+      ...deadAirIssues({
+        silences: measured.silences,
+        durationSeconds: params.durationSeconds,
+        cut: params.cut,
+        scenes: params.storyboard.scenes,
+      }),
+      ...levelJumpIssues(measured.windows),
+      ...abruptEndIssue({ tailPeakDb: measured.tailPeakDb, durationSeconds: params.durationSeconds }),
+    );
+  } catch (error) {
+    console.error('[render] timing measurement failed:', (error as Error).message);
+  }
+
+  return issues;
+}
+
 async function inspect(
   context: StageContext,
   params: {
@@ -1003,6 +1095,13 @@ async function inspect(
     understanding: ProductUnderstanding | null;
     /** Which pass this is. The director only sends a shot back on the first. */
     attempt: number;
+    /** The captions as they will ship, for the checks that read a clock. */
+    captions: FilmCaptions;
+    /** Where each line was actually spoken, head silence already removed. */
+    spoken: readonly SpokenLine[];
+    cut: FilmCut;
+    fps: number;
+    durationSeconds: number;
   },
 ): Promise<QaFinding[]> {
   const { registry, project, organizationId } = context;
@@ -1040,6 +1139,17 @@ async function inspect(
       }),
     );
   }
+
+  /*
+   * The clock, on the file itself.
+   *
+   * Everything above decides from the plan or from one frame. These are
+   * measured out of the finished master — frozen frames, holes in the track,
+   * loudness moving between windows, a tail that stops rather than ends —
+   * because they are exactly the defects that are correct in the plan and
+   * wrong in the render.
+   */
+  issues.push(...(await checkTiming(context, params)));
 
   if (params.skipVision) return issues;
 
@@ -1244,6 +1354,8 @@ async function speakNarration(
 ): Promise<{
   tracks: {
     path: string;
+    /** The scene this line belongs to, so its timing can be judged against it. */
+    sceneId: string | null;
     atSeconds: number;
     durationSeconds: number;
     headSilenceSeconds: number;
@@ -1303,6 +1415,7 @@ async function speakNarration(
     return {
       tracks: result.tracks.map((track) => ({
         path: track.path,
+        sceneId: track.sceneId ?? null,
         atSeconds: track.atSeconds,
         durationSeconds: track.durationSeconds,
         // Carried for the captions: where the words start inside the file, and
