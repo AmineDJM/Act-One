@@ -751,3 +751,31 @@
 .orderTools { display: inline-flex; gap: var(--space-1); }
 .orderTools .btn { height: 30px; padding: 0 10px; }
 @media (max-width: 720px) { .entryHead { grid-template-columns: 1fr; } }
+
+/*
+ * The quality breakdowns, side by side.
+ *
+ * Six small tallies read as one picture when they sit in a grid and as a long
+ * scroll when they stack — and the whole point of them is comparing one
+ * dimension against another.
+ */
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface-raised);
+  padding: var(--space-4);
+}
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.panelHead h3 { font-size: 0.95rem; letter-spacing: -0.01em; }

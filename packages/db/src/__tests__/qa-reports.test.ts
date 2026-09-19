@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   Concept,
   QaIssue,
+  QaReport,
   CreativeTreatment,
   Storyboard,
   newId,
   type NewOrganization,
   type Project,
-  type QaReport,
   type Render,
   type User,
 } from '@act-one/core';
@@ -119,22 +119,14 @@ async function filmed(store: Store, name: string) {
 }
 
 function report(projectId: string, renderId: string, over: Partial<QaReport> = {}): QaReport {
-  return {
+  return QaReport.parse({
     id: newId('ast'),
     renderId,
     projectId,
     passed: true,
-    state: 'ready',
-    attempt: 0,
-    issues: [],
-    repairs: [],
-    extraCostUsd: 0,
-    extraLatencyMs: 0,
-    layers: [],
-    framesInspected: 0,
     createdAt: new Date().toISOString(),
     ...over,
-  };
+  });
 }
 
 function issue(check: QaIssue['check'], severity: QaIssue['severity']): QaIssue {

@@ -1,4 +1,4 @@
-import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, Referral as ReferralSchema } from '@act-one/core';
+import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, QaReport as QaReportSchema, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
   AppError,
@@ -54,8 +54,8 @@ import type {
   ProductCredential,
   ProductUnderstanding,
   Project,
-  ProjectStage,
   QaReport,
+  ProjectStage,
   Render,
   ResearchSource,
   RevisionRequest,
@@ -1584,7 +1584,7 @@ export class PgStore implements Store {
           id,
           organizationId,
         ]);
-        return (r.rows[0]?.['data'] as QaReport) ?? null;
+        return r.rows[0] ? toQaReport(r.rows[0]['data']) : null;
       }),
 
     update: async (organizationId: string, id: string, patch: Partial<QaReport>) =>
@@ -1593,7 +1593,7 @@ export class PgStore implements Store {
           id,
           organizationId,
         ]);
-        const current = existing.rows[0]?.['data'] as QaReport | undefined;
+        const current = existing.rows[0] ? toQaReport(existing.rows[0]['data']) : undefined;
         if (!current) throw new AppError('not_found', 'QA report not found.');
         const next = { ...current, ...patch };
         await c.query(
@@ -1610,7 +1610,7 @@ export class PgStore implements Store {
            ORDER BY created_at DESC LIMIT 1`,
           [renderId, organizationId],
         );
-        return (r.rows[0]?.['data'] as QaReport) ?? null;
+        return r.rows[0] ? toQaReport(r.rows[0]['data']) : null;
       }),
 
     list: async (limit = 200) =>
@@ -1620,7 +1620,7 @@ export class PgStore implements Store {
           [limit],
         );
         return r.rows.map((row) => ({
-          ...(row['data'] as QaReport),
+          ...toQaReport(row['data']),
           organizationId: row['organization_id'] as string,
         }));
       }),
@@ -3146,6 +3146,67 @@ function toSubscription(row: Row): Subscription {
 
 /** Thrown inside the ledger transaction to roll it back. Never escapes. */
 class LedgerNotApplied extends Error {}
+
+/**
+ * Reports written in the old words, read in the new ones.
+ *
+ * Severity used to be note/minor/major/blocker and the timecode used to be
+ * `atSeconds`. Discarding those rows would have been the easy answer and the
+ * wrong one: the Quality console exists to count defects across every film the
+ * platform has made, and a console that forgets everything from before the
+ * rename measures the rename rather than the quality.
+ */
+function migrateQaReport(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data;
+  const report = data as { issues?: unknown };
+  if (!Array.isArray(report.issues)) return data;
+
+  const SEVERITY: Record<string, string> = {
+    blocker: 'hard_fail',
+    major: 'soft_fail',
+    minor: 'warning',
+    note: 'info',
+  };
+
+  return {
+    ...report,
+    issues: report.issues.map((raw) => {
+      if (!raw || typeof raw !== 'object') return raw;
+      const issue = raw as Record<string, unknown>;
+      const severity = typeof issue['severity'] === 'string' ? issue['severity'] : '';
+      const migrated: Record<string, unknown> = { ...issue };
+      if (SEVERITY[severity]) migrated['severity'] = SEVERITY[severity];
+      if (migrated['timecodeStart'] === undefined && issue['atSeconds'] !== undefined) {
+        migrated['timecodeStart'] = issue['atSeconds'];
+      }
+      return migrated;
+    }),
+  };
+}
+
+/**
+ * A stored report, read back through its schema.
+ *
+ * The JSONB was cast straight to the type, which is a promise rather than a
+ * check: a report written before a field existed comes back missing it, and
+ * the first page that reads the field crashes on a row nobody can see. Parsing
+ * fills the defaults, so an old report reads as one with nothing to say rather
+ * than as a broken one.
+ */
+function toQaReport(data: unknown): QaReport {
+  const parsed = QaReportSchema.safeParse(migrateQaReport(data));
+  if (parsed.success) return parsed.data;
+  // A row we cannot read at all is worth knowing about and is not worth
+  // failing a page for.
+  console.error('[db] unreadable QA report:', parsed.error.message.slice(0, 200));
+  return QaReportSchema.parse({
+    id: (data as { id?: string })?.id ?? 'unknown',
+    renderId: (data as { renderId?: string })?.renderId ?? 'unknown',
+    projectId: (data as { projectId?: string })?.projectId ?? 'unknown',
+    passed: false,
+    createdAt: (data as { createdAt?: string })?.createdAt ?? new Date(0).toISOString(),
+  });
+}
 
 function toCreditEntry(row: Row): CreditLedgerEntry {
   return {

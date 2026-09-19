@@ -346,6 +346,13 @@ export async function runRender(
           extraCostUsd: 0,
           extraLatencyMs: 0,
           layers: [],
+          // What was being made, so the console can break failures down by it
+          // without joining back to a project that may have changed since.
+          cut,
+          format: project.brief.filmFormat,
+          renderKind: kind,
+          durationSeconds: storyboardDuration(current),
+          shots: current.scenes.map((scene) => ({ sceneId: scene.id, archetype: scene.visualType })),
           framesInspected: findings.length,
           createdAt: new Date().toISOString(),
         },

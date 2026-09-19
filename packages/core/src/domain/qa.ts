@@ -354,6 +354,20 @@ export const QaReport = z.object({
   extraLatencyMs: z.number().int().min(0).default(0),
   /** Which layers actually ran. A layer that was skipped proved nothing. */
   layers: z.array(QaLayer).default([]),
+  /*
+   * What was being made, kept with the verdict.
+   *
+   * Denormalised on purpose: a report is a fact about a film at a moment, and
+   * a breakdown by format or by archetype has to say what the film was when it
+   * was judged, not what its project says today. It also means the whole of
+   * the quality intelligence can be computed from these rows alone.
+   */
+  cut: z.string().default('feature'),
+  format: z.string().default('product_tour'),
+  renderKind: z.string().default('film'),
+  durationSeconds: z.number().min(0).default(0),
+  /** The shots this film was made of, so a defect can be traced to a kind of shot. */
+  shots: z.array(z.object({ sceneId: z.string(), archetype: z.string() })).default([]),
   framesInspected: z.number().int().min(0).default(0),
   createdAt: z.string(),
 });
