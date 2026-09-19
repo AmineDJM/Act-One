@@ -91,10 +91,14 @@ services:
     # which costs more than the larger instance would have.
     plan: pro
     region: frankfurt
-    # Both browsers are installed at build time — Playwright's Chromium for
-    # research and Remotion's chrome-headless-shell for rendering — so the
-    # first job does not begin with a download.
-    buildCommand: npm ci --include=dev && npm run browsers
+    # Everything the worker shells out to is installed at build time, so the
+    # first job does not begin with a download and a host with no egress at
+    # run time still works: Playwright's Chromium for research, Remotion's
+    # chrome-headless-shell for rendering, and Blender for the 3D shots. A
+    # managed Node build has no root and therefore no package manager, so
+    # Blender is the official self-contained build rather than an apt package.
+    # Without it every 3D shot quietly degrades to a flat capture.
+    buildCommand: npm ci --include=dev && npm run browsers && npm run blender
     startCommand: npm run worker
     autoDeploy: true
     envVars:

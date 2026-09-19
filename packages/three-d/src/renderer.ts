@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, constants, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildBlenderScript } from './script.ts';
 import { estimateRenderSeconds, normaliseScene, type ThreeDScene } from './rigs.ts';
 
@@ -16,6 +17,45 @@ import { estimateRenderSeconds, normaliseScene, type ThreeDScene } from './rigs.
 export type BlenderResult =
   | { ok: true; frameDir: string; frameCount: number; elapsedMs: number }
   | { ok: false; error: string; elapsedMs: number };
+
+/**
+ * Where Blender is, without anybody having to say.
+ *
+ * The same order ffmpeg resolves in, for the same reason: a host that ships
+ * its own wins, then the copy the build downloaded, then whatever is on PATH
+ * for a developer who installed it themselves. Configuration is the fallback
+ * here rather than the mechanism, because a worker that needs an environment
+ * variable set to do 3D is a worker that silently does no 3D the first time
+ * somebody forgets.
+ */
+const INSTALLED = path.join(
+  path.resolve(fileURLToPath(new URL('../../..', import.meta.url))),
+  'node_modules',
+  '.blender',
+  'blender',
+);
+
+/** Only the filesystem probe is remembered; the environment stays live. */
+let downloaded: string | false | null = null;
+
+export async function resolveBlender(override?: string): Promise<string> {
+  if (override) return override;
+
+  const configured = process.env.ACT_ONE_BLENDER_PATH;
+  if (configured) return configured;
+
+  if (downloaded === null) {
+    try {
+      await access(INSTALLED, constants.X_OK);
+      downloaded = INSTALLED;
+    } catch {
+      // Not downloaded in this deployment; fall through to PATH.
+      downloaded = false;
+    }
+  }
+
+  return downloaded === false ? 'blender' : downloaded;
+}
 
 export type RenderOptions = {
   scene: unknown;
@@ -35,7 +75,7 @@ export async function renderThreeDScene(options: RenderOptions): Promise<Blender
     console.warn('[three-d] adjusted scene:', adjustments.join(' '));
   }
 
-  const blender = options.blenderPath ?? process.env.ACT_ONE_BLENDER_PATH ?? 'blender';
+  const blender = await resolveBlender(options.blenderPath);
   const workDir = await mkdtemp(path.join(tmpdir(), 'act-one-3d-'));
   const outputDir = options.outputDir ?? path.join(workDir, 'frames');
   const scriptPath = path.join(workDir, 'scene.py');
@@ -160,7 +200,7 @@ function run(
 }
 
 export async function isBlenderAvailable(blenderPath?: string): Promise<boolean> {
-  const command = blenderPath ?? process.env.ACT_ONE_BLENDER_PATH ?? 'blender';
+  const command = await resolveBlender(blenderPath);
   return new Promise((resolve) => {
     const child = spawn(command, ['--version'], { stdio: 'ignore' });
     child.on('error', () => resolve(false));
