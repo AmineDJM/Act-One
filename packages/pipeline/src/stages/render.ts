@@ -21,7 +21,9 @@ import {
   type AspectRatio,
   type BrandSystem,
   type ProductUnderstanding,
-  type QaIssue,
+  normalizeFindings,
+  blocksRelease,
+  type QaFinding,
   type Render,
   type RenderKind,
   type RenderQuality,
@@ -119,7 +121,7 @@ export type RenderOptions = {
 export async function runRender(
   context: StageContext,
   options: RenderOptions,
-): Promise<{ renderId: string; assetId: string; qaPassed: boolean; issues: QaIssue[] }> {
+): Promise<{ renderId: string; assetId: string; qaPassed: boolean; issues: QaFinding[] }> {
   const { store, registry, project, organizationId } = context;
   /*
    * The master is composed in its own cut's frame.
@@ -213,7 +215,7 @@ export async function runRender(
 
   try {
     let current = storyboard;
-    let issues: QaIssue[] = [];
+    let issues: QaFinding[] = [];
     let masterPath = '';
     /*
      * From the last attempt, not the first: a repair re-reads the shots it
@@ -266,11 +268,11 @@ export async function runRender(
           {
             id: newId('evt'),
             sceneId: null,
-            atSeconds: null,
+            timecodeStart: null,
             detectedBy: 'deterministic',
             evidenceAssetId: null,
             check: 'missing_audio',
-            severity: 'major',
+            severity: 'soft_fail',
             message:
               `The sound library is missing ${rendered.missingAudio.length} file(s), so this film ` +
               `is silent where it was scored. Run \`npm run sound-library\`. ` +
@@ -281,15 +283,28 @@ export async function runRender(
         ];
       }
 
+      /*
+       * Loose findings become real ones here, once.
+       *
+       * Every check hands back what it knows and leaves the rest alone; this
+       * is where the defaults are filled and each check is stamped with the
+       * layer it belongs to, so nothing downstream has to guess.
+       */
+      const findings = normalizeFindings(issues);
       const report = await store.qaReports.create(
         {
           id: newId('ast'),
           renderId: render.id,
           projectId: project.id,
-          passed: !issues.some((issue) => issue.severity === 'blocker'),
-          issues,
-          repairActions: [],
-          framesInspected: issues.length,
+          passed: !findings.some((issue) => blocksRelease(issue.severity)),
+          state: 'analyzing',
+          attempt,
+          issues: findings,
+          repairs: [],
+          extraCostUsd: 0,
+          extraLatencyMs: 0,
+          layers: [],
+          framesInspected: findings.length,
           createdAt: new Date().toISOString(),
         },
         organizationId,
@@ -420,7 +435,7 @@ export async function runRender(
      *
      * The issues are returned either way, and the storyboard shows them.
      */
-    const blocked = issues.some((issue) => issue.severity === 'blocker');
+    const blocked = issues.some((issue) => issue.severity === 'hard_fail');
     const passed = !blocked || kind === 'animatic';
     await store.renders.update(organizationId, render.id, {
       status: passed ? 'completed' : 'failed',
@@ -572,7 +587,7 @@ async function renderOnce(
     /** Whether this cut wears its captions in the picture. */
     burnCaptions: boolean;
   },
-): Promise<{ path: string; missingAudio: string[]; soundIssues: QaIssue[]; captions: FilmCaptions }> {
+): Promise<{ path: string; missingAudio: string[]; soundIssues: QaFinding[]; captions: FilmCaptions }> {
   const { storyboard, brand, system } = params;
 
   /*
@@ -771,7 +786,7 @@ async function renderOnce(
     durationSeconds: storyboardDuration(storyboard),
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
-  const soundIssues: QaIssue[] = [...narration.issues, ...captions.issues];
+  const soundIssues: QaFinding[] = [...narration.issues, ...captions.issues];
   if (voiceTracks.length > 0 && design.music) {
     let lead = await measureDialogueLead(plan, voiceTracks, { ...(context.signal ? { signal: context.signal } : {}) });
     const reduction = lead ? bedReductionDb(lead) : 0;
@@ -788,11 +803,11 @@ async function renderOnce(
       soundIssues.push({
         id: newId('evt'),
         sceneId: null,
-        atSeconds: voiceTracks[0]?.atSeconds ?? null,
+        timecodeStart: voiceTracks[0]?.atSeconds ?? null,
         detectedBy: 'deterministic',
         evidenceAssetId: null,
         check: 'audio_balance',
-        severity: 'major',
+        severity: 'soft_fail',
         message:
           `The voice sits ${lead.leadLu.toFixed(1)} LU above the music while speaking; ` +
           `${DIALOGUE_LEAD_MIN} is the floor (${cite(AUDIO_STANDARDS.dialogueLead)}). ` +
@@ -865,7 +880,7 @@ async function checkFlashRate(
   context: StageContext,
   masterPath: string,
   workDir: string,
-): Promise<QaIssue[]> {
+): Promise<QaFinding[]> {
   const metadataPath = path.join(workDir, `luma-${newId('evt')}.txt`);
 
   try {
@@ -892,11 +907,11 @@ async function checkFlashRate(
         {
           id: newId('evt'),
           sceneId: null,
-          atSeconds: null,
+          timecodeStart: null,
           detectedBy: 'deterministic',
           evidenceAssetId: null,
           check: 'flicker',
-          severity: 'major',
+          severity: 'soft_fail',
           message:
             'The photosensitivity check could not run on this film, so it has not been ' +
             'cleared for flashing content.',
@@ -931,7 +946,7 @@ async function checkFlashRate(
 async function checkColourDistribution(
   context: StageContext,
   params: { storyboard: Storyboard; brand: BrandSystem; aspect: AspectRatio; masterPath: string; workDir: string },
-): Promise<QaIssue[]> {
+): Promise<QaFinding[]> {
   const tokens = resolveTokens(params.brand, { aspect: params.aspect });
   const candidates = params.storyboard.scenes
     .filter((scene) => ['kinetic_typography', 'statistic', 'quote'].includes(scene.visualType))
@@ -939,7 +954,7 @@ async function checkColourDistribution(
     .sort((a, b) => b.duration - a.duration)
     .slice(0, 3);
 
-  const issues: QaIssue[] = [];
+  const issues: QaFinding[] = [];
   for (const scene of candidates) {
     const framePath = path.join(params.workDir, `palette-${scene.id}.jpg`);
     const extracted = await runFfmpeg(
@@ -989,14 +1004,14 @@ async function inspect(
     /** Which pass this is. The director only sends a shot back on the first. */
     attempt: number;
   },
-): Promise<QaIssue[]> {
+): Promise<QaFinding[]> {
   const { registry, project, organizationId } = context;
   await context.progress(0.78, 'Checking the film');
   await context.activity({ step: 'composition', kind: 'step', label: 'checking the film frame by frame', status: 'active' });
 
   const { understanding } = params;
 
-  const issues: QaIssue[] = [
+  const issues: QaFinding[] = [
     ...(await checkFlashRate(context, params.masterPath, params.workDir)),
     ...(await checkColourDistribution(context, {
       storyboard: params.storyboard,
@@ -1033,7 +1048,7 @@ async function inspect(
   const frames = selectFramesToInspect(params.storyboard.scenes, { maxFrames: 6 });
   for (const frame of frames) {
     const framePath = path.join(params.workDir, `qa-${frame.scene.id}.jpg`);
-    const extracted = await runFfmpeg(posterArgs(params.masterPath, frame.atSeconds, framePath), {
+    const extracted = await runFfmpeg(posterArgs(params.masterPath, frame.timecodeStart, framePath), {
       signal: context.signal,
       timeoutMs: 60_000,
     });
@@ -1045,7 +1060,7 @@ async function inspect(
       issues.push(
         ...(await inspectFrame(
           registry.llm(),
-          { frameUrl: dataUrl, scene: frame.scene, atSeconds: frame.atSeconds },
+          { frameUrl: dataUrl, scene: frame.scene, timecodeStart: frame.timecodeStart },
           { organizationId, projectId: project.id, sceneId: frame.scene.id, signal: context.signal },
         )),
       );
@@ -1079,9 +1094,9 @@ async function inspect(
         check: 'direction',
         // Major rather than blocker: it earns a second attempt at one shot,
         // and it can never be the reason a finished film is withheld.
-        severity: 'major',
+        severity: 'soft_fail',
         sceneId: back.sceneId,
-        atSeconds: null,
+        timecodeStart: null,
         message: `The weakest shot in the cut: ${back.reason}`,
         evidenceAssetId: null,
         confidence: 0.7,
@@ -1126,17 +1141,17 @@ async function askTheDirector(
   await context.progress(0.9, 'Watching it back');
   await context.activity({ step: 'composition', kind: 'step', label: 'watching the cut back', status: 'active' });
 
-  const frames: { sceneId: string; atSeconds: number; data: Uint8Array }[] = [];
+  const frames: { sceneId: string; timecodeStart: number; data: Uint8Array }[] = [];
   for (const scene of scenes) {
     // Six tenths in: the motion has settled and the shot is not yet leaving.
-    const atSeconds = scene.startTime + scene.duration * 0.6;
+    const timecodeStart = scene.startTime + scene.duration * 0.6;
     const framePath = path.join(params.workDir, `cut-${scene.id}.jpg`);
-    const extracted = await runFfmpeg(posterArgs(params.masterPath, atSeconds, framePath), {
+    const extracted = await runFfmpeg(posterArgs(params.masterPath, timecodeStart, framePath), {
       signal: context.signal,
       timeoutMs: 60_000,
     });
     if (!extracted.ok) continue;
-    frames.push({ sceneId: scene.id, atSeconds, data: new Uint8Array(await readFile(framePath)) });
+    frames.push({ sceneId: scene.id, timecodeStart, data: new Uint8Array(await readFile(framePath)) });
   }
   if (frames.length === 0) return null;
 
@@ -1235,7 +1250,7 @@ async function speakNarration(
     tailSilenceSeconds: number;
     text: string;
   }[];
-  issues: QaIssue[];
+  issues: QaFinding[];
 }> {
   const spoken = storyboard.scenes.filter(
     (scene) => scene.voiceOver && scene.narration.trim().length > 0,

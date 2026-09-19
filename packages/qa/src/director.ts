@@ -12,7 +12,7 @@ import {
   type DirectorsVerdict as Verdict,
   type FilmCut,
   type FilmFormat,
-  type QaIssue,
+  type QaFinding,
   type Scene,
   type Storyboard,
 } from '@act-one/core';
@@ -94,7 +94,7 @@ function systemPrompt(format: FilmFormat, cut: FilmCut): string {
 export type DirectorInput = {
   storyboard: Storyboard;
   /** One frame per shot, in order, already labelled. */
-  contactSheet: { url: string; shots: { sceneId: string; atSeconds: number }[] };
+  contactSheet: { url: string; shots: { sceneId: string; timecodeStart: number }[] };
   /** What the company is and who the film is for. */
   brief: string;
   /** The brand's own register, so the director judges against it and not against taste. */
@@ -179,9 +179,9 @@ export async function reviewCut(
  * watching the film.
  */
 export async function buildContactSheet(
-  frames: { sceneId: string; atSeconds: number; data: Uint8Array }[],
+  frames: { sceneId: string; timecodeStart: number; data: Uint8Array }[],
   options: { tileWidth?: number; columns?: number } = {},
-): Promise<{ png: Uint8Array; shots: { sceneId: string; atSeconds: number }[] }> {
+): Promise<{ png: Uint8Array; shots: { sceneId: string; timecodeStart: number }[] }> {
   if (frames.length === 0) throw new Error('A contact sheet needs at least one frame.');
 
   const tileWidth = options.tileWidth ?? 420;
@@ -199,7 +199,7 @@ export async function buildContactSheet(
     frames.map(async (frame, index) => {
       const resized = await sharp(Buffer.from(frame.data))
         .resize(tileWidth, tileHeight, { fit: 'cover' })
-        .composite([{ input: Buffer.from(label(index + 1, frame.atSeconds, tileWidth)), top: 0, left: 0 }])
+        .composite([{ input: Buffer.from(label(index + 1, frame.timecodeStart, tileWidth)), top: 0, left: 0 }])
         .png()
         .toBuffer();
       return {
@@ -219,13 +219,13 @@ export async function buildContactSheet(
 
   return {
     png: new Uint8Array(png),
-    shots: frames.map((frame) => ({ sceneId: frame.sceneId, atSeconds: frame.atSeconds })),
+    shots: frames.map((frame) => ({ sceneId: frame.sceneId, timecodeStart: frame.timecodeStart })),
   };
 }
 
 /** The shot number and its timecode, as an overlay the tile carries. */
-function label(n: number, atSeconds: number, tileWidth: number): string {
-  const text = `${n} · ${atSeconds.toFixed(1)}s`;
+function label(n: number, timecodeStart: number, tileWidth: number): string {
+  const text = `${n} · ${timecodeStart.toFixed(1)}s`;
   const size = Math.round(tileWidth * 0.055);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${tileWidth}" height="${size * 2}">` +
@@ -243,13 +243,13 @@ function label(n: number, atSeconds: number, tileWidth: number): string {
  * failing that, to say plainly what it thinks, which is worth more to the
  * person deciding whether to ship it than a silent pass.
  */
-export function verdictIssues(verdict: Verdict): QaIssue[] {
+export function verdictIssues(verdict: Verdict): QaFinding[] {
   return weakestDimensions(verdict).map((note) => ({
     id: newId('evt'),
     check: 'direction' as const,
-    severity: 'note' as const,
+    severity: 'info' as const,
     sceneId: note.sceneId,
-    atSeconds: note.atSeconds,
+    timecodeStart: note.atSeconds,
     message: `${titleOf(note.dimension)}: ${note.note}`,
     evidenceAssetId: null,
     confidence: 0.8,

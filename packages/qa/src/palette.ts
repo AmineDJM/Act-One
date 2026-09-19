@@ -5,7 +5,7 @@ import {
   MIN_CANVAS_SHARE,
   cite,
   newId,
-  type QaIssue,
+  type QaFinding,
   type Scene,
 } from '@act-one/core';
 import type { DesignTokens } from '@act-one/design';
@@ -66,12 +66,12 @@ export async function colourShares(
 export function distributionIssues(
   shares: ColourShares,
   scene: Pick<Scene, 'id' | 'startTime' | 'index'>,
-): QaIssue[] {
-  const issues: QaIssue[] = [];
+): QaFinding[] {
+  const issues: QaFinding[] = [];
   const base = {
     id: newId('evt'),
     sceneId: scene.id,
-    atSeconds: scene.startTime,
+    timecodeStart: scene.startTime,
     detectedBy: 'deterministic' as const,
     evidenceAssetId: null,
     check: 'composition' as const,
@@ -81,7 +81,7 @@ export function distributionIssues(
   if (shares.accent > MAX_ACCENT_SHARE) {
     issues.push({
       ...base,
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `The accent covers ${(shares.accent * 100).toFixed(0)}% of scene ${scene.index + 1}; past ` +
         `${(MAX_ACCENT_SHARE * 100).toFixed(0)}% it is the canvas, not an accent ` +
@@ -91,7 +91,7 @@ export function distributionIssues(
     issues.push({
       ...base,
       id: newId('evt'),
-      severity: 'minor',
+      severity: 'warning',
       message:
         `Only ${(shares.canvas * 100).toFixed(0)}% of scene ${scene.index + 1} is canvas; a ` +
         `typographic frame that is mostly not canvas is crowded (${cite(COLOR_STANDARDS.distribution)}).`,

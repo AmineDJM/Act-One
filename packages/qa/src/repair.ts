@@ -32,7 +32,7 @@ export function planRepairs(report: QaReport, attempt: number, maxAttempts = 2):
 
   const manual = report.issues.filter(
     (issue) =>
-      (issue.severity === 'blocker' || issue.severity === 'major') &&
+      (issue.severity === 'hard_fail' || issue.severity === 'soft_fail') &&
       (!issue.repair || issue.repair === 'manual_review'),
   );
 
@@ -57,7 +57,7 @@ export function planRepairs(report: QaReport, attempt: number, maxAttempts = 2):
   const bySc = new Map<string, { action: RepairAction; reason: string; severity: number }>();
   for (const issue of repairable) {
     if (!issue.sceneId || !issue.repair) continue;
-    const severity = issue.severity === 'blocker' ? 2 : 1;
+    const severity = issue.severity === 'hard_fail' ? 2 : 1;
     const existing = bySc.get(issue.sceneId);
     if (!existing || severity > existing.severity) {
       bySc.set(issue.sceneId, { action: issue.repair, reason: issue.message, severity });

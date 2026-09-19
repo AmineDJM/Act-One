@@ -148,7 +148,7 @@ describe('listening back', () => {
       }),
       language: 'en',
     });
-    expect(paused).toEqual([expect.objectContaining({ check: 'narration_pause', severity: 'major', blocking: true })]);
+    expect(paused).toEqual([expect.objectContaining({ check: 'narration_pause', severity: 'soft_fail', blocking: true })]);
   });
 
   it('judges the recording itself: clipping, a read that stopped early, a read that runs long', () => {
@@ -157,15 +157,15 @@ describe('listening back', () => {
     expect(judgeAudio({ facts, roomSeconds: 6, characters: 40 })).toEqual([]);
     expect(judgeAudio({ facts: { ...facts, peakDb: 0 }, roomSeconds: 6, characters: 40 })[0]).toMatchObject({ check: 'audio_clipping', blocking: true });
     expect(judgeAudio({ facts, roomSeconds: 6, characters: 400 })[0]).toMatchObject({ check: 'narration_truncated', blocking: true });
-    expect(judgeAudio({ facts, roomSeconds: 4, characters: 40 })[0]).toMatchObject({ check: 'narration_timing', severity: 'major', blocking: true });
-    expect(judgeAudio({ facts, roomSeconds: 4.7, characters: 40 })[0]).toMatchObject({ check: 'narration_timing', severity: 'minor', blocking: false });
-    expect(judgeAudio({ facts: { ...facts, silences: [{ start: 1, end: 2.6 }] }, roomSeconds: null, characters: 40 })[0]).toMatchObject({ check: 'narration_pause', severity: 'minor' });
+    expect(judgeAudio({ facts, roomSeconds: 4, characters: 40 })[0]).toMatchObject({ check: 'narration_timing', severity: 'soft_fail', blocking: true });
+    expect(judgeAudio({ facts, roomSeconds: 4.7, characters: 40 })[0]).toMatchObject({ check: 'narration_timing', severity: 'warning', blocking: false });
+    expect(judgeAudio({ facts: { ...facts, silences: [{ start: 1, end: 2.6 }] }, roomSeconds: null, characters: 40 })[0]).toMatchObject({ check: 'narration_pause', severity: 'warning' });
   });
 
   it('scores blocking findings above everything and notices uneven levels', () => {
-    expect(scoreFindings([{ check: 'narration_pause', severity: 'minor', message: '', blocking: false }])).toBe(1);
-    expect(scoreFindings([{ check: 'audio_clipping', severity: 'major', message: '', blocking: true }])).toBe(110);
+    expect(scoreFindings([{ check: 'narration_pause', severity: 'warning', message: '', blocking: false }])).toBe(1);
+    expect(scoreFindings([{ check: 'audio_clipping', severity: 'soft_fail', message: '', blocking: true }])).toBe(110);
     expect(judgeLoudnessSpread([-20, -21, null])).toBeNull();
-    expect(judgeLoudnessSpread([-20, -27])).toMatchObject({ check: 'narration_loudness', severity: 'major' });
+    expect(judgeLoudnessSpread([-20, -27])).toMatchObject({ check: 'narration_loudness', severity: 'soft_fail' });
   });
 });

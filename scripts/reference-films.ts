@@ -253,7 +253,7 @@ for (const film of FILMS) {
       'evd_meridian_latency',
       'evd_halyard_pages',
     ]),
-  }).filter((issue) => issue.severity === 'blocker' || issue.severity === 'major');
+  }).filter((issue) => issue.severity === 'hard_fail' || issue.severity === 'soft_fail');
 
   if (issues.length > 0) {
     console.error(`\n${film.slug} would not pass our own QA:`);

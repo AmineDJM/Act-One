@@ -1,4 +1,14 @@
 import { adaptForSpeech, type QaCheck } from '@act-one/core';
+import type { QaSeverity } from '@act-one/core';
+
+/** How much each level counts against a take when takes are compared. */
+const SEVERITY_WEIGHT: Record<QaSeverity, number> = {
+  info: 1,
+  warning: 1,
+  soft_fail: 10,
+  hard_fail: 50,
+  critical_fail: 100,
+};
 
 /**
  * Voice QA: the recording is listened back to and compared with the script.
@@ -19,7 +29,7 @@ export type NarrationFinding = {
     | 'narration_loudness'
     | 'audio_clipping'
   >;
-  severity: 'minor' | 'major' | 'blocker';
+  severity: QaSeverity;
   message: string;
   /** Regenerate the passage rather than ship it. */
   blocking: boolean;
@@ -89,7 +99,7 @@ export function judgeTranscript(params: {
   if (expected && heard && heard !== expected && confidence >= 0.6) {
     findings.push({
       check: 'narration_language',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message: `The passage was read in ${heard}, not ${expected}.`,
       blocking: true,
     });
@@ -101,14 +111,14 @@ export function judgeTranscript(params: {
   if (wer >= WER_MAJOR) {
     findings.push({
       check: 'narration_accuracy',
-      severity: 'major',
+      severity: 'soft_fail',
       message: `What was heard differs from the script in ${Math.round(wer * 100)}% of the words.`,
       blocking: true,
     });
   } else if (wer >= WER_MINOR) {
     findings.push({
       check: 'narration_accuracy',
-      severity: 'minor',
+      severity: 'warning',
       message: `What was heard differs from the script in ${Math.round(wer * 100)}% of the words.`,
       blocking: false,
     });
@@ -123,7 +133,7 @@ export function judgeTranscript(params: {
     if (missing.length > 0) {
       findings.push({
         check: 'narration_accuracy',
-        severity: 'major',
+        severity: 'soft_fail',
         message: `A figure was not heard as written: ${[...new Set(missing)].slice(0, 4).join(', ')}.`,
         blocking: true,
       });
@@ -134,7 +144,7 @@ export function judgeTranscript(params: {
     if (reference.length >= 3 && lastWritten.length > 0 && !lastWritten.some((word) => lastHeard.has(word))) {
       findings.push({
         check: 'narration_truncated',
-        severity: 'major',
+        severity: 'soft_fail',
         message: `The ending was not heard: "…${lastWritten.join(' ')}".`,
         blocking: true,
       });
@@ -147,7 +157,7 @@ export function judgeTranscript(params: {
     if (gap >= PAUSE_MINOR) {
       findings.push({
         check: 'narration_pause',
-        severity: gap >= PAUSE_MAJOR ? 'major' : 'minor',
+        severity: gap >= PAUSE_MAJOR ? 'soft_fail' : 'warning',
         message: `A ${gap.toFixed(1)}s pause after "${words[i - 1]!.word}" that the script does not have.`,
         blocking: gap >= PAUSE_MAJOR,
       });
@@ -180,7 +190,7 @@ export function judgeAudio(params: {
   if (facts.peakDb > -0.3) {
     findings.push({
       check: 'audio_clipping',
-      severity: 'major',
+      severity: 'soft_fail',
       message: `The recording peaks at ${facts.peakDb.toFixed(1)} dBFS: it clips.`,
       blocking: true,
     });
@@ -190,7 +200,7 @@ export function judgeAudio(params: {
   if (params.characters >= 40 && spoken < params.characters / 22) {
     findings.push({
       check: 'narration_truncated',
-      severity: 'major',
+      severity: 'soft_fail',
       message: `${spoken.toFixed(1)}s of speech for ${params.characters} characters: the read stopped early.`,
       blocking: true,
     });
@@ -199,7 +209,7 @@ export function judgeAudio(params: {
     const over = spoken / params.roomSeconds - 1;
     findings.push({
       check: 'narration_timing',
-      severity: over > 0.1 ? 'major' : 'minor',
+      severity: over > 0.1 ? 'soft_fail' : 'warning',
       message: `The read runs ${spoken.toFixed(1)}s in a ${params.roomSeconds.toFixed(1)}s scene.`,
       blocking: over > 0.1,
     });
@@ -208,7 +218,7 @@ export function judgeAudio(params: {
   if (longest >= PAUSE_MINOR) {
     findings.push({
       check: 'narration_pause',
-      severity: longest >= PAUSE_MAJOR ? 'major' : 'minor',
+      severity: longest >= PAUSE_MAJOR ? 'soft_fail' : 'warning',
       message: `A ${longest.toFixed(1)}s silence inside the read.`,
       blocking: longest >= PAUSE_MAJOR,
     });
@@ -219,8 +229,7 @@ export function judgeAudio(params: {
 /** Lower is better: blocking findings dominate, then the rest. */
 export function scoreFindings(findings: NarrationFinding[]): number {
   return findings.reduce(
-    (score, finding) =>
-      score + (finding.blocking ? 100 : 0) + (finding.severity === 'major' ? 10 : finding.severity === 'blocker' ? 50 : 1),
+    (score, finding) => score + (finding.blocking ? 100 : 0) + SEVERITY_WEIGHT[finding.severity],
     0,
   );
 }
@@ -233,7 +242,7 @@ export function judgeLoudnessSpread(levels: (number | null)[]): NarrationFinding
   if (spread <= 3) return null;
   return {
     check: 'narration_loudness',
-    severity: spread > 6 ? 'major' : 'minor',
+    severity: spread > 6 ? 'soft_fail' : 'warning',
     message: `The passages differ by ${spread.toFixed(1)} LU before levelling.`,
     blocking: false,
   };

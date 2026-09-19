@@ -80,7 +80,7 @@ describe('flash rate', () => {
   it('blocks rather than merely noting', () => {
     const issues = flashIssues(alternating(0.02, 0.7, 3, 90), 30);
     expect(issues.length).toBeGreaterThan(0);
-    expect(issues[0]!.severity).toBe('blocker');
+    expect(issues[0]!.severity).toBe('hard_fail');
     expect(issues[0]!.message).toMatch(/WCAG 2\.2/);
     expect(issues[0]!.message).toMatch(/seizures/);
   });

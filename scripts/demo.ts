@@ -156,7 +156,7 @@ async function main(): Promise<void> {
     line('Duration', `${render.durationSeconds.toFixed(1)}s`);
     const qa = await store.qaReports.getForRender(organization.id, render.id);
     if (qa) {
-      line('QA', qa.passed ? 'passed' : `${qa.issues.filter((i) => i.severity === 'blocker').length} blockers`);
+      line('QA', qa.passed ? 'passed' : `${qa.issues.filter((i) => i.severity === 'hard_fail').length} blockers`);
       for (const issue of qa.issues.slice(0, 4)) {
         console.log(`    \x1b[2m${issue.severity}\x1b[0m ${issue.check}: ${issue.message.slice(0, 90)}`);
       }

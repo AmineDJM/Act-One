@@ -86,7 +86,7 @@ describe('what a verdict does', () => {
     const issues = verdictIssues(verdict());
     expect(issues.length).toBeGreaterThan(0);
     for (const issue of issues) {
-      expect(issue.severity).toBe('note');
+      expect(issue.severity).toBe('info');
       expect(issue.check).toBe('direction');
       expect(issue.repair).toBeNull();
     }
@@ -94,7 +94,7 @@ describe('what a verdict does', () => {
 
   it('carries the timecode, so a note can be found', () => {
     const [first] = verdictIssues(verdict());
-    expect(first!.atSeconds).toBe(9);
+    expect(first!.timecodeStart).toBe(9);
     expect(first!.sceneId).toBe('c');
   });
 });
@@ -138,7 +138,7 @@ describe('the film as one image', () => {
     const frames = await Promise.all(
       [10, 90, 170, 250, 200].map(async (colour, index) => ({
         sceneId: `s${index}`,
-        atSeconds: index * 3.5,
+        timecodeStart: index * 3.5,
         data: await frame(colour),
       })),
     );
@@ -149,7 +149,7 @@ describe('the film as one image', () => {
     expect(meta.width).toBe(3 * 200 + 4 * 8);
     expect(meta.height).toBe(2 * Math.round(200 * (180 / 320)) + 3 * 8);
     expect(sheet.shots.map((shot) => shot.sceneId)).toEqual(['s0', 's1', 's2', 's3', 's4']);
-    expect(sheet.shots[2]!.atSeconds).toBeCloseTo(7, 5);
+    expect(sheet.shots[2]!.timecodeStart).toBeCloseTo(7, 5);
   });
 
   it('refuses to review a film it has no frames of', async () => {
@@ -165,7 +165,7 @@ describe('what comes back from the director', () => {
 
   const input = {
     storyboard,
-    contactSheet: { url: 'data:image/png;base64,AA==', shots: [{ sceneId: 'a', atSeconds: 2.4 }] },
+    contactSheet: { url: 'data:image/png;base64,AA==', shots: [{ sceneId: 'a', timecodeStart: 2.4 }] },
     brief: 'Northwind: closes the books in one run.',
     tone: 'Plain and exact.',
   };

@@ -209,7 +209,7 @@ describe('captions for a film', () => {
     const rate = result.issues.filter((issue) => issue.message.includes('a second'));
     expect(rate.length).toBeGreaterThan(0);
     for (const issue of result.issues) {
-      expect(issue.severity).toBe('minor');
+      expect(issue.severity).toBe('warning');
       expect(issue.check).toBe('caption_readability');
       expect(issue.repair).toBeNull();
       // The finding cites the rule it broke, so it can be looked up.

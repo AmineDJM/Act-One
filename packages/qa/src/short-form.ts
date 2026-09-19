@@ -5,7 +5,7 @@ import {
   SHORT_FORM_STANDARDS,
   cite,
   newId,
-  type QaIssue,
+  type QaFinding,
   type Scene,
   type Storyboard,
 } from '@act-one/core';
@@ -24,21 +24,21 @@ import { heldTooLong, opensOnAPatternInterrupt, payoffAt } from '@act-one/creati
  * held opening and a shot given room are what a film somebody chose to watch
  * is *made of*; the same choices in a feed are why nobody saw it.
  */
-export function runShortFormChecks(storyboard: Storyboard): QaIssue[] {
-  const issues: QaIssue[] = [];
+export function runShortFormChecks(storyboard: Storyboard): QaFinding[] {
+  const issues: QaFinding[] = [];
   const scenes = storyboard.scenes;
   if (scenes.length === 0) return issues;
 
   const film = (
-    issue: Omit<QaIssue, 'id' | 'sceneId' | 'atSeconds' | 'detectedBy' | 'evidenceAssetId'> & {
+    issue: Omit<QaFinding, 'id' | 'sceneId' | 'timecodeStart' | 'detectedBy' | 'evidenceAssetId'> & {
       sceneId?: string | null;
-      atSeconds?: number | null;
+      timecodeStart?: number | null;
     },
   ) => {
     issues.push({
       id: newId('evt'),
       sceneId: issue.sceneId ?? null,
-      atSeconds: issue.atSeconds ?? null,
+      timecodeStart: issue.timecodeStart ?? null,
       detectedBy: 'deterministic',
       evidenceAssetId: null,
       ...issue,
@@ -58,9 +58,9 @@ export function runShortFormChecks(storyboard: Storyboard): QaIssue[] {
        * it holds the storyboard for review rather than failing the production
        * over a film somebody may still want.
        */
-      severity: 'major',
+      severity: 'soft_fail',
       sceneId: scenes[0]!.id,
-      atSeconds: 0,
+      timecodeStart: 0,
       message:
         `This short spends its first ${PATTERN_INTERRUPT_SECONDS} seconds on setup ` +
         `(${cite(SHORT_FORM_STANDARDS.patternInterrupt)}). In a feed the decision is made before ` +
@@ -79,9 +79,9 @@ export function runShortFormChecks(storyboard: Storyboard): QaIssue[] {
   for (const scene of heldTooLong(scenes)) {
     film({
       check: 'composition',
-      severity: 'minor',
+      severity: 'warning',
       sceneId: scene.id,
-      atSeconds: scene.startTime,
+      timecodeStart: scene.startTime,
       message:
         `Nothing is happening in shot ${scene.index + 1} for ${scene.duration.toFixed(1)}s — no ` +
         `subject, no action, no arriving type, no sound and no change from the shot before ` +
@@ -105,9 +105,9 @@ export function runShortFormChecks(storyboard: Storyboard): QaIssue[] {
     const last = lastBeat(scenes);
     film({
       check: 'composition',
-      severity: 'minor',
+      severity: 'warning',
       sceneId: last?.id ?? null,
-      atSeconds: last?.startTime ?? null,
+      timecodeStart: last?.startTime ?? null,
       message:
         `The payoff lands at ${Math.round(payoff * 100)}% of the runtime ` +
         `(${cite(SHORT_FORM_STANDARDS.earlyPayoff)}). Past ${Math.round(PAYOFF_BY * 100)}% most ` +

@@ -46,7 +46,7 @@ describe('invented urgency', () => {
     const urgency = issues.filter((i) => /invents urgency/.test(i.message));
     // Scene b trips two patterns; it is the scenes that matter, not the count.
     expect([...new Set(urgency.map((i) => i.sceneId))].sort()).toEqual(['a', 'b']);
-    expect(urgency.every((i) => i.severity === 'major' && i.repair === 'rewrite_copy')).toBe(true);
+    expect(urgency.every((i) => i.severity === 'soft_fail' && i.repair === 'rewrite_copy')).toBe(true);
   });
 
   it('leaves a plain deadline alone', () => {
@@ -158,7 +158,7 @@ describe('colour distribution', () => {
     expect(shares.accent).toBeGreaterThan(0.45);
     const issues = distributionIssues(shares, { id: 's', startTime: 0, index: 2 });
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('major');
+    expect(issues[0]!.severity).toBe('soft_fail');
     expect(issues[0]!.message).toMatch(/accent covers \d+% of scene 3/);
   });
 });

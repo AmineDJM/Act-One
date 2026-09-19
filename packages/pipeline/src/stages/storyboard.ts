@@ -127,7 +127,7 @@ export async function runStoryboard(
     issues.push(...runShortFormChecks(built.storyboard));
   }
 
-  const blockers = issues.filter((issue) => issue.severity === 'blocker');
+  const blockers = issues.filter((issue) => issue.severity === 'hard_fail');
 
   // The language the film was written in, so the voice can be chosen for
   // it. The brief's word when it gave one; otherwise asked of the copy.

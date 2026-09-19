@@ -1,4 +1,4 @@
-import { newId, type Evidence, type ProductUnderstanding, type QaIssue, type Storyboard } from '@act-one/core';
+import { newId, type Evidence, type ProductUnderstanding, type QaFinding, type Storyboard } from '@act-one/core';
 
 /**
  * Fact check.
@@ -18,8 +18,8 @@ export type FactCheckInput = {
   excludedClaims?: string[];
 };
 
-export function factCheck(input: FactCheckInput): QaIssue[] {
-  const issues: QaIssue[] = [];
+export function factCheck(input: FactCheckInput): QaFinding[] {
+  const issues: QaFinding[] = [];
   const corpus = buildCorpus(input.understanding.evidence);
   const excluded = (input.excludedClaims ?? []).map((claim) => claim.toLowerCase().trim()).filter(Boolean);
 
@@ -32,9 +32,9 @@ export function factCheck(input: FactCheckInput): QaIssue[] {
           issues.push({
             id: newId('evt'),
             check: 'unsupported_claim',
-            severity: 'blocker',
+            severity: 'hard_fail',
             sceneId: scene.id,
-            atSeconds: scene.startTime,
+            timecodeStart: scene.startTime,
             message: `"${figure}" does not appear anywhere in the material we read. We do not put numbers on screen that the customer has not published.`,
             evidenceAssetId: null,
             confidence: 1,
@@ -49,9 +49,9 @@ export function factCheck(input: FactCheckInput): QaIssue[] {
           issues.push({
             id: newId('evt'),
             check: 'unsupported_claim',
-            severity: 'blocker',
+            severity: 'hard_fail',
             sceneId: scene.id,
-            atSeconds: scene.startTime,
+            timecodeStart: scene.startTime,
             message: `This scene makes a claim the customer excluded: "${claim}".`,
             evidenceAssetId: null,
             confidence: 1,
@@ -74,9 +74,9 @@ export function factCheck(input: FactCheckInput): QaIssue[] {
         issues.push({
           id: newId('evt'),
           check: 'unsupported_claim',
-          severity: 'major',
+          severity: 'soft_fail',
           sceneId: scene.id,
-          atSeconds: scene.startTime,
+          timecodeStart: scene.startTime,
           message: `"${name}" is named on screen but appears nowhere in the customer's own material.`,
           evidenceAssetId: null,
           confidence: 0.7,

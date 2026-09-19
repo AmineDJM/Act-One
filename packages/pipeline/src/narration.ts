@@ -6,7 +6,7 @@ import {
   newId,
   type NarrationContext,
   type PronunciationRule,
-  type QaIssue,
+  type QaFinding,
   type SpeechQuality,
   type TakeVariant,
   type VoiceDirection,
@@ -105,7 +105,7 @@ export type NarrationUsage = {
 
 export type NarrationResult = {
   tracks: NarrationTrack[];
-  issues: QaIssue[];
+  issues: QaFinding[];
   usage: NarrationUsage;
   /** Passages that produced no usable audio at all. */
   failed: string[];
@@ -135,7 +135,7 @@ export async function narrate(context: StageContext, options: NarrationOptions):
   const call = { organizationId: context.organizationId, projectId: context.project.id, signal: context.signal };
 
   const tracks: NarrationTrack[] = [];
-  const issues: QaIssue[] = [];
+  const issues: QaFinding[] = [];
   const failed: string[] = [];
   const usage: NarrationUsage = { characters: 0, secondsSynthesised: 0, costUsd: 0, calls: 0, failed: 0, provider: null, model: null };
   const previousRequestIds: string[] = [];
@@ -238,7 +238,7 @@ export async function narrate(context: StageContext, options: NarrationOptions):
 
     if (!best || !best.analysis) {
       failed.push(passage.id);
-      issues.push(issue(passage, 'missing_audio', 'major', `Passage ${position + 1} could not be read: the voice engine failed on every attempt.`, 'manual_review'));
+      issues.push(issue(passage, 'missing_audio', 'soft_fail', `Passage ${position + 1} could not be read: the voice engine failed on every attempt.`, 'manual_review'));
       continue;
     }
     if (best.result.requestId) previousRequestIds.push(best.result.requestId);
@@ -360,15 +360,15 @@ async function levelTracks(tracks: NarrationTrack[], workDir: string, signal: Ab
 
 function issue(
   passage: { id: string; sceneId?: string | null; atSeconds?: number | null },
-  check: QaIssue['check'],
-  severity: QaIssue['severity'],
+  check: QaFinding['check'],
+  severity: QaFinding['severity'],
   message: string,
-  repair: QaIssue['repair'],
-): QaIssue {
+  repair: QaFinding['repair'],
+): QaFinding {
   return {
     id: newId('evt'),
     sceneId: passage.sceneId ?? null,
-    atSeconds: passage.atSeconds ?? null,
+    timecodeStart: passage.atSeconds ?? null,
     detectedBy: 'audio',
     evidenceAssetId: null,
     check,

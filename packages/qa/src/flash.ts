@@ -3,7 +3,7 @@ import {
   MOTION_STANDARDS,
   cite,
   newId,
-  type QaIssue,
+  type QaFinding,
   COLOR_STANDARDS,
   MIN_REDNESS_CHANGE,
   RED_FLOOR,
@@ -53,7 +53,7 @@ export function relativeLuminance(yAvg: number, fullRange = false): number {
 
 export type FlashEvent = {
   /** Seconds into the film. */
-  atSeconds: number;
+  timecodeStart: number;
   /** How many flashes fell in the one-second window starting here. */
   count: number;
 };
@@ -125,7 +125,7 @@ export function findFlashes(
     }
     // One report per offending stretch rather than one per frame of it.
     if (count > limit && from > reportedUntil) {
-      events.push({ atSeconds: from / fps, count });
+      events.push({ timecodeStart: from / fps, count });
       reportedUntil = from + window;
     }
   }
@@ -134,17 +134,17 @@ export function findFlashes(
 }
 
 /** Turns flash events into QA findings. Always blocking. */
-export function flashIssues(luminance: readonly number[], fps: number): QaIssue[] {
+export function flashIssues(luminance: readonly number[], fps: number): QaFinding[] {
   return findFlashes(luminance, fps).map((event) => ({
     id: newId('evt'),
     sceneId: null,
-    atSeconds: Number(event.atSeconds.toFixed(2)),
+    timecodeStart: Number(event.timecodeStart.toFixed(2)),
     detectedBy: 'deterministic' as const,
     evidenceAssetId: null,
     check: 'flicker' as const,
-    severity: 'blocker' as const,
+    severity: 'hard_fail' as const,
     message:
-      `${event.count} flashes in one second at ${event.atSeconds.toFixed(1)}s; ` +
+      `${event.count} flashes in one second at ${event.timecodeStart.toFixed(1)}s; ` +
       `${MAX_FLASHES_PER_SECOND} is the limit (${cite(MOTION_STANDARDS.flashRate)}). ` +
       'This can trigger seizures and is never shipped.',
     confidence: 1,
@@ -243,24 +243,24 @@ export function findRedFlashes(
     let count = 0;
     for (let i = start; i < flashes.length && flashes[i]! < from + window; i += 1) count += 1;
     if (count > limit && from > reportedUntil) {
-      events.push({ atSeconds: from / fps, count });
+      events.push({ timecodeStart: from / fps, count });
       reportedUntil = from + window;
     }
   }
   return events;
 }
 
-export function redFlashIssues(rednessSeries: readonly number[], fps: number): QaIssue[] {
+export function redFlashIssues(rednessSeries: readonly number[], fps: number): QaFinding[] {
   return findRedFlashes(rednessSeries, fps).map((event) => ({
     id: newId('evt'),
     sceneId: null,
-    atSeconds: Number(event.atSeconds.toFixed(2)),
+    timecodeStart: Number(event.timecodeStart.toFixed(2)),
     detectedBy: 'deterministic' as const,
     evidenceAssetId: null,
     check: 'flicker' as const,
-    severity: 'blocker' as const,
+    severity: 'hard_fail' as const,
     message:
-      `${event.count} saturated-red flashes in one second at ${event.atSeconds.toFixed(1)}s ` +
+      `${event.count} saturated-red flashes in one second at ${event.timecodeStart.toFixed(1)}s ` +
       `(${cite(MOTION_STANDARDS.redFlash)}). Red transitions are more provocative than ` +
       'luminance flashes of the same rate, and this is never shipped.',
     confidence: 0.9,
@@ -275,7 +275,7 @@ export function redFlashIssues(rednessSeries: readonly number[], fps: number): Q
  * browser, and where it clips is not ours to choose. A full-range file is a
  * different failure and is caught by the container check.
  */
-export function rangeIssues(stats: Pick<FrameStats, 'ymin' | 'ymax'>, fullRange: boolean, fps: number): QaIssue[] {
+export function rangeIssues(stats: Pick<FrameStats, 'ymin' | 'ymax'>, fullRange: boolean, fps: number): QaFinding[] {
   if (fullRange) return [];
   const low = STUDIO_BLACK_8BIT - STUDIO_RANGE_TOLERANCE;
   const high = STUDIO_WHITE_8BIT + STUDIO_RANGE_TOLERANCE;
@@ -295,11 +295,11 @@ export function rangeIssues(stats: Pick<FrameStats, 'ymin' | 'ymax'>, fullRange:
     {
       id: newId('evt'),
       sceneId: null,
-      atSeconds: fps > 0 ? Number((firstBad / fps).toFixed(2)) : null,
+      timecodeStart: fps > 0 ? Number((firstBad / fps).toFixed(2)) : null,
       detectedBy: 'deterministic' as const,
       evidenceAssetId: null,
       check: 'composition' as const,
-      severity: 'major' as const,
+      severity: 'soft_fail' as const,
       message:
         `${count} frame${count === 1 ? '' : 's'} carry luma outside the studio range ` +
         `(${STUDIO_BLACK_8BIT}–${STUDIO_WHITE_8BIT}), first at ${(firstBad / fps).toFixed(1)}s ` +

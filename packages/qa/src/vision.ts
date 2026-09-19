@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { newId, type QaCheck, type QaIssue, type Scene } from '@act-one/core';
+import { newId, type QaCheck, type QaFinding, type Scene } from '@act-one/core';
 import type { CallContext, LlmProvider } from '@act-one/providers';
 
 /**
@@ -61,7 +61,7 @@ export type VisionQaInput = {
   /** Data URL or signed https URL of the frame. */
   frameUrl: string;
   scene: Scene | null;
-  atSeconds: number;
+  timecodeStart: number;
   /** Told to the model so it does not flag intentional emptiness. */
   intent?: string;
 };
@@ -70,14 +70,14 @@ export async function inspectFrame(
   llm: LlmProvider,
   input: VisionQaInput,
   context: CallContext,
-): Promise<QaIssue[]> {
+): Promise<QaFinding[]> {
   const { value } = await llm.completeJson(
     [
       { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
         content:
-          `Frame at ${input.atSeconds.toFixed(1)}s.` +
+          `Frame at ${input.timecodeStart.toFixed(1)}s.` +
           (input.scene ? ` This scene is meant to: ${input.scene.purpose}.` : '') +
           (input.intent ? ` Creative intent: ${input.intent}` : ''),
       },
@@ -99,9 +99,9 @@ export async function inspectFrame(
     check: finding.check as QaCheck,
     // Vision findings never block on their own. A model that misreads a
     // deliberately dark frame must not be able to stop a film shipping.
-    severity: finding.severity === 'major' ? ('major' as const) : ('minor' as const),
+    severity: finding.severity === 'major' ? ('soft_fail' as const) : ('warning' as const),
     sceneId: input.scene?.id ?? null,
-    atSeconds: input.atSeconds,
+    timecodeStart: input.timecodeStart,
     message: finding.message,
     evidenceAssetId: null,
     confidence: finding.confidence,
@@ -110,7 +110,7 @@ export async function inspectFrame(
   }));
 }
 
-function repairFor(check: string): QaIssue['repair'] {
+function repairFor(check: string): QaFinding['repair'] {
   switch (check) {
     case 'image_artifact':
     case 'anatomy':
@@ -142,7 +142,7 @@ function repairFor(check: string): QaIssue['repair'] {
 export function selectFramesToInspect(
   scenes: Scene[],
   options: { maxFrames?: number } = {},
-): { scene: Scene; atSeconds: number }[] {
+): { scene: Scene; timecodeStart: number }[] {
   const maxFrames = options.maxFrames ?? 8;
 
   const scored = scenes.map((scene) => {
@@ -160,7 +160,7 @@ export function selectFramesToInspect(
     .map(({ scene }) => ({
       scene,
       // 60% in: motion has settled, and the frame is not yet dissolving out.
-      atSeconds: scene.startTime + scene.duration * 0.6,
+      timecodeStart: scene.startTime + scene.duration * 0.6,
     }))
-    .sort((a, b) => a.atSeconds - b.atSeconds);
+    .sort((a, b) => a.timecodeStart - b.timecodeStart);
 }

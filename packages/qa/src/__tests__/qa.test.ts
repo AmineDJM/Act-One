@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { BrandSystem as BrandSystemSchema, newId, resequence, type BrandSystem, type Scene, type Storyboard, type QaReport } from '@act-one/core';
+import {
+  BrandSystem as BrandSystemSchema,
+  QaIssue,
+  QaReport,
+  newId,
+  resequence,
+  type BrandSystem,
+  type Scene,
+  type Storyboard,
+} from '@act-one/core';
 import { neutralRamp } from '@act-one/design';
 import { runDeterministicChecks, factCheck, planRepairs, applyRepairs, selectFramesToInspect, extractProperNouns } from '../index.ts';
 
@@ -45,7 +54,7 @@ describe('deterministic QA', () => {
       brand,
       aspect: '16:9',
     });
-    const issue = issues.find((i) => i.check === 'text_overflow' && i.severity === 'blocker');
+    const issue = issues.find((i) => i.check === 'text_overflow' && i.severity === 'hard_fail');
     expect(issue).toBeDefined();
     expect(issue!.message).toMatch(/to read/);
   });
@@ -57,7 +66,7 @@ describe('deterministic QA', () => {
       aspect: '16:9',
     });
     const issue = issues.find((i) => i.check === 'fake_product_ui');
-    expect(issue?.severity).toBe('blocker');
+    expect(issue?.severity).toBe('hard_fail');
     expect(issue?.repair).toBe('recapture_product');
   });
 
@@ -75,7 +84,7 @@ describe('deterministic QA', () => {
       brand,
       aspect: '16:9',
     });
-    expect(issues.some((i) => i.check === 'legible_generated_text' && i.severity === 'blocker')).toBe(true);
+    expect(issues.some((i) => i.check === 'legible_generated_text' && i.severity === 'hard_fail')).toBe(true);
   });
 
   it('flags an edit where every scene is the same length', () => {
@@ -111,7 +120,7 @@ describe('deterministic QA', () => {
       aspect: '16:9',
       knownEvidenceIds: new Set(['evt_real']),
     });
-    expect(issues.some((i) => i.check === 'unsupported_claim' && i.severity === 'blocker')).toBe(true);
+    expect(issues.some((i) => i.check === 'unsupported_claim' && i.severity === 'hard_fail')).toBe(true);
   });
 
   it('passes a well-formed film', () => {
@@ -125,7 +134,7 @@ describe('deterministic QA', () => {
       brand,
       aspect: '16:9',
     });
-    expect(issues.filter((i) => i.severity === 'blocker')).toEqual([]);
+    expect(issues.filter((i) => i.severity === 'hard_fail')).toEqual([]);
   });
 });
 
@@ -150,7 +159,7 @@ describe('fact check', () => {
       storyboard: board([scene({ id: 'a', duration: 3, visualType: 'statistic', onScreenText: ['87% faster'] })]),
       understanding,
     });
-    expect(issues.some((i) => i.severity === 'blocker' && i.message.includes('87%'))).toBe(true);
+    expect(issues.some((i) => i.severity === 'hard_fail' && i.message.includes('87%'))).toBe(true);
   });
 
   it('allows a figure the customer actually published', () => {
@@ -158,7 +167,7 @@ describe('fact check', () => {
       storyboard: board([scene({ id: 'a', duration: 3, visualType: 'statistic', onScreenText: ['3x faster'] })]),
       understanding,
     });
-    expect(issues.filter((i) => i.severity === 'blocker')).toEqual([]);
+    expect(issues.filter((i) => i.severity === 'hard_fail')).toEqual([]);
   });
 
   it('blocks a claim the customer explicitly excluded', () => {
@@ -167,7 +176,7 @@ describe('fact check', () => {
       understanding,
       excludedClaims: ['fastest close'],
     });
-    expect(issues.some((i) => i.severity === 'blocker')).toBe(true);
+    expect(issues.some((i) => i.severity === 'hard_fail')).toBe(true);
   });
 
   it('flags a company named on screen that we never read about', () => {
@@ -192,20 +201,21 @@ describe('fact check', () => {
 });
 
 describe('repair planning', () => {
-  function report(issues: QaReport['issues']): QaReport {
-    return {
+  function report(issues: QaIssue[]): QaReport {
+    return QaReport.parse({
       id: 'qa_1', renderId: 'rnd_1', projectId: 'prj_1',
-      passed: !issues.some((i) => i.severity === 'blocker'),
-      issues, repairActions: [], framesInspected: 4, createdAt: '2026-01-01T00:00:00.000Z',
-    };
+      passed: !issues.some((i) => i.severity === 'hard_fail'),
+      issues, framesInspected: 4, createdAt: '2026-01-01T00:00:00.000Z',
+    });
   }
 
-  const issue = (over: Partial<QaReport['issues'][number]>) => ({
-    id: newId('evt'), check: 'image_artifact' as const, severity: 'blocker' as const,
-    sceneId: 's1', atSeconds: 1, message: 'artifact', evidenceAssetId: null,
-    confidence: 0.9, repair: 'regenerate_shot' as const, detectedBy: 'vision' as const,
-    ...over,
-  });
+  const issue = (over: Partial<QaIssue>): QaIssue =>
+    QaIssue.parse({
+      id: newId('evt'), check: 'image_artifact', severity: 'hard_fail',
+      sceneId: 's1', timecodeStart: 1, message: 'artifact',
+      confidence: 0.9, repair: 'regenerate_shot', detectedBy: 'vision',
+      ...over,
+    });
 
   it('ships a clean film', () => {
     const plan = planRepairs(report([]), 0);
@@ -222,8 +232,8 @@ describe('repair planning', () => {
   it('takes the most severe instruction when one scene has two problems', () => {
     const plan = planRepairs(
       report([
-        issue({ sceneId: 's1', severity: 'major', repair: 'recrop' }),
-        issue({ sceneId: 's1', severity: 'blocker', repair: 'regenerate_shot' }),
+        issue({ sceneId: 's1', severity: 'soft_fail', repair: 'recrop' }),
+        issue({ sceneId: 's1', severity: 'hard_fail', repair: 'regenerate_shot' }),
       ]),
       0,
     );
@@ -304,7 +314,7 @@ describe('frame selection', () => {
   it('samples after motion has settled, not on the cut', () => {
     const scenes = board([scene({ id: 'a', duration: 4, visualType: 'generated_broll' })]).scenes;
     const [frame] = selectFramesToInspect(scenes);
-    expect(frame!.atSeconds).toBeCloseTo(2.4);
+    expect(frame!.timecodeStart).toBeCloseTo(2.4);
   });
 
   it('returns frames in playback order', () => {
@@ -314,7 +324,7 @@ describe('frame selection', () => {
       scene({ id: 'c', duration: 3, visualType: 'logo_reveal' }),
     ]).scenes;
     const frames = selectFramesToInspect(scenes);
-    const times = frames.map((f) => f.atSeconds);
+    const times = frames.map((f) => f.timecodeStart);
     expect(times).toEqual([...times].sort((a, b) => a - b));
   });
 });
@@ -343,7 +353,7 @@ describe('professional standards', () => {
       aspect: '16:9',
     });
 
-    const issue = issues.find((i) => i.check === 'unsupported_claim' && i.severity === 'blocker');
+    const issue = issues.find((i) => i.check === 'unsupported_claim' && i.severity === 'hard_fail');
     expect(issue).toBeDefined();
     expect(issue!.message).toMatch(/Reuters/);
   });
@@ -383,7 +393,7 @@ describe('professional standards', () => {
 
     const issue = issues.find((i) => i.message.includes('industry-leading'));
     expect(issue).toBeDefined();
-    expect(issue!.severity).toBe('major');
+    expect(issue!.severity).toBe('soft_fail');
   });
 
   it('catches a superlative that would need substantiating in law', () => {
@@ -494,7 +504,7 @@ describe('the end card', () => {
     });
     const issue = issues.find((i) => /names no action/.test(i.message));
     expect(issue).toBeDefined();
-    expect(issue!.severity).toBe('major');
+    expect(issue!.severity).toBe('soft_fail');
   });
 
   it('has no opinion when no end card was asked for', () => {
@@ -515,7 +525,7 @@ describe('scenes that show nothing', () => {
 
     const issue = issues.find((i) => /renders as .* of black/.test(i.message));
     expect(issue).toBeDefined();
-    expect(issue!.severity).toBe('blocker');
+    expect(issue!.severity).toBe('hard_fail');
     expect(issue!.repair).toBe('remove_scene');
   });
 
@@ -634,7 +644,7 @@ describe('a film that repeats itself', () => {
 
     const issue = issues.find((i) => /is on screen 2 times/.test(i.message));
     expect(issue).toBeDefined();
-    expect(issue!.severity).toBe('major');
+    expect(issue!.severity).toBe('soft_fail');
   });
 
   it('allows a single word to repeat as a rhythmic device', () => {

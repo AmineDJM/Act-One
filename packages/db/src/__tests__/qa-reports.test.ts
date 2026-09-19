@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   Concept,
+  QaIssue,
   CreativeTreatment,
   Storyboard,
   newId,
@@ -123,28 +124,23 @@ function report(projectId: string, renderId: string, over: Partial<QaReport> = {
     renderId,
     projectId,
     passed: true,
+    state: 'ready',
+    attempt: 0,
     issues: [],
-    repairActions: [],
+    repairs: [],
+    extraCostUsd: 0,
+    extraLatencyMs: 0,
+    layers: [],
     framesInspected: 0,
     createdAt: new Date().toISOString(),
     ...over,
   };
 }
 
-function issue(check: QaReport['issues'][number]['check'], severity: QaReport['issues'][number]['severity']) {
-  return {
-    id: newId('ast'),
-    check,
-    severity,
-    sceneId: null,
-    atSeconds: null,
-    message: `${check} fired`,
-    evidenceAssetId: null,
-    confidence: 0.9,
-    repair: null,
-    detectedBy: 'deterministic' as const,
-  };
+function issue(check: QaIssue['check'], severity: QaIssue['severity']): QaIssue {
+  return QaIssue.parse({ id: newId('ast'), check, severity, message: `${check} fired`, confidence: 0.9 });
 }
+
 
 describe.each(storeCases())('qa reports ($name)', ({ open, close }) => {
   it('reads back every verdict, newest first, with the workspace that earned it', async () => {
@@ -156,7 +152,7 @@ describe.each(storeCases())('qa reports ($name)', ({ open, close }) => {
         report(acme.project.id, acme.render.id, {
           passed: false,
           createdAt: '2026-01-01T00:00:00.000Z',
-          issues: [issue('safe_area', 'blocker')],
+          issues: [issue('safe_area', 'hard_fail')],
         }),
         acme.organization.id,
       );
@@ -173,7 +169,7 @@ describe.each(storeCases())('qa reports ($name)', ({ open, close }) => {
       // Newest first: an operator opening this wants the last film, not the first.
       expect(mine[0]!.organizationId).toBe(rival.organization.id);
       expect(mine[1]).toMatchObject({ organizationId: acme.organization.id, passed: false });
-      expect(mine[1]!.issues[0]).toMatchObject({ check: 'safe_area', severity: 'blocker' });
+      expect(mine[1]!.issues[0]).toMatchObject({ check: 'safe_area', severity: 'hard_fail' });
     } finally {
       await close(store);
     }

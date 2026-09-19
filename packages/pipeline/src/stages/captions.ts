@@ -8,7 +8,7 @@ import {
   newId,
   toWebVtt,
   type CaptionCue,
-  type QaIssue,
+  type QaFinding,
 } from '@act-one/core';
 import type { StageContext } from '../context.ts';
 
@@ -45,7 +45,7 @@ export type FilmCaptions = {
   cues: CaptionCue[];
   /** The sidecar, ready to store. Empty when there is nothing to caption. */
   vtt: string;
-  issues: QaIssue[];
+  issues: QaFinding[];
   /** How many passages were timed from the audio rather than estimated. */
   alignedPassages: number;
   passages: number;
@@ -161,13 +161,13 @@ const STANDARDS = indexStandards(CAPTION_STANDARDS);
  * that cannot be read at the published rate has too many words in it, and
  * rewriting the copy to fix a caption is a decision the customer makes.
  */
-function toIssues(cues: readonly CaptionCue[], language: string | null): QaIssue[] {
+function toIssues(cues: readonly CaptionCue[], language: string | null): QaFinding[] {
   return captionFindings(cues, { language }).map((finding) => {
     const standard = STANDARDS.get(finding.standardId);
     return {
       id: newId('evt'),
       check: 'caption_readability' as const,
-      severity: 'minor' as const,
+      severity: 'warning' as const,
       sceneId: null,
       atSeconds: finding.atSeconds,
       message: standard ? `${finding.message} (${cite(standard)})` : finding.message,

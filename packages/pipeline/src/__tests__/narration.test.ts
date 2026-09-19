@@ -226,7 +226,7 @@ describe('the narration engine', () => {
     expect(assets.map((asset) => asset.metadata['selected'])).toEqual(expect.arrayContaining([true, false]));
     const rejected = assets.find((asset) => asset.metadata['selected'] === false);
     expect(rejected?.metadata['findings']).toEqual(
-      expect.arrayContaining([expect.objectContaining({ check: 'narration_language', severity: 'blocker' })]),
+      expect.arrayContaining([expect.objectContaining({ check: 'narration_language', severity: 'hard_fail' })]),
     );
   });
 
@@ -300,7 +300,7 @@ describe('the narration engine', () => {
     });
     expect(result.failed).toEqual(['p1']);
     expect(result.tracks.map((track) => track.passageId)).toEqual(['p2']);
-    expect(result.issues).toEqual([expect.objectContaining({ check: 'missing_audio', sceneId: 'scn_1', severity: 'major' })]);
+    expect(result.issues).toEqual([expect.objectContaining({ check: 'missing_audio', sceneId: 'scn_1', severity: 'soft_fail' })]);
     expect(result.usage.failed).toBe(2);
   });
 

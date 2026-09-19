@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { qaVerdict, type QaIssue, type QaReport, type QaSeverity } from '@act-one/core';
+import { SEVERITY_ORDER, blocksRelease, qaVerdict, type QaIssue, type QaReport, type QaSeverity } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
 import styles from '../admin.module.css';
 
@@ -34,7 +34,7 @@ export default async function QualityPage() {
   const judged = reports.length;
   const passed = reports.filter((report) => report.passed).length;
   const issues = reports.flatMap((report) => report.issues);
-  const blockers = issues.filter((issue) => issue.severity === 'blocker');
+  const blockers = issues.filter((issue) => blocksRelease(issue.severity));
 
   /*
    * Ranked by how often a check fires, not by severity.
@@ -207,13 +207,11 @@ function Metric({ label, value, note }: { label: string; value: string; note?: s
   );
 }
 
-const SEVERITY_ORDER: Record<QaSeverity, number> = { note: 0, minor: 1, major: 2, blocker: 3 };
-
-/* Never the accent: a "major" in the colour the product uses for good news
+/* Never the accent: a failure in the colour the product uses for good news
    reads as a pass, which is the opposite of what it is. */
 function toneFor(severity: QaIssue['severity']): string {
-  if (severity === 'blocker') return 'danger';
-  if (severity === 'major') return 'warn';
+  if (severity === 'hard_fail' || severity === 'critical_fail') return 'danger';
+  if (severity === 'soft_fail') return 'warn';
   return 'muted';
 }
 

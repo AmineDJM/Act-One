@@ -31,7 +31,7 @@ import {
   visualMix,
   weaselPhrasesIn,
   type BrandSystem,
-  type QaIssue,
+  type QaFinding,
   type Scene,
   type Storyboard,
 } from '@act-one/core';
@@ -71,8 +71,8 @@ export type DeterministicInput = {
   assetResolutions?: Record<string, { width: number; height: number }>;
 };
 
-export function runDeterministicChecks(input: DeterministicInput): QaIssue[] {
-  const issues: QaIssue[] = [];
+export function runDeterministicChecks(input: DeterministicInput): QaFinding[] {
+  const issues: QaFinding[] = [];
   const tokens = resolveTokens(input.brand, { aspect: input.aspect });
 
   for (const scene of input.storyboard.scenes) {
@@ -85,11 +85,11 @@ export function runDeterministicChecks(input: DeterministicInput): QaIssue[] {
     issues.push({
       id: newId('evt'),
       sceneId: null,
-      atSeconds: null,
+      timecodeStart: null,
       detectedBy: 'deterministic',
       evidenceAssetId: null,
       check: 'composition',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `"${input.cta}" names no action (${cite(CONVERSION_STANDARDS.singleCta)}). ` +
         'It is what you write when nobody decided what the viewer should do.',
@@ -101,15 +101,15 @@ export function runDeterministicChecks(input: DeterministicInput): QaIssue[] {
   return issues;
 }
 
-function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInput): QaIssue[] {
-  const issues: QaIssue[] = [];
+function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInput): QaFinding[] {
+  const issues: QaFinding[] = [];
   const add = (
-    issue: Omit<QaIssue, 'id' | 'sceneId' | 'atSeconds' | 'detectedBy' | 'evidenceAssetId'>,
+    issue: Omit<QaFinding, 'id' | 'sceneId' | 'timecodeStart' | 'detectedBy' | 'evidenceAssetId'>,
   ) => {
     issues.push({
       id: newId('evt'),
       sceneId: scene.id,
-      atSeconds: scene.startTime,
+      timecodeStart: scene.startTime,
       detectedBy: 'deterministic',
       evidenceAssetId: null,
       ...issue,
@@ -139,7 +139,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (widest > maxWidth + 1) {
       add({
         check: 'text_clipping',
-        severity: 'blocker',
+        severity: 'hard_fail',
         message: `Copy overflows the safe width at ${token.sizePx}px: "${text.slice(0, 60)}…"`,
         confidence: 1,
         repair: 'relayout_text',
@@ -150,7 +150,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (lines.length > 4) {
       add({
         check: 'text_overflow',
-        severity: 'major',
+        severity: 'soft_fail',
         message: `${lines.length} lines of on-screen copy. Four is the most that reads as design.`,
         confidence: 1,
         repair: 'rewrite_copy',
@@ -162,7 +162,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (scene.duration < needed) {
       add({
         check: 'text_overflow',
-        severity: 'blocker',
+        severity: 'hard_fail',
         message:
           `${words} words need ${needed.toFixed(1)}s to read; the scene runs ` +
           `${scene.duration.toFixed(1)}s (${cite(TYPE_STANDARDS.readingTime)}).`,
@@ -177,7 +177,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (longest > MEASURE_MAX_ON_SCREEN) {
       add({
         check: 'text_overflow',
-        severity: 'minor',
+        severity: 'warning',
         message:
           `A line runs ${longest} characters; ${MEASURE_MAX_ON_SCREEN} is the comfortable ` +
           `maximum on screen (${cite(TYPE_STANDARDS.measure)}).`,
@@ -192,7 +192,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
       if (!endsDangling(line)) continue;
       add({
         check: 'text_overflow',
-        severity: 'major',
+        severity: 'soft_fail',
         message:
           `"${line}" ends mid-thought. On-screen copy is read once and nothing follows it ` +
           `on the frame (${cite(EDITORIAL_STANDARDS.plainLanguage)}).`,
@@ -204,7 +204,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     for (const phrase of urgencyPhrasesIn(`${text} ${scene.narration}`)) {
       add({
         check: 'unsupported_claim',
-        severity: 'major',
+        severity: 'soft_fail',
         message:
           `"${phrase}" invents urgency (${cite(CONVERSION_STANDARDS.noFakeUrgency)}). ` +
           'A deadline the company has not set is a deceptive practice, not a hook.',
@@ -216,7 +216,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     for (const phrase of weaselPhrasesIn(text)) {
       add({
         check: 'unsupported_claim',
-        severity: 'major',
+        severity: 'soft_fail',
         message: `"${phrase}" asserts evidence without carrying any (${cite(EDITORIAL_STANDARDS.weasel)}).`,
         confidence: 1,
         repair: 'rewrite_copy',
@@ -226,7 +226,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     for (const superlative of superlativesIn(text)) {
       add({
         check: 'unsupported_claim',
-        severity: 'major',
+        severity: 'soft_fail',
         message:
           `"${superlative}" is an objective claim in advertising law and needs substantiation ` +
           `(${cite(EDITORIAL_STANDARDS.superlatives)}).`,
@@ -239,7 +239,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (containsStatistic(text) && scene.claimEvidenceIds.length === 0) {
       add({
         check: 'unsupported_claim',
-        severity: 'blocker',
+        severity: 'hard_fail',
         message:
           `"${text.slice(0, 60)}" puts a figure on screen with nothing behind it ` +
           `(${cite(EDITORIAL_STANDARDS.numbers)}).`,
@@ -253,7 +253,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (ratio < minimum) {
       add({
         check: 'contrast',
-        severity: 'blocker',
+        severity: 'hard_fail',
         message:
           `Text contrast is ${ratio.toFixed(1)}:1 against the canvas; ${minimum}:1 is the floor ` +
           `(${cite(COLOR_STANDARDS.textContrast)}).`,
@@ -266,7 +266,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   if (scene.duration < MIN_SHOT_SECONDS) {
     add({
       check: 'transition_quality',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `${scene.duration.toFixed(2)}s is below the ${MIN_SHOT_SECONDS}s floor: the viewer ` +
         `registers a disturbance rather than a shot (${cite(MOTION_STANDARDS.minimumShot)}).`,
@@ -278,7 +278,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   if (scene.narration && scene.narration.split(/\s+/).length / 2.35 > scene.duration + 0.4) {
     add({
       check: 'text_overflow',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message: 'Narration is longer than the scene it sits in and will be cut off mid-word.',
       confidence: 1,
       repair: 'rewrite_copy',
@@ -293,7 +293,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   if (!sceneShowsSomething(scene)) {
     add({
       check: 'composition',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message:
         `A ${scene.visualType.replace(/_/g, ' ')} scene with no text, no capture and no shot ` +
         `behind it. It renders as ${scene.duration.toFixed(1)}s of black.`,
@@ -311,7 +311,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   ) {
     add({
       check: 'fake_product_ui',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message: 'A product scene with no captured asset behind it. We never render an invented interface.',
       confidence: 1,
       repair: 'recapture_product',
@@ -325,7 +325,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   ) {
     add({
       check: 'unsupported_claim',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message: 'This scene cites evidence this project does not hold.',
       confidence: 1,
       repair: 'rewrite_copy',
@@ -337,7 +337,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (!need.mustNotContainText) {
       add({
         check: 'legible_generated_text',
-        severity: 'blocker',
+        severity: 'hard_fail',
         message: 'A generated shot was allowed to contain text. Generative models cannot set type.',
         confidence: 1,
         repair: 'regenerate_shot',
@@ -351,7 +351,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     if (resolution && resolution.width < minimum) {
       add({
         check: 'asset_resolution',
-        severity: 'major',
+        severity: 'soft_fail',
         message: `Asset is ${resolution.width}px wide against a ${tokens.frame.width}px frame and will look soft.`,
         confidence: 1,
         repair: 'recapture_product',
@@ -362,15 +362,15 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   return issues;
 }
 
-function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
-  const issues: QaIssue[] = [];
+function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaFinding[] {
+  const issues: QaFinding[] = [];
   const add = (
-    issue: Omit<QaIssue, 'id' | 'sceneId' | 'atSeconds' | 'detectedBy' | 'evidenceAssetId'>,
+    issue: Omit<QaFinding, 'id' | 'sceneId' | 'timecodeStart' | 'detectedBy' | 'evidenceAssetId'>,
   ) => {
     issues.push({
       id: newId('evt'),
       sceneId: null,
-      atSeconds: null,
+      timecodeStart: null,
       detectedBy: 'deterministic',
       evidenceAssetId: null,
       ...issue,
@@ -379,7 +379,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
 
   const scenes = storyboard.scenes;
   if (scenes.length === 0) {
-    add({ check: 'composition', severity: 'blocker', message: 'The film has no scenes.', confidence: 1, repair: 'manual_review' });
+    add({ check: 'composition', severity: 'hard_fail', message: 'The film has no scenes.', confidence: 1, repair: 'manual_review' });
     return issues;
   }
 
@@ -390,7 +390,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (scenes.length >= 5 && distinct.size <= 2) {
     add({
       check: 'transition_quality',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `Only ${distinct.size} distinct motion treatments across ${scenes.length} scenes ` +
         `(${cite(MOTION_STANDARDS.variety)}).`,
@@ -403,7 +403,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (run > MAX_CONSECUTIVE_SAME_TREATMENT) {
     add({
       check: 'transition_quality',
-      severity: 'minor',
+      severity: 'warning',
       message:
         `The same treatment runs for ${run} consecutive scenes; ` +
         `${MAX_CONSECUTIVE_SAME_TREATMENT} is the most that reads as a choice ` +
@@ -419,7 +419,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (scenes.length >= 5 && variation < MIN_RHYTHM_VARIATION) {
     add({
       check: 'composition',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `Shot lengths vary by ${(variation * 100).toFixed(0)}% of their mean; below ` +
         `${(MIN_RHYTHM_VARIATION * 100).toFixed(0)}% the edit has no rhythm ` +
@@ -455,7 +455,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     if (count < 2) continue;
     add({
       check: 'composition',
-      severity: 'major',
+      severity: 'soft_fail',
       message: `"${line}" is on screen ${count} times. A film that repeats itself was not edited.`,
       confidence: 1,
       repair: 'rewrite_copy',
@@ -467,7 +467,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (!opensOnSubject(scenes)) {
     add({
       check: 'composition',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `The film opens on branding for its first ${HOOK_SECONDS}s rather than on the ` +
         `problem or the product (${cite(CONVERSION_STANDARDS.hook)}).`,
@@ -492,7 +492,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     if (total > 0 && here.startTime / total >= PROOF_BLOCK_START) {
       add({
         check: 'composition',
-        severity: 'minor',
+        severity: 'warning',
         message:
           `Scenes ${here.index + 1} and ${next.index + 1} stack proof at the end of the film ` +
           `(${cite(CONVERSION_STANDARDS.proofPlacement)}). Evidence belongs after the claim it supports.`,
@@ -523,7 +523,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     ) {
       add({
         check: 'transition_quality',
-        severity: 'minor',
+        severity: 'warning',
         message:
           `Scenes ${previous.index + 1} and ${scene.index + 1} show the same capture with the same ` +
           `treatment and camera move (${cite(MOTION_STANDARDS.thirtyDegree)}). The cut between ` +
@@ -538,7 +538,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
     if (Math.abs(before) > 0.005 && Math.abs(after) > 0.005 && Math.sign(before) !== Math.sign(after)) {
       add({
         check: 'transition_quality',
-        severity: 'minor',
+        severity: 'warning',
         message:
           `The camera drifts ${before > 0 ? 'right' : 'left'} across scene ${previous.index + 1} and ` +
           `${after > 0 ? 'right' : 'left'} across scene ${scene.index + 1}, on the same capture ` +
@@ -563,7 +563,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (families.size > MAX_TYPE_FAMILIES) {
     add({
       check: 'brand_consistency',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `${families.size} typefaces across the film; ${MAX_TYPE_FAMILIES} is the limit ` +
         `(${cite(TYPE_STANDARDS.families)}).`,
@@ -579,7 +579,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (spoken > 0 && written === 0) {
     add({
       check: 'composition',
-      severity: 'major',
+      severity: 'soft_fail',
       message:
         `Every line in this film is spoken and none of it is on screen; muted playback ` +
         `carries none of it (${cite(CONVERSION_STANDARDS.soundOff)}).`,
@@ -592,7 +592,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (mix.generative > 0.45) {
     add({
       check: 'brand_consistency',
-      severity: 'major',
+      severity: 'soft_fail',
       message: `${(mix.generative * 100).toFixed(0)}% of the film is generated footage.`,
       confidence: 1,
       repair: 'regenerate_shot',
@@ -604,7 +604,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (!withinSafeArea(grid, grid.safe)) {
     add({
       check: 'safe_area',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message: `The layout grid falls outside title safe (${cite(LAYOUT_STANDARDS.titleSafe)}).`,
       confidence: 1,
       repair: 'manual_review',
@@ -616,7 +616,7 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaIssue[] {
   if (!withinInset(grid.safe, frame, TITLE_SAFE_INSET)) {
     add({
       check: 'safe_area',
-      severity: 'blocker',
+      severity: 'hard_fail',
       message:
         `The grid's safe box is inside the ${(TITLE_SAFE_INSET * 100).toFixed(1)}% text-safe ` +
         `inset (${cite(LAYOUT_STANDARDS.titleSafe)}).`,
