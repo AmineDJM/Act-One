@@ -129,7 +129,17 @@ const movingShot = (index: number, duration: number, assetId: string) =>
 /** `npm run prove:repair-loop -- --absorbing` proves the accepting path instead. */
 const absorbing = process.argv.includes('--absorbing');
 
-const root = await mkdtemp(path.join(tmpdir(), 'act-one-loop-'));
+/*
+ * The same storage a deployment uses, when one is configured.
+ *
+ * The sound library lives in storage, and a proof that writes to a fresh
+ * temporary directory has no library in it — so every film it renders comes
+ * out silent and carries a `missing_audio` finding that says more about the
+ * fixture than about the loop. `npm run sound-library` puts the library in
+ * ACT_ONE_STORAGE_DIR; this uses it when it is there.
+ */
+const root =
+  process.env['ACT_ONE_STORAGE_DIR'] ?? (await mkdtemp(path.join(tmpdir(), 'act-one-proof-')));
 const storage = new LocalFsStorageProvider({ root });
 const registry = new ProviderRegistry({ costSink: new NullCostSink(), overrides: { storage } });
 

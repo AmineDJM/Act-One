@@ -155,7 +155,17 @@ const first = await store.storyboards.create(
 );
 await store.projects.update(organizationId, project.id, { activeStoryboardId: first.id });
 
-const root = await mkdtemp(path.join(tmpdir(), 'act-one-replan-'));
+/*
+ * The same storage a deployment uses, when one is configured.
+ *
+ * The sound library lives in storage, and a proof that writes to a fresh
+ * temporary directory has no library in it — so every film it renders comes
+ * out silent and carries a `missing_audio` finding that says more about the
+ * fixture than about the loop. `npm run sound-library` puts the library in
+ * ACT_ONE_STORAGE_DIR; this uses it when it is there.
+ */
+const root =
+  process.env['ACT_ONE_STORAGE_DIR'] ?? (await mkdtemp(path.join(tmpdir(), 'act-one-proof-')));
 const registry = new ProviderRegistry({
   overrides: { storage: new LocalFsStorageProvider({ root }) },
 });
