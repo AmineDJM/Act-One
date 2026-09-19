@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   FilmFormat,
   PITCH_PRODUCT_CEILING,
+  PITCH_PRODUCT_LIMIT,
   PRODUCT_NAVIGATION_VISUAL_TYPES,
   REAL_PRODUCT_VISUAL_TYPES,
   budgetFor,
   pitchDrift,
+  pitchIsNavigationLed,
   type Concept,
   type VisualType,
 } from '@act-one/core';
@@ -107,37 +109,77 @@ describe('the four ways a pitch becomes a tour', () => {
     expect(pitchDrift(honest)).toEqual([]);
   });
 
-  it('catches the interface being driven, however briefly', () => {
+  it('stops the interface being driven, however briefly', () => {
+    // The one categorical rule left: a cursor crossing a live interface is a
+    // demonstration however short it runs.
     const driven = honest.map((entry) =>
       entry.id === 'c' ? { ...entry, visualType: 'product_ui' as VisualType, duration: 0.5 } : entry,
     );
-    expect(pitchDrift(driven).map((drift) => drift.kind)).toContain('navigated');
+    const drift = pitchDrift(driven);
+    expect(drift.map((entry) => entry.kind)).toContain('navigated');
+    expect(pitchIsNavigationLed(drift)).toBe(true);
   });
 
-  it('catches a film that opens on the product, because that is what it is about', () => {
+  it('notes a film that opens on the product without refusing it', () => {
     const opened = [
       scene({ id: 'z', index: 0, visualType: 'screenshot_motion', duration: 1 }),
       ...honest.slice(1),
     ];
-    const kinds = pitchDrift(opened).map((drift) => drift.kind);
-    expect(kinds).toContain('opens_on_product');
+    const drift = pitchDrift(opened);
+    expect(drift.map((entry) => entry.kind)).toContain('opens_on_product');
+    // A director may open on a striking frame of the product and be right.
+    expect(pitchIsNavigationLed(drift)).toBe(false);
   });
 
-  it('catches two product shots cut together, which is a walkthrough', () => {
+  it('notes two product shots cut together without refusing them', () => {
     const sequence = honest.map((entry) =>
       entry.id === 'd' ? { ...entry, visualType: 'screenshot_motion' as VisualType, duration: 1 } : entry,
     );
-    expect(pitchDrift(sequence).map((drift) => drift.kind)).toContain('product_spine');
+    const drift = pitchDrift(sequence);
+    expect(drift.map((entry) => entry.kind)).toContain('product_spine');
+    expect(pitchIsNavigationLed(drift)).toBe(false);
   });
 
-  it('catches a demonstration with an atmospheric introduction', () => {
+  it('advises past the usual share, rather than forbidding it', () => {
+    // A quarter of the film on the product is above what this format usually
+    // holds to and well within what a director may defend. The system says so
+    // and does not stop the film.
+    const generous = [
+      scene({ id: 'a', index: 0, visualType: 'kinetic_typography', duration: 4 }),
+      scene({ id: 'b', index: 1, visualType: 'screenshot_motion', duration: 3 }),
+      scene({ id: 'c', index: 2, visualType: 'statistic', duration: 3 }),
+      scene({ id: 'd', index: 3, visualType: 'generated_broll', duration: 2 }),
+    ];
+    const over = pitchDrift(generous).find((drift) => drift.kind === 'over_ceiling');
+    expect(over?.severity).toBe('advisory');
+    expect(over?.message).toMatch(new RegExp(`${Math.round(PITCH_PRODUCT_CEILING * 100)}%`));
+    expect(pitchIsNavigationLed(pitchDrift(generous))).toBe(false);
+  });
+
+  it('stops a film that is mostly interface, whatever was intended by it', () => {
     const mostly = [
       scene({ id: 'a', index: 0, visualType: 'kinetic_typography', duration: 2 }),
       scene({ id: 'b', index: 1, visualType: 'screenshot_motion', duration: 8 }),
       scene({ id: 'c', index: 2, visualType: 'statistic', duration: 2 }),
     ];
     const over = pitchDrift(mostly).find((drift) => drift.kind === 'over_ceiling');
-    expect(over?.message).toMatch(new RegExp(`${Math.round(PITCH_PRODUCT_CEILING * 100)}%`));
+    expect(over?.severity).toBe('blocking');
+    expect(over?.message).toMatch(new RegExp(`${Math.round(PITCH_PRODUCT_LIMIT * 100)}%`));
+    expect(pitchIsNavigationLed(pitchDrift(mostly))).toBe(true);
+  });
+
+  it('treats one signal as a choice and all of them together as a tour', () => {
+    // Opens on it, cuts two together, and over the usual share — each
+    // defensible alone, and a walkthrough with the lights down in combination.
+    const tour = [
+      scene({ id: 'a', index: 0, visualType: 'screenshot_motion', duration: 3 }),
+      scene({ id: 'b', index: 1, visualType: 'product_ui_3d', duration: 3 }),
+      scene({ id: 'c', index: 2, visualType: 'kinetic_typography', duration: 6 }),
+      scene({ id: 'd', index: 3, visualType: 'statistic', duration: 6 }),
+    ];
+    const drift = pitchDrift(tour);
+    expect(drift.filter((entry) => entry.severity === 'advisory').length).toBeGreaterThanOrEqual(3);
+    expect(pitchIsNavigationLed(drift)).toBe(true);
   });
 
   it('says nothing about a film with no scenes in it', () => {
@@ -277,12 +319,12 @@ describe('the storyboard a pitch actually gets', () => {
 
   it('reports the drift rather than silently producing a tour', async () => {
     // Every scene asked for the product, so this plan *is* a tour. The engine
-    // stops it driving anything; the violations say what is still wrong, which
-    // is what the repair loop and the render guard act on.
-    const { storyboard, violations } = await build(productArchetypes, 'pitch');
+    // stops it driving anything; the drift says what is still wrong, which is
+    // what the render guard and the console act on.
+    const { storyboard } = await build(productArchetypes, 'pitch');
     const drift = pitchDrift(storyboard.scenes);
     expect(drift.length).toBeGreaterThan(0);
-    expect(violations.some((violation) => violation.kind === 'pitch_drift')).toBe(true);
+    expect(pitchIsNavigationLed(drift)).toBe(true);
   });
 
   it('is shown a few moments to cut to, not the whole list to plan from', async () => {

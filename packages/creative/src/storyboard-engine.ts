@@ -46,7 +46,14 @@ import {
 } from './systems/index.ts';
 import { routeShot, enforceBudget, checkBudget, type BudgetViolation } from './shot-routing.ts';
 import { copyFits, fitToDuration, narrationSeconds, readingSeconds, varyRhythm, type TimingConstraint } from './timing.ts';
-import { canOpenAShort, shortRhythm, shortStructureLines, withAttentionReset } from './short-form.ts';
+import {
+  canOpenAShort,
+  needsAttention,
+  opensOnAPatternInterrupt,
+  shortRhythm,
+  shortStructureLines,
+  withAttentionReset,
+} from './short-form.ts';
 
 /**
  * The Storyboard Engine.
@@ -172,7 +179,28 @@ export class StoryboardEngine {
       cutSeconds(cut, input.brief.durationSeconds ?? input.concept.estimatedDurationSeconds);
 
     const plan = await this.plan(input, system, archetypes, target, context);
-    const built = this.materialise(plan, input, system, archetypes, target);
+    let built = this.materialise(plan, input, system, archetypes, target);
+
+    /*
+     * A short whose opening is wrong gets a new one written, not shuffled.
+     *
+     * The order of a film is an argument. Promoting a beat out of the middle
+     * to patch the top breaks the continuity either side of where it was and
+     * lands the viewer mid-thought, which is a worse film than one that opens
+     * slowly. So the planner is asked again, told exactly what was wrong, and
+     * writes an opening — which is what a director would do.
+     *
+     * Once, and only when it failed: a second deep call is real money, and the
+     * first plan is kept when the second does no better, so the cost buys an
+     * improvement or nothing changes.
+     */
+    if (cut === 'short' && !opensOnAPatternInterrupt(built.storyboard.scenes)) {
+      const rewritten = await this.plan(input, system, archetypes, target, context, {
+        rewriteOpening: openingProblem(built.storyboard.scenes),
+      });
+      const second = this.materialise(rewritten, input, system, archetypes, target);
+      if (opensOnAPatternInterrupt(second.storyboard.scenes)) built = second;
+    }
 
     const budget = { ...budgetFor(input.brief.creativeMode, format) };
     const withinBudget = enforceBudget(built.storyboard, budget);
@@ -271,6 +299,8 @@ export class StoryboardEngine {
     archetypes: SceneArchetype[],
     target: number,
     context: CallContext,
+    /** Set on the second pass, when the first film opened on setup. */
+    retry: { rewriteOpening: string } | null = null,
   ): Promise<z.infer<typeof ScenePlan>> {
     const format = input.brief.filmFormat;
     const cut = input.brief.filmCut;
@@ -365,6 +395,17 @@ export class StoryboardEngine {
             `CTA at the end: ${input.treatment.cta}`,
             input.brief.realMediaOnly ? 'Real media only: no generative briefs at all.' : '',
             `Hard prohibitions: ${system.prohibitions.join('; ')}`,
+            ...(retry
+              ? [
+                  ``,
+                  `# The opening has to be written again`,
+                  retry.rewriteOpening,
+                  `Write a new opening rather than moving a later beat to the front: the order of`,
+                  `this film is an argument, and taking a shot out of the middle to patch the top`,
+                  `breaks what is either side of it. Scene 1 should say the strongest thing this`,
+                  `film has to say, immediately, and the beats after it should still follow from it.`,
+                ]
+              : []),
           ]
             .filter(Boolean)
             .join('\n'),
@@ -374,7 +415,10 @@ export class StoryboardEngine {
         schema: ScenePlan,
         schemaName: 'ScenePlan',
         tier: 'deep',
-        temperature: 0.6,
+        // Warmer on the rewrite: asked again at the same temperature, a model
+        // returns the plan it just returned, and the second deep call buys
+        // nothing.
+        temperature: retry ? 0.8 : 0.6,
         maxOutputTokens: 6000,
         repairAttempts: 1,
       },
@@ -416,7 +460,7 @@ export class StoryboardEngine {
      * Carried for the same reason as the recipe: two identical camera moves in
      * a row is one long move with a cut in it, which resets nothing.
      */
-    let previousMove: CameraRecipe['move'] | null = null;
+
 
     /*
      * Real pictures first. A scene the planner gave a library picture shows
@@ -505,18 +549,7 @@ export class StoryboardEngine {
       );
       previousRecipe = motionRecipe.name;
 
-      /*
-       * In a feed, a frame that does nothing for two seconds is a scroll. The
-       * reset is a property of the shot rather than a note in a brief, so it
-       * is decided here where the shot is built.
-       */
-      const cameraRecipe =
-        cut === 'short'
-          ? withAttentionReset(cameraFor(archetype, input.brand), {
-              ...(previousMove ? { previousMove } : {}),
-            })
-          : cameraFor(archetype, input.brand);
-      previousMove = cameraRecipe.move;
+      const cameraRecipe = cameraFor(archetype, input.brand);
 
       const scene: Scene = {
         id: sceneId,
@@ -588,26 +621,20 @@ export class StoryboardEngine {
     const kept = drafted.filter((entry) => sceneShowsSomething(entry.scene));
 
     /*
-     * A short never opens on setup.
+     * Nothing is reordered here, in either cut.
      *
-     * The mark, a bare transition and an empty frame are all introduction, and
-     * introduction at the top of a reel is the most reliable way there is to
-     * lose the audience — by the time it clears the screen the decision has
-     * been made. So the first shot that actually says something is moved to
-     * the front rather than dropped: it is the film's strongest material, and
-     * it was sitting behind a title card.
+     * A short must not open on setup, and the first attempt at that promoted
+     * the first informative shot to the front — which trades one problem for
+     * a worse one. The order of a film is an argument; moving a beat out of
+     * the middle to patch the top breaks the continuity either side of where
+     * it was and lands the viewer mid-thought. A reel that opens well and
+     * makes no sense is not an improvement on one that opens slowly.
      *
-     * Moved rather than refused, because refusing hands the customer a failed
-     * production over a fixable ordering mistake.
+     * So a bad opening is written again rather than shuffled: `build` hands
+     * the planner what was wrong with it and asks for another. That is what a
+     * director does, and it is the only thing that can actually fix it.
      */
-    const ordered =
-      cut === 'short' && kept.length > 1 && !canOpenAShort(kept[0]!.scene)
-        ? (() => {
-            const opener = kept.findIndex((entry) => canOpenAShort(entry.scene));
-            if (opener <= 0) return kept;
-            return [kept[opener]!, ...kept.filter((_, index) => index !== opener)];
-          })()
-        : kept;
+    const ordered = kept;
 
     const scenes: Scene[] = ordered.map((entry, index) => ({ ...entry.scene, index }));
 
@@ -680,27 +707,25 @@ export class StoryboardEngine {
       updatedAt: new Date().toISOString(),
     });
 
+    const scored = sequenced.scenes.map((scene, index) => ({
+      ...scene,
+      soundCues: soundCuesFor(
+        scene,
+        /*
+         * The scene's own archetype, not the plan's entry at the same
+         * position. They were already different whenever a scene was dropped
+         * for having nothing on it — so a film could take its sound cues from
+         * a beat that is no longer there.
+         */
+        this.resolveArchetype(archetypes, ordered[index]?.planned.archetypeId ?? '', index, scenes.length),
+        system,
+        index,
+        sequenced.scenes.length,
+      ),
+    }));
+
     return {
-      storyboard: {
-        ...sequenced,
-        scenes: sequenced.scenes.map((scene, index) => ({
-          ...scene,
-          soundCues: soundCuesFor(
-            scene,
-            /*
-             * The scene's own archetype, not the plan's entry at the same
-             * position. They were already different whenever a scene was
-             * dropped for having nothing on it, and a short may reorder its
-             * opening as well — so a film could take its sound cues from a
-             * beat that is no longer there.
-             */
-            this.resolveArchetype(archetypes, ordered[index]?.planned.archetypeId ?? '', index, scenes.length),
-            system,
-            index,
-            sequenced.scenes.length,
-          ),
-        })),
-      },
+      storyboard: { ...sequenced, scenes: cut === 'short' ? attentive(scored) : scored },
       copyAdjustments,
     };
   }
@@ -732,6 +757,55 @@ export class StoryboardEngine {
     );
     return fuzzy ?? archetypes[index % archetypes.length]!;
   }
+}
+
+/**
+ * What is wrong with this opening, in the words the planner gets back.
+ *
+ * Specific rather than a restatement of the rule: a model told "open on the
+ * strongest thing" returns what it already returned, and a model told "your
+ * first shot is a logo holding for 1.4 seconds" writes a different one.
+ */
+export function openingProblem(scenes: readonly Scene[]): string {
+  const first = scenes[0];
+  if (!first) return 'This film has no opening shot at all.';
+  if (first.visualType === 'logo_reveal') {
+    return `Scene 1 is the brand mark, held for ${first.duration.toFixed(1)}s. In a feed that is the whole hook spent on a logo.`;
+  }
+  if (first.visualType === 'transition') {
+    return `Scene 1 is a transition, holding ${first.duration.toFixed(1)}s before anything is said.`;
+  }
+  if (!first.onScreenText.some((line) => line.trim().length > 0) && first.assetRefs.length === 0) {
+    return `Scene 1 puts nothing on screen for ${first.duration.toFixed(1)}s — no words and no picture, only the beat.`;
+  }
+  return `Scene 1 does not say anything for ${first.duration.toFixed(1)}s, which is the whole window this film has.`;
+}
+
+/**
+ * The last pass over a short: gives a frame something to do where nothing is.
+ *
+ * Runs here, at the end, rather than while each shot is drafted, because the
+ * question cannot be answered earlier. Whether a frame is empty depends on how
+ * long it finally runs, what shot precedes it and which sounds landed on it —
+ * and all three are decided after the drafting, by the timing fit, the
+ * retention curve and the sound pass.
+ *
+ * Narrow on purpose. A shot with a moving subject, an action playing out in
+ * it, type arriving or a sound on it is already doing something, and adding a
+ * camera move on top of one is the mistake this format is best known for. A
+ * held frame with a reason is left exactly as the system composed it.
+ */
+function attentive(scenes: readonly Scene[]): Scene[] {
+  let previousMove: CameraRecipe['move'] | null = null;
+  const out: Scene[] = [];
+  for (const [index, scene] of scenes.entries()) {
+    const reset: CameraRecipe = needsAttention(scene, out[index - 1] ?? scenes[index - 1])
+      ? withAttentionReset(scene.cameraRecipe, { ...(previousMove ? { previousMove } : {}) })
+      : scene.cameraRecipe;
+    previousMove = reset.move;
+    out.push(reset === scene.cameraRecipe ? scene : { ...scene, cameraRecipe: reset });
+  }
+  return out;
 }
 
 /** What the director is told a moment can show. */
@@ -823,12 +897,18 @@ function cutLines(cut: FilmCut, target: number): string[] {
     ``,
     `Scene 1 is the strongest thing in this film, not an introduction to it. No title card, no`,
     `logo, no establishing shot, no question before the idea — by the time those clear the screen`,
-    `the viewer has gone.`,
-    `Every shot earns its place. There is no beat here for atmosphere alone: at ${target} seconds a`,
-    `breath is a fraction of the whole film and reads as the film having ended.`,
-    `Something changes at least every two seconds — the framing, the scale, the subject, or what`,
-    `the type is doing. That is not a cut every two seconds: a film cut on a metronome is what`,
-    `this format looks like when somebody confuses retention with noise.`,
+    `the viewer has gone. It may be a line, a figure, a face or an image: what it may not be is`,
+    `set-up for one.`,
+    `Every shot earns its place. A beat of texture is allowed and has to be doing something the`,
+    `film needs — a pause before a payoff, a breath against a dense run — because at ${target}`,
+    `seconds it costs a fraction of the whole film. An accidental one is just the film stopping.`,
+    `Something is happening at all times, and the something may be stillness. A subject moving, an`,
+    `action inside the frame, type arriving, a sound landing, a cut to something else, a`,
+    `composition that has changed — any of those is the film alive, and a held frame is one of the`,
+    `strongest things in this form when it is a held reaction or a deliberate contrast. What fails`,
+    `is a frame where nothing is happening and nothing was meant to be. Do not answer this with a`,
+    `cut every two seconds or a zoom on every beat: that is what this format looks like when`,
+    `somebody confuses retention with noise.`,
     `The voice is not heard. Every scene that says something must also show it or write it: a`,
     `scene whose meaning lives only in the narration is a silent scene here.`,
     `The payoff lands before the last fifth. A film whose point arrives at the end is a film most`,

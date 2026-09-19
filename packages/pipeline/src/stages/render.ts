@@ -507,13 +507,29 @@ async function assertProductIsReal(context: StageContext, storyboard: Storyboard
    */
   if (context.project.brief.filmFormat === 'pitch') {
     const drift = pitchDrift(storyboard.scenes);
-    if (drift.length > 0) {
+    const blocking = drift.filter((entry) => entry.severity === 'blocking');
+    if (blocking.length > 0) {
       throw new AppError(
         'unsafe_operation',
-        `This production is a pitch film, and it has become a product tour. ${drift
+        `This production is a pitch film, and it has become a product tour. ${blocking
           .map((entry) => entry.message)
           .join(' ')} Switch the production to a product tour, or direct those scenes another way.`,
       );
+    }
+    /*
+     * The rest are signals rather than verdicts, and they go on the record
+     * instead of stopping the film. A pitch that opens on a striking frame of
+     * the product may be exactly what the director wanted; refusing to render
+     * it would be a system overruling the person it works for.
+     */
+    for (const entry of drift) {
+      await context.activity({
+        step: 'composition',
+        kind: 'note',
+        label: 'the story is meant to lead here',
+        detail: entry.message,
+        status: 'done',
+      });
     }
   }
 

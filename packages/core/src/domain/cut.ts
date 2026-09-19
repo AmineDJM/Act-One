@@ -92,15 +92,17 @@ export const FILM_CUTS: Record<FilmCut, CutSpec> = {
       'default, in a vertical frame, with the sound off, and the viewer leaves at any moment at ' +
       'no cost. The first second decides whether there is a second one, so it opens on the ' +
       'strongest thing in the film rather than building to it — no title card before the idea, ' +
-      'no logo before the hook, no establishing shot. Every shot earns its place: nothing is ' +
-      'held for atmosphere alone, and every beat carries its meaning in the picture and in the ' +
-      'words on it, because the voice is not heard. Something changes at least every two ' +
-      'seconds. The payoff lands before the last fifth. Higher information density, shorter ' +
-      'pauses, shorter shots, an earlier emotional peak and a tighter ending than a classic ' +
-      'film. Composed natively for a phone — subjects framed for a vertical screen, and the top ' +
-      'and bottom of the frame left to the platform. And still premium: this is attention ' +
-      'engineering, not decoration. A cut on a metronome, a zoom on every beat and a caption on ' +
-      'every word are what this format looks like when somebody confuses retention with noise.',
+      'no logo before the hook, no establishing shot. Every shot earns its place, and every beat ' +
+      'carries its meaning in the picture and in the words on it, because the voice is not ' +
+      'heard. Something is happening at all times, and the something may be stillness: a held ' +
+      'reaction, a beat of quiet before a payoff or a static frame against a dense run are ' +
+      'among the strongest things in the form. What fails is a frame where nothing is happening ' +
+      'and nothing was meant to be. Higher information density, shorter pauses, shorter shots, ' +
+      'an earlier emotional peak and a tighter ending than a classic film. Composed natively ' +
+      'for a phone — subjects framed for a vertical screen, and the top and bottom of the frame ' +
+      'left to the platform. And still premium: this is attention engineering, not decoration. ' +
+      'A cut on a metronome, a zoom on every beat and a caption on every word are what this ' +
+      'format looks like when somebody confuses retention with noise.',
   },
 };
 

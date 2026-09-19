@@ -52,6 +52,12 @@ export function runShortFormChecks(storyboard: Storyboard): QaIssue[] {
   if (!opensOnAPatternInterrupt(scenes)) {
     film({
       check: 'composition',
+      /*
+       * Major, and not a blocker. The engine has already asked the planner for
+       * a new opening once; this is what is left when that did no better, and
+       * it holds the storyboard for review rather than failing the production
+       * over a film somebody may still want.
+       */
       severity: 'major',
       sceneId: scenes[0]!.id,
       atSeconds: 0,
@@ -77,11 +83,15 @@ export function runShortFormChecks(storyboard: Storyboard): QaIssue[] {
       sceneId: scene.id,
       atSeconds: scene.startTime,
       message:
-        `Shot ${scene.index + 1} holds one arrangement for ${scene.duration.toFixed(1)}s with ` +
-        `nothing changing (${cite(SHORT_FORM_STANDARDS.attentionReset)}). Past ` +
-        `${ATTENTION_RESET_SECONDS}s a static frame reads as a still picture.`,
-      confidence: 0.9,
+        `Nothing is happening in shot ${scene.index + 1} for ${scene.duration.toFixed(1)}s — no ` +
+        `subject, no action, no arriving type, no sound and no change from the shot before ` +
+        `(${cite(SHORT_FORM_STANDARDS.attentionReset)}). A held frame is fine when the stillness ` +
+        `is doing something; past ${ATTENTION_RESET_SECONDS}s an empty one reads as the film ` +
+        'having stopped.',
+      confidence: 0.75,
       // Shortening the hold is the honest fix when nothing in the shot moves.
+      // A minor finding rather than a correction, because the director may
+      // have meant it and can see what no storyboard shows.
       repair: 'reduce_duration',
     });
   }

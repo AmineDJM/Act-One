@@ -291,12 +291,14 @@ export function checkBudget(
    *
    * The customer did not ask for a film with no interface in it; they asked
    * for a film that is not *about* the interface. So one glimpse passes, and
-   * the four ways a pitch turns into a tour — driving it, opening on it,
-   * cutting two of them together, or spending a fifth of the film on it —
-   * each come back as their own violation.
+   * only the drift that means the story has stopped leading is a violation —
+   * driving the interface, or a film that is mostly one. The signals short of
+   * that are a director's business and travel as notes on the production
+   * rather than as something to correct.
    */
   if (format === 'pitch') {
     for (const drift of pitchDrift(storyboard.scenes)) {
+      if (drift.severity !== 'blocking') continue;
       violations.push({ kind: 'pitch_drift', message: drift.message, sceneIds: drift.sceneIds });
     }
   }

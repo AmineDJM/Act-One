@@ -164,31 +164,124 @@ function positionOf(
 }
 
 /**
- * Shots that hold one arrangement for longer than attention survives.
+ * What is happening in a shot, if anything.
  *
- * A reset is any of: a cut to a different kind of shot, a camera that moves,
- * a change of scale, or type that arrives. A shot that has none of those and
- * runs past the window is a still frame in a feed, which is a scroll.
+ * Deliberately a list rather than a boolean, because the point of this
+ * refinement is that a reset has many sources and only one of them is the
+ * camera. A subject moving, an action playing out inside the frame, type
+ * arriving, a sound landing, a cut to a different kind of shot, a composition
+ * that has changed from the one before — any of these is the frame doing
+ * something, and a film that has one does not want a slow zoom added on top.
+ *
+ * The previous shot is passed because two of the sources are relational: a
+ * cutaway and a recomposition only exist against what came before.
+ */
+export function resetSources(scene: Scene, previous?: Scene): string[] {
+  const sources: string[] = [];
+  const camera: CameraRecipe = scene.cameraRecipe;
+
+  if (camera.move !== 'static') sources.push('camera');
+  if (
+    Math.abs(camera.toScale - camera.fromScale) > 0.02 ||
+    Math.abs(camera.toX - camera.fromX) > 0.01 ||
+    Math.abs(camera.toY - camera.fromY) > 0.01
+  ) {
+    sources.push('scale');
+  }
+
+  // A subject that moves of its own accord: commissioned footage, a 3D shot,
+  // a capture played rather than held.
+  if (MOVING_PICTURE.includes(scene.visualType) || scene.motionRecipe.name === 'footage') {
+    sources.push('subject');
+  }
+
+  // Action inside the frame: a sequence playing through a capture, a cursor
+  // crossing it, a window opening. The picture is still, the content is not.
+  if (INTERNAL_ACTION.includes(scene.motionRecipe.name)) sources.push('action');
+
+  // Type that arrives rather than appearing: a stagger across lines or words,
+  // or a recipe whose whole job is the arrival.
+  if (
+    (scene.motionRecipe.stagger > 0.01 && scene.onScreenText.length > 0) ||
+    ARRIVING_TYPE.includes(scene.motionRecipe.name)
+  ) {
+    sources.push('type');
+  }
+
+  // A sound landing inside the shot rather than under it. A hit at 0.4s is a
+  // reset the eye feels even when the frame has not moved.
+  if (scene.soundCues.some((cue) => PUNCTUATING.includes(cue.type))) sources.push('sound');
+
+  if (previous) {
+    if (previous.visualType !== scene.visualType) sources.push('cutaway');
+    else if (previous.cameraRecipe.toScale !== camera.fromScale) sources.push('composition');
+  }
+
+  return sources;
+}
+
+/**
+ * Shots where nothing is happening and nothing was meant to be.
+ *
+ * Not "shots that hold" — a held frame is one of the strongest things in this
+ * form when it is a held reaction, a beat of tension, or a deliberate contrast
+ * against everything around it. What this finds is the other thing: a frame
+ * with no subject, no action, no arriving type, no sound and no change from
+ * the shot before, running past the point where a viewer reads it as the film
+ * having stopped.
  */
 export function heldTooLong(
   scenes: readonly Scene[],
   windowSeconds = ATTENTION_RESET_SECONDS,
 ): Scene[] {
-  return scenes.filter((scene) => scene.duration > windowSeconds && !resets(scene));
+  return scenes.filter(
+    (scene, index) =>
+      scene.duration > windowSeconds && resetSources(scene, scenes[index - 1]).length === 0,
+  );
 }
 
-/** Whether anything in this shot moves, changes scale, or arrives. */
-export function resets(scene: Scene): boolean {
-  const camera: CameraRecipe = scene.cameraRecipe;
-  if (camera.move !== 'static') return true;
-  if (Math.abs(camera.toScale - camera.fromScale) > 0.02) return true;
-  if (Math.abs(camera.toX - camera.fromX) > 0.01 || Math.abs(camera.toY - camera.fromY) > 0.01) return true;
-  // Type that arrives in sequence is itself a reset: the frame at two seconds
-  // is not the frame at one.
-  if (scene.motionRecipe.stagger > 0.01 && scene.onScreenText.length > 1) return true;
-  if (scene.visualType === 'generated_broll' || scene.visualType === 'cinematic_3d') return true;
-  return false;
+/** Whether anything at all is happening in this shot. */
+export function resets(scene: Scene, previous?: Scene): boolean {
+  return resetSources(scene, previous).length > 0;
 }
+
+/** Visual types whose picture moves by itself. */
+const MOVING_PICTURE: readonly Scene['visualType'][] = [
+  'generated_broll',
+  'cinematic_3d',
+  'product_ui_3d',
+  'mixed_media',
+];
+
+/** Recipes that play an action out inside an otherwise still frame. */
+const INTERNAL_ACTION: readonly Scene['motionRecipe']['name'][] = [
+  'product_sequence',
+  'cursor_sequence',
+  'window_explosion',
+  'command_bar_collapse',
+  'image_wall',
+  'spatial_cards',
+  'feature_stack',
+];
+
+/** Recipes whose whole job is type arriving. */
+const ARRIVING_TYPE: readonly Scene['motionRecipe']['name'][] = [
+  'word_reveal',
+  'kinetic_headline',
+  'editorial_headline',
+  'mask_reveal',
+  'statistic_reveal',
+  'metric_reveal',
+];
+
+/** Sound that lands on a moment rather than running under one. */
+const PUNCTUATING: readonly Scene['soundCues'][number]['type'][] = [
+  'impact',
+  'sub_drop',
+  'whoosh',
+  'ui_click',
+  'logo_sting',
+];
 
 /**
  * Whether the opening is a pattern interrupt rather than an introduction.
@@ -203,10 +296,7 @@ export function opensOnAPatternInterrupt(
 ): boolean {
   let elapsed = 0;
   for (const scene of scenes) {
-    const carriesSomething =
-      scene.onScreenText.some((line) => line.trim().length > 0) || scene.assetRefs.length > 0;
-    const isSetup = scene.visualType === 'logo_reveal' || scene.visualType === 'transition';
-    if (!isSetup && carriesSomething) return elapsed <= windowSeconds;
+    if (canOpenAShort(scene)) return elapsed <= windowSeconds;
     elapsed += scene.duration;
     if (elapsed > windowSeconds) return false;
   }
@@ -255,18 +345,19 @@ function round3(value: number): number {
 }
 
 /**
- * Gives a static shot in a short something to do.
+ * Gives a shot something to do, when it has nothing and was not meant to.
  *
- * The attention reset is a real property of the frame rather than a note in a
- * brief: a shot that holds one arrangement past the window is a still picture
- * in a feed, and a still picture in a feed is a scroll. So a shot that would
- * hold gets the gentlest move that changes the frame — a slow push, or a drift
- * where a push would fight the composition.
+ * Deliberately narrow, and narrower than it was. The first version added a
+ * slow push to every static shot in a short, which is the mistake this format
+ * is best known for: a zoom on every beat is not attention, it is decoration,
+ * and it flattens exactly the contrast that makes a held frame land. A shot
+ * with a moving subject, an action inside it, type arriving, a sound on it or
+ * a composition that has changed already has a reset, and adding a camera move
+ * on top of one is how a reel starts to look like a template.
  *
- * Deliberately small. The failure on the other side is a zoom on every beat,
- * which is what this format looks like when somebody confuses retention with
- * noise, and it is not what the work people admire does. Six percent over two
- * seconds is a frame that is alive, not a frame that is shouting.
+ * So this runs only where `resetSources` is empty and the shot is long enough
+ * for the emptiness to read — and even then it is six percent over the shot,
+ * a frame that is alive rather than one that is shouting.
  */
 export function withAttentionReset(
   camera: CameraRecipe,
@@ -284,17 +375,39 @@ export function withAttentionReset(
 }
 
 /**
+ * Whether this shot needs one, given everything else that is happening in it.
+ *
+ * The question the engine actually asks. A short shot needs nothing — it
+ * resets by ending — and a shot with a subject, an action, arriving type or a
+ * sound already has one.
+ */
+export function needsAttention(
+  scene: Pick<Scene, 'duration' | 'visualType' | 'motionRecipe' | 'cameraRecipe' | 'onScreenText' | 'soundCues'>,
+  previous?: Scene,
+  windowSeconds = ATTENTION_RESET_SECONDS,
+): boolean {
+  if (scene.duration <= windowSeconds) return false;
+  return resetSources(scene as Scene, previous).length === 0;
+}
+
+/**
  * Whether this shot may open a short.
  *
- * The mark, a bare transition and an empty frame are all setup, and setup at
- * the top of a reel is the single most reliable way to lose the audience.
+ * The mark, a bare transition and an empty frame are setup, and setup at the
+ * top of a reel is the single most reliable way to lose the audience.
+ *
+ * Everything else may open one, including a commissioned image with no words
+ * on it. A striking frame *is* a pattern interrupt — often the best one there
+ * is — and no storyboard tells the difference between a striking frame and a
+ * shot of weather, so this does not pretend to. The director is the one who
+ * can see it, and the check exists so they are asked rather than overruled.
  */
-export function canOpenAShort(scene: Pick<Scene, 'visualType' | 'onScreenText' | 'assetRefs'>): boolean {
+export function canOpenAShort(scene: Pick<Scene, 'visualType' | 'onScreenText' | 'assetRefs' | 'generativeNeeds'>): boolean {
   if (scene.visualType === 'logo_reveal' || scene.visualType === 'transition') return false;
   return (
     scene.onScreenText.some((line) => line.trim().length > 0) ||
     scene.assetRefs.length > 0 ||
-    scene.visualType === 'generated_broll' ||
+    scene.generativeNeeds.length > 0 ||
     scene.visualType === 'cinematic_3d'
   );
 }

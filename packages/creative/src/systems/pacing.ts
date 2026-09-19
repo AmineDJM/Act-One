@@ -1,4 +1,4 @@
-import { FILM_CUTS, type FilmCut } from '@act-one/core';
+import { FILM_CUTS, SHORT_SILENCE_BUDGET, type FilmCut } from '@act-one/core';
 import type { CreativeSystem, SceneArchetype } from './types.ts';
 
 /**
@@ -47,15 +47,19 @@ export function pacedForCut(
         averageSceneSeconds: scale(system.pacing.averageSceneSeconds),
         sceneRange: [scale(system.pacing.sceneRange[0]), scale(system.pacing.sceneRange[1])],
         /*
-         * No silence at all in a feed.
+         * Quiet is a tool in a feed, not a default.
          *
-         * A pause is a gift to somebody who chose to watch and an exit to
-         * somebody who did not: two seconds of nothing in a twenty-second
-         * film is a tenth of it, and a viewer who is not listening reads it
-         * as the film having stopped. Scaled rather than zeroed, this was
-         * still a beat of dead air in the middle of a reel.
+         * A silence budget written for a film somebody chose to watch is dead
+         * air by another name: two to four seconds, which at twenty seconds of
+         * runtime is a fifth of the film spent on nothing. But zero was the
+         * other mistake — a micro-pause before a payoff, or a beat of quiet
+         * against a dense cut, is one of the few ways this format creates
+         * tension at all. Cut hard, not to nothing.
          */
-        silenceBudget: cut === 'short' ? 0 : round1(system.pacing.silenceBudget * pace),
+        silenceBudget:
+          cut === 'short'
+            ? Math.min(SHORT_SILENCE_BUDGET, round1(system.pacing.silenceBudget * pace))
+            : round1(system.pacing.silenceBudget * pace),
       },
     },
     archetypes: archetypes.map((archetype) => ({

@@ -47,36 +47,43 @@ export const SHORT_FORM_STANDARDS = {
   },
   attentionReset: {
     id: 'short.attention_reset',
-    rule: 'Something changes at least every two seconds: the framing, the scale, the subject or the type.',
+    rule: 'Something is happening at all times. The something may be stillness, if the stillness is doing work.',
     source: 'House rule, from editorial practice in short form',
     authority: 'house',
     enforcement: 'checked',
     because:
-      'Attention decays against a static frame far faster than against a moving one, and a feed ' +
-      'viewer has an alternative one thumb away. A reset is not a cut for its own sake — a push, ' +
-      'a change of scale or a change of subject all do it — but a film that holds one arrangement ' +
-      'for four seconds has stopped asking to be watched.',
+      'The enemy is dead attention, not stillness. A reset can come from a subject moving, an ' +
+      'action inside the frame, type arriving, a sound landing, a cut to something else, a ' +
+      'composition that has changed, or a camera that moves — and a held static frame is one of ' +
+      'the strongest things in the form when it is a held *reaction*, a beat of tension or a ' +
+      'deliberate contrast against everything around it. What fails is a frame where nothing is ' +
+      'happening and nothing was meant to be: that is not restraint, it is a film that has ' +
+      'stopped asking to be watched. Injecting a slow zoom into every static shot to satisfy the ' +
+      'rule is the same mistake wearing motion.',
   },
   density: {
     id: 'short.density',
-    rule: 'Every shot carries information. Nothing is held for atmosphere alone.',
+    rule: 'Every shot earns its place. A beat of texture must be doing something the film needs.',
     source: 'House rule, from editorial practice in short form',
     authority: 'house',
     enforcement: 'checked',
     because:
-      'Texture is what a classic film spends its middle on and it is the first thing to cut here. ' +
-      'At twenty seconds a breath is a twentieth of the film, and a viewer reads it as the film ' +
-      'having ended.',
+      'Texture is what a classic film spends its middle on, and here it has to justify itself: ' +
+      'at twenty seconds a breath is a twentieth of the film. That is an argument for making the ' +
+      'pause deliberate, not for having none — a beat placed to let something land is worth more ' +
+      'than the shot it replaced. An accidental one is just the film stopping.',
   },
   silence: {
     id: 'short.silence',
-    rule: 'No deliberate silence. Dead air is a scroll.',
+    rule: 'Silence is a tool here, not a default. A pause is short, placed, and doing work.',
     source: 'House rule, from platform retention behaviour',
     authority: 'house',
     enforcement: 'designed_in',
     because:
-      'A pause is a gift to somebody who chose to watch and an exit to somebody who did not. The ' +
-      'silence budget every creative system carries is set to nothing here.',
+      'Dead air is a scroll, and a silence budget written for a film somebody chose to watch is ' +
+      'dead air by another name. But a micro-pause before a payoff, or a beat of quiet against a ' +
+      'dense cut, is one of the few ways this format creates tension at all. The budget is cut ' +
+      'hard rather than to nothing.',
   },
   earlyPayoff: {
     id: 'short.early_payoff',
@@ -189,13 +196,26 @@ export function shortBeatAt(fraction: number): ShortBeatId {
 export const PATTERN_INTERRUPT_SECONDS = 1.5;
 
 /**
- * Seconds. The longest an arrangement may hold before something must change.
+ * Seconds. The longest a frame may hold with nothing happening in it.
  *
- * A change is a cut, a move, a change of scale, a change of subject or a
- * change of what the type is doing — not necessarily a new shot. A film that
- * holds one static frame past this has stopped asking to be watched.
+ * Not a cutting rhythm and not a ceiling on a shot — a held frame can run
+ * much longer than this and be the best thing in the film, provided something
+ * is happening: a subject moving, an action inside the frame, type arriving, a
+ * sound landing, a composition that has changed from the shot before. This is
+ * the window after which a frame where *nothing* is happening stops reading as
+ * a held beat and starts reading as a film that has stopped.
  */
 export const ATTENTION_RESET_SECONDS = 2;
+
+/**
+ * Seconds of deliberate quiet a short may spend.
+ *
+ * Enough for one micro-pause before a payoff or one beat of contrast against a
+ * dense cut; not enough for a film of pauses. A classic film's budget is two
+ * to four seconds, which at twenty seconds of runtime is a fifth of the film
+ * spent on nothing.
+ */
+export const SHORT_SILENCE_BUDGET = 0.6;
 
 /** Fraction of the runtime by which the payoff must have landed. */
 export const PAYOFF_BY = 0.86;

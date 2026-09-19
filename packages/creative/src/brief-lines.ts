@@ -84,6 +84,9 @@ export function cutDirectionLines(cut: FilmCut): string[] {
       ? [
           'This is a different medium from a classic film, not a shorter one. Higher information',
           'density, shorter shots, a stronger hook, an earlier emotional peak and a tighter ending.',
+          'Stillness and silence are tools here rather than faults — a held reaction or a beat of',
+          'quiet before a payoff is one of the few ways this format creates tension. The enemy is',
+          'dead attention, not stillness.',
           'And still premium: engineered for attention, never decorated for it. A cut on a',
           'metronome, a zoom on every beat and a caption on every word are what this format looks',
           'like when somebody confuses retention with noise.',
