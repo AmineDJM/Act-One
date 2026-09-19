@@ -145,6 +145,41 @@ export async function buildRegistry(
   });
 }
 
+/**
+ * Whether this worker can actually read the credentials the console stored.
+ *
+ * Presence of a key is not the same as being able to use it. The vault is
+ * shared by the web service, the worker and the console, and a worker whose
+ * ACT_ONE_SECRET_KEYS differs decrypts nothing, falls back to environment
+ * variables that are not set, and fails every job with a provider 401 — while
+ * Super Admin shows every integration green, because the service that wrote
+ * them can still read them.
+ *
+ * One line per provider at startup, which is the moment this is cheap to fix.
+ */
+export async function auditCredentials(
+  config: WorkerConfig,
+  providers: string[],
+): Promise<{ provider: string; state: 'vault' | 'environment' | 'unreadable' | 'missing' }[]> {
+  return Promise.all(
+    providers.map(async (provider) => {
+      const stored = await config.store.platform.getProviderSecret(provider);
+      if (stored?.enabled) {
+        try {
+          config.vault.decrypt(stored.ciphertext as never, secretContext.providerKey(provider));
+          return { provider, state: 'vault' as const };
+        } catch {
+          return { provider, state: 'unreadable' as const };
+        }
+      }
+      return {
+        provider,
+        state: Object.keys(fromEnv(provider)).length > 0 ? ('environment' as const) : ('missing' as const),
+      };
+    }),
+  );
+}
+
 async function readAll(
   config: WorkerConfig,
   providers: string[],
@@ -161,7 +196,17 @@ async function readAll(
             ) as Record<string, string>,
           ] as const;
         } catch {
-          console.error(`[worker] could not decrypt credentials for ${provider}`);
+          /*
+           * Almost always one thing: this service's ACT_ONE_SECRET_KEYS is not
+           * the one the console encrypted with. Said plainly, because the
+           * symptom is otherwise a 401 from a provider whose key the operator
+           * can see, green, in Super Admin.
+           */
+          console.error(
+            `[worker] could not decrypt the stored ${provider} credentials. ` +
+              'ACT_ONE_SECRET_KEYS here is not the key the console encrypted them with; ' +
+              'both services and the console must share one vault.',
+          );
         }
       }
       return [provider, fromEnv(provider)] as const;

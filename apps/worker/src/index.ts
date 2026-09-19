@@ -5,7 +5,7 @@ import { bundleFilm } from '@act-one/motion';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_LIBRARY, resolveFfmpeg, validateLibrary } from '@act-one/sound';
-import { buildRegistry, loadConfig, type WorkerConfig } from './config.ts';
+import { auditCredentials, buildRegistry, loadConfig, type WorkerConfig } from './config.ts';
 
 /**
  * The render worker.
@@ -170,6 +170,7 @@ async function preflight(config: WorkerConfig): Promise<void> {
   }
 
   checkEgress();
+  await checkCredentials(config);
   await checkStorage(config);
   await checkSoundLibrary();
 }
@@ -211,6 +212,40 @@ function checkEgress(): void {
  * the database, the player is black, and the only trace is an ENOENT in the
  * web service's log naming a path that was never on its machine.
  */
+/**
+ * Says out loud which provider keys this worker can actually read.
+ *
+ * A key stored by the console and unreadable here is the worst of the
+ * configuration failures, because Super Admin shows it green: the service that
+ * encrypted it can still read it, and only the worker cannot. Every job then
+ * fails with a provider 401 pointing at a key the operator can see is set.
+ */
+async function checkCredentials(config: WorkerConfig): Promise<void> {
+  const audited = await auditCredentials(config, [
+    'openai',
+    'browserbase',
+    'higgsfield',
+    'supabase',
+    'elevenlabs',
+  ]);
+  const unreadable = audited.filter((entry) => entry.state === 'unreadable');
+  if (unreadable.length > 0) {
+    log(
+      `credentials: cannot decrypt ${unreadable.map((entry) => entry.provider).join(', ')} — ` +
+        'ACT_ONE_SECRET_KEYS here is not the key Super Admin encrypted them with. ' +
+        'Both services and the console must share one vault.',
+    );
+  }
+  const readable = audited.filter((entry) => entry.state === 'vault').map((entry) => entry.provider);
+  const fromEnvironment = audited.filter((entry) => entry.state === 'environment').map((entry) => entry.provider);
+  const missing = audited.filter((entry) => entry.state === 'missing').map((entry) => entry.provider);
+  log(
+    `credentials: ${readable.length} from the vault${readable.length ? ` (${readable.join(', ')})` : ''}` +
+      `${fromEnvironment.length ? `, ${fromEnvironment.length} from the environment (${fromEnvironment.join(', ')})` : ''}` +
+      `${missing.length ? `, ${missing.length} not configured (${missing.join(', ')})` : ''}`,
+  );
+}
+
 async function checkStorage(config: WorkerConfig): Promise<void> {
   const registry = await buildRegistry(config, { organizationId: 'platform' });
   const problem = registry.storageMisconfiguration();
