@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { brandDirectionLines } from './brief-lines.ts';
+import { brandDirectionLines, cutDirectionLines, formatDirectionLines } from './brief-lines.ts';
 import {
   standardsBrief,
   VoiceStrategy,
@@ -128,6 +128,11 @@ export class CreativeDirector {
             ...brandDirectionLines(input.brand),
             ``,
             `# Constraints`,
+            ...formatDirectionLines(input.brief.filmFormat),
+            ...cutDirectionLines(input.brief.filmCut),
+            input.brief.filmFormat === 'pitch'
+              ? '"productUiUsage" is how this film refuses the interface: what it cuts to at the moments a lesser film would cut to a screen. Write it as direction, not as an apology.'
+              : '',
             `Runtime: about ${input.brief.durationSeconds ?? input.concept.estimatedDurationSeconds} seconds.`,
             input.brief.creativeMode === 'authentic'
               ? 'Authentic mode: real product and company material only. No generated imagery whatsoever.'
@@ -175,7 +180,16 @@ export class CreativeDirector {
         ? 'Real media only, at the customer’s instruction. No generated imagery.'
         : value.generativeMediaStrategy,
       productUiUsage: value.productUiUsage,
+      // The exclusion the customer actually chose, carried in the treatment's
+      // own words so it travels to every stage that reads a treatment.
+
       exclusions: dedupe([
+        ...(input.brief.filmCut === 'short'
+          ? ['No slow build — the first second is the strongest frame in the film']
+          : []),
+        ...(input.brief.filmFormat === 'pitch'
+          ? ['No interface of any kind — this film argues about the product, it does not navigate it']
+          : []),
         ...value.exclusions,
         ...system.prohibitions.slice(0, 2),
         ...(input.brand.allowsGradient ? [] : ['No gradients — the brand does not use them']),

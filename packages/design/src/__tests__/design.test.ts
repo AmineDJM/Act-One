@@ -234,10 +234,20 @@ describe('tokens', () => {
     }
   });
 
-  it('sizes type against frame height so vertical type is not tiny', () => {
+  it('sizes type against the side that actually constrains a line', () => {
     const wide = resolveTokens(brand, { aspect: '16:9' });
     const tall = resolveTokens(brand, { aspect: '9:16' });
-    expect(tall.type.display.sizePx).toBeGreaterThan(wide.type.display.sizePx);
+    /*
+     * Both frames are 1080 on their short side, so both set type at the same
+     * size — which is the point. Sizing on height instead put 211px display
+     * type in a frame 1080 wide, where a five-word headline wrapped to three
+     * lines and the third was clipped: "Now it takes one run." came out as
+     * "Now it takes".
+     */
+    expect(tall.type.display.sizePx).toBe(wide.type.display.sizePx);
+    // And a line of display type still fits across the narrow frame, which is
+    // the thing that was actually broken.
+    expect(tall.type.display.sizePx * 4).toBeLessThan(tall.grid.safe.width);
   });
 
   it('puts an editorial brand on a light canvas rather than forcing black', () => {

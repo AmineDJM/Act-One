@@ -6,6 +6,8 @@ import {
   AppError,
   CommentTarget,
   FILM_LANGUAGES,
+  FilmCut,
+  FilmFormat,
   ProductCredentialKind,
   Tone,
   VoiceAccent,
@@ -427,8 +429,25 @@ export async function authorizeProductAction(
     });
 
     const project = await getProjectOr404(session, projectId);
-    // Explore straight away. Somebody who just handed over access expects
-    // something to happen, and the capture is what makes their film different.
+    /*
+     * Explore straight away. Somebody who just handed over access expects
+     * something to happen, and the capture is what makes their film different.
+     *
+     * Unless the production is a pitch, which never navigates the product. The
+     * credential is kept — the customer may switch the format later, and
+     * asking for it twice is worse than holding it — but nothing signs in with
+     * it, and the message says so rather than claiming a session that is not
+     * opening.
+     */
+    if (project.brief.filmFormat === 'pitch') {
+      revalidatePath(`/app/projects/${projectId}`);
+      return {
+        error: null,
+        message:
+          'Access saved. This production is a pitch film, so nothing signs in — switch it to a ' +
+          'product tour and we will look around.',
+      };
+    }
     await enqueue(project, 'capture_product_moments', {}, 7);
 
     revalidatePath(`/app/projects/${projectId}`);
@@ -594,6 +613,10 @@ export async function correctWebsiteAction(
  */
 function briefFromForm(formData: FormData): Partial<ProjectBrief> {
   const brief: Partial<ProjectBrief> = {};
+  const format = String(formData.get('filmFormat') ?? '');
+  if (FilmFormat.options.includes(format as FilmFormat)) brief.filmFormat = format as FilmFormat;
+  const cut = String(formData.get('filmCut') ?? '');
+  if (FilmCut.options.includes(cut as FilmCut)) brief.filmCut = cut as FilmCut;
   const duration = Number(formData.get('duration') ?? '');
   if (Number.isFinite(duration) && duration > 0) brief.durationSeconds = Math.round(duration);
   const tone = String(formData.get('tone') ?? '');
@@ -633,6 +656,9 @@ export async function updateBriefAction(_previous: FormState, formData: FormData
     }
     const { updateBrief } = await import('@/server/projects.ts');
     await updateBrief(session, project, {
+      // Everything here resets to "you decide" when the form does not send it.
+      // The format is deliberately absent: it has no undecided state, so an
+      // omitted radio keeps whatever the production already chose.
       durationSeconds: null,
       tone: null,
       language: null,

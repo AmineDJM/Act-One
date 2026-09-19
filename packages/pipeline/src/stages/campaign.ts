@@ -1,5 +1,5 @@
 import { AppError, newId, resequence, storyboardDuration } from '@act-one/core';
-import { DEFAULT_CAMPAIGN, planCampaign, toVariant, variantStoryboard } from '@act-one/creative';
+import { DEFAULT_CAMPAIGN, campaignFor, planCampaign, toVariant, variantStoryboard } from '@act-one/creative';
 import type { StageContext } from '../context.ts';
 import { runRender } from './render.ts';
 
@@ -25,7 +25,8 @@ export async function runCampaign(
   const storyboard = await store.storyboards.get(organizationId, master.storyboardId);
   if (!storyboard) throw new AppError('conflict', 'The storyboard behind this film is missing.');
 
-  const purposes = options.purposes ?? DEFAULT_CAMPAIGN;
+  // A vertical master does not need four vertical re-crops of itself.
+  const purposes = options.purposes ?? campaignFor(project.brief.filmCut);
   const plans = planCampaign(storyboard, purposes);
 
   const variants = plans.map((plan) => toVariant({ renderId: master.id, projectId: project.id, plan }));

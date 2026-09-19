@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { briefDirectionLines } from './brief-lines.ts';
+import { briefDirectionLines, cutDirectionLines, formatDirectionLines } from './brief-lines.ts';
 import {
   CreativeSystemId,
   NarrativeStructure,
@@ -7,11 +7,14 @@ import {
   lenientEnumArray,
   conceptSetIsDiverse,
   conceptDivergence,
+  cutSeconds,
+  FILM_CUTS,
   leastDivergentPair,
   newId,
   topMoments,
   type BrandSystem,
   type Concept,
+  type FilmCut,
   type ProductUnderstanding,
   type ProjectBrief,
 } from '@act-one/core';
@@ -172,10 +175,22 @@ export class CreativeStrategyEngine {
     const ranked = rankSystems(input.brand, input.understanding).filter(
       (entry) => entry.system.productionReady,
     );
-    const hasRealFootage = input.understanding.productMoments.some((m) => m.screenshots.length > 0);
+    const pitch = input.brief.filmFormat === 'pitch';
+    const hasRealFootage =
+      !pitch && input.understanding.productMoments.some((m) => m.screenshots.length > 0);
 
-    // Three angles that cannot collapse into each other: lead with the problem,
-    // lead with the product, lead with the consequence of having it.
+    /*
+     * Three angles that cannot collapse into each other: lead with the
+     * problem, lead with the thing itself, lead with the consequence of having
+     * it.
+     *
+     * The middle one is the one the format changes. A product tour leads with
+     * the product working, which is a demonstration and needs an interface. A
+     * pitch has no interface, so it leads with the thing made concrete — the
+     * object, the place, the people — and the demonstration structures are off
+     * the table entirely rather than left available to be chosen and then
+     * quietly undeliverable.
+     */
     const angles: {
       angle: string;
       structures: NarrativeStructure[];
@@ -186,11 +201,19 @@ export class CreativeStrategyEngine {
         structures: ['problem_shift_proof', 'before_after', 'metaphor_to_product'],
         emotion: 'relief',
       },
-      {
-        angle: 'Lead with the product. Show the thing working, end to end, no preamble.',
-        structures: ['demonstration', 'day_in_the_life', 'countdown_reveal'],
-        emotion: 'confidence',
-      },
+      pitch
+        ? {
+            angle:
+              'Lead with the thing itself, made concrete. The object, the place, the people, ' +
+              'the work — never a screen.',
+            structures: ['countdown_reveal', 'question_answer', 'before_after'],
+            emotion: 'confidence',
+          }
+        : {
+            angle: 'Lead with the product. Show the thing working, end to end, no preamble.',
+            structures: ['demonstration', 'day_in_the_life', 'countdown_reveal'],
+            emotion: 'confidence',
+          },
       {
         angle: 'Lead with the consequence. What becomes possible once this exists.',
         structures: ['manifesto', 'question_answer', 'metaphor_to_product'],
@@ -242,9 +265,18 @@ export class CreativeStrategyEngine {
       ...assignment.avoid.map((c) => `- "${c.name}": ${c.keyIdea}`),
     ];
 
-    const duration =
-      input.brief.durationSeconds ??
-      (understanding.launchContext === 'paid_social' ? 20 : 60);
+    /*
+     * The cut decides the length, and the customer's own number is pulled into
+     * its band rather than obeyed outside it: a request for sixty seconds made
+     * before the cut was chosen is not an instruction to deliver a
+     * sixty-second reel.
+     */
+    const cut = input.brief.filmCut;
+    const duration = cutSeconds(
+      cut,
+      input.brief.durationSeconds ?? (understanding.launchContext === 'paid_social' ? 20 : null),
+    );
+    const [floorSeconds, ceilingSeconds] = FILM_CUTS[cut].seconds;
 
     const { value } = await this.llm.completeJson(
       [
@@ -272,8 +304,10 @@ export class CreativeStrategyEngine {
               ? understanding.proofPoints.slice(0, 4).map((c) => `- ${c.text}`)
               : ['- none; do not imply any metrics or customer names']),
             ``,
-            `Filmable product moments (id — what happens):`,
-            ...moments.map(
+            input.brief.filmFormat === 'pitch'
+              ? `Filmable product moments: none. This film does not navigate the product.`
+              : `Filmable product moments (id — what happens):`,
+            ...(input.brief.filmFormat === 'pitch' ? [] : moments).map(
               (m) =>
                 `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'}${
                   m.screenshots.length > 0 ? ' [real capture available]' : ' [not yet captured]'
@@ -293,12 +327,16 @@ export class CreativeStrategyEngine {
             `Creative system: ${system.name} — ${system.essence}`,
             `That system suits: ${system.suitsWhen.join('; ')}`,
             `That system forbids: ${system.prohibitions.join('; ')}`,
-            `Target runtime: about ${duration} seconds`,
+            `Target runtime: about ${duration} seconds. "estimatedDurationSeconds" must be between ${floorSeconds} and ${ceilingSeconds}.`,
+            ...cutDirectionLines(cut),
             ...briefDirectionLines(input.brief),
+            ...formatDirectionLines(input.brief.filmFormat),
             `Channels must be chosen from: ${Channel.options.join(', ')}`,
-            hasRealFootage
-              ? `We have real captured footage of the product. Use it for anything that shows the product working.`
-              : `We have NO captured product footage. Do not describe scenes that depend on showing the real UI in detail, and never invent a fake interface.`,
+            input.brief.filmFormat === 'pitch'
+              ? `There is no product footage in this film and there will not be. "productUiUsage" describes how you refuse the interface — what the film shows instead of a screen, at the moments a lesser film would cut to one. Every beat is carried by image, figure, voice or type.`
+              : hasRealFootage
+                ? `We have real captured footage of the product. Use it for anything that shows the product working.`
+                : `We have NO captured product footage. Do not describe scenes that depend on showing the real UI in detail, and never invent a fake interface.`,
             input.brief.realMediaOnly
               ? `The customer has asked for real media only: no generated imagery at all.`
               : ``,
@@ -334,6 +372,7 @@ export class CreativeStrategyEngine {
       projectId: input.projectId,
       structure: assignment.structure,
       systemId: assignment.systemId,
+      cut,
       knownMomentIds: new Set(understanding.productMoments.map((m) => m.id)),
     });
   }
@@ -353,6 +392,7 @@ function toConcept(
     projectId: string;
     structure: NarrativeStructure;
     systemId: CreativeSystemId;
+    cut: FilmCut;
     knownMomentIds: Set<string>;
   },
 ): Concept {
@@ -373,7 +413,9 @@ function toConcept(
     soundDirection: response.soundDirection,
     productUiUsage: response.productUiUsage,
     generativeUsage: response.generativeUsage,
-    estimatedDurationSeconds: response.estimatedDurationSeconds,
+    // The cut is not a suggestion: a concept estimated outside its band would
+    // be storyboarded to a length the format cannot carry.
+    estimatedDurationSeconds: cutSeconds(params.cut, response.estimatedDurationSeconds),
     recommendedChannels: response.recommendedChannels,
     keyScenes: response.keyScenes,
     // A hallucinated moment id would silently become an empty scene later.

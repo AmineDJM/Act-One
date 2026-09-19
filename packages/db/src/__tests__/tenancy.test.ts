@@ -62,7 +62,7 @@ function makeProject(organizationId: string, userId: string, name: string): Proj
     latestRenderId: null,
     stage: 'created',
     brief: {
-      targetAudience: null,
+      filmFormat: 'product_tour', filmCut: 'feature', targetAudience: null,
       goal: null,
       keyMessage: null,
       durationSeconds: null,

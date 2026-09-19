@@ -3,7 +3,11 @@
 import { useActionState, useState } from 'react';
 import {
   DURATION_CHOICES,
+  FILM_CUTS,
+  FILM_FORMATS,
   FILM_LANGUAGES,
+  cutDurationChoices,
+  type FilmCut,
   TONE_LABELS,
   Tone,
   VOICE_ACCENT_LABELS,
@@ -14,6 +18,7 @@ import {
   VoiceStyle,
 } from '@act-one/core';
 import { createProjectAction, type FormState } from './actions.ts';
+import { FilmShape } from './FilmShape.tsx';
 import styles from './app.module.css';
 
 /**
@@ -37,7 +42,10 @@ export function NewProjectForm({ maxDurationSeconds, autoFocus = false }: { maxD
   });
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [showOptions, setShowOptions] = useState(false);
-  const durations = DURATION_CHOICES.filter((seconds) => seconds <= maxDurationSeconds);
+  const [cut, setCut] = useState<FilmCut>('feature');
+  // Only the lengths this cut can actually deliver. A ninety-second reel is
+  // not a reel, so it is not on the menu.
+  const durations = cutDurationChoices(cut, DURATION_CHOICES, maxDurationSeconds);
 
   const toggle = (key: string) =>
     setOpen((current) => {
@@ -99,6 +107,15 @@ export function NewProjectForm({ maxDurationSeconds, autoFocus = false }: { maxD
             {showOptions ? (
               <>
                 {/*
+                 * The kind of film, first and on its own, because it is not a
+                 * preference. Length and tone shade a film; this decides
+                 * whether we sign into the customer's product at all and what
+                 * every shot after that is allowed to be. It has a default
+                 * rather than a blank, so nobody is stopped by it, and it is
+                 * the only option here with no "you decide".
+                 */}
+                <FilmShape format="product_tour" cut={cut} onCutChange={setCut} />
+                {/*
                  * The decisions a customer wants to make up front. Each has a
                  * "you decide" default, so the bar stays one line for the people
                  * who only have a URL.
@@ -107,7 +124,9 @@ export function NewProjectForm({ maxDurationSeconds, autoFocus = false }: { maxD
                   <div className="field">
                     <label htmlFor="duration">Length</label>
                     <select id="duration" name="duration" className="input" defaultValue="">
-                      <option value="">Let the concept decide</option>
+                      <option value="">
+                        Let the concept decide (about {FILM_CUTS[cut].defaultSeconds} seconds)
+                      </option>
                       {durations.map((seconds) => (
                         <option key={seconds} value={seconds}>
                           {seconds} seconds
@@ -201,6 +220,16 @@ export function NewProjectForm({ maxDurationSeconds, autoFocus = false }: { maxD
             {source.label}
           </button>
         ))}
+        {/*
+          * Names the choice rather than the drawer.
+          *
+          * "Length, tone, voice" was a list of preferences, and the two
+          * decisions that actually change what gets made — whether we navigate
+          * the product, and whether the master is landscape or vertical — were
+          * behind it with nothing to suggest they were there. Showing what is
+          * currently chosen makes the split legible without opening anything,
+          * and makes it obvious it can be changed.
+          */}
         <button
           type="button"
           className={styles.source}
@@ -209,7 +238,7 @@ export function NewProjectForm({ maxDurationSeconds, autoFocus = false }: { maxD
           aria-pressed={showOptions}
           style={{ marginLeft: 'auto' }}
         >
-          Length, tone, voice
+          {FILM_FORMATS.product_tour.title} · {FILM_CUTS[cut].title} · length, voice
         </button>
       </div>
 

@@ -229,6 +229,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <BriefPanel
           projectId={project.id}
           brief={{
+            filmFormat: project.brief.filmFormat,
+            filmCut: project.brief.filmCut,
             durationSeconds: project.brief.durationSeconds ?? null,
             language: project.brief.language ?? null,
             tone: project.brief.tone ?? null,
@@ -247,6 +249,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           projectId={project.id}
           productHost={safeHost(project.websiteUrl)}
           canManage={can(session.actor, 'credentials:manage')}
+          filmFormat={project.brief.filmFormat}
           access={
             access.credential
               ? {

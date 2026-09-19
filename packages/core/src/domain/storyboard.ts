@@ -35,6 +35,15 @@ export const REAL_PRODUCT_VISUAL_TYPES: readonly VisualType[] = [
 export const SELF_CONTAINED_VISUAL_TYPES: readonly VisualType[] = [
   'logo_reveal',
   'transition',
+  /*
+   * And a cinematic 3D shot, which is form and light rather than a container.
+   * It is built in Blender from the brand — a surface, a rim, a lens — and
+   * needs nothing handed to it. Leaving it out of this list meant every such
+   * scene written without a line of copy was dropped from the storyboard
+   * before anything had a chance to render it, which made the whole technique
+   * unreachable in a film carrying no on-screen text.
+   */
+  'cinematic_3d',
 ] as const;
 
 /**

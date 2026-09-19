@@ -170,3 +170,83 @@ describe('rig planning', () => {
     expect(preview.scene.width).toBeLessThan(master.scene.width);
   });
 });
+
+describe('a shot with no interface in it', () => {
+  /**
+   * The Python has to parse.
+   *
+   * It is generated from templates spliced together by string index, which is
+   * a thing that works until an edit lands a `def` on the end of the line
+   * before the next one — and then Blender starts, fails on line 188, exits 1,
+   * and the pipeline records "3D frames would not encode" for every shot in
+   * every film. Handing it to a real parser is the only check that catches
+   * that class of mistake before a render does.
+   */
+  it('generates Python that parses, for every rig', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const probe = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], {
+      input: 'x = 1',
+    });
+    // No Python here means this cannot be checked, and saying so beats passing.
+    expect(probe.status, 'python3 is needed to check the generated script').toBe(0);
+
+    for (const rig of Object.keys(RIGS)) {
+      const built = normaliseScene({
+        rig,
+        // Screenless, which is the case that builds the form geometry. The
+        // screen rigs are exercised at the same time because a rig with no
+        // screens still emits its whole script.
+        screenAssets: [],
+        backgroundColor: '#0a0b10',
+        accentColor: '#5b6cff',
+        lighting: 'rim_dark',
+        depthOfField: 0.5,
+      });
+      const source = buildBlenderScript(built.scene, { outputPattern: '/tmp/frame_' });
+      const result = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], {
+        input: source,
+        encoding: 'utf8',
+      });
+      expect(result.status, `${rig}: ${result.stderr}`).toBe(0);
+    }
+  });
+
+  it('builds geometry rather than rendering an empty void', () => {
+    // A screen rig takes its geometry from the screens. Given none it used to
+    // render the world and the lights and nothing else — which is a flat
+    // coloured frame, and is what every `cinematic_3d` shot in a film with no
+    // capture behind it actually produced.
+    const { scene: form } = normaliseScene({ rig: 'material_monolith', screenAssets: [] });
+    const source = buildBlenderScript(form, {});
+    expect(source).toContain('def form():');
+    expect(source).toMatch(/if FORM and not SCREENS:/);
+    expect(source).toContain('FORM = True');
+    expect(source).toContain('monolith');
+  });
+
+  it('lights a form like an object and a screen like a screen', () => {
+    const { scene: form } = normaliseScene({ rig: 'material_monolith', screenAssets: [], lighting: 'rim_dark' });
+    const { scene: screen } = normaliseScene({ rig: 'browser_float', screenAssets: ['/tmp/a.png'], lighting: 'rim_dark' });
+    // The form's key is large and close, for falloff across a flat surface;
+    // the screen's stays small and out of the way of an emissive interface.
+    expect(buildBlenderScript(form, {})).toMatch(/key\.data\.size = 7/);
+    expect(buildBlenderScript(screen, {})).toMatch(/key\.data\.size = 3/);
+  });
+
+  it('opens the lens for a form, and keeps it closed where an interface must stay readable', () => {
+    const { scene: form } = normaliseScene({ rig: 'material_monolith', screenAssets: [], depthOfField: 0.5 });
+    const { scene: screen } = normaliseScene({ rig: 'browser_float', screenAssets: ['/tmp/a.png'], depthOfField: 0.5 });
+    expect(buildBlenderScript(form, {})).toMatch(/3\.2 - DOF \* 2\.0/);
+    expect(buildBlenderScript(screen, {})).toMatch(/8\.0 - DOF \* 6\.0/);
+  });
+
+  it('plans a form rig when there is no capture to stage', () => {
+    const board = planThreeDScene({
+      scene: { ...scene, visualType: 'cinematic_3d', assetRefs: [] },
+      brand,
+      screenAssetPaths: [],
+      aspect: '16:9',
+    });
+    expect(board.scene.rig).toMatch(/^material_/);
+  });
+});

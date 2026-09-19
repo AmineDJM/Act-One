@@ -1,6 +1,7 @@
 import {
   AppError,
-  MODE_BUDGETS,
+  budgetFor,
+  cutAspect,
   REAL_PRODUCT_VISUAL_TYPES,
   usdToCredits,
   type GenerativeNeed,
@@ -58,7 +59,7 @@ export async function runSceneAssets(
    * agreed to. What this production has already spent on generated media comes
    * off the top.
    */
-  const budget = MODE_BUDGETS[project.brief.creativeMode];
+  const budget = budgetFor(project.brief.creativeMode, project.brief.filmFormat);
   const allowance = budget.maxCostPerSecondUsd * storyboard.scenes.reduce((sum, s) => sum + s.duration, 0);
   const spent = (await store.costs.listForProject(organizationId, project.id))
     .filter((cost) => cost.operation.startsWith('media.') && cost.succeeded)
@@ -250,13 +251,24 @@ async function renderThreeD(
   }
 
   const screenUrls = Object.values(await resolveAssetUrls(context, scene.assetRefs));
-  if (screenUrls.length === 0) return 'skipped';
+  /*
+   * A `product_ui_3d` shot is a capture staged as an object, so with no
+   * capture there is nothing to stage and the scene is skipped. A
+   * `cinematic_3d` shot is form and light — it was never made of a screen, and
+   * skipping it here is what made every screenless 3D beat disappear between
+   * the storyboard and the film.
+   */
+  if (screenUrls.length === 0 && scene.visualType !== 'cinematic_3d') return 'skipped';
 
   const { scene: threeD } = planThreeDScene({
     scene,
     brand,
     screenAssetPaths: screenUrls,
-    aspect: '16:9',
+    // Rendered in the film's own frame. A vertical film given a landscape 3D
+    // shot gets the sides cropped off the composition it just paid Cycles to
+    // light, and the rig itself changes with the frame — a handset rig for
+    // vertical, a browser for landscape.
+    aspect: cutAspect(context.project.brief.filmCut),
   });
 
   /*
@@ -277,7 +289,16 @@ async function renderThreeD(
 
   const clipPath = path.join(frameDir, 'shot.mp4');
   const encoded = await runFfmpeg(
-    framesToVideoArgs(path.join(frameDir, 'frame_%04d.png'), threeD.fps, clipPath),
+    // The pattern comes from the render rather than being assembled here. It
+    // was assembled here, as `frame_%04d.png`, against a directory of `.exr` —
+    // so every 3D shot rendered in full and then failed to encode.
+    framesToVideoArgs(result.framePattern, threeD.fps, clipPath, {
+      linear: result.linear,
+      // Laid over the brand's own canvas, which is what sits behind the shot
+      // in the film. Flattened onto black instead, every screenless form
+      // would carry a black surround the composition never asked for.
+      flattenTo: brand.canvasDark,
+    }),
     { signal: context.signal, timeoutMs: 300_000 },
   );
   if (!encoded.ok) {

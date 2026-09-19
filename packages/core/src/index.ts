@@ -24,6 +24,7 @@ export * from './domain/entitlement-policy.ts';
 export * from './domain/asset.ts';
 export * from './media/image-info.ts';
 export * from './domain/render.ts';
+export * from './domain/cut.ts';
 export * from './domain/cost.ts';
 export * from './domain/operations.ts';
 export * from './domain/copy.ts';

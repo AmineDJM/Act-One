@@ -1,4 +1,13 @@
-import { TONE_LABELS, languageName, type BrandSystem, type ProjectBrief } from '@act-one/core';
+import {
+  FILM_CUTS,
+  FILM_FORMATS,
+  TONE_LABELS,
+  languageName,
+  type BrandSystem,
+  type FilmCut,
+  type FilmFormat,
+  type ProjectBrief,
+} from '@act-one/core';
 
 /**
  * What the customer asked for, in the words every writing prompt gets.
@@ -36,4 +45,40 @@ export function brandDirectionLines(brand: Pick<BrandSystem, 'communication' | '
   if (words.vocabulary.length > 0) lines.push(`Words the brand uses: ${words.vocabulary.join(', ')}.`);
   if (words.wordsToAvoid.length > 0) lines.push(`Words the brand never uses — never write them: ${words.wordsToAvoid.join(', ')}.`);
   return lines;
+}
+
+/**
+ * Which of the two films this is, in the words every writing prompt gets.
+ *
+ * Told to the strategist and the director as well as the planner, because a
+ * concept written around watching the product work cannot be rescued by a
+ * storyboard that is forbidden to show it — it becomes a film narrating a
+ * demonstration that never happens, which is worse than either format done
+ * plainly.
+ */
+export function formatDirectionLines(format: FilmFormat): string[] {
+  const spec = FILM_FORMATS[format];
+  return [
+    `The kind of film: ${spec.title}. ${spec.blurb}`,
+    `What carries the picture: ${spec.carries}`,
+    `What this film never does: ${spec.never}`,
+  ];
+}
+
+/**
+ * How this film is cut, in the words every writing prompt gets.
+ *
+ * The same reasoning as the format: a concept written as a sixty-second film
+ * that builds cannot be rescued by a storyboard cutting it to twenty-two
+ * seconds in a vertical frame. It arrives as a long film with its middle
+ * missing, which is what a repurposed landscape film looks like and exactly
+ * what choosing this was meant to avoid.
+ */
+export function cutDirectionLines(cut: FilmCut): string[] {
+  const spec = FILM_CUTS[cut];
+  return [
+    `How it is cut: ${spec.title}, ${spec.aspect}, ${spec.seconds[0]}\u2013${spec.seconds[1]} seconds.`,
+    spec.direction,
+    `The opening has ${spec.hookSeconds} second${spec.hookSeconds === 1 ? '' : 's'} to earn the rest of the film.`,
+  ];
 }

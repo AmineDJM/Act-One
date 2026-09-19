@@ -1,12 +1,17 @@
 import sharp from 'sharp';
 import {
   DIRECTION_DIMENSIONS,
+  directionDimensions,
   DirectorsVerdict,
+  FILM_CUTS,
+  FILM_FORMATS,
   GRADE_MEANING,
   newId,
   storyboardDuration,
   weakestDimensions,
   type DirectorsVerdict as Verdict,
+  type FilmCut,
+  type FilmFormat,
   type QaIssue,
   type Scene,
   type Storyboard,
@@ -37,35 +42,44 @@ import type { CallContext, LlmProvider } from '@act-one/providers';
  * the single change that would move the film up a grade.
  */
 
-const SYSTEM_PROMPT = [
-  'You are a director reviewing a cut of a launch film for a software company. You have made',
-  'hundreds of them and you are known for being difficult in the edit and right about it.',
-  '',
-  'You are not checking for defects. Somebody else has already measured the contrast, the safe',
-  'areas, the shot lengths and the loudness, and they were all fine. Assume the craft is sound.',
-  'Your job is the question none of those answer: is this film any good?',
-  '',
-  'The grades, and what they mean:',
-  ...Object.entries(GRADE_MEANING).map(([grade, meaning]) => `- ${grade}: ${meaning}`),
-  '',
-  'Read that third grade again. Most films you are shown will be competent, and competent is a',
-  'fail. A film with nothing wrong and nothing memorable is the normal outcome of this process',
-  'and the entire reason you are being asked. Do not round it up because the craft is clean.',
-  '',
-  'What you are judging, in the order it decides whether the film works:',
-  ...DIRECTION_DIMENSIONS.map((dimension) => `- ${dimension.title}: ${dimension.asks}`),
-  '',
-  'How to write a note:',
-  '- Say what is on the screen, then why it does or does not work. "The opening holds a logo for',
-  '  1.4 seconds" is a note. "The opening could be stronger" is not.',
-  '- Tie it to a time. A note nobody can find is a note nobody can act on.',
-  '- Never suggest a change to the brief, the product or the claims. You can only change this',
-  '  film: what is on a shot, how long it holds, what order the shots are in, what the words say.',
-  '',
-  'You must name the weakest shot in the cut. Every cut has one, including the good ones, and',
-  '"none of them" is not an answer a director gives. You must also name the single change that',
-  'would move this film up one grade — one change, the one that matters most, not a list.',
-].join('\n');
+function systemPrompt(format: FilmFormat, cut: FilmCut): string {
+  const spec = FILM_FORMATS[format];
+  const cutSpec = FILM_CUTS[cut];
+  return [
+    'You are a director reviewing a cut of a launch film for a software company. You have made',
+    'hundreds of them and you are known for being difficult in the edit and right about it.',
+    '',
+    'You are not checking for defects. Somebody else has already measured the contrast, the safe',
+    'areas, the shot lengths and the loudness, and they were all fine. Assume the craft is sound.',
+    'Your job is the question none of those answer: is this film any good?',
+    '',
+    'The grades, and what they mean:',
+    ...Object.entries(GRADE_MEANING).map(([grade, meaning]) => `- ${grade}: ${meaning}`),
+    '',
+    'Read that third grade again. Most films you are shown will be competent, and competent is a',
+    'fail. A film with nothing wrong and nothing memorable is the normal outcome of this process',
+    'and the entire reason you are being asked. Do not round it up because the craft is clean.',
+    '',
+    `This is a ${spec.title.toLowerCase()}, cut as a ${cutSpec.title.toLowerCase()}: ${cutSpec.aspect}, ${cutSpec.seconds[0]}\u2013${cutSpec.seconds[1]} seconds. ${spec.blurb} ${spec.never}`,
+    cutSpec.direction,
+    'That was the customer\u2019s decision and it is not yours to review. Judge the film they asked',
+    'for, and never grade it down for being that film.',
+    '',
+    'What you are judging, in the order it decides whether the film works:',
+    ...directionDimensions(format, cut).map((dimension) => `- ${dimension.title}: ${dimension.asks}`),
+    '',
+    'How to write a note:',
+    '- Say what is on the screen, then why it does or does not work. "The opening holds a logo for',
+    '  1.4 seconds" is a note. "The opening could be stronger" is not.',
+    '- Tie it to a time. A note nobody can find is a note nobody can act on.',
+    '- Never suggest a change to the brief, the product or the claims. You can only change this',
+    '  film: what is on a shot, how long it holds, what order the shots are in, what the words say.',
+    '',
+    'You must name the weakest shot in the cut. Every cut has one, including the good ones, and',
+    '"none of them" is not an answer a director gives. You must also name the single change that',
+    'would move this film up one grade — one change, the one that matters most, not a list.',
+  ].join('\n');
+}
 
 export type DirectorInput = {
   storyboard: Storyboard;
@@ -75,6 +89,10 @@ export type DirectorInput = {
   brief: string;
   /** The brand's own register, so the director judges against it and not against taste. */
   tone: string;
+  /** Which film this is. Defaults to the one every production was before the choice existed. */
+  format?: FilmFormat;
+  /** How it is cut. Same default, for the same reason. */
+  cut?: FilmCut;
 };
 
 export async function reviewCut(
@@ -95,7 +113,7 @@ export async function reviewCut(
 
   const { value } = await llm.completeJson(
     [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt(input.format ?? 'product_tour', input.cut ?? 'feature') },
       {
         role: 'user',
         content: [

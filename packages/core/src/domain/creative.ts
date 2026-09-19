@@ -6,6 +6,82 @@ export const CreativeMode = z.enum(['authentic', 'studio', 'cinematic']);
 export type CreativeMode = z.infer<typeof CreativeMode>;
 
 /**
+ * What kind of film this is.
+ *
+ * Not a style and not a template — a decision about whether the product's own
+ * interface appears on screen at all, which changes every stage downstream.
+ *
+ * `product_tour` is the film this platform was built for: we sign into the
+ * real product, navigate it, and the film's argument is carried by watching
+ * the thing work. It is the honest format for software whose value is visible
+ * in the using of it.
+ *
+ * `pitch` is the film for everybody else. A school, a studio, a fund, a
+ * consultancy — and plenty of software companies, whose interface is a
+ * spreadsheet nobody wants to watch and whose actual argument is what happens
+ * because of it. Nothing navigates. The film is carried by image, figure,
+ * voice and cut, which is what most of the work people admire actually is.
+ *
+ * The distinction is load-bearing rather than cosmetic: a pitch never opens an
+ * authenticated session against the customer's product, never routes a shot to
+ * a product visual type, and is judged on a different question in the edit.
+ */
+export const FilmFormat = z.enum(['product_tour', 'pitch']);
+export type FilmFormat = z.infer<typeof FilmFormat>;
+
+/**
+ * How each format is described to a customer and to the agents.
+ *
+ * One source, read by the brief form, by the concept and storyboard prompts
+ * and by the director, so the promise the customer chose is the promise every
+ * stage is working to.
+ */
+export const FILM_FORMATS: Record<
+  FilmFormat,
+  {
+    title: string;
+    /** One line, on the control. */
+    blurb: string;
+    /** Who it is for, on the control's second line. */
+    suits: string;
+    /** What carries the picture. Handed to the planning agents verbatim. */
+    carries: string;
+    /** What this format never does. Also handed over verbatim. */
+    never: string;
+  }
+> = {
+  product_tour: {
+    title: 'Product tour',
+    blurb: 'The film navigates the real product.',
+    suits: 'Software and AI agents whose value is visible on screen.',
+    carries:
+      'Real capture of the product doing the thing, staged with typography, figures and sound ' +
+      'around it. The interface is the evidence and the film is built to earn the moment it ' +
+      'appears.',
+    never:
+      'Never an invented interface. If a beat has no real capture behind it, the film says it ' +
+      'another way rather than drawing a product that does not exist.',
+  },
+  pitch: {
+    title: 'Pitch film',
+    blurb: 'No navigation. The film argues, it does not demonstrate.',
+    suits: 'A school, an institution, a studio — or software that would rather be talked about.',
+    carries:
+      'Image, figure, voice and cut. Photography the customer already owns, commissioned ' +
+      'footage, light and form in three dimensions, and typography that is designed rather ' +
+      'than defaulted to.',
+    never:
+      'Never a screenshot, never a cursor, never an interface of any kind — not the real one ' +
+      'and certainly not an invented one. The product is spoken about, never navigated.',
+  },
+};
+
+/** Whether this format puts the product's own interface on screen. */
+export function formatShowsProduct(format: FilmFormat): boolean {
+  return format === 'product_tour';
+}
+
+/**
  * Creative systems are modular creative languages, not templates. A system
  * supplies opening grammar, type treatment, product staging, transitions and
  * sound behaviour; the Creative Director composes them per project.

@@ -278,7 +278,7 @@ describe('pipeline', () => {
       productUnderstandingId: null, selectedConceptId: null, activeStoryboardId: null,
       latestRenderId: null, stage: 'created',
       brief: {
-        targetAudience: null, goal: null, keyMessage: null, durationSeconds: 45, channels: [],
+        filmFormat: 'product_tour', filmCut: 'feature', targetAudience: null, goal: null, keyMessage: null, durationSeconds: 45, channels: [],
         creativeMode: 'studio', voiceStrategy: null, formats: [], excludedClaims: [], realMediaOnly: false, language: null, tone: null, voiceGender: null, voiceAccent: null, voiceStyle: null, voicePace: null,
       },
       productCredentialId: null, costUsd: 0, creditsSpent: 0, archivedAt: null,
@@ -562,6 +562,62 @@ describe('pipeline', () => {
     // by QA after the film has been paid for.
     expect(outcome.status === 'failed' && outcome.error).toMatch(/generated material/i);
     expect(outcome.status === 'failed' && outcome.retryable).toBe(false);
+  });
+
+  it('refuses to put an interface in a film that promised not to show one', async () => {
+    /*
+     * A pitch is the customer saying "talk about my product, do not navigate
+     * it". A revision, a repair or a change of format after storyboarding can
+     * all put a screen back, so the promise is checked where the frames are
+     * about to be made rather than trusted to hold because of how the
+     * storyboard was planned.
+     */
+    await runJob(deps, await enqueued(store, org.id, project.id, 'research_product'));
+    await runJob(deps, await enqueued(store, org.id, project.id, 'generate_concepts'));
+    const concepts = await store.concepts.listForProject(org.id, project.id);
+    await store.projects.update(org.id, project.id, { selectedConceptId: concepts[0]!.id });
+    await runJob(deps, await enqueued(store, org.id, project.id, 'build_storyboard', { conceptId: concepts[0]!.id }));
+
+    const board = (await store.storyboards.listForProject(org.id, project.id))[0]!;
+    await store.storyboards.updateScene(org.id, board.scenes[0]!.id, { visualType: 'product_ui' });
+
+    const stored = (await store.projects.get(org.id, project.id))!;
+    await store.projects.update(org.id, project.id, {
+      brief: { ...stored.brief, filmFormat: 'pitch' },
+    });
+
+    const outcome = await runJob(
+      deps,
+      await enqueued(store, org.id, project.id, 'render_film', { storyboardId: board.id }),
+    );
+
+    expect(outcome.status).toBe('failed');
+    expect(outcome.status === 'failed' && outcome.error).toMatch(/pitch film/i);
+    // Failing identically forever: retrying it only costs money.
+    expect(outcome.status === 'failed' && outcome.retryable).toBe(false);
+  });
+
+  it('never signs in to a product the film will not show', async () => {
+    /*
+     * The least access that does the job is none. A pitch never navigates the
+     * product, so there is nothing an authenticated session could capture that
+     * the film is allowed to use — and opening one anyway would mean driving a
+     * browser through somebody's real account to take screenshots nobody will
+     * ever see.
+     */
+    const stored = (await store.projects.get(org.id, project.id))!;
+    await store.projects.update(org.id, project.id, {
+      brief: { ...stored.brief, filmFormat: 'pitch' },
+      productCredentialId: 'crd_authorised',
+    });
+
+    const outcome = await runJob(deps, await enqueued(store, org.id, project.id, 'capture_product_moments'));
+    expect(outcome.status).toBe('completed');
+
+    const understanding = await store.understandings.getLatestForProject(org.id, project.id);
+    expect(understanding).not.toBeNull();
+    // Read the site, yes. Signed in, no: nothing was captured from inside.
+    expect(understanding!.productMoments.every((moment) => moment.captureKind !== 'in_app')).toBe(true);
   });
 
   it('records a failure against the project instead of spinning forever', async () => {

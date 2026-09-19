@@ -96,10 +96,24 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
     lineHeight: 1.08,
   };
 
-  // Type is sized against frame height, not width. A 9:16 frame is not a
-  // smaller 16:9 frame — sizing on width would make vertical type tiny.
-  const displaySize = Math.round(frame.height * scale.displayRatio);
-  const bodySize = Math.round(frame.height * scale.bodyRatio);
+  /*
+   * Type is sized against the shorter side of the frame.
+   *
+   * It used to be sized against the height, on the reasoning that a 9:16 frame
+   * is not a smaller 16:9 frame and sizing on width would make vertical type
+   * tiny. Half of that is right — and the other half put 211px display type in
+   * a frame 1080 wide, where a five-word headline wrapped to three lines and
+   * the third one was clipped. "Now it takes one run." rendered as "Now it
+   * takes", which is not a design decision, it is a sentence cut in half.
+   *
+   * The shorter side is what actually constrains a line of type, and it gives
+   * the right answer in both frames: in 16:9 it *is* the height, so every
+   * landscape film is set exactly as before; in 9:16 it is the width, which is
+   * the dimension the line has to fit across.
+   */
+  const typeBasis = Math.min(frame.width, frame.height);
+  const displaySize = Math.round(typeBasis * scale.displayRatio);
+  const bodySize = Math.round(typeBasis * scale.bodyRatio);
 
   /*
    * Every other size is a step on one ratio rather than a multiplier somebody
@@ -124,7 +138,7 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
    * leading does not, because that is not a style, it is a mistake.
    */
   const leading = (size: number, preferred?: number) => {
-    const standard = leadingFor(size, frame.height);
+    const standard = leadingFor(size, typeBasis);
     if (preferred === undefined) return standard;
     return clamp(preferred, standard * 0.9, standard * 1.15);
   };
@@ -154,7 +168,7 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
         weight: display.weights[display.weights.length - 1] ?? 700,
         sizePx: displaySize,
         lineHeight: leading(displaySize, scale.lineHeight),
-        tracking: opticalTracking(displaySize, scale.tracking, frame.height),
+        tracking: opticalTracking(displaySize, scale.tracking, typeBasis),
         case: 'sentence',
       },
       statement: {
@@ -162,7 +176,7 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
         weight: display.weights[0] ?? 600,
         sizePx: statementSize,
         lineHeight: leading(statementSize, scale.lineHeight * 1.12),
-        tracking: opticalTracking(statementSize, scale.tracking, frame.height),
+        tracking: opticalTracking(statementSize, scale.tracking, typeBasis),
         case: 'sentence',
       },
       body: {
@@ -170,7 +184,7 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
         weight: 400,
         sizePx: bodySize,
         lineHeight: leading(bodySize),
-        tracking: opticalTracking(bodySize, body.tracking, frame.height),
+        tracking: opticalTracking(bodySize, body.tracking, typeBasis),
         case: 'sentence',
       },
       caption: {

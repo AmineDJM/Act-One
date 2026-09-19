@@ -6,6 +6,8 @@ import { supportingSystems } from './supporting.ts';
 import type { CreativeSystem } from './types.ts';
 
 export * from './types.ts';
+export * from './pitch.ts';
+export * from './pacing.ts';
 export { cinematicBlack, kineticProduct, editorialTech };
 
 /**

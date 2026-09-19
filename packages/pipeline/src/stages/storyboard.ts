@@ -1,4 +1,4 @@
-import { AppError, rankLibraryAssets, storyboardEstimatedCost } from '@act-one/core';
+import { AppError, cutAspect, rankLibraryAssets, storyboardEstimatedCost } from '@act-one/core';
 import { planFor } from '../entitlements.ts';
 import { CreativeDirector, StoryboardEngine, detectLanguage } from '@act-one/creative';
 import { runDeterministicChecks } from '@act-one/qa';
@@ -111,7 +111,10 @@ export async function runStoryboard(
   const issues = runDeterministicChecks({
     storyboard: built.storyboard,
     brand,
-    aspect: '16:9',
+    // The frame this film is actually in. Safe areas and line lengths are
+    // different in a vertical frame, so checking a reel against a landscape
+    // one passes copy that will not fit and flags copy that would.
+    aspect: cutAspect(project.brief.filmCut),
     knownEvidenceIds: new Set(understanding.evidence.map((evidence) => evidence.id)),
   });
   const blockers = issues.filter((issue) => issue.severity === 'blocker');

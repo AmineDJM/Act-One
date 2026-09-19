@@ -31,11 +31,13 @@ export function ProductAccess({
   productHost,
   access,
   canManage,
+  filmFormat,
 }: {
   projectId: string;
   productHost: string;
   access: AccessView | null;
   canManage: boolean;
+  filmFormat: 'product_tour' | 'pitch';
 }) {
   const [authState, authorize, authorizing] = useActionState<FormState, FormData>(
     authorizeProductAction,
@@ -124,6 +126,31 @@ export function ProductAccess({
   }
 
   if (!canManage) return null;
+
+  /*
+   * A pitch is not asked for credentials.
+   *
+   * Nothing would sign in with them — the pitch format never opens a session —
+   * so a form here would be asking for a password we have already decided not
+   * to use. Said plainly instead, with the way to change it, because somebody
+   * who wanted their product filmed and chose the wrong kind of film should
+   * find out here rather than when the master arrives without it.
+   */
+  if (filmFormat === 'pitch') {
+    return (
+      <section className={styles.panel}>
+        <div className={styles.panelHead}>
+          <h3>Your product</h3>
+          <span className="badge">Not used</span>
+        </div>
+        <p className="secondary" style={{ fontSize: '0.9rem' }}>
+          This is a pitch film: it argues about {productHost} rather than navigating it, so we do
+          not sign in and never ask for a password. Change the film to a product tour in the brief
+          above and this becomes available.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className={styles.panel}>

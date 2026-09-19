@@ -205,4 +205,40 @@ describe('what comes back from the director', () => {
     await reviewCut(llm, input, call);
     expect(llm.calls[0]!.options.tier).toBe('deep');
   });
+
+  it('asks a pitch the question a pitch can answer, and tells it not to relitigate the format', async () => {
+    // "Is the product seen working?" has one answer in a film that was asked
+    // not to show it, and a director allowed to give that answer grades the
+    // customer's own decision as the film's weakness.
+    const llm = new ScriptedLlmProvider([{ respond: verdict({ weakestSceneId: 'a' }) }]);
+    await reviewCut(llm, { ...input, format: 'pitch' }, call);
+    const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
+
+    expect(prompt).not.toMatch(/Is the product seen doing the thing/i);
+    expect(prompt).toMatch(/cannot demonstrate/i);
+    expect(prompt).toMatch(/never grade it down for being that film/i);
+    // And the bar has not moved.
+    expect(prompt).toMatch(/competent is a\s+fail/i);
+  });
+
+  it('asks a short the questions a feed asks, not the ones a page does', async () => {
+    const llm = new ScriptedLlmProvider([{ respond: verdict({ weakestSceneId: 'a' }) }]);
+    await reviewCut(llm, { ...input, cut: 'short' }, call);
+    const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
+
+    // The hook question changes: in a feed it is not whether the opening earns
+    // the film, it is whether there is anything there in the first second.
+    expect(prompt).toMatch(/first second/i);
+    expect(prompt).toMatch(/scrolls away/i);
+    // And the one dimension a landscape film never has to answer.
+    expect(prompt).toMatch(/sound is off/i);
+    expect(prompt).toContain('9:16');
+  });
+
+  it('asks a product tour whether the product is actually seen working', async () => {
+    const llm = new ScriptedLlmProvider([{ respond: verdict({ weakestSceneId: 'a' }) }]);
+    await reviewCut(llm, input, call);
+    const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
+    expect(prompt).toMatch(/Is the product seen doing the thing/i);
+  });
 });

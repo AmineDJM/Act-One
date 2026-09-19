@@ -27,6 +27,18 @@ export const RigName = z.enum([
   'device_phone',       // vertical interface on a handset
   'glass_planes',       // frosted planes with the interface behind them
   'spatial_transition', // a move between two arrangements, used as a cut
+  /*
+   * The two rigs that hold no interface at all.
+   *
+   * Every rig above stages a screen. A film that is not allowed to show a
+   * screen — a pitch — still wants the texture that three dimensions give it:
+   * real light falling on a real surface, a lens with a real depth of field,
+   * an object that turns. Without these, `cinematic_3d` in such a film was a
+   * scene Blender rendered as an empty void, because the geometry was built
+   * from the screens and there were none.
+   */
+  'material_monolith',  // one bevelled form, lit and turning. Weight and edge.
+  'material_field',     // a landscape of extruded forms, shot long
 ]);
 export type RigName = z.infer<typeof RigName>;
 
@@ -153,6 +165,22 @@ export const RIGS: Record<RigName, RigDefinition> = {
     defaultLighting: 'rim_dark',
     // Refraction is expensive; worth knowing before quoting a render.
     secondsPerFrameEstimate: 2.4,
+  },
+  material_monolith: {
+    name: 'material_monolith',
+    purpose: 'One form, lit and turning. Material and edge, standing in for nothing.',
+    screenCapacity: 0,
+    suitedMoves: ['orbit_left', 'orbit_right', 'slow_push'],
+    defaultLighting: 'rim_dark',
+    secondsPerFrameEstimate: 0.7,
+  },
+  material_field: {
+    name: 'material_field',
+    purpose: 'A landscape of forms, shot long and shallow. Scale without a subject.',
+    screenCapacity: 0,
+    suitedMoves: ['slow_push', 'slow_pull', 'orbit_left'],
+    defaultLighting: 'rim_dark',
+    secondsPerFrameEstimate: 1.1,
   },
   spatial_transition: {
     name: 'spatial_transition',

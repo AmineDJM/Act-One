@@ -228,6 +228,37 @@
 .sourceFields { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .options { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 
+/* --- the one decision that changes the film -------------------------------- */
+
+.formats { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.format {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  padding: var(--space-3) var(--space-4);
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+.format:hover { border-color: var(--line-strong); }
+.format input { position: absolute; opacity: 0; pointer-events: none; }
+.format:focus-within { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-glow); }
+.format:has(input:checked) { border-color: var(--accent-line); background: var(--surface); }
+.formatName {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.04em; color: var(--text);
+}
+.formatName::before { content: '○'; color: var(--text-muted); font-size: 0.7rem; }
+.format:has(input:checked) .formatName::before { content: '●'; color: var(--accent); }
+.formatGroup { display: grid; gap: var(--space-2); }
+.formatLegend {
+  font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.formatBlurb { margin-top: 4px; font-size: 0.82rem; line-height: 1.45; color: var(--text-secondary); }
+.formatSuits { margin-top: 2px; font-size: 0.76rem; line-height: 1.45; color: var(--text-muted); }
+
 .heroAside {
   position: relative;
   overflow: hidden;

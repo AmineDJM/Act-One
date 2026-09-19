@@ -15,8 +15,37 @@ import { estimateRenderSeconds, normaliseScene, type ThreeDScene } from './rigs.
  * reproducibility is the entire reason 3D is in-house rather than a vendor call.
  */
 export type BlenderResult =
-  | { ok: true; frameDir: string; frameCount: number; elapsedMs: number }
+  | {
+      ok: true;
+      frameDir: string;
+      frameCount: number;
+      /**
+       * The frames as ffmpeg wants them: an absolute path with `%04d` where
+       * the number goes, carrying the extension Blender actually wrote.
+       *
+       * Returned rather than left for the caller to assemble, because the
+       * caller assembled it wrong: the pipeline encoded `frame_%04d.png`
+       * against a directory of `.exr`, so every 3D shot rendered in full,
+       * failed to encode, and logged a line nobody was reading. Minutes of
+       * Cycles per shot, thrown away, and the scene fell back to typography —
+       * which looks exactly like a film made by somebody who does not do 3D.
+       */
+      framePattern: string;
+      /** Whether those frames are linear-light with an alpha channel. */
+      linear: boolean;
+      elapsedMs: number;
+    }
   | { ok: false; error: string; elapsedMs: number };
+
+/**
+ * What Blender writes, and why it is not a PNG.
+ *
+ * EXR keeps the linear float values and the alpha, which is what lets a shot
+ * be composited over the brand's own canvas rather than over whatever grey the
+ * renderer guessed. It costs an extra conversion on the way to h264 and is
+ * worth it.
+ */
+export const FRAME_EXTENSION = 'exr';
 
 /**
  * Where Blender is, without anybody having to say.
@@ -126,7 +155,17 @@ export async function renderThreeDScene(options: RenderOptions): Promise<Blender
       };
     }
 
-    return { ok: true, frameDir: outputDir, frameCount: frames.length, elapsedMs: Date.now() - started };
+    // Read off the frames themselves rather than assumed, so a Blender that
+    // writes something else cannot silently break the encode downstream.
+    const extension = path.extname(frames[0]!).replace('.', '') || FRAME_EXTENSION;
+    return {
+      ok: true,
+      frameDir: outputDir,
+      frameCount: frames.length,
+      framePattern: path.join(outputDir, `frame_%04d.${extension}`),
+      linear: extension === 'exr',
+      elapsedMs: Date.now() - started,
+    };
   } catch (error) {
     return { ok: false, error: (error as Error).message, elapsedMs: Date.now() - started };
   } finally {

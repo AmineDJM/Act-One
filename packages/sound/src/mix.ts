@@ -313,24 +313,75 @@ export function muxArgs(videoPath: string, audioPath: string, outputPath: string
  * factor because this clip will be re-encoded once more in the master and the
  * losses compound, and the index at the front so it can be streamed.
  */
-export function framesToVideoArgs(pattern: string, fps: number, outputPath: string): string[] {
-  return [
-    '-y', '-hide_banner', '-loglevel', 'error',
-    '-framerate', String(fps),
-    '-start_number', '1',
-    '-i', pattern,
+export function framesToVideoArgs(
+  pattern: string,
+  fps: number,
+  outputPath: string,
+  options: {
+    /**
+     * Frames are linear-light with alpha — which is what Blender writes.
+     *
+     * They need the transfer curve applied on the way in, or the clip comes
+     * back washed out and two stops bright, and they need flattening onto
+     * something, because 4:2:0 carries no alpha and ffmpeg's default is to
+     * composite the transparent part of every frame onto black.
+     */
+    linear?: boolean;
+    /** The canvas the frames are laid over. The brand's own, normally. */
+    flattenTo?: string;
+  } = {},
+): string[] {
+  const common = [
     '-an',
     '-c:v', 'libx264',
     '-preset', 'slow',
     '-crf', '16',
     '-pix_fmt', 'yuv420p',
     '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
-    // An odd dimension is not encodable in 4:2:0, and a renderer that produced
-    // one would otherwise fail here rather than where the size was chosen.
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
     '-movflags', '+faststart',
+  ];
+  // An odd dimension is not encodable in 4:2:0, and a renderer that produced
+  // one would otherwise fail here rather than where the size was chosen.
+  const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
+
+  if (!options.linear) {
+    return [
+      '-y', '-hide_banner', '-loglevel', 'error',
+      '-framerate', String(fps),
+      '-start_number', '1',
+      '-i', pattern,
+      ...common,
+      '-vf', even,
+      outputPath,
+    ];
+  }
+
+  /*
+   * A colour source sized from the frames themselves by `scale2ref`, so the
+   * canvas needs no dimensions passed in and cannot disagree with them.
+   */
+  return [
+    '-y', '-hide_banner', '-loglevel', 'error',
+    // Applied to the input, so it comes before its -i.
+    '-apply_trc', 'iec61966_2_1',
+    '-framerate', String(fps),
+    '-start_number', '1',
+    '-i', pattern,
+    '-f', 'lavfi',
+    '-i', `color=c=${ffmpegColour(options.flattenTo ?? '#000000')}`,
+    '-filter_complex',
+    `[0:v]format=rgba[fg];[1:v][fg]scale2ref[bg][fg2];[bg][fg2]overlay=shortest=1,${even}[v]`,
+    '-map', '[v]',
+    ...common,
     outputPath,
   ];
+}
+
+/** `#0a0b10` as ffmpeg spells it. Anything else is refused rather than guessed. */
+function ffmpegColour(hex: string): string {
+  const match = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!match) throw new Error(`Not a colour ffmpeg can be given: ${hex}`);
+  return `0x${match[1]!.toLowerCase()}`;
 }
 
 /** Extracts a poster frame. */

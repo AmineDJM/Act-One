@@ -53,6 +53,41 @@ export const MODE_BUDGETS = {
 } as const satisfies Record<string, CreativeBudget>;
 
 /**
+ * The budget for a film, given its mode and its format.
+ *
+ * The generative ceiling exists for one reason: generated imagery must never
+ * stand in for the product. In a pitch there is no product on screen by
+ * design, so that ceiling is protecting something that is not there — and held
+ * at 25% it does real damage, because stripping the product archetypes out of
+ * a creative system leaves typography and one statistic, and a budget that
+ * then trims the footage away turns the film into a metronome of title cards.
+ *
+ * So a pitch may lean on commissioned image, and still may not be made of it:
+ * a third of the runtime stays typography, figures and the mark, rendered by
+ * our own engine where the brand is exact. `authentic` is untouched, because
+ * real media only means real media whatever the film is.
+ */
+export function budgetFor(
+  mode: keyof typeof MODE_BUDGETS,
+  format: 'product_tour' | 'pitch' = 'product_tour',
+): CreativeBudget {
+  const budget = MODE_BUDGETS[mode];
+  if (format !== 'pitch' || budget.maxGenerativeRatio === 0) return budget;
+  return {
+    ...budget,
+    maxGenerativeRatio: Math.min(1, budget.maxGenerativeRatio + 0.3),
+    minDeterministicRatio: Math.max(0.3, budget.minDeterministicRatio - 0.15),
+    // Image is the whole picture here rather than the connective tissue
+    // between product shots, so the film commissions more of it.
+    maxCostPerSecondUsd: round2(budget.maxCostPerSecondUsd * 1.6),
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
  * Frame-safe areas as fractions of the frame, for each aspect we deliver.
  *
  * Every one of these clears EBU R 95 title safe (a 5% inset on each edge) with

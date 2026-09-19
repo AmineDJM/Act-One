@@ -20,16 +20,30 @@ export function planThreeDScene(params: {
   const { scene, brand } = params;
   const screens = params.screenAssetPaths.length;
 
+  /*
+   * With no interface to stage, every screen rig builds nothing: the geometry
+   * comes from the screens, so a screenless scene rendered as an empty void
+   * and the shot fell back to typography. A film that is not allowed to show
+   * an interface — a pitch — is made almost entirely of such scenes, so these
+   * two rigs build form instead, from the brand rather than from a capture.
+   */
   const rig: RigName =
+    // A logo reveal keeps its rig whether or not anything was captured: the
+    // motion engine draws the lockup, and what it wants behind the mark is an
+    // empty void rather than a form competing with it.
     scene.motionRecipe.name === 'logo_reveal'
       ? 'logo_extrusion'
-      : params.aspect === '9:16'
-        ? 'device_phone'
-        : screens >= 3
-          ? 'floating_ui'
-          : screens === 2
-            ? 'layered_depth'
-            : 'browser_float';
+      : screens === 0
+        ? scene.motionRecipe.name === 'image_wall' || scene.cameraRecipe.move === 'lateral_drift'
+          ? 'material_field'
+          : 'material_monolith'
+        : params.aspect === '9:16'
+          ? 'device_phone'
+          : screens >= 3
+            ? 'floating_ui'
+            : screens === 2
+              ? 'layered_depth'
+              : 'browser_float';
 
   const camera =
     scene.cameraRecipe.move === 'slow_pull'

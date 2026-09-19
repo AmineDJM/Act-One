@@ -28,7 +28,7 @@ function project(organizationId: string, userId: string, name: string): Project 
     supplementalUrls: [], brandId: null, productUnderstandingId: null, selectedConceptId: null, activeStoryboardId: null,
     latestRenderId: null, stage: 'created',
     brief: {
-      targetAudience: null, goal: null, keyMessage: null, durationSeconds: null, channels: [], creativeMode: 'studio',
+      filmFormat: 'product_tour', filmCut: 'feature', targetAudience: null, goal: null, keyMessage: null, durationSeconds: null, channels: [], creativeMode: 'studio',
       voiceStrategy: null, formats: [], excludedClaims: [], realMediaOnly: false, language: null, tone: null,
       voiceGender: null, voiceAccent: null, voiceStyle: null, voicePace: null,
     },

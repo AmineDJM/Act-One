@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     productUnderstandingId: null, selectedConceptId: null, activeStoryboardId: null,
     latestRenderId: null, stage: 'created',
     brief: {
-      targetAudience: null, goal: null, keyMessage: null, durationSeconds: 45,
+      filmFormat: 'product_tour', filmCut: 'feature', targetAudience: null, goal: null, keyMessage: null, durationSeconds: 45,
       channels: [], creativeMode: 'studio', voiceStrategy: null, formats: [],
       excludedClaims: [], realMediaOnly: false, language: null, tone: null, voiceGender: null, voiceAccent: null, voiceStyle: null, voicePace: null,
     },

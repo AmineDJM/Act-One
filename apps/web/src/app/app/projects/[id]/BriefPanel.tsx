@@ -3,7 +3,12 @@
 import { useActionState, useEffect, useState } from 'react';
 import {
   DURATION_CHOICES,
+  FILM_CUTS,
+  FILM_FORMATS,
   FILM_LANGUAGES,
+  cutDurationChoices,
+  type FilmCut,
+  type FilmFormat,
   TONE_LABELS,
   Tone,
   VOICE_ACCENT_LABELS,
@@ -15,12 +20,16 @@ import {
   languageName,
 } from '@act-one/core';
 import { updateBriefAction, type FormState } from '../../actions.ts';
+import { FilmShape } from '../../FilmShape.tsx';
 import styles from '../../app.module.css';
 
 /**
- * The three things a customer most wants to decide and used to have nowhere
- * to say: how long, in what tone, in which language. Everything else about
- * the film is inferred, and stays that way.
+ * What the customer decided, and can still change.
+ *
+ * The kind of film comes first because it is the only one that changes what
+ * we do rather than how it looks: a pitch never signs into their product, and
+ * every shot after that is drawn from a different vocabulary. The rest — how
+ * long, in what tone, in which language, read by whom — shade the film.
  *
  * Editable until the film is rendered. A change applies to the next step —
  * the storyboard, if it has not been built yet, or the next revision.
@@ -33,6 +42,8 @@ export function BriefPanel({
 }: {
   projectId: string;
   brief: {
+    filmFormat: FilmFormat;
+    filmCut: FilmCut;
     durationSeconds: number | null;
     language: string | null;
     tone: Tone | null;
@@ -48,12 +59,13 @@ export function BriefPanel({
     error: null,
   });
   const [editing, setEditing] = useState(false);
+  const [cut, setCut] = useState<FilmCut>(brief.filmCut);
 
   // A saved brief closes the form and shows the values it now holds.
   useEffect(() => {
     if (state.message && !state.error) setEditing(false);
   }, [state]);
-  const durations = DURATION_CHOICES.filter((seconds) => seconds <= maxDurationSeconds);
+  const durations = cutDurationChoices(cut, DURATION_CHOICES, maxDurationSeconds);
 
   return (
     <section className={styles.panel}>
@@ -69,6 +81,7 @@ export function BriefPanel({
       {editing ? (
         <form action={save} className="stack" style={{ gap: 'var(--space-3)' }}>
           <input type="hidden" name="projectId" value={projectId} />
+          <FilmShape format={brief.filmFormat} cut={cut} onCutChange={setCut} compact />
           <div className="field">
             <label htmlFor="brief-duration">Length</label>
             <select
@@ -77,14 +90,19 @@ export function BriefPanel({
               className="input"
               defaultValue={brief.durationSeconds ?? ''}
             >
-              <option value="">Let the concept decide</option>
+              <option value="">
+                Let the concept decide (about {FILM_CUTS[cut].defaultSeconds} seconds)
+              </option>
               {durations.map((seconds) => (
                 <option key={seconds} value={seconds}>
                   {seconds} seconds
                 </option>
               ))}
             </select>
-            <span className="hint">Your plan renders up to {maxDurationSeconds} seconds.</span>
+            <span className="hint">
+              A {FILM_CUTS[cut].title.toLowerCase()} runs {FILM_CUTS[cut].seconds[0]}–
+              {FILM_CUTS[cut].seconds[1]} seconds. Your plan renders up to {maxDurationSeconds}.
+            </span>
           </div>
           <div className="field">
             <label htmlFor="brief-tone">Tone</label>
@@ -185,6 +203,15 @@ export function BriefPanel({
         </form>
       ) : (
         <dl className={styles.kv}>
+          <div className={styles.kvRow}>
+            <dt>Film</dt>
+            <dd>
+              {FILM_FORMATS[brief.filmFormat].title} · {FILM_CUTS[brief.filmCut].title}
+              <span className="hint" style={{ display: 'block' }}>
+                {FILM_FORMATS[brief.filmFormat].blurb} {FILM_CUTS[brief.filmCut].blurb}
+              </span>
+            </dd>
+          </div>
           <div className={styles.kvRow}>
             <dt>Length</dt>
             <dd>

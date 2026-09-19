@@ -61,6 +61,14 @@ export const DIRECTION_DIMENSIONS = [
     id: 'hook',
     title: 'The first two seconds',
     asks: 'Does the opening earn the next ten, for somebody who did not choose to watch it?',
+    /*
+     * In a feed the question is not whether the opening earns the film — it is
+     * whether there is a film at all after one second. A build, a title card,
+     * a logo: each is a frame spent, and the viewer has already gone.
+     */
+    asksOfAShort:
+      'Is the strongest thing in the film in the first second, or does the film build towards it ' +
+      'while the viewer scrolls away?',
   },
   {
     id: 'argument',
@@ -71,11 +79,38 @@ export const DIRECTION_DIMENSIONS = [
     id: 'product',
     title: 'The product, working',
     asks: 'Is the product seen doing the thing, or only described while something else is on screen?',
+    /*
+     * The one dimension the format changes.
+     *
+     * "Is the product seen working?" is unanswerable in a film that was asked
+     * not to show it, and a director handed an unanswerable question answers
+     * it badly — it grades the absence of the product as the film's weakness,
+     * which is the customer's own decision, and then the re-direct sends back
+     * a shot for being exactly what it was meant to be.
+     *
+     * The question a pitch actually has to survive is the harder one anyway:
+     * a film that cannot demonstrate has to make you believe by other means,
+     * and most of them do not.
+     */
+    asksOfAPitch:
+      'The film cannot demonstrate, so does it make the thing real by other means — a picture, ' +
+      'a figure, a voice that has actually seen it — or does it only assert?',
   },
   {
     id: 'rhythm',
     title: 'The cut',
     asks: 'Do the shot lengths follow the argument, or is every shot the same length as the last?',
+    asksOfAShort:
+      'Does this move at the speed of the feed it is in, or does it hold shots like a film ' +
+      'somebody chose to watch?',
+  },
+  {
+    id: 'sound_off',
+    title: 'Watched with the sound off',
+    asks: 'Would this still work muted, for the many who watch it that way?',
+    asksOfAShort:
+      'The sound is off. Does every beat carry its meaning in the picture and the words on it, ' +
+      'or are there shots that mean nothing without the voice?',
   },
   {
     id: 'ending',
@@ -95,6 +130,41 @@ export const DIRECTION_DIMENSIONS = [
 ] as const;
 
 export type DimensionId = (typeof DIRECTION_DIMENSIONS)[number]['id'];
+
+export type DirectionDimension = {
+  id: DimensionId;
+  title: string;
+  asks: string;
+};
+
+/**
+ * The rubric for one kind of film.
+ *
+ * Every dimension is asked of both formats; one of them is asked differently,
+ * because the question that decides whether a product tour works is not the
+ * question that decides whether a pitch does.
+ */
+export function directionDimensions(
+  format: 'product_tour' | 'pitch' = 'product_tour',
+  cut: 'feature' | 'short' = 'feature',
+): DirectionDimension[] {
+  return DIRECTION_DIMENSIONS.map((dimension) => ({
+    id: dimension.id,
+    title: dimension.title,
+    /*
+     * The cut asks first, because it changes the viewing: a hook question
+     * written for somebody sitting down to watch is the wrong question for a
+     * feed whatever the film is about. The format then changes what the film
+     * is allowed to show.
+     */
+    asks:
+      cut === 'short' && 'asksOfAShort' in dimension
+        ? dimension.asksOfAShort
+        : format === 'pitch' && 'asksOfAPitch' in dimension
+          ? dimension.asksOfAPitch
+          : dimension.asks,
+  }));
+}
 
 export const DimensionId = z.enum(
   DIRECTION_DIMENSIONS.map((dimension) => dimension.id) as unknown as [DimensionId, ...DimensionId[]],

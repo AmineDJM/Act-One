@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AppError,
+  cutAspect,
+  FILM_CUTS,
   AUDIO_STANDARDS,
   DEFAULT_FPS,
   DIALOGUE_LEAD_MIN,
@@ -118,8 +120,24 @@ export async function runRender(
   options: RenderOptions,
 ): Promise<{ renderId: string; assetId: string; qaPassed: boolean; issues: QaIssue[] }> {
   const { store, registry, project, organizationId } = context;
-  const aspect = options.aspect ?? '16:9';
+  /*
+   * The master is composed in its own cut's frame.
+   *
+   * This used to be sixteen by nine unless a campaign cut said otherwise,
+   * which meant a customer who asked for a reel got a landscape film and a
+   * vertical crop of it afterwards — the exact thing a reel must not be. A cut
+   * passed in the options still wins, because that is the campaign asking for
+   * a specific frame from material already approved.
+   */
+  const cut = project.brief.filmCut;
+  const aspect = options.aspect ?? cutAspect(cut);
   const kind = options.kind ?? 'film';
+  /*
+   * And a short wears its captions in the picture. It is watched muted in a
+   * feed, where a caption the viewer has to switch on is a caption nobody
+   * reads. A caller that has decided for itself — the campaign — still wins.
+   */
+  const burnCaptions = options.burnCaptions ?? FILM_CUTS[cut].captionsBurned;
 
   /*
    * The plan decides the master, and the worker asks the plan rather than
@@ -217,7 +235,7 @@ export async function runRender(
         attempt,
         understanding,
         voice,
-        burnCaptions: options.burnCaptions ?? false,
+        burnCaptions,
       });
       masterPath = rendered.path;
       captions = rendered.captions;
@@ -367,7 +385,7 @@ export async function runRender(
               cues: captions.cues.length,
               language: current.language ?? context.project.brief.language ?? null,
               timing: captions.alignedPassages === captions.passages ? 'aligned' : 'estimated',
-              burnedIn: options.burnCaptions ?? false,
+              burnedIn: burnCaptions,
             },
           })
         : null;
@@ -475,6 +493,23 @@ async function assertProductIsReal(context: StageContext, storyboard: Storyboard
   const productScenes = storyboard.scenes.filter((scene) =>
     REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType),
   );
+
+  /*
+   * And in a pitch, the rule inverts: a real interface is as wrong as an
+   * invented one, because the customer asked for a film that does not show
+   * their product at all. Checked here for the same reason as everything else
+   * in this function — planning is upstream of the revision, the repair pass
+   * and the campaign cut, and any of those can put a screen back.
+   */
+  if (context.project.brief.filmFormat === 'pitch' && productScenes.length > 0) {
+    throw new AppError(
+      'unsafe_operation',
+      `This production is a pitch film, which never shows the product's interface, but ` +
+        `${productScenes.length} scene${productScenes.length === 1 ? '' : 's'} would put one on ` +
+        'screen. Switch the production to a product tour, or direct those scenes another way.',
+    );
+  }
+
   const ids = [...new Set(productScenes.flatMap((scene) => scene.assetRefs))];
   if (ids.length === 0) return;
 
@@ -1096,6 +1131,8 @@ async function askTheDirector(
           ? `${params.understanding.name}: ${params.understanding.oneLiner}`
           : context.project.name,
         tone: params.brand.tone,
+        format: context.project.brief.filmFormat,
+        cut: context.project.brief.filmCut,
       },
       { organizationId: context.organizationId, projectId: context.project.id, signal: context.signal },
     );

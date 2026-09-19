@@ -250,6 +250,23 @@ export const DEFAULT_CAMPAIGN: VariantPurpose[] = [
   'homepage_loop',
 ];
 
+/**
+ * The campaign that suits a vertical master.
+ *
+ * The default campaign exists to take a landscape hero film into the feed:
+ * four of its five cuts are the vertical and square versions somebody would
+ * otherwise crop by hand. A master that is already vertical needs the opposite
+ * — the channels it is not yet in, and the shorter cuts of itself — and giving
+ * it the default produces five re-crops of a film that was already the right
+ * shape, which is work nobody asked for and spend nobody agreed to.
+ */
+export const SHORT_CAMPAIGN: VariantPurpose[] = ['reel', 'tiktok', 'linkedin_cut', 'bumper_6'];
+
+/** The campaign that belongs to a master cut this way. */
+export function campaignFor(cut: 'feature' | 'short'): VariantPurpose[] {
+  return cut === 'short' ? SHORT_CAMPAIGN : DEFAULT_CAMPAIGN;
+}
+
 export function planCampaign(
   storyboard: Storyboard,
   purposes: VariantPurpose[] = DEFAULT_CAMPAIGN,

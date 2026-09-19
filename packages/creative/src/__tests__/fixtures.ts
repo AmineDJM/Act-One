@@ -102,6 +102,7 @@ export function understandingFixture(over: Partial<ProductUnderstanding> = {}): 
 
 export function briefFixture(over: Partial<ProjectBrief> = {}): ProjectBrief {
   return {
+    filmFormat: 'product_tour', filmCut: 'feature',
     targetAudience: null,
     goal: null,
     keyMessage: null,

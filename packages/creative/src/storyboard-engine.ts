@@ -1,8 +1,11 @@
 import { z } from 'zod';
-import { brandDirectionLines, briefDirectionLines } from './brief-lines.ts';
+import { brandDirectionLines, briefDirectionLines, cutDirectionLines, formatDirectionLines } from './brief-lines.ts';
 import {
   standardsBrief,
-  MODE_BUDGETS,
+  budgetFor,
+  cutAspect,
+  cutSeconds,
+  FILM_CUTS,
   findMoment,
   newId,
   coherentRecipe,
@@ -19,6 +22,8 @@ import {
   type Concept,
   type CreativeTreatment,
   type EasingName,
+  type FilmCut,
+  type FilmFormat,
   type MotionRecipe,
   type MotionRecipeName,
   type ProductMoment,
@@ -30,7 +35,7 @@ import {
   type VisualType,
 } from '@act-one/core';
 import type { CallContext, LlmProvider } from '@act-one/providers';
-import { getSystem, type CreativeSystem, type SceneArchetype } from './systems/index.ts';
+import { archetypesFor, getSystem, pacedForCut, type CreativeSystem, type SceneArchetype } from './systems/index.ts';
 import { routeShot, enforceBudget, checkBudget, type BudgetViolation } from './shot-routing.ts';
 import { copyFits, fitToDuration, narrationSeconds, readingSeconds, varyRhythm, type TimingConstraint } from './timing.ts';
 
@@ -128,22 +133,45 @@ export class StoryboardEngine {
   }
 
   async build(input: StoryboardInput, context: CallContext): Promise<StoryboardResult> {
-    const system = getSystem(input.concept.creativeSystem);
+    const written = getSystem(input.concept.creativeSystem);
+    const format = input.brief.filmFormat;
+    /*
+     * The vocabulary this film is allowed to speak in.
+     *
+     * Everything else in this method reads from here rather than from the
+     * system directly, so a pitch cannot reach a product archetype by any
+     * route — not through the planner, not through a fuzzy id match, not
+     * through the positional fallback.
+     */
+    const vocabulary = archetypesFor(written, format);
+    /*
+     * The runtime, held inside what the cut can carry.
+     *
+     * A caller's explicit target still wins outright — that is the campaign
+     * asking for a specific length from approved material. Everything else,
+     * including the concept's own estimate, is pulled into the cut's band:
+     * a twenty-two second reel storyboarded to sixty seconds is a long film
+     * with two thirds of it cut off, which is the repurposed-landscape look
+     * this choice exists to prevent.
+     */
+    const cut = input.brief.filmCut;
+    // The system, cut for this film's rhythm. Everything below reads from
+    // these rather than from the system as written.
+    const { system, archetypes } = pacedForCut(written, vocabulary, cut);
     const target =
       input.targetDurationSeconds ??
-      input.brief.durationSeconds ??
-      input.concept.estimatedDurationSeconds;
+      cutSeconds(cut, input.brief.durationSeconds ?? input.concept.estimatedDurationSeconds);
 
-    const plan = await this.plan(input, system, target, context);
-    const built = this.materialise(plan, input, system, target);
+    const plan = await this.plan(input, system, archetypes, target, context);
+    const built = this.materialise(plan, input, system, archetypes, target);
 
-    const budget = { ...MODE_BUDGETS[input.brief.creativeMode] };
+    const budget = { ...budgetFor(input.brief.creativeMode, format) };
     const withinBudget = enforceBudget(built.storyboard, budget);
     const finalBoard = resequence(withinBudget);
 
     return {
       storyboard: finalBoard,
-      violations: checkBudget(finalBoard, input.understanding, input.brief.creativeMode),
+      violations: checkBudget(finalBoard, input.understanding, input.brief.creativeMode, {}, format),
       copyAdjustments: built.copyAdjustments,
     };
   }
@@ -231,10 +259,16 @@ export class StoryboardEngine {
   private async plan(
     input: StoryboardInput,
     system: CreativeSystem,
+    archetypes: SceneArchetype[],
     target: number,
     context: CallContext,
   ): Promise<z.infer<typeof ScenePlan>> {
-    const moments = input.understanding.productMoments;
+    const format = input.brief.filmFormat;
+    const cut = input.brief.filmCut;
+    // A pitch is not shown the moments at all. Listing captures it may not use
+    // is how a planner talks itself into a product beat and then writes copy
+    // that only makes sense over a screenshot nobody will see.
+    const moments = format === 'pitch' ? [] : input.understanding.productMoments;
     const claims = [
       ...input.understanding.keyBenefits,
       ...input.understanding.differentiators,
@@ -273,20 +307,25 @@ export class StoryboardEngine {
             ...input.concept.keyScenes.map((s, i) => `${i + 1}. ${s}`),
             ``,
             `# Available scene archetypes (use these ids)`,
-            ...system.archetypes.map(
+            ...archetypes.map(
               (a) =>
                 `- ${a.id}: ${a.purpose} (${a.durationRange[0]}–${a.durationRange[1]}s, ` +
                 `max ${a.maxWords} words on screen${a.requiresProductAsset ? ', needs real product capture' : ''})`,
             ),
             ``,
+            ...formatLines(format),
+            ...cutLines(cut),
+            ``,
             `# Product moments available (id — what happens — what we can actually show)`,
-            ...(moments.length > 0
-              ? moments.map(
-                  (m) =>
-                    `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'} ` +
-                    captureNote(m),
-                )
-              : ['- none']),
+            ...(format === 'pitch'
+              ? ['- none. This film does not navigate the product. Leave every "momentId" null.']
+              : moments.length > 0
+                ? moments.map(
+                    (m) =>
+                      `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'} ` +
+                      captureNote(m),
+                  )
+                : ['- none']),
             ``,
             `# Library (real pictures; use these before imagining anything)`,
             ...(library.length > 0
@@ -338,11 +377,14 @@ export class StoryboardEngine {
     plan: z.infer<typeof ScenePlan>,
     input: StoryboardInput,
     system: CreativeSystem,
+    archetypes: SceneArchetype[],
     target: number,
   ): { storyboard: Storyboard; copyAdjustments: StoryboardResult['copyAdjustments'] } {
     const storyboardId = newId('sbd');
+    const format = input.brief.filmFormat;
+    const cut = input.brief.filmCut;
     const allowGenerative =
-      !input.brief.realMediaOnly && MODE_BUDGETS[input.brief.creativeMode].maxGenerativeRatio > 0;
+      !input.brief.realMediaOnly && budgetFor(input.brief.creativeMode, format).maxGenerativeRatio > 0;
     const allowThreeD = input.brief.creativeMode !== 'authentic' || true;
     const copyAdjustments: StoryboardResult['copyAdjustments'] = [];
 
@@ -368,28 +410,53 @@ export class StoryboardEngine {
     );
 
     const drafted = plan.scenes.map((planned, index): { scene: Scene; planned: typeof planned } => {
-      const archetype = this.resolveArchetype(system, planned.archetypeId, index, plan.scenes.length);
-      const moment = planned.momentId ? findMoment(input.understanding, planned.momentId) : undefined;
+      const archetype = this.resolveArchetype(archetypes, planned.archetypeId, index, plan.scenes.length);
+      // A pitch never films a moment, so a moment id the planner supplied
+      // anyway is dropped here rather than carried into assetRefs.
+      const moment =
+        format !== 'pitch' && planned.momentId
+          ? findMoment(input.understanding, planned.momentId)
+          : undefined;
       const picked = planned.libraryAssetId && !used.has(planned.libraryAssetId) ? library.get(planned.libraryAssetId) : undefined;
       if (picked) used.add(picked.id);
+      // In a pitch a product capture from the archive is still a product
+      // capture, and the format says no interface. It is simply not used.
       const pickedIsProduct = Boolean(picked && isRealProductAsset(picked));
       const pickedIsPhoto = Boolean(picked && !pickedIsProduct);
-      const hasRealAsset = Boolean(moment && moment.screenshots.length > 0) || pickedIsProduct;
+      const usablePicture = format === 'pitch' ? pickedIsPhoto : Boolean(picked);
+      const hasRealAsset = format !== 'pitch' && (Boolean(moment && moment.screenshots.length > 0) || pickedIsProduct);
 
       const routed = routeShot({
         purpose: purposeFor(archetype, planned.generativeBrief.length > 0),
         hasRealProductAsset: hasRealAsset,
         allowGenerative,
         allowThreeD,
+        format,
       });
 
-      // The archetype's own visual type wins unless routing has vetoed it —
-      // which happens exactly when a product scene has no real capture behind
-      // it — and a photograph from the library is real media whatever the
-      // archetype was written for.
+      /*
+       * The archetype's own visual type wins unless something has vetoed it,
+       * and a photograph from the library is real media whatever the archetype
+       * was written for.
+       *
+       * Four vetoes, all the same shape: the archetype declares a container
+       * and nothing exists to put in it. A product scene with no capture, an
+       * interface in a film that promised not to show one, a photography beat
+       * with no photograph, a commissioned shot on a project that does not
+       * commission shots. Each one used to render as an empty frame or, worse,
+       * quietly become something the customer said no to.
+       */
+      const vetoed =
+        (archetype.requiresProductAsset && !hasRealAsset) ||
+        (format === 'pitch' && REAL_PRODUCT_VISUAL_TYPES.includes(archetype.visualType)) ||
+        (archetype.visualType === 'real_media' && !usablePicture) ||
+        (!allowGenerative &&
+          !usablePicture &&
+          (archetype.visualType === 'generated_broll' || archetype.visualType === 'mixed_media'));
+
       const visualType: VisualType = pickedIsPhoto
         ? 'real_media'
-        : archetype.requiresProductAsset && !hasRealAsset
+        : vetoed
           ? routed.visualType
           : archetype.visualType;
 
@@ -430,14 +497,14 @@ export class StoryboardEngine {
         narration,
         onScreenText,
         visualType,
-        assetRefs: picked ? [picked.id, ...(moment?.screenshots ?? [])] : (moment?.screenshots ?? []),
+        assetRefs: usablePicture && picked ? [picked.id, ...(moment?.screenshots ?? [])] : (moment?.screenshots ?? []),
         momentIds: moment ? [moment.id] : [],
         motionRecipe,
         cameraRecipe: cameraFor(archetype, input.brand),
         soundCues: [],
         voiceOver: narration.length > 0,
         generativeNeeds:
-          !picked && (visualType === 'generated_broll' || visualType === 'mixed_media')
+          !usablePicture && (visualType === 'generated_broll' || visualType === 'mixed_media')
             ? [
                 {
                   kind: 'video' as const,
@@ -445,7 +512,16 @@ export class StoryboardEngine {
                   mustNotContainText: true,
                   referenceAssetIds: anchor ? [anchor.id] : [],
                   durationSeconds: 4,
-                  aspect: '16:9' as const,
+                  /*
+                   * Commissioned in the frame the film is actually in.
+                   *
+                   * Hardcoded landscape, a vertical film paid for a 16:9 shot
+                   * and then cropped the middle out of it — which loses the
+                   * composition the shot was generated for, and is the same
+                   * repurposed-landscape look choosing a short was meant to
+                   * avoid, except this version costs money.
+                   */
+                  aspect: cutAspect(cut),
                   resolvedProvider: null,
                   resolvedModel: null,
                   estimatedCostUsd: 0,
@@ -455,7 +531,10 @@ export class StoryboardEngine {
         threeDSceneId: null,
         status: 'draft' as const,
         claimEvidenceIds: evidenceFor(planned.claimText, input.understanding),
-        notes: picked ? `Real picture from the library: ${picked.name || picked.id}.` : routed.reason,
+        notes:
+          usablePicture && picked
+            ? `Real picture from the library: ${picked.name || picked.id}.`
+            : routed.reason,
         estimatedCostUsd: 0,
       };
 
@@ -492,7 +571,7 @@ export class StoryboardEngine {
 
     const constraints: TimingConstraint[] = scenes.map((scene, index) => {
       const archetype = this.resolveArchetype(
-        system,
+        archetypes,
         kept[index]?.planned.archetypeId ?? '',
         index,
         scenes.length,
@@ -541,7 +620,7 @@ export class StoryboardEngine {
           ...scene,
           soundCues: soundCuesFor(
             scene,
-            this.resolveArchetype(system, plan.scenes[index]?.archetypeId ?? '', index, scenes.length),
+            this.resolveArchetype(archetypes, plan.scenes[index]?.archetypeId ?? '', index, scenes.length),
             system,
             index,
             sequenced.scenes.length,
@@ -560,24 +639,24 @@ export class StoryboardEngine {
    * and anything else becomes the archetype whose purpose is closest.
    */
   private resolveArchetype(
-    system: CreativeSystem,
+    archetypes: readonly SceneArchetype[],
     id: string,
     index: number,
     total: number,
   ): SceneArchetype {
-    const exact = system.archetypes.find((a) => a.id === id);
+    const exact = archetypes.find((a) => a.id === id);
     if (exact) return exact;
 
     if (index === total - 1) {
       return (
-        system.archetypes.find((a) => a.visualType === 'logo_reveal') ??
-        system.archetypes[system.archetypes.length - 1]!
+        archetypes.find((a) => a.visualType === 'logo_reveal') ??
+        archetypes[archetypes.length - 1]!
       );
     }
-    const fuzzy = system.archetypes.find(
+    const fuzzy = archetypes.find(
       (a) => a.id.includes(id) || id.includes(a.id) || a.purpose.toLowerCase().includes(id.toLowerCase()),
     );
-    return fuzzy ?? system.archetypes[index % system.archetypes.length]!;
+    return fuzzy ?? archetypes[index % archetypes.length]!;
   }
 }
 
@@ -626,6 +705,57 @@ export function stagedForCapture(
     if (name === 'cursor_sequence') name = 'product_window';
   }
   return { ...recipe, name, params };
+}
+
+/**
+ * What the format means, in the planner's own terms.
+ *
+ * Read from one table so the sentence the customer chose on the brief form is
+ * the sentence the planner is working to, rather than a paraphrase of it that
+ * drifts the first time either is edited.
+ */
+/**
+ * How this film is cut, in the planner's own terms.
+ *
+ * The shared direction plus the two rules that are the planner's to obey
+ * rather than the writer's: where the hook goes, and that a film watched
+ * without sound has to carry its meaning in the picture.
+ */
+function cutLines(cut: FilmCut): string[] {
+  const spec = FILM_CUTS[cut];
+  return [
+    ``,
+    `# How it is cut: ${spec.title}`,
+    ...cutDirectionLines(cut),
+    ...(cut === 'short'
+      ? [
+          'Scene 1 is the strongest thing in this film, not an introduction to it. Do not plan a',
+          'title card, a logo or a question before the idea — by the time they clear the screen the',
+          'viewer has gone.',
+          'The voice is not heard. Every scene that says something must also show it or write it:',
+          'a scene whose meaning lives only in the narration is a silent scene here.',
+        ]
+      : []),
+  ];
+}
+
+function formatLines(format: FilmFormat): string[] {
+  return [
+    ``,
+    `# The kind of film this is`,
+    ...formatDirectionLines(format),
+    ...(format === 'pitch'
+      ? [
+          'There is no interface in this film and there is no capture to reach for. Do not plan a',
+          'scene that shows a screen, a cursor, a dashboard or a window, and do not write a',
+          'generative brief that describes one. You may say what the product does; you may not',
+          'show it being done.',
+          'The pictures you have are the archive, commissioned footage, form and light in three',
+          'dimensions, figures and type. Use them. A pitch planned entirely as title cards is the',
+          'failure mode of this format and it will be sent back.',
+        ]
+      : []),
+  ];
 }
 
 function purposeFor(

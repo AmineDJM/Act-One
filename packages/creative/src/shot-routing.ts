@@ -1,9 +1,10 @@
 import {
-  MODE_BUDGETS,
+  budgetFor,
   REAL_PRODUCT_VISUAL_TYPES,
   visualMix,
   type CreativeBudget,
   type CreativeMode,
+  type FilmFormat,
   type ProductUnderstanding,
   type Scene,
   type Storyboard,
@@ -45,16 +46,34 @@ export type RoutingDecision = {
   reason: string;
 };
 
-/**
- * What a scene is *for* decides the technique, not what would look coolest.
- */
-export function routeShot(params: {
-  purpose: 'workflow' | 'result' | 'feature' | 'agent_behaviour' | 'metaphor' | 'environment' | 'mood' | 'human_context' | 'statement' | 'proof' | 'hero' | 'transition' | 'ending';
+export type ShotPurpose =
+  | 'workflow' | 'result' | 'feature' | 'agent_behaviour'
+  | 'metaphor' | 'environment' | 'mood' | 'human_context'
+  | 'statement' | 'proof' | 'hero' | 'transition' | 'ending';
+
+export type RoutingParams = {
+  purpose: ShotPurpose;
   hasRealProductAsset: boolean;
   allowGenerative: boolean;
   allowThreeD: boolean;
-}): RoutingDecision {
-  const { purpose, hasRealProductAsset, allowGenerative, allowThreeD } = params;
+  /**
+   * Product tour unless told otherwise, so every caller that predates the
+   * choice keeps routing exactly as it did.
+   */
+  format?: FilmFormat;
+};
+
+/**
+ * What a scene is *for* decides the technique, not what would look coolest.
+ */
+export function routeShot(params: RoutingParams): RoutingDecision {
+  const { purpose, allowGenerative, allowThreeD } = params;
+  const format = params.format ?? 'product_tour';
+  const pitch = format === 'pitch';
+  // A pitch has no product on screen, whatever the storyboard believes it
+  // captured. This is the single lock: every product branch below reads this
+  // rather than the raw flag.
+  const hasRealProductAsset = pitch ? false : params.hasRealProductAsset;
 
   switch (purpose) {
     case 'workflow':
@@ -66,6 +85,12 @@ export function routeShot(params: {
           visualType: purpose === 'result' ? 'screenshot_motion' : 'product_ui',
           technique: 'real_product',
           reason: 'Anything showing what the product does must be the real product.',
+        };
+      }
+      if (pitch) {
+        return {
+          ...withoutTheProduct(allowGenerative, allowThreeD),
+          reason: 'A pitch talks about what the product does; it never navigates it.',
         };
       }
       // No capture: fall back to typography rather than invent an interface.
@@ -90,6 +115,12 @@ export function routeShot(params: {
           reason: 'Real UI, staged flat.',
         };
       }
+      if (pitch) {
+        return {
+          ...withoutTheProduct(allowGenerative, allowThreeD),
+          reason: 'The hero of a pitch is an image, not an interface.',
+        };
+      }
       return {
         visualType: 'kinetic_typography',
         technique: 'deterministic',
@@ -105,6 +136,13 @@ export function routeShot(params: {
           visualType: 'generated_broll',
           technique: 'generative',
           reason: 'Conceptual and atmospheric shots are where generation genuinely helps.',
+        };
+      }
+      if (pitch && allowThreeD) {
+        return {
+          visualType: 'cinematic_3d',
+          technique: 'three_d',
+          reason: 'Generative media is off, so form and light in space carry the image.',
         };
       }
       return {
@@ -132,6 +170,24 @@ export function routeShot(params: {
   }
 }
 
+/**
+ * What carries a beat in a pitch, best first.
+ *
+ * The order is the argument of the whole format. Commissioned footage before
+ * three dimensions before type — because falling back to typography every time
+ * is how a film becomes a stack of title cards at a fixed interval, which is
+ * what a product tour with no capture already does and what nobody should have
+ * to watch for thirty seconds.
+ */
+function withoutTheProduct(
+  allowGenerative: boolean,
+  allowThreeD: boolean,
+): Omit<RoutingDecision, 'reason'> {
+  if (allowGenerative) return { visualType: 'generated_broll', technique: 'generative' };
+  if (allowThreeD) return { visualType: 'cinematic_3d', technique: 'three_d' };
+  return { visualType: 'kinetic_typography', technique: 'deterministic' };
+}
+
 export type BudgetViolation = {
   kind: 'too_much_generative' | 'too_little_deterministic' | 'too_little_real' | 'fake_product' | 'over_cost';
   message: string;
@@ -152,8 +208,9 @@ export function checkBudget(
   understanding: ProductUnderstanding,
   mode: CreativeMode,
   overrides: Partial<CreativeBudget> = {},
+  format: FilmFormat = 'product_tour',
 ): BudgetViolation[] {
-  const budget: CreativeBudget = { ...MODE_BUDGETS[mode], ...overrides };
+  const budget: CreativeBudget = { ...budgetFor(mode, format), ...overrides };
   const mix = visualMix(storyboard);
   const violations: BudgetViolation[] = [];
 
@@ -181,7 +238,14 @@ export function checkBudget(
     });
   }
 
-  const hasRealFootage = understanding.productMoments.some((m) => m.screenshots.length > 0);
+  /*
+   * Only a film that is supposed to show the product can be accused of not
+   * showing it. Research still captures pages for a pitch — it reads the site
+   * either way — and without this the check fires on every pitch to complain
+   * that footage nobody asked for went unused.
+   */
+  const hasRealFootage =
+    format !== 'pitch' && understanding.productMoments.some((m) => m.screenshots.length > 0);
   if (hasRealFootage && mix.realMedia < budget.minRealMediaRatio) {
     violations.push({
       kind: 'too_little_real',
@@ -200,6 +264,25 @@ export function checkBudget(
       (scene.visualType === 'generated_broll' || scene.visualType === 'mixed_media') &&
       mentionsProductSurface(scene),
   );
+  /*
+   * And in a pitch the rule is absolute rather than proportional: a product
+   * visual type is not a budget overrun, it is the format broken. The customer
+   * chose a film that does not navigate their product; a single screenshot in
+   * it is the one thing they said no to.
+   */
+  const navigated =
+    format === 'pitch'
+      ? storyboard.scenes.filter((scene) => REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType))
+      : [];
+  if (navigated.length > 0) {
+    violations.push({
+      kind: 'fake_product',
+      message:
+        'This film is a pitch: it argues about the product rather than navigating it. ' +
+        `${navigated.length} scene${navigated.length === 1 ? '' : 's'} put the interface on screen.`,
+      sceneIds: navigated.map((scene) => scene.id),
+    });
+  }
   if (fakeProduct.length > 0) {
     violations.push({
       kind: 'fake_product',

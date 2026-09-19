@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { JobKind } from './job.ts';
 import { urlString, nonEmpty } from '../zod-helpers.ts';
-import { CreativeMode, Channel, VoiceStrategy } from './creative.ts';
+import { CreativeMode, Channel, FilmFormat, VoiceStrategy } from './creative.ts';
 import { AspectRatio } from './render.ts';
+import { FilmCut } from './cut.ts';
 import { LaunchContext } from './product.ts';
 
 /**
@@ -241,6 +242,20 @@ export function languageName(code: string | null | undefined): string | null {
 export const DURATION_CHOICES = [15, 30, 45, 60, 90, 120] as const;
 
 export const ProjectBrief = z.object({
+  /**
+   * Whether the film navigates the real product or argues without it.
+   *
+   * Defaulted rather than required, because every project that existed before
+   * this choice did was a product tour and must stay one.
+   */
+  filmFormat: FilmFormat.default('product_tour'),
+  /**
+   * Whether the master is a landscape film or a vertical short.
+   *
+   * Defaulted for the same reason as the format: every production that existed
+   * before this choice did was a landscape film and must stay one.
+   */
+  filmCut: FilmCut.default('feature'),
   targetAudience: z.string().max(400).nullable().default(null),
   goal: LaunchContext.nullable().default(null),
   keyMessage: z.string().max(400).nullable().default(null),
@@ -262,6 +277,15 @@ export const ProjectBrief = z.object({
   channels: z.array(Channel).default([]),
   creativeMode: CreativeMode.default('studio'),
   voiceStrategy: VoiceStrategy.nullable().default(null),
+  /**
+   * Superseded by `filmCut`, and read by nothing.
+   *
+   * It was where a customer would have asked for extra aspect ratios. The
+   * master's own frame now comes from the cut, and the other frames come from
+   * the campaign's channel specs — both of which know what a film in that
+   * shape should be cut like, which a bare list of ratios never did. Kept so
+   * stored briefs still parse; do not wire anything to it.
+   */
   formats: z.array(AspectRatio).default([]),
   /** Claims legal/marketing has told us never to make. Enforced by the fact checker. */
   excludedClaims: z.array(z.string().max(300)).default([]),
