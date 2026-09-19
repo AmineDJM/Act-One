@@ -405,6 +405,7 @@
 }
 .pill[data-tone='ok'] { color: var(--accent-text); border-color: var(--accent-line); }
 .pill[data-tone='danger'] { color: var(--danger); border-color: var(--danger); }
+.pill[data-tone='warn'] { color: var(--warning); border-color: var(--warning); }
 .pill[data-tone='muted'] { color: var(--text-muted); }
 
 .plainList {

@@ -113,8 +113,11 @@ export default async function BillingPage() {
           </div>
           <p className="secondary" style={{ fontSize: '0.9rem' }}>
             Production credits cover the expensive work: cinematography, 3D, extra cuts and extra
-            languages. Your plan includes{' '}
-            {plan.limits.monthlyCredits.toLocaleString('en-US')} a month.
+            languages.{' '}
+            {plan.limits.monthlyCredits > 0
+              ? `Your plan includes ${plan.limits.monthlyCredits.toLocaleString('en-US')} a month, added each time it renews.`
+              : /* "Your plan includes 0 a month" is true and reads as a fault. */
+                'Your plan has no monthly allowance — credits are added when you buy them.'}
           </p>
           <p className="muted" style={{ fontSize: '0.82rem' }}>
             Roughly €{creditsToUsd(organization.creditBalance).toFixed(2)} of production work

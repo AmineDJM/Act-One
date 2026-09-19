@@ -960,6 +960,10 @@ export class MemoryStore implements Store {
       this.scoped(this.tables.qaReports, organizationId)
         .filter((r) => r.renderId === renderId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null,
+    list: async (limit = 200) =>
+      [...this.tables.qaReports.values()]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit),
   };
 
   readonly jobs = {

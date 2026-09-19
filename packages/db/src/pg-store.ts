@@ -1468,6 +1468,18 @@ export class PgStore implements Store {
         );
         return (r.rows[0]?.['data'] as QaReport) ?? null;
       }),
+
+    list: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          'SELECT organization_id, data FROM qa_reports ORDER BY created_at DESC LIMIT $1',
+          [limit],
+        );
+        return r.rows.map((row) => ({
+          ...(row['data'] as QaReport),
+          organizationId: row['organization_id'] as string,
+        }));
+      }),
   };
 
   readonly jobs = {

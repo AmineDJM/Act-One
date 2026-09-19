@@ -357,6 +357,12 @@ export interface QaReportRepo {
   create(report: QaReport, organizationId: string): Promise<QaReport>;
   get(organizationId: string, id: string): Promise<QaReport | null>;
   getForRender(organizationId: string, renderId: string): Promise<QaReport | null>;
+  /**
+   * Every report, newest first, across every workspace. Operator-facing: what
+   * the product thinks of the films it has made, which is the only measurement
+   * of the quality bar it exists to hold.
+   */
+  list(limit?: number): Promise<Array<QaReport & { organizationId: string }>>;
 }
 
 /** How the console asks for jobs. */
