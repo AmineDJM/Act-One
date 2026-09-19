@@ -4,7 +4,9 @@ import {
   QaIssue,
   QaReport,
   type RepairRecord,
+  HELD_FRAME_CEILING,
   newId,
+  readingSecondsFor,
   resequence,
   type BrandSystem,
   type Scene,
@@ -401,6 +403,15 @@ function sceneRepair(over: { sceneId: string; action: SceneRepair['action']; rea
   return { issueId: 'evt_1', check: 'image_artifact', escalated: false, ...over };
 }
 
+/** A held-frame finding, which is what `trim_hold` reads to know how much to cut. */
+function held(sceneId: string, start: number, end: number): QaIssue {
+  return QaIssue.parse({
+    id: newId('evt'), check: 'still_frame_hold', severity: 'soft_fail', layer: 'visual',
+    sceneId, timecodeStart: start, timecodeEnd: end, message: 'nothing moves',
+    confidence: 0.9, repair: 'trim_hold', detectedBy: 'temporal',
+  });
+}
+
 describe('applyRepairs', () => {
   it('clears assets and marks the scene pending so new material is fetched', () => {
     const original = board([
@@ -429,6 +440,82 @@ describe('applyRepairs', () => {
     });
     expect(storyboard.scenes[0]!.duration).toBeGreaterThan(2);
     expect(storyboard.scenes[0]!.onScreenText).toEqual(['Some words']);
+  });
+
+  it('never trims a held shot below the time its words take to read', () => {
+    const copy = ['Six words is enough to measure'];
+    const original = board([
+      scene({ id: 's1', duration: 4, visualType: 'kinetic_typography', onScreenText: copy }),
+    ]);
+    const { storyboard } = applyRepairs(
+      original,
+      {
+        scenes: [sceneRepair({ sceneId: 's1', action: 'trim_hold', reason: 'held' })],
+        film: [], manual: [], state: 'repairing', shippable: false, deadEnd: false,
+      },
+      { issues: [held('s1', 0.2, 4)] },
+    );
+
+    /*
+     * Trading a soft fail for a hard one is not a repair. The arithmetic alone
+     * wants 1.72s here, which is below what six words need, and the next pass
+     * came back with `text_overflow` — a worse defect than the hold.
+     */
+    const floor = readingSecondsFor(copy.join(' '));
+    expect(storyboard.scenes[0]!.duration).toBeLessThan(4);
+    expect(storyboard.scenes[0]!.duration).toBeGreaterThanOrEqual(floor);
+  });
+
+  it('leaves a shot alone when there is nothing to trim off it', () => {
+    const original = board([
+      scene({
+        id: 's1', duration: 3, visualType: 'kinetic_typography',
+        onScreenText: ['Eight words is more than this shot can lose'],
+      }),
+    ]);
+    const { storyboard } = applyRepairs(
+      original,
+      {
+        scenes: [sceneRepair({ sceneId: 's1', action: 'trim_hold', reason: 'held' })],
+        film: [], manual: [], state: 'repairing', shippable: false, deadEnd: false,
+      },
+      { issues: [held('s1', 0.2, 3)] },
+    );
+    // Untouched, so the repair settles as `unchanged` and escalates to a
+    // person rather than shaving frames off a shot that cannot spare them.
+    expect(storyboard.scenes[0]).toEqual(original.scenes[0]);
+  });
+
+  it('cuts a held shot back to the part that moved, in one pass', () => {
+    const original = board([
+      scene({ id: 's1', duration: 6, visualType: 'generated_broll', assetRefs: ['ast_ok'] }),
+    ]);
+    const { storyboard } = applyRepairs(
+      original,
+      {
+        scenes: [sceneRepair({ sceneId: 's1', action: 'trim_hold', reason: 'held' })],
+        film: [], manual: [], state: 'repairing', shippable: false, deadEnd: false,
+      },
+      { issues: [held('s1', 1.5, 6)] },
+    );
+
+    /*
+     * The shot moved for 1.5s and then stopped. What is left is those 1.5s
+     * plus the beat a film is allowed to hold — so the recheck finds a hold
+     * inside the ceiling rather than a slightly shorter violation, which is
+     * what a proportional trim produced and what spent the attempt budget.
+     */
+    expect(storyboard.scenes[0]!.duration).toBe(round3(1.5 + HELD_FRAME_CEILING.feature - TRIM_MARGIN));
+  });
+
+  it('holds a reel to a tighter beat than a film', () => {
+    const original = board([scene({ id: 's1', duration: 6, visualType: 'generated_broll' })]);
+    const plan = {
+      scenes: [sceneRepair({ sceneId: 's1', action: 'trim_hold' as const, reason: 'held' })],
+      film: [], manual: [], state: 'repairing' as const, shippable: false, deadEnd: false,
+    };
+    const short = applyRepairs(original, plan, { issues: [held('s1', 1.5, 6)], cut: 'short' });
+    expect(short.storyboard.scenes[0]!.duration).toBe(round3(1.5 + HELD_FRAME_CEILING.short - TRIM_MARGIN));
   });
 
   it('re-times the film after removing a scene', () => {
@@ -823,3 +910,14 @@ describe('a film that repeats itself', () => {
   });
 });
 
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
+/**
+ * How far inside the ceiling a trimmed hold lands, mirroring the repair's own
+ * HOLD_TRIM_MARGIN. Written out here rather than imported so that moving it
+ * has to be a decision: these numbers are what the customer sees as the length
+ * of a shot.
+ */
+const TRIM_MARGIN = 0.1;

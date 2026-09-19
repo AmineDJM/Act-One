@@ -10,6 +10,7 @@ import {
   captionSyncTolerance,
   cite,
   newId,
+  readingSecondsFor,
   type CaptionCue,
   type FilmCut,
   type QaFinding,
@@ -236,15 +237,25 @@ export function heldFrameIssues(params: {
   cut: FilmCut;
   fps: number;
 }): QaFinding[] {
-  const ceiling = HELD_FRAME_CEILING[params.cut === 'short' ? 'short' : 'feature'];
+  const beat = HELD_FRAME_CEILING[params.cut === 'short' ? 'short' : 'feature'];
+
   return params.freezes
-    .filter((freeze) => freeze.end - freeze.start > ceiling)
-    .map((freeze) =>
+    .map((freeze) => {
+      const scene = sceneAt(params.scenes, freeze.start);
+      const reading = readingAllowance(scene);
+      return { freeze, scene, ceiling: Math.max(beat, reading), reading };
+    })
+    // Compared at the precision the measurement is reported at. FFmpeg gives
+    // these back as floats, and `3.2 - 2 > 1.2` is true in binary — a rule
+    // that says "more than a beat" must not fire on exactly a beat because of
+    // the last bit of a double.
+    .filter(({ freeze, ceiling }) => round3(freeze.end - freeze.start) > ceiling)
+    .map(({ freeze, scene, ceiling, reading }) =>
       finding({
         check: 'still_frame_hold',
         severity: 'soft_fail',
         layer: 'visual',
-        sceneId: sceneAt(params.scenes, freeze.start)?.id ?? null,
+        sceneId: scene?.id ?? null,
         timecodeStart: round3(freeze.start),
         timecodeEnd: round3(freeze.end),
         frameStart: toFrame(freeze.start, params.fps),
@@ -253,10 +264,34 @@ export function heldFrameIssues(params: {
         repair: 'trim_hold',
         message:
           `Nothing on screen changes for ${(freeze.end - freeze.start).toFixed(2)}s from ` +
-          `${freeze.start.toFixed(2)}s; the ceiling for this cut is ${ceiling}s.`,
+          `${freeze.start.toFixed(2)}s; ` +
+          (reading > beat
+            ? `its copy takes ${reading.toFixed(2)}s to read and the hold outlasts it.`
+            : `the ceiling for this cut is ${ceiling}s.`),
         because: cite(TEMPORAL_STANDARDS.heldFrame),
       }),
     );
+}
+
+/**
+ * How long a still frame is allowed to stay still because someone is reading it.
+ *
+ * The standard behind the check says a frozen frame is either a held
+ * composition or a render that dropped its motion, and that the bar is what
+ * the eye tolerates rather than what the code intended. What the eye tolerates
+ * is not a constant: a viewer halfway through a sentence is not waiting, they
+ * are reading, and a beat-and-a-bit ceiling applied to a typographic shot
+ * flags every well-made one of them. So the shot is given the time its own
+ * copy needs — and past that it is a finding again, held on purpose or not,
+ * which is what keeps this from becoming an exemption for anything that calls
+ * itself a hold.
+ *
+ * A shot with nothing to read gets no allowance. There is nothing on it that
+ * asks for the time.
+ */
+function readingAllowance(scene: Scene | null): number {
+  if (!scene || scene.onScreenText.length === 0) return 0;
+  return readingSecondsFor(scene.onScreenText.join(' '));
 }
 
 /** Holes in the track. A pause is a tool; past a second it reads as a fault. */
@@ -273,7 +308,7 @@ export function deadAirIssues(params: {
       // anything has started and the other is the ending.
       if (silence.start < 0.2) return false;
       if (silence.end > params.durationSeconds - 0.3) return false;
-      return silence.end - silence.start > ceiling;
+      return round3(silence.end - silence.start) > ceiling;
     })
     .map((silence) =>
       finding({

@@ -8,6 +8,7 @@ import {
   plainText,
   redactDetail,
   redactMessage,
+  resequence,
   retryDelayMs,
   verdictFor,
   windowStartMs,
@@ -807,16 +808,28 @@ export class MemoryStore implements Store {
       }
       return storyboard;
     },
+    /*
+     * Read back on the film's own clock.
+     *
+     * `resequence`, here and in the Postgres store both, because a storyboard
+     * is stored as a bag of scenes and a timeline is a property of the order
+     * they are in — not of whatever `startTime` each row happened to be
+     * written with. Only one of the two stores did this, and the difference
+     * was invisible until temporal QA started reading `startTime`: on
+     * Postgres a finding at 00:02 named the shot that plays at two seconds,
+     * and on the memory store it named whichever shot was written with a
+     * matching number, so a repair trimmed the wrong shot.
+     */
     get: async (organizationId: string, id: string) => {
       const found = this.tables.storyboards.get(id);
       if (!found || found.organizationId !== organizationId) return null;
-      return { ...found, scenes: this.scenesFor(organizationId, id) };
+      return resequence({ ...found, scenes: this.scenesFor(organizationId, id) });
     },
     listForProject: async (organizationId: string, projectId: string) =>
       this.scoped(this.tables.storyboards, organizationId)
         .filter((s) => s.projectId === projectId)
         .sort((a, b) => b.version - a.version)
-        .map((s) => ({ ...s, scenes: this.scenesFor(organizationId, s.id) })),
+        .map((s) => resequence({ ...s, scenes: this.scenesFor(organizationId, s.id) })),
     replaceScenes: async (organizationId: string, storyboardId: string, scenes: Scene[]) => {
       const board = this.tables.storyboards.get(storyboardId);
       if (!board || board.organizationId !== organizationId) throw notFound('Storyboard');
@@ -828,7 +841,7 @@ export class MemoryStore implements Store {
       }
       const next = { ...board, updatedAt: new Date().toISOString() };
       this.tables.storyboards.set(storyboardId, next);
-      return { ...next, scenes };
+      return resequence({ ...next, scenes });
     },
     updateScene: async (organizationId: string, sceneId: string, patch: Partial<Scene>) =>
       this.patch(this.tables.scenes, organizationId, sceneId, patch, 'Scene'),

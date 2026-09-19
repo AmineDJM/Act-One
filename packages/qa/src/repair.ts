@@ -1,10 +1,13 @@
 import {
+  HELD_FRAME_CEILING,
   SEVERITY_ORDER,
   newId,
   qaVerdict,
+  readingSecondsFor,
   releaseDecision,
   repairableAutomatically,
   sceneShowsSomething,
+  type FilmCut,
   type QaCheck,
   type QaIssue,
   type QaReport,
@@ -250,11 +253,12 @@ function escalate(issue: QaIssue, history: readonly RepairRecord[]): RepairActio
 export function applyRepairs(
   storyboard: Storyboard,
   plan: RepairPlan,
-  context: { issues?: readonly QaIssue[] } = {},
+  context: { issues?: readonly QaIssue[]; cut?: FilmCut } = {},
 ): { storyboard: Storyboard; needsProvider: { sceneId: string; action: RepairAction }[] } {
   const actions = new Map(plan.scenes.map((entry) => [entry.sceneId, entry]));
   const needsProvider: { sceneId: string; action: RepairAction }[] = [];
   const issues = context.issues ?? [];
+  const cut = context.cut ?? 'feature';
 
   const scenes = storyboard.scenes
     .map((scene): Scene | null => {
@@ -281,15 +285,37 @@ export function applyRepairs(
 
         case 'trim_hold': {
           /*
-           * A shot that stopped moving is shortened to the part that moved.
+           * A shot that stopped moving is shortened to the part that moved,
+           * plus the beat it is allowed to hold afterwards.
            *
-           * Never below the minimum a shot needs to register: a held frame is
-           * a defect, and a shot flashing past is a worse one.
+           * Measured from where the freeze began rather than scaled off the
+           * duration, for the same reason `retime_scene` reads the overrun:
+           * a proportional trim leaves a proportion of the hold behind, so
+           * the next pass finds the same defect a little smaller and the
+           * attempt budget goes on converging instead of on fixing.
+           *
+           * Floored twice, and the second floor is the one that matters. A
+           * shot below `MIN_SHOT_AFTER_TRIM` reads as a flash rather than a
+           * shot — but a shot carrying copy has a harder floor than that: the
+           * time it takes to read the words on it. Trimming past that trades a
+           * soft fail for a hard one, which is what the first version of this
+           * did on a typographic film — it cut a held caption to 0.8s and the
+           * next pass came back with `text_overflow`, a worse defect than the
+           * hold it had just removed.
+           *
+           * When the floor is already the whole shot there is nothing to trim,
+           * and leaving the scene alone is the honest answer: the repair
+           * settles as `unchanged`, escalates, and asks for a person rather
+           * than shaving frames off a shot that cannot spare them.
            */
-          const held = heldSecondsFor(issues, scene.id);
-          if (held === null) return scene;
-          const trimmed = Math.max(MIN_SHOT_AFTER_TRIM, round3(scene.duration - held * 0.6));
-          return trimmed < scene.duration ? { ...scene, duration: trimmed, status: 'draft' } : scene;
+          const freeze = heldFindingFor(issues, scene.id);
+          if (!freeze || freeze.timecodeStart === null) return scene;
+          const reading = readingSecondsFor(scene.onScreenText.join(' '));
+          const ceiling = Math.max(HELD_FRAME_CEILING[cut === 'short' ? 'short' : 'feature'], reading);
+          const floor = Math.max(MIN_SHOT_AFTER_TRIM, reading);
+          const moving = Math.max(0, freeze.timecodeStart - scene.startTime);
+          const trimmed = Math.max(floor, round3(moving + ceiling - HOLD_TRIM_MARGIN));
+          return trimmed < scene.duration ? { ...scene, duration: round3(trimmed), status: 'draft' } : scene;
         }
 
         case 'relayout_text':
@@ -427,6 +453,17 @@ export function settleRepairs(params: {
 /** A shot below this reads as a flash rather than a shot. */
 const MIN_SHOT_AFTER_TRIM = 0.8;
 
+/**
+ * How far inside the ceiling a trimmed hold is aimed.
+ *
+ * Three frames at thirty, two at twenty-four. A repair that lands the shot
+ * exactly on the limit has not decided anything: the renderer quantises a
+ * duration to whole frames and the detector measures in frames, so either can
+ * give the hold a frame back and the recheck finds the same defect by a
+ * hair — a second pass spent on rounding, out of a budget of two.
+ */
+const HOLD_TRIM_MARGIN = 0.1;
+
 function overrunFor(issues: readonly QaIssue[], sceneId: string): number | null {
   const drift = issues.find(
     (issue) => issue.sceneId === sceneId && issue.check === 'narration_shot_drift',
@@ -435,10 +472,8 @@ function overrunFor(issues: readonly QaIssue[], sceneId: string): number | null 
   return Math.max(0, drift.timecodeEnd - drift.timecodeStart);
 }
 
-function heldSecondsFor(issues: readonly QaIssue[], sceneId: string): number | null {
-  const held = issues.find((issue) => issue.sceneId === sceneId && issue.check === 'still_frame_hold');
-  if (!held || held.timecodeStart === null || held.timecodeEnd === null) return null;
-  return Math.max(0, held.timecodeEnd - held.timecodeStart);
+function heldFindingFor(issues: readonly QaIssue[], sceneId: string): QaIssue | null {
+  return issues.find((issue) => issue.sceneId === sceneId && issue.check === 'still_frame_hold') ?? null;
 }
 
 function round3(n: number): number {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { newId, type CaptionCue, type Scene } from '@act-one/core';
+import { HELD_FRAME_CEILING, newId, readingSecondsFor, type CaptionCue, type Scene } from '@act-one/core';
 import { runFfmpeg } from '@act-one/sound';
 import {
   abruptEndIssue,
@@ -115,6 +115,32 @@ describe('what the film is allowed to hold', () => {
     expect(heldFrameIssues({ freezes, scenes, cut: 'feature', fps: 30 })).toHaveLength(0);
     // The same freeze in a reel is a second of a viewer's attention.
     expect(heldFrameIssues({ freezes, scenes, cut: 'short', fps: 30 })).toHaveLength(1);
+  });
+
+  it('lets a shot stay still for as long as its copy takes to read', () => {
+    const copy = ['Close the books.'];
+    const reading = readingSecondsFor(copy.join(' '));
+    const scenes = [scene({ duration: 4, onScreenText: copy })];
+
+    // Past the beat ceiling and inside the reading time. The viewer is not
+    // waiting, they are reading — and flagging this flags every typographic
+    // shot ever made well.
+    expect(reading).toBeGreaterThan(HELD_FRAME_CEILING.feature);
+    expect(
+      heldFrameIssues({ freezes: [{ start: 0.3, end: 0.3 + reading - 0.1 }], scenes, cut: 'feature', fps: 30 }),
+    ).toHaveLength(0);
+
+    // Past the reading time it is a hold again, deliberate or not.
+    const [held] = heldFrameIssues({
+      freezes: [{ start: 0.3, end: 0.3 + reading + 0.5 }], scenes, cut: 'feature', fps: 30,
+    });
+    expect(held).toMatchObject({ check: 'still_frame_hold', repair: 'trim_hold' });
+    expect(held!.message).toMatch(/takes 1.60s to read/);
+  });
+
+  it('gives no allowance to a shot with nothing to read', () => {
+    const scenes = [scene({ duration: 4, onScreenText: [] })];
+    expect(heldFrameIssues({ freezes: [{ start: 1, end: 2.4 }], scenes, cut: 'feature', fps: 30 })).toHaveLength(1);
   });
 
   it('marks the frames, not only the seconds', () => {

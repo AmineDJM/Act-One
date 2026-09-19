@@ -431,7 +431,7 @@ export async function runRender(
 
       // Only what broke. Re-rendering everything would change scenes the
       // customer already approved.
-      const applied = applyRepairs(current, plan, { issues: findings });
+      const applied = applyRepairs(current, plan, { issues: findings, cut });
       current = applied.storyboard;
       await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
       filmRepairs = plan.film.map((repair) => repair.action);
