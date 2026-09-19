@@ -308,6 +308,42 @@ export const Subscription = z.object({
 });
 export type Subscription = z.infer<typeof Subscription>;
 
+export const PaymentKind = z.enum(['credits', 'subscription']);
+export type PaymentKind = z.infer<typeof PaymentKind>;
+
+export const PaymentStatus = z.enum(['succeeded', 'failed', 'refunded']);
+export type PaymentStatus = z.infer<typeof PaymentStatus>;
+
+/**
+ * Money that moved, written down.
+ *
+ * A credit balance says what a workspace has; it never said what anybody
+ * paid, when, or for what — so a customer could not be shown their receipts
+ * and an operator could not see a month's takings. One row per Stripe event
+ * that moved money, keyed by that event, so a retry records nothing twice.
+ *
+ * A failed attempt is a payment too. It is the row that explains why a
+ * subscription went past due, and leaving it out is how "their card was
+ * declined on the 3rd" becomes unanswerable.
+ */
+export const Payment = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  kind: PaymentKind,
+  status: PaymentStatus.default('succeeded'),
+  /** In the currency's smallest unit, as Stripe reports it. */
+  amountCents: z.number().int(),
+  currency: z.string().min(3).max(8).default('usd'),
+  /** What it bought, where it bought credits. Null for a month of a plan. */
+  credits: z.number().int().nullable().default(null),
+  planId: z.string().nullable().default(null),
+  description: z.string().max(400).default(''),
+  stripeEventId: z.string().nullable().default(null),
+  stripeObjectId: z.string().nullable().default(null),
+  createdAt: z.string(),
+});
+export type Payment = z.infer<typeof Payment>;
+
 /** A plan grants entitlements only while the subscription is in good standing. */
 export function subscriptionIsLive(status: SubscriptionStatus): boolean {
   return status === 'active' || status === 'trialing';

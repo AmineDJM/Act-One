@@ -49,6 +49,7 @@ import type {
   RevisionRequest,
   Scene,
   Storyboard,
+  Payment,
   Subscription,
   User,
   Variant, AudioEdition, BrandVoice, VoiceConsentRecord, VoiceSettings, JobEvent, ResearchSource,} from '@act-one/core';
@@ -74,6 +75,7 @@ export interface Store {
   readonly invitations: InvitationRepo;
   readonly sessions: SessionRepo;
   readonly subscriptions: SubscriptionRepo;
+  readonly payments: PaymentRepo;
   readonly brands: BrandRepo;
   readonly projects: ProjectRepo;
   readonly understandings: UnderstandingRepo;
@@ -199,6 +201,24 @@ export interface SubscriptionRepo {
   getByStripeSubscriptionId(id: string): Promise<Subscription | null>;
   /** Every subscription, newest first. Operator-facing: who is paying, on what. */
   list(limit?: number): Promise<Subscription[]>;
+}
+
+/**
+ * Money that moved.
+ *
+ * Append-only: a payment is a fact about the past, and the one mutation
+ * anybody ever wants — "that one was refunded" — is its own row rather than an
+ * edit to the receipt the customer already has.
+ */
+export interface PaymentRepo {
+  /**
+   * Writes one payment. Returns null when this Stripe event already wrote one,
+   * so a webhook retry cannot bill a customer's history twice.
+   */
+  record(payment: Payment): Promise<Payment | null>;
+  listForOrganization(organizationId: string, limit?: number): Promise<Payment[]>;
+  /** Every payment, newest first. Operator-facing. */
+  list(limit?: number): Promise<Payment[]>;
 }
 
 export interface BrandRepo {

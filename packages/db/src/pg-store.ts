@@ -61,6 +61,7 @@ import type {
   RevisionRequest,
   Scene,
   Storyboard,
+  Payment,
   Subscription,
   User,
   Variant,
@@ -580,6 +581,55 @@ export class PgStore implements Store {
           [limit],
         );
         return r.rows.map(toSubscription);
+      }),
+  };
+
+  readonly payments = {
+    /*
+     * ON CONFLICT DO NOTHING on the Stripe event id, so a webhook retry adds
+     * nothing to a customer's history. The null return is how the caller tells
+     * "recorded" from "already had it" without a second query.
+     */
+    record: async (payment: Payment) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `INSERT INTO payments
+             (id, organization_id, kind, status, amount_cents, currency, credits, plan_id,
+              description, stripe_event_id, stripe_object_id, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           ON CONFLICT (stripe_event_id) DO NOTHING
+           RETURNING *`,
+          [
+            payment.id,
+            payment.organizationId,
+            payment.kind,
+            payment.status,
+            payment.amountCents,
+            payment.currency,
+            payment.credits,
+            payment.planId,
+            payment.description,
+            payment.stripeEventId,
+            payment.stripeObjectId,
+            payment.createdAt,
+          ],
+        );
+        return r.rows[0] ? toPayment(r.rows[0]) : null;
+      }),
+
+    listForOrganization: async (organizationId: string, limit = 50) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          'SELECT * FROM payments WHERE organization_id = $1 ORDER BY created_at DESC LIMIT $2',
+          [organizationId, limit],
+        );
+        return r.rows.map(toPayment);
+      }),
+
+    list: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM payments ORDER BY created_at DESC LIMIT $1', [limit]);
+        return r.rows.map(toPayment);
       }),
   };
 
@@ -2933,6 +2983,23 @@ function toSubscription(row: Row): Subscription {
     seats: num(row['seats']),
     createdAt: iso(row['created_at']),
     updatedAt: iso(row['updated_at']),
+  };
+}
+
+function toPayment(row: Row): Payment {
+  return {
+    id: row['id'] as string,
+    organizationId: row['organization_id'] as string,
+    kind: row['kind'] as Payment['kind'],
+    status: row['status'] as Payment['status'],
+    amountCents: num(row['amount_cents']),
+    currency: row['currency'] as string,
+    credits: row['credits'] === null || row['credits'] === undefined ? null : num(row['credits']),
+    planId: (row['plan_id'] as string) ?? null,
+    description: (row['description'] as string) ?? '',
+    stripeEventId: (row['stripe_event_id'] as string) ?? null,
+    stripeObjectId: (row['stripe_object_id'] as string) ?? null,
+    createdAt: iso(row['created_at']),
   };
 }
 

@@ -1,6 +1,6 @@
 import 'server-only';
 import Stripe from 'stripe';
-import { AppError, creditsToUsd, newId, type Organization, type Plan } from '@act-one/core';
+import { AppError, creditsToUsd, newId, type Organization, type Payment, type Plan } from '@act-one/core';
 import type { ProviderHealth } from '@act-one/providers';
 import { getStore } from './store.ts';
 import { readProviderCredentials } from './platform.ts';
@@ -185,6 +185,31 @@ export async function createCreditCheckout(params: {
 }
 
 /**
+ * Writes down that money moved.
+ *
+ * Every branch below that touches a balance or a plan calls this, because a
+ * credit balance says what a workspace has and never said what anybody paid.
+ * Keyed by the Stripe event, so a retry adds nothing: the caller's own
+ * de-duplication already stops the work being done twice, and this stops a
+ * replay from a different path writing a second receipt for one payment.
+ *
+ * It never throws. A payment that recorded in Stripe and failed to record here
+ * must still credit the customer — losing the receipt is bad, losing what they
+ * bought is worse.
+ */
+async function recordPayment(payment: Omit<Payment, 'id' | 'createdAt'>): Promise<void> {
+  try {
+    await getStore().payments.record({
+      ...payment,
+      id: newId('pay'),
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[stripe] payment not recorded', error);
+  }
+}
+
+/**
  * Applies a webhook event.
  *
  * Idempotent by event id: Stripe retries aggressively, and crediting an account
@@ -204,6 +229,18 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
       if (session.metadata?.['kind'] === 'credits') {
         const credits = Number(session.metadata['credits'] ?? 0);
         if (credits > 0) await store.organizations.adjustCredits(organizationId, credits);
+        await recordPayment({
+          organizationId,
+          kind: 'credits',
+          status: 'succeeded',
+          amountCents: session.amount_total ?? 0,
+          currency: session.currency ?? 'usd',
+          credits,
+          planId: null,
+          description: `${credits.toLocaleString('en-US')} credits`,
+          stripeEventId: event.id,
+          stripeObjectId: session.id,
+        });
         // Money is the strongest signal a referral was real.
         await rewardReferralFor(organizationId);
         return { handled: true, note: `Added ${credits} credits.` };
@@ -261,6 +298,59 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
       return { handled: true, note: 'Subscription cancelled; workspace downgraded to free.' };
     }
 
+    /*
+     * The month that was actually paid for.
+     *
+     * This event was not handled at all, which cost two things. The takings
+     * were invisible — a renewal moved money and left nothing behind but a
+     * period end that had shifted. And the credit allowance the pricing page
+     * sells as "2,000 a month" was granted once, on the day the subscription
+     * was created, and never again: month two arrived with whatever was left
+     * of month one.
+     *
+     * The allowance rides on the invoice that paid for the period, which is
+     * the only thing that knows a period was actually bought. Only on a
+     * renewal — `subscription_cycle` — because the first period's credits are
+     * granted when the subscription is created, and a customer who is still in
+     * a trial has not bought a month yet.
+     */
+    case 'invoice.payment_succeeded': {
+      const invoice = event.data.object;
+      const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
+      if (!customerId) return { handled: false, note: 'No customer on invoice.' };
+      const organization = await store.organizations.getByStripeCustomerId(customerId);
+      if (!organization) return { handled: false, note: 'Unknown customer.' };
+
+      const existing = await store.subscriptions.getForOrganization(organization.id);
+      const planId = existing?.planId ?? organization.planId;
+
+      await recordPayment({
+        organizationId: organization.id,
+        kind: 'subscription',
+        status: 'succeeded',
+        amountCents: invoice.amount_paid ?? 0,
+        currency: invoice.currency ?? 'usd',
+        credits: null,
+        planId,
+        description: invoice.billing_reason === 'subscription_cycle' ? 'Renewal' : 'Subscription',
+        stripeEventId: event.id,
+        stripeObjectId: invoice.id ?? null,
+      });
+
+      if (invoice.billing_reason !== 'subscription_cycle') {
+        return { handled: true, note: 'Payment recorded.' };
+      }
+
+      const { planById, withGrants } = await import('@act-one/core');
+      const { plans } = await import('./platform.ts').then((m) => m.getPlatformConfig());
+      const plan = withGrants(planById(plans, planId), organization);
+      if (plan.limits.monthlyCredits > 0) {
+        await store.organizations.adjustCredits(organization.id, plan.limits.monthlyCredits);
+        return { handled: true, note: `Renewed: ${plan.limits.monthlyCredits} credits.` };
+      }
+      return { handled: true, note: 'Renewed.' };
+    }
+
     case 'invoice.payment_failed': {
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
@@ -276,6 +366,23 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ handled:
           updatedAt: new Date().toISOString(),
         });
       }
+      /*
+       * An attempt that failed is a payment too: it is the row that explains
+       * why this workspace went past due, and without it "their card was
+       * declined on the 3rd" is a question nobody here can answer.
+       */
+      await recordPayment({
+        organizationId: organization.id,
+        kind: 'subscription',
+        status: 'failed',
+        amountCents: invoice.amount_due ?? 0,
+        currency: invoice.currency ?? 'usd',
+        credits: null,
+        planId: existing?.planId ?? organization.planId,
+        description: 'Payment failed',
+        stripeEventId: event.id,
+        stripeObjectId: invoice.id ?? null,
+      });
       return { handled: true, note: 'Marked past due.' };
     }
 

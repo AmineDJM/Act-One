@@ -29,9 +29,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function RevenuePage() {
   const store = getStore();
-  const [subscriptions, organizations, { plans: configured }] = await Promise.all([
+  const [subscriptions, organizations, payments, { plans: configured }] = await Promise.all([
     store.subscriptions.list(500),
     store.organizations.list(500),
+    store.payments.list(200),
     getPlatformConfig(),
   ]);
   const plans = configured.length > 0 ? configured : DEFAULT_PLANS;
@@ -68,7 +69,46 @@ export default async function RevenuePage() {
   );
   const credits = customers.reduce((sum, organization) => sum + organization.creditBalance, 0);
 
-  const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  /*
+   * Collected, as opposed to recurring.
+   *
+   * MRR is what should arrive each month if nothing changes; this is what
+   * actually did arrive, one-off credit purchases included. They are different
+   * numbers and a dashboard that shows only the first is a forecast wearing
+   * the clothes of an accounts page.
+   */
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const collected = payments.filter(
+    (payment) => payment.status === 'succeeded' && payment.createdAt >= thirtyDaysAgo,
+  );
+  /*
+   * Per currency, not one sum.
+   *
+   * Adding euros to dollars because both are stored as integer cents produces
+   * a number that is wrong in every currency at once. Almost always there is
+   * one, and then this reads as one figure; where there are two, it says so
+   * rather than quietly averaging them.
+   */
+  const collectedByCurrency = new Map<string, number>();
+  for (const payment of collected) {
+    const currency = payment.currency.toUpperCase();
+    collectedByCurrency.set(currency, (collectedByCurrency.get(currency) ?? 0) + payment.amountCents);
+  }
+  const [largestCurrency, largestAmount] = [...collectedByCurrency.entries()].sort(
+    (left, right) => right[1] - left[1],
+  )[0] ?? ['USD', 0];
+  const organizationName = (id: string) => byId.get(id)?.name ?? id;
+
+  /*
+   * A plan price, in the currency the product actually charges.
+   *
+   * `Plan` carries cents and no currency, and every customer-facing page —
+   * pricing, billing, the plan editor — renders them with a euro sign. This
+   * page was the one place quoting the same numbers in dollars, which is how
+   * an operator reads €1,490 off the pricing page and $1,490 off the console
+   * and believes they are looking at two different things.
+   */
+  const price = (cents: number) => money(cents, PRICE_CURRENCY);
 
   return (
     <>
@@ -82,10 +122,10 @@ export default async function RevenuePage() {
       </header>
 
       <div className={styles.metrics}>
-        <Metric label="Monthly recurring" value={usd(mrr)} note={`${live.length} live`} />
+        <Metric label="Monthly recurring" value={price(mrr)} note={`${live.length} live`} />
         <Metric
           label="Annualised"
-          value={usd(mrr * 12)}
+          value={price(mrr * 12)}
           note="At today's run rate"
         />
         <Metric
@@ -95,7 +135,7 @@ export default async function RevenuePage() {
         />
         <Metric
           label="Average"
-          value={paying.size > 0 ? usd(mrr / paying.size) : '—'}
+          value={paying.size > 0 ? price(mrr / paying.size) : '—'}
           note="Per paying workspace"
         />
         <Metric
@@ -103,6 +143,15 @@ export default async function RevenuePage() {
           value={`$${creditsToUsd(credits).toFixed(2)}`}
           note={`${credits.toLocaleString('en-US')} credits held`}
           tone={credits > 0 ? 'neutral' : undefined}
+        />
+        <Metric
+          label="Collected, 30 days"
+          value={money(largestAmount, largestCurrency)}
+          note={
+            collectedByCurrency.size > 1
+              ? `${collected.length} payments, ${collectedByCurrency.size} currencies`
+              : `${collected.length} payment${collected.length === 1 ? '' : 's'} in the window`
+          }
         />
         <Metric
           label="Lifted limits"
@@ -126,7 +175,7 @@ export default async function RevenuePage() {
           <strong>
             {ending.length} cancel{ending.length === 1 ? 's' : ''} at period end
           </strong>{' '}
-          — {usd(ending.reduce((sum, row) => sum + monthlyCents(row.plan, row.subscription), 0))} a
+          — {price(ending.reduce((sum, row) => sum + monthlyCents(row.plan, row.subscription), 0))} a
           month, leaving.
         </div>
       ) : null}
@@ -169,7 +218,7 @@ export default async function RevenuePage() {
                   <td style={{ textAlign: 'right' }}>{row.subscription.seats}</td>
                   <td style={{ textAlign: 'right' }}>
                     {subscriptionIsLive(row.subscription.status)
-                      ? usd(monthlyCents(row.plan, row.subscription))
+                      ? price(monthlyCents(row.plan, row.subscription))
                       : '—'}
                   </td>
                   <td>
@@ -177,6 +226,48 @@ export default async function RevenuePage() {
                       ? `Ends ${day(row.subscription.currentPeriodEnd)}`
                       : day(row.subscription.currentPeriodEnd)}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2>Payments</h2>
+        </div>
+        {payments.length === 0 ? (
+          <p className={styles.empty}>
+            Nothing has been paid yet. Every credit purchase and every renewal lands here the
+            moment Stripe says it collected — including the attempts that failed.
+          </p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Workspace</th>
+                <th>For</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.slice(0, 50).map((payment) => (
+                <tr key={payment.id}>
+                  <td>{day(payment.createdAt)}</td>
+                  <td>{organizationName(payment.organizationId)}</td>
+                  <td>{payment.description || payment.kind}</td>
+                  <td>
+                    <span
+                      className={styles.pill}
+                      data-tone={payment.status === 'succeeded' ? 'ok' : payment.status === 'failed' ? 'danger' : 'muted'}
+                    >
+                      {payment.status}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{money(payment.amountCents, payment.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -261,6 +352,23 @@ function Metric({
  */
 function monthlyCents(plan: Plan, subscription: Subscription): number {
   return plan.monthlyPriceCents * Math.max(1, subscription.seats);
+}
+
+/**
+ * An amount in the currency it was actually taken in.
+ *
+ * The plans are quoted in one currency; a payment is a fact about a charge
+ * that already happened, and rendering a euro charge with a dollar sign is the
+ * kind of quiet wrongness that gets a figure repeated in a board deck.
+ */
+const PRICE_CURRENCY = 'EUR';
+
+function money(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    currencyDisplay: 'narrowSymbol',
+  }).format(cents / 100);
 }
 
 function toneFor(status: Subscription['status']): string {

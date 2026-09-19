@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { creditsToUsd, planById } from '@act-one/core';
+import { creditsToUsd, effectivePlan } from '@act-one/core';
 import { requireSessionForPage } from '@/server/auth.ts';
 import { getStore } from '@/server/store.ts';
 import { getPlatformConfig } from '@/server/platform.ts';
@@ -13,14 +13,28 @@ export default async function BillingPage() {
   const session = await requireSessionForPage('/app/billing');
   const store = getStore();
 
-  const [organization, subscription, { plans }] = await Promise.all([
+  const [organization, subscription, payments, { plans }] = await Promise.all([
     store.organizations.get(session.organizationId),
     store.subscriptions.getForOrganization(session.organizationId),
+    store.payments.listForOrganization(session.organizationId, 24),
     getPlatformConfig(),
   ]);
   if (!organization) return null;
 
-  const plan = planById(plans, subscription?.planId ?? organization.planId);
+  /*
+   * The plan actually in force, not the one the row remembers.
+   *
+   * This page used to read the plan id straight off the subscription, which
+   * showed Pro to a workspace whose card had failed — the entitlement layer
+   * had already dropped them to free, so the page was telling them they had
+   * something the product was refusing them. `effectivePlan` is the same
+   * answer the rest of the app uses, lifted limits and all.
+   */
+  const plan = effectivePlan({
+    plans,
+    organization,
+    subscription: subscription ? { planId: subscription.planId, status: subscription.status } : null,
+  });
   const spend = await store.costs.totalForOrganization(session.organizationId);
 
   return (
@@ -108,6 +122,34 @@ export default async function BillingPage() {
           </p>
         </section>
       </div>
+
+      {payments.length > 0 ? (
+        <section className={styles.panel} style={{ marginTop: 'var(--space-6)' }}>
+          <div className={styles.panelHead}>
+            <h3>Receipts</h3>
+            <span className="mono secondary">{payments.length}</span>
+          </div>
+          <dl className={styles.kv}>
+            {payments.map((payment) => (
+              <div key={payment.id} className={styles.kvRow}>
+                <dt>
+                  {new Date(payment.createdAt).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}{' '}
+                  · {payment.description || payment.kind}
+                </dt>
+                <dd>
+                  {payment.status === 'succeeded'
+                    ? `€${(payment.amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                    : payment.status}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
       <div style={{ marginTop: 'var(--space-6)' }}>
         <BillingActions

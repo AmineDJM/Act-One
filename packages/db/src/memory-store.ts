@@ -62,6 +62,7 @@ import type {
   VoiceSettings,
   Scene,
   Storyboard,
+  Payment,
   Subscription,
   User,
   Variant,
@@ -87,6 +88,7 @@ export class MemoryStore implements Store {
       { id: string; userId: string; tokenHash: string; expiresAt: string; organizationId?: string | null }
     >(),
     subscriptions: new Map<string, Subscription>(),
+    payments: new Map<string, Payment>(),
     brands: new Map<string, BrandSystem>(),
     projects: new Map<string, Project>(),
     understandings: new Map<string, ProductUnderstanding & { organizationId: string }>(),
@@ -595,6 +597,28 @@ export class MemoryStore implements Store {
       [...this.tables.subscriptions.values()].find((s) => s.stripeSubscriptionId === id) ?? null,
     list: async (limit = 200) =>
       [...this.tables.subscriptions.values()]
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, limit),
+  };
+
+  readonly payments = {
+    record: async (payment: Payment) => {
+      // Keyed by the Stripe event, so a retry writes nothing twice.
+      if (
+        payment.stripeEventId &&
+        [...this.tables.payments.values()].some((p) => p.stripeEventId === payment.stripeEventId)
+      ) {
+        return null;
+      }
+      this.tables.payments.set(payment.id, payment);
+      return payment;
+    },
+    listForOrganization: async (organizationId: string, limit = 50) =>
+      this.scoped(this.tables.payments, organizationId)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, limit),
+    list: async (limit = 200) =>
+      [...this.tables.payments.values()]
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
         .slice(0, limit),
   };

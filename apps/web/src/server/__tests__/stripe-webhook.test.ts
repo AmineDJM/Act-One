@@ -145,6 +145,112 @@ describe('the webhook', () => {
     expect((await store.subscriptions.getByStripeSubscriptionId('sub_1'))?.status).toBe('canceled');
   });
 
+  it('writes down every payment, including the one that failed', async () => {
+    await deliver(
+      eventPayload('checkout.session.completed', {
+        id: 'cs_pay',
+        object: 'checkout.session',
+        amount_total: 24_000,
+        currency: 'eur',
+        metadata: { organizationId, kind: 'credits', credits: '2000' },
+      }),
+    );
+    await deliver(
+      eventPayload('invoice.payment_failed', {
+        id: 'in_bad',
+        object: 'invoice',
+        customer: 'cus_acme',
+        amount_due: 149_000,
+        currency: 'eur',
+      }),
+    );
+
+    const payments = await store.payments.listForOrganization(organizationId);
+    expect(payments).toHaveLength(2);
+    expect(payments.find((payment) => payment.kind === 'credits')).toMatchObject({
+      status: 'succeeded',
+      amountCents: 24_000,
+      currency: 'eur',
+      credits: 2000,
+      stripeObjectId: 'cs_pay',
+    });
+    // The failed attempt is on the record too: it is what explains the past due.
+    expect(payments.find((payment) => payment.status === 'failed')).toMatchObject({
+      kind: 'subscription',
+      amountCents: 149_000,
+    });
+  });
+
+  it('gives the month’s credits to the invoice that paid for the month, once', async () => {
+    await deliver(
+      eventPayload('customer.subscription.created', {
+        id: 'sub_renew',
+        object: 'subscription',
+        customer: 'cus_acme',
+        status: 'active',
+        metadata: { organizationId, planId: 'pro' },
+        current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
+        cancel_at_period_end: false,
+        items: { data: [{ quantity: 1 }] },
+      }),
+    );
+    const firstMonth = (await store.organizations.get(organizationId))!.creditBalance;
+    expect(firstMonth).toBe(2000);
+
+    // The invoice that opened the subscription must not pay the allowance
+    // twice: the subscription event already did.
+    const opening = await deliver(
+      eventPayload('invoice.payment_succeeded', {
+        id: 'in_open',
+        object: 'invoice',
+        customer: 'cus_acme',
+        amount_paid: 149_000,
+        currency: 'eur',
+        billing_reason: 'subscription_create',
+      }),
+    );
+    expect(await opening.json()).toMatchObject({ handled: true, note: 'Payment recorded.' });
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(firstMonth);
+
+    // Month two. This event was not handled at all before, so a customer sold
+    // "2,000 credits a month" was given them once and never again.
+    const renewal = await deliver(
+      eventPayload('invoice.payment_succeeded', {
+        id: 'in_month_2',
+        object: 'invoice',
+        customer: 'cus_acme',
+        amount_paid: 149_000,
+        currency: 'eur',
+        billing_reason: 'subscription_cycle',
+      }),
+    );
+    expect(await renewal.json()).toMatchObject({ handled: true, note: 'Renewed: 2000 credits.' });
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(firstMonth + 2000);
+
+    // And Stripe's retry of that same delivery pays nothing a second time.
+    const renewalPayload = eventPayload(
+      'invoice.payment_succeeded',
+      {
+        id: 'in_month_2',
+        object: 'invoice',
+        customer: 'cus_acme',
+        amount_paid: 149_000,
+        currency: 'eur',
+        billing_reason: 'subscription_cycle',
+      },
+      'evt_month_2_retry',
+    );
+    await deliver(renewalPayload);
+    const afterFirst = (await store.organizations.get(organizationId))!.creditBalance;
+    const retry = await deliver(renewalPayload);
+    expect(await retry.json()).toMatchObject({ handled: false, note: 'Already processed.' });
+    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(afterFirst);
+
+    // One receipt per month, and one for the invoice that opened it.
+    const recorded = await store.payments.listForOrganization(organizationId);
+    expect(recorded.filter((payment) => payment.kind === 'subscription')).toHaveLength(3);
+  });
+
   it('refuses to trust an unsigned body when no webhook secret is configured', async () => {
     await saveProviderCredentials('stripe', { secretKey: SECRET_KEY }, 'usr_staff');
     const payload = eventPayload('checkout.session.completed', {

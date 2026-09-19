@@ -101,6 +101,15 @@ export default async function AdminOverview() {
   const missingOptional = unconfigured.filter((p) => !requiredSlots.has(p.id));
 
   const usd = (value: number) => `$${value.toFixed(2)}`;
+  /*
+   * Plan prices are quoted in euros on every page a customer sees — pricing,
+   * billing, the plan editor — so this tile says euros too. The other figures
+   * here really are dollars: provider spend is what vendors charge us, and
+   * credit revenue is priced off it.
+   */
+  const eur = (cents: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', currencyDisplay: 'narrowSymbol' })
+      .format(cents / 100);
   const plain = (value: number) => value.toLocaleString('en-US');
 
   /*
@@ -180,7 +189,7 @@ export default async function AdminOverview() {
         <Metric label="Gross margin" value={`${marginPct.toFixed(0)}%`} note={usd(margin)} />
         <Metric
           label="Monthly recurring"
-          value={usd(mrrCents / 100)}
+          value={eur(mrrCents)}
           note={`${live.length} live subscription${live.length === 1 ? '' : 's'}`}
         />
         <Metric label="Credit revenue" value={usd(revenue)} note="What we charged customers" />

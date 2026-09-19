@@ -44,6 +44,7 @@ export type IdPrefix =
   | 'bvc'
   | 'vcs'
   | 'inv'
+  | 'pay'
   | 'mom'
   | 'cpy';
 
