@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
-import { proxyMisconfiguration } from '@act-one/providers';
+import { proxyMisconfiguration, sharedStorageRequired } from '@act-one/providers';
+import { getStorage } from '@/server/assets.ts';
 import { getDatabase, getStore, isUsingMemoryStore } from '@/server/store.ts';
 
 export const runtime = 'nodejs';
@@ -46,6 +47,30 @@ export async function GET(): Promise<NextResponse> {
     const egress = proxyMisconfiguration();
     if (egress) {
       return NextResponse.json({ ok: false, store: 'postgres', reason: egress }, { status: 503 });
+    }
+
+    /*
+     * And storage, because a service that can reach its database and its
+     * providers and cannot reach the films it has made is not healthy.
+     *
+     * A deployment fell back to local disk with no object store configured:
+     * the worker wrote every master to its own instance, this service answered
+     * ENOENT to every download, and the customer saw a black player with no
+     * error anywhere they could see.
+     */
+    if (sharedStorageRequired() && !(await getStorage()).shared) {
+      return NextResponse.json(
+        {
+          ok: false,
+          store: 'postgres',
+          reason:
+            'Storage is the local filesystem, which this service and the render worker ' +
+            'cannot share: every finished film is unreachable from the page that offers ' +
+            'it. Configure Supabase Storage in Super Admin → Providers, or set ' +
+            'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.',
+        },
+        { status: 503 },
+      );
     }
     return NextResponse.json({ ok: true, store: 'postgres' });
   } catch (error) {

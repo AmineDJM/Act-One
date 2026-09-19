@@ -34,6 +34,16 @@ export function SetupPanel({ readiness }: { readiness: Readiness }) {
 
   const blockers = readiness.blocking.filter((item) => !item.ready);
   const live = blockers.length === 0;
+  /*
+   * Configured and verified are different claims.
+   *
+   * `readiness` says a credential is present. Only the check below calls each
+   * provider and finds out whether it works — so until somebody has pressed
+   * it, saying "verified" tells an operator their platform has been tested
+   * when nothing has been tested, which is the one thing this panel exists to
+   * be trusted about.
+   */
+  const verified = health !== null && health.every((entry) => entry.healthy);
 
   return (
     <section className={styles.setup} data-live={live}>
@@ -42,7 +52,9 @@ export function SetupPanel({ readiness }: { readiness: Readiness }) {
           <h2>{live ? 'Ready to make films' : 'Not ready yet'}</h2>
           <p className={styles.providerPurpose}>
             {live
-              ? 'Everything required is configured and verified. The rest below is optional and widens what the platform can do.'
+              ? verified
+                ? 'Everything required is configured, and answered when we called it. The rest below is optional and widens what the platform can do.'
+                : 'Everything required is configured. Press “Check everything” to call each one and confirm it answers.'
               : `${blockers.length} required integration${blockers.length === 1 ? '' : 's'} still to configure.`}
           </p>
         </div>

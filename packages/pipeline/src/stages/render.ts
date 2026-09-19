@@ -699,6 +699,35 @@ export async function runRender(
     });
 
     /*
+     * Read it back before calling it delivered.
+     *
+     * Every check up to here has been on a file in this worker's temp
+     * directory. What the customer plays is whatever comes back out of
+     * storage, and those are the same bytes only if the store is one both
+     * services can reach. A deployment with no object store configured fell
+     * back to local disk: the worker wrote each master to its own instance,
+     * the web service answered ENOENT to every download, and the film existed
+     * in the database, was offered on the page and could not be played by
+     * anybody. Nothing in the pipeline noticed, because nothing had ever
+     * asked storage for a film back.
+     *
+     * One question, once, at the only moment it can still be answered
+     * honestly: is the film there.
+     */
+    if (!(await registry.storage().exists(master.asset.storageKey))) {
+      throw new AppError(
+        'internal',
+        `The master was stored at ${master.asset.storageKey} and is not readable back from ` +
+          `${registry.storage().name}.`,
+        {
+          publicMessage:
+            'Your film was made and could not be saved where you can reach it. ' +
+            'Nothing is lost; we have stopped rather than hand you a film that will not play.',
+        },
+      );
+    }
+
+    /*
      * The caption track, stored whether or not it is also in the picture.
      *
      * WCAG asks for captions on prerecorded audio and the sidecar is what a

@@ -5,6 +5,7 @@ export * from './secrets.ts';
 export * from './registry.ts';
 
 export * from './llm/types.ts';
+export { sharedStorageRequired } from './registry.ts';
 export { OpenAiLlmProvider, tryParseJson, priceFor, pricedModels, unpricedModels, setModelPrices, DEFAULT_ROUTING } from './llm/openai.ts';
 export { toStrictJsonSchema, supportsStrictMode } from './llm/json-schema.ts';
 export { ScriptedLlmProvider, type ScriptedResponse } from './llm/scripted.ts';

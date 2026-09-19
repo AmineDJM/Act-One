@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   };
 
   log(`starting as ${config.workerId} (concurrency ${config.concurrency})`);
-  await preflight();
+  await preflight(config);
   installSignalHandlers(state);
   startReaper(state);
   startEditor(state);
@@ -151,7 +151,7 @@ async function runOne(
  * start. Bundling here also warms the cache so the first real job is not the
  * one paying for it.
  */
-async function preflight(): Promise<void> {
+async function preflight(config: WorkerConfig): Promise<void> {
   try {
     const ffmpeg = await resolveFfmpeg();
     log(`ffmpeg: ${ffmpeg}`);
@@ -170,6 +170,7 @@ async function preflight(): Promise<void> {
   }
 
   checkEgress();
+  await checkStorage(config);
   await checkSoundLibrary();
 }
 
@@ -199,6 +200,22 @@ function checkEgress(): void {
   const problem = proxyMisconfiguration();
   if (problem) log(`egress: ${problem}`);
   else if (proxyConfigured()) log('egress: through the configured proxy');
+}
+
+/**
+ * Says out loud whether anything this worker makes can be reached.
+ *
+ * The worker renders a film and writes it to storage; the web service serves
+ * it from storage. If that store is this instance's own disk, every master it
+ * produces is unreachable from the page that offers it — the film exists in
+ * the database, the player is black, and the only trace is an ENOENT in the
+ * web service's log naming a path that was never on its machine.
+ */
+async function checkStorage(config: WorkerConfig): Promise<void> {
+  const registry = await buildRegistry(config, { organizationId: 'platform' });
+  const problem = registry.storageMisconfiguration();
+  if (problem) log(`storage: ${problem}`);
+  else log(`storage: ${registry.storage().name}`);
 }
 
 async function checkSoundLibrary(): Promise<void> {

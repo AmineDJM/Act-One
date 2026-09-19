@@ -32,6 +32,18 @@ import type { StorageProvider } from './storage/types.ts';
  * deployment that had got the other, with no way to tell which from the
  * outside. The provider owns the answer; this asks it.
  */
+/**
+ * Whether this process is part of a deployment that needs shared storage.
+ *
+ * A single machine running everything — a laptop, CI, a one-off script — can
+ * read what it wrote. Anything in production cannot assume that, and saying so
+ * explicitly beats guessing from the presence of credentials.
+ */
+export function sharedStorageRequired(): boolean {
+  if (process.env['ACT_ONE_SINGLE_MACHINE'] === '1') return false;
+  return process.env['NODE_ENV'] === 'production';
+}
+
 const LlmConfig = z.object({
   primary: z.enum(['openai']).default('openai'),
   enabled: z.boolean().default(true),
@@ -307,10 +319,44 @@ export class ProviderRegistry {
     return this.memo(`storage:${this.config.storage.primary}`, () => {
       if (this.config.storage.primary === 'local-fs') return new LocalFsStorageProvider();
       const supabase = new SupabaseStorageProvider();
-      // Falling back to disk keeps development and CI working without cloud
-      // credentials, and never silently downgrades a configured deployment.
-      return supabase.isConfigured() ? supabase : new LocalFsStorageProvider();
+      /*
+       * Falling back to disk keeps development and CI working without cloud
+       * credentials — and it is a downgrade, so it says so.
+       *
+       * The comment here used to claim it "never silently downgrades a
+       * configured deployment", and that is exactly what it did: a deployment
+       * whose object-store credentials were missing got local disk, the worker
+       * wrote every master to its own instance, and the web service answered
+       * ENOENT to every download. The film existed in the database and nowhere
+       * a customer could reach. `storageMisconfiguration` is what turns that
+       * into something a person is told.
+       */
+      if (supabase.isConfigured()) return supabase;
+      console.warn(
+        '[storage] No object store configured; using local disk. ' +
+          'Only one process can read what this writes.',
+      );
+      return new LocalFsStorageProvider();
     });
+  }
+
+  /**
+   * Why this deployment cannot deliver a film, or nothing.
+   *
+   * Two services with two disks and a store only one of them can read is not
+   * a degraded mode, it is a product that renders films nobody can watch. Said
+   * at startup and on the health check, because the alternative is finding out
+   * from a customer looking at a black player.
+   */
+  storageMisconfiguration(): string | null {
+    if (this.storage().shared) return null;
+    if (!sharedStorageRequired()) return null;
+    return (
+      'Storage is the local filesystem, which the web service and the render ' +
+      'worker cannot share: every finished film will be unreachable from the ' +
+      'page that offers it. Configure Supabase Storage ' +
+      '(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY).'
+    );
   }
 
   async healthAll(): Promise<ProviderHealth[]> {

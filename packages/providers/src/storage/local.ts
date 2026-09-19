@@ -17,6 +17,14 @@ export class LocalFsStorageProvider implements StorageProvider {
   readonly name = 'local-fs';
   readonly kind = 'storage' as const;
 
+  /**
+   * False, and the whole point of the flag.
+   *
+   * One process reading what it wrote is development. Two services on two
+   * machines is production, and this cannot serve it.
+   */
+  readonly shared = false;
+
   private readonly root: string;
   private readonly publicBaseUrl: string | null;
   private server: Server | null = null;

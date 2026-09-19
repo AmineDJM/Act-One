@@ -30,6 +30,9 @@ export class SupabaseStorageProvider implements StorageProvider {
     this.bucket = config.bucket ?? process.env.SUPABASE_STORAGE_BUCKET ?? 'act-one';
   }
 
+  /** An object store both services reach over the network. */
+  readonly shared = true;
+
   isConfigured(): boolean {
     return this.baseUrl.length > 0 && this.serviceKey.length > 0;
   }
