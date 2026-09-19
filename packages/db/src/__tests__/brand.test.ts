@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BrandSystem, newId, type Organization, type Project, type User } from '@act-one/core';
+import { BrandSystem, newId, type NewOrganization, type Organization, type Project, type User } from '@act-one/core';
 import type { Store } from '../store.ts';
 import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
 
@@ -8,7 +8,7 @@ import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
  * own DNA and nobody else's, a stored brand comes back whole with every
  * later field defaulted, and a workspace boundary is a wall.
  */
-function org(name: string): Organization {
+function org(name: string): NewOrganization {
   return {
     id: newId('org'), name, slug: uniqueSlug(name), planId: 'pro', stripeCustomerId: null,
     creditBalance: 0, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),

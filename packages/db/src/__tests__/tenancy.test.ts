@@ -3,6 +3,7 @@ import {
   newId,
   type AssetInput,
   type Concept,
+  type NewOrganization,
   type Organization,
   type Project,
   type User,
@@ -20,7 +21,7 @@ import { postgresAvailable, storeCases, uniqueEmail, uniqueSlug } from './stores
  * organisation must behave as if it does not exist — not "forbidden", which
  * would let an attacker enumerate which ids are real.
  */
-function makeOrg(name: string): Organization {
+function makeOrg(name: string): NewOrganization {
   return {
     id: newId('org'),
     name,
@@ -339,9 +340,8 @@ describe.each(storeCases())('project quota accounting ($name)', ({ open, close }
 
   beforeEach(async () => {
     store = await open();
-    org = makeOrg('Quota');
+    org = await store.organizations.create(makeOrg('Quota'));
     user = makeUser('founder@quota.com');
-    await store.organizations.create(org);
     await store.users.create(user);
   });
 

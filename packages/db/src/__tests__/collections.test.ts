@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newId, type CollectionEntry, type Organization, type Project, type User } from '@act-one/core';
+import { newId, type CollectionEntry, type NewOrganization, type Organization, type Project, type User } from '@act-one/core';
 import type { Store } from '../store.ts';
 import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
 
@@ -9,7 +9,7 @@ import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
  * editorial order, and a patch that keeps the columns and the document in
  * step.
  */
-function org(name: string): Organization {
+function org(name: string): NewOrganization {
   return {
     id: newId('org'), name, slug: uniqueSlug(name), planId: 'pro', stripeCustomerId: null,
     creditBalance: 0, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),

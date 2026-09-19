@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ReferralProgram, newId, type Membership, type Organization, type Referral, type User } from '@act-one/core';
+import { ReferralProgram, newId, type Membership, type NewOrganization, type Organization, type Referral, type User } from '@act-one/core';
 import { advanceReferral } from '../referrals.ts';
 import type { Store } from '../store.ts';
 import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
@@ -9,7 +9,7 @@ import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
  * in the right workspaces, a ceiling that holds, and a programme that pays
  * only for what it asks for.
  */
-function org(name: string, credits = 0): Organization {
+function org(name: string, credits = 0): NewOrganization {
   return {
     id: newId('org'), name, slug: uniqueSlug(name), planId: 'pro', stripeCustomerId: null,
     creditBalance: credits, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),

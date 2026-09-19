@@ -24,6 +24,8 @@ export type OrganizationState = {
   planId: string;
   isSuspended: boolean;
   creditBalance: number;
+  /** A workspace the operator runs. Optional: absent reads as a customer. */
+  isInternal?: boolean;
 };
 
 export type SubscriptionState = {
@@ -39,6 +41,12 @@ export type SubscriptionState = {
  * only trusted when there is no subscription contradicting it — otherwise a
  * failed payment that never updated the organisation row would keep a customer
  * on Pro indefinitely.
+ *
+ * An id, and only an id: it cannot express a limit an operator lifted for one
+ * workspace, and it does not know that the operator's own workspace is not on
+ * a plan at all. Anything deciding what a workspace may actually do wants
+ * `effectivePlan`, which answers with the plan those two things are folded
+ * into.
  */
 export function effectivePlanId(
   organization: OrganizationState,
@@ -153,6 +161,14 @@ export function canSpendCredits(params: {
   organization: OrganizationState;
   credits: number;
 }): AccessDecision {
+  /*
+   * Credits are what a customer buys from us. The operator's own workspace
+   * buys nothing from itself, so a zero balance there is not a decision about
+   * spending — it is a ledger that was never filled. What actually protects
+   * the operator from a runaway render is the project's dollar ceiling, and
+   * that still applies to them.
+   */
+  if (params.organization.isInternal) return ALLOWED;
   if (params.credits <= params.organization.creditBalance) return ALLOWED;
   return {
     allowed: false,

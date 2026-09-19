@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newId, type AssetInput, type Organization, type Project, type User } from '@act-one/core';
+import { newId, type AssetInput, type NewOrganization, type Organization, type Project, type User } from '@act-one/core';
 import type { Store } from '../store.ts';
 import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
 
@@ -9,7 +9,7 @@ import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
  * search reads what the classifier wrote; a version knows its original;
  * and none of it crosses a workspace boundary.
  */
-function org(name: string): Organization {
+function org(name: string): NewOrganization {
   return {
     id: newId('org'), name, slug: uniqueSlug(name), planId: 'pro', stripeCustomerId: null,
     creditBalance: 0, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),

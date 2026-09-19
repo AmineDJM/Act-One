@@ -182,3 +182,66 @@ describe('system fit scoring', () => {
     expect(kineticForPh.score).toBeGreaterThan(kineticForFund.score);
   });
 });
+
+describe('a concept the account can actually render', () => {
+  /**
+   * The complaint: a free workspace is offered three sixty-second directions,
+   * reads them, chooses one, and the storyboard quietly cuts it to thirty —
+   * so the film they approved is not the film they get. A concept is a promise
+   * about a film, and it should not promise one the plan cannot make.
+   */
+  function generate(maxDurationSeconds: number | undefined, estimate = 60) {
+    let call = 0;
+    const llm = new ScriptedLlmProvider([
+      {
+        respond: () => {
+          call += 1;
+          return {
+            ...concept(`Concept ${call}`, `Distinct idea number ${call} about reconciliation`, `Hook ${call}`),
+            estimatedDurationSeconds: estimate,
+          };
+        },
+      },
+    ]);
+    return new CreativeStrategyEngine(llm)
+      .generate(
+        {
+          projectId: 'prj_1',
+          understanding: understandingFixture(),
+          brand: brandFixture(),
+          brief: briefFixture(),
+          ...(maxDurationSeconds === undefined ? {} : { maxDurationSeconds }),
+        },
+        { organizationId: 'org_1', projectId: 'prj_1' },
+      )
+      .then((result) => ({ ...result, llm }));
+  }
+
+  it('never promises a film longer than the plan renders', async () => {
+    const { concepts } = await generate(30);
+    for (const concept of concepts) {
+      expect(concept.estimatedDurationSeconds, concept.name).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it('tells the strategist what it is working within, rather than trimming after', async () => {
+    const { llm } = await generate(30);
+    const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
+    expect(prompt).toMatch(/renders films up to 30 seconds/i);
+    // Tolerant of where the prompt wraps: the sentence matters, not the line.
+    expect(prompt).toMatch(/genuinely good\s+at that length/i);
+  });
+
+  it('says nothing about a ceiling that is not binding', async () => {
+    const { llm } = await generate(600);
+    const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
+    expect(prompt).not.toMatch(/This account renders films up to/i);
+  });
+
+  it('behaves exactly as before when no ceiling is given', async () => {
+    const { concepts } = await generate(undefined, 45);
+    for (const concept of concepts) {
+      expect(concept.estimatedDurationSeconds).toBe(45);
+    }
+  });
+});

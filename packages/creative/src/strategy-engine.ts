@@ -111,6 +111,16 @@ export type StrategyInput = {
   understanding: ProductUnderstanding;
   brand: BrandSystem;
   brief: ProjectBrief;
+  /**
+   * The longest film this workspace can actually render.
+   *
+   * Without it the strategist writes three sixty-second directions for a plan
+   * that renders thirty, the customer reads them, picks one, and the
+   * storyboard quietly cuts it in half — so the film they approved is not the
+   * film they get. A concept is a promise about a film; it should not promise
+   * one the account cannot make.
+   */
+  maxDurationSeconds?: number;
   /** Regenerate away from these, when the customer asked for new directions. */
   rejectedConcepts?: Concept[];
 };
@@ -272,11 +282,21 @@ export class CreativeStrategyEngine {
      * sixty-second reel.
      */
     const cut = input.brief.filmCut;
-    const duration = cutSeconds(
-      cut,
-      input.brief.durationSeconds ?? (understanding.launchContext === 'paid_social' ? 20 : null),
+    /*
+     * Three numbers, narrowest wins: what the cut can carry, what the
+     * customer asked for, and what their plan will render.
+     */
+    const planCeiling = input.maxDurationSeconds ?? Number.POSITIVE_INFINITY;
+    const duration = Math.min(
+      planCeiling,
+      cutSeconds(
+        cut,
+        input.brief.durationSeconds ?? (understanding.launchContext === 'paid_social' ? 20 : null),
+      ),
     );
-    const [floorSeconds, ceilingSeconds] = FILM_CUTS[cut].seconds;
+    const [bandFloor, bandCeiling] = FILM_CUTS[cut].seconds;
+    const ceilingSeconds = Math.min(bandCeiling, planCeiling);
+    const floorSeconds = Math.min(bandFloor, ceilingSeconds);
 
     const { value } = await this.llm.completeJson(
       [
@@ -328,6 +348,14 @@ export class CreativeStrategyEngine {
             `That system suits: ${system.suitsWhen.join('; ')}`,
             `That system forbids: ${system.prohibitions.join('; ')}`,
             `Target runtime: about ${duration} seconds. "estimatedDurationSeconds" must be between ${floorSeconds} and ${ceilingSeconds}.`,
+            ...(input.maxDurationSeconds !== undefined && input.maxDurationSeconds < bandCeiling
+              ? [
+                  `This account renders films up to ${input.maxDurationSeconds} seconds. That is the`,
+                  `real constraint, not a preference: write three directions that are genuinely good`,
+                  `at that length rather than three that would be good at twice it. A concept the`,
+                  `customer cannot render is a concept they will read, choose, and then be refused.`,
+                ]
+              : []),
             ...cutDirectionLines(cut),
             ...briefDirectionLines(input.brief),
             ...formatDirectionLines(input.brief.filmFormat),
@@ -373,6 +401,7 @@ export class CreativeStrategyEngine {
       structure: assignment.structure,
       systemId: assignment.systemId,
       cut,
+      maxDurationSeconds: ceilingSeconds,
       knownMomentIds: new Set(understanding.productMoments.map((m) => m.id)),
     });
   }
@@ -393,6 +422,7 @@ function toConcept(
     structure: NarrativeStructure;
     systemId: CreativeSystemId;
     cut: FilmCut;
+    maxDurationSeconds: number;
     knownMomentIds: Set<string>;
   },
 ): Concept {
@@ -413,9 +443,18 @@ function toConcept(
     soundDirection: response.soundDirection,
     productUiUsage: response.productUiUsage,
     generativeUsage: response.generativeUsage,
-    // The cut is not a suggestion: a concept estimated outside its band would
-    // be storyboarded to a length the format cannot carry.
-    estimatedDurationSeconds: cutSeconds(params.cut, response.estimatedDurationSeconds),
+    /*
+     * Neither the cut nor the plan is a suggestion.
+     *
+     * A concept estimated outside the cut's band would be storyboarded to a
+     * length the format cannot carry; one estimated above the plan's ceiling
+     * is a promise the account cannot keep, and the customer finds that out
+     * after they have chosen it.
+     */
+    estimatedDurationSeconds: Math.min(
+      params.maxDurationSeconds,
+      cutSeconds(params.cut, response.estimatedDurationSeconds),
+    ),
     recommendedChannels: response.recommendedChannels,
     keyScenes: response.keyScenes,
     // A hallucinated moment id would silently become an empty scene later.

@@ -1,4 +1,5 @@
 import { AppError } from '@act-one/core';
+import { planFor } from '../entitlements.ts';
 import { CreativeStrategyEngine } from '@act-one/creative';
 import type { StageContext } from '../context.ts';
 
@@ -39,6 +40,17 @@ export async function runConcepts(
   await context.progress(0.2, 'Developing three directions');
   await context.activity({ step: 'strategy', kind: 'step', label: 'developing three directions', status: 'active' });
 
+  /*
+   * Three directions the customer can actually render.
+   *
+   * The concept estimates a runtime and the plan caps one, and nothing
+   * reconciled them here — so a free account was shown three sixty-second
+   * directions, chose one, and the storyboard silently cut it to thirty. The
+   * film they approved was not the film they got. The storyboard stage has
+   * capped this for a while; by then the promise has already been made.
+   */
+  const plan = await planFor(store, organizationId);
+
   const engine = new CreativeStrategyEngine(registry.llm());
   const result = await engine.generate(
     {
@@ -46,6 +58,7 @@ export async function runConcepts(
       understanding,
       brand,
       brief: project.brief,
+      maxDurationSeconds: plan.limits.maxMasterDurationSeconds,
       rejectedConcepts: rejected,
     },
     { organizationId, projectId: project.id, signal: context.signal },

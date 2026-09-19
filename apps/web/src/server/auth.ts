@@ -306,6 +306,19 @@ export async function signUp(input: SignUpInput): Promise<Session> {
     creditBalance: 0,
     maxProjectCostUsd: 120,
     isSuspended: false,
+    limitOverrides: {},
+    extraEntitlements: [],
+    /*
+     * The operator's own workspace is not a customer of the product.
+     *
+     * Without this the person who owns the platform signs up, lands on the
+     * free plan like anybody else, and is told their film may not run past
+     * thirty seconds — by their own software. It follows the staff flag
+     * exactly, so a self-hosted install works out of the box and nobody else
+     * can reach it: `isSuperAdmin` is true only for the first account on a
+     * fresh install and is never settable from the app.
+     */
+    isInternal: user.isSuperAdmin,
     createdAt: now,
   });
 

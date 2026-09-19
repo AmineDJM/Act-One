@@ -49,6 +49,7 @@ import type {
   Membership,
   MemberRole,
   Organization,
+  NewOrganization,
   ProductCredential,
   ProductUnderstanding,
   Project,
@@ -383,12 +384,13 @@ export class MemoryStore implements Store {
   // --- repositories -------------------------------------------------------
 
   readonly organizations = {
-    create: async (org: Organization) => {
+    create: async (org: NewOrganization) => {
       if ([...this.tables.organizations.values()].some((o) => o.slug === org.slug)) {
         throw new AppError('conflict', `Organization slug "${org.slug}" is taken.`);
       }
-      this.tables.organizations.set(org.id, org);
-      return org;
+      const opened: Organization = { limitOverrides: {}, extraEntitlements: [], isInternal: false, ...org };
+      this.tables.organizations.set(opened.id, opened);
+      return opened;
     },
     get: async (id: string) => this.tables.organizations.get(id) ?? null,
     getBySlug: async (slug: string) =>
@@ -591,6 +593,10 @@ export class MemoryStore implements Store {
       this.scoped(this.tables.subscriptions, organizationId)[0] ?? null,
     getByStripeSubscriptionId: async (id: string) =>
       [...this.tables.subscriptions.values()].find((s) => s.stripeSubscriptionId === id) ?? null,
+    list: async (limit = 200) =>
+      [...this.tables.subscriptions.values()]
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, limit),
   };
 
   readonly brands = {

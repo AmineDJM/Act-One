@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newId, type JobEvent, type Organization, type Project, type ResearchSource, type User } from '@act-one/core';
+import { newId, type JobEvent, type NewOrganization, type Organization, type Project, type ResearchSource, type User } from '@act-one/core';
 import type { Store } from '../store.ts';
 import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
 
@@ -8,7 +8,7 @@ import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
  * come back in order and only to their workspace; a rerun's trail replaces
  * the last one rather than piling up.
  */
-function org(name: string): Organization {
+function org(name: string): NewOrganization {
   return {
     id: newId('org'), name, slug: uniqueSlug(name), planId: 'pro', stripeCustomerId: null,
     creditBalance: 0, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),

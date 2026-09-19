@@ -132,9 +132,11 @@ export async function runSceneAssets(
       }
 
       // Credits are checked before the call, not after: a customer who cannot
-      // afford a shot should be told, not billed.
+      // afford a shot should be told, not billed. The operator's own workspace
+      // is not a customer and has no balance to draw on; the media allowance
+      // above is the ceiling that holds for them.
       const credits = usdToCredits(estimate);
-      if (organization && organization.creditBalance < credits) {
+      if (organization && !organization.isInternal && organization.creditBalance < credits) {
         result.skipped += 1;
         result.notes.push(`Scene ${scene.index + 1}: skipped, not enough credits.`);
         continue;
@@ -146,7 +148,9 @@ export async function runSceneAssets(
           result.generated += 1;
           result.costUsd += estimate;
           remaining -= estimate;
-          if (organization) await store.organizations.adjustCredits(organizationId, -credits);
+          if (organization && !organization.isInternal) {
+            await store.organizations.adjustCredits(organizationId, -credits);
+          }
         } else {
           result.failed += 1;
         }

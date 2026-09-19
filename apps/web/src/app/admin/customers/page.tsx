@@ -1,4 +1,11 @@
-import { creditsToUsd, planById } from '@act-one/core';
+import {
+  INTERNAL_PLAN,
+  creditsToUsd,
+  planById,
+  withGrants,
+  type Organization,
+  type Subscription,
+} from '@act-one/core';
 import { getStore } from '@/server/store.ts';
 import { getPlatformConfig } from '@/server/platform.ts';
 import { CustomerControls } from './CustomerControls.tsx';
@@ -50,11 +57,18 @@ export default async function CustomersPage() {
       ) : (
         <ul className={styles.customerList}>
           {rows.map((row) => {
-            const plan = planById(plans, row.organization.planId);
+            /*
+             * What the workspace is actually on, grants and all — which is
+             * what the operator is looking at when they open the drawer. The
+             * plan alone would say "Free" for a workspace running on lifted
+             * limits, and the grant control beside it would show numbers that
+             * contradict it.
+             */
+            const plan = row.organization.isInternal
+              ? INTERNAL_PLAN
+              : withGrants(planById(plans, row.organization.planId), row.organization);
             const margin = row.revenue - row.spend;
-            const status = row.organization.isSuspended
-              ? 'suspended'
-              : (row.subscription?.status ?? 'free');
+            const status = statusOf(row.organization, row.subscription);
 
             return (
               <li key={row.organization.id} className={styles.customerRow}>
@@ -63,19 +77,7 @@ export default async function CustomersPage() {
                   <span className="mono">{row.organization.slug}</span>
                 </div>
 
-                <span
-                  className={`badge ${
-                    row.organization.isSuspended
-                      ? 'badge--bad'
-                      : row.subscription?.status === 'past_due'
-                        ? 'badge--warn'
-                        : row.subscription
-                          ? 'badge--ok'
-                          : ''
-                  }`}
-                >
-                  {status}
-                </span>
+                <span className={`badge ${BADGE_TONE[status]}`}>{status}</span>
 
                 <dl className={styles.customerFigures}>
                   <div>
@@ -112,6 +114,9 @@ export default async function CustomersPage() {
                   planId={row.organization.planId}
                   plans={planOptions}
                   suspended={row.organization.isSuspended}
+                  internal={row.organization.isInternal}
+                  limitOverrides={row.organization.limitOverrides}
+                  planLimits={plan.limits}
                 />
               </li>
             );
@@ -121,3 +126,38 @@ export default async function CustomersPage() {
     </>
   );
 }
+
+/**
+ * How a workspace stands with us, in one word.
+ *
+ * Internal comes first, because it answers a different question: an operator
+ * scanning this list wants to know which rows are customers, and one of ours
+ * showing "free" among the real free accounts is how an internal workspace
+ * gets counted in a churn number or suspended by mistake.
+ *
+ * "Unbilled" is a paid plan with nothing billing it — an operator put them
+ * there by hand, or a Stripe subscription never arrived. One is a decision and
+ * the other is revenue not being collected, and "free" beside a Studio plan
+ * says neither.
+ */
+type CustomerStatus = 'ours' | 'suspended' | 'free' | 'unbilled' | Subscription['status'];
+
+function statusOf(organization: Organization, subscription: Subscription | null): CustomerStatus {
+  if (organization.isInternal) return 'ours';
+  if (organization.isSuspended) return 'suspended';
+  if (subscription) return subscription.status;
+  return organization.planId === 'free' ? 'free' : 'unbilled';
+}
+
+const BADGE_TONE: Record<CustomerStatus, string> = {
+  ours: 'badge--ok',
+  suspended: 'badge--bad',
+  active: 'badge--ok',
+  trialing: 'badge--ok',
+  past_due: 'badge--warn',
+  unbilled: 'badge--warn',
+  canceled: '',
+  incomplete: 'badge--warn',
+  none: '',
+  free: '',
+};

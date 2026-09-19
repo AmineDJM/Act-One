@@ -196,6 +196,72 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
       ) : null}
 
+      {/*
+        The work, then the material.
+
+        The three directions used to sit below the archive, the notes, the
+        brief, the product-access form and the whole of what we understood — so
+        a page whose one instruction was "choose a direction" asked for
+        something that was off the bottom of the screen, and the customer had to
+        scroll past five panels of reference to find it. The order now follows
+        what is being asked: the decision, then what was made, then everything
+        that informed it.
+      */}
+      {concepts.length > 0 ? (
+        <section style={{ marginTop: 'var(--space-7)' }}>
+          <div className={styles.head}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', letterSpacing: '-0.03em' }}>Three directions</h2>
+              <p className="secondary" style={{ marginTop: 'var(--space-2)', maxWidth: '62ch' }}>
+                Genuinely different arguments, not one idea in three fonts. Each has its own
+                narrative structure and its own creative language.
+              </p>
+            </div>
+          </div>
+          <ConceptChoice projectId={project.id} concepts={concepts} />
+        </section>
+      ) : null}
+
+      {storyboard ? (
+        <section style={{ marginTop: 'var(--space-7)' }}>
+          <div className={styles.head}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', letterSpacing: '-0.03em' }}>Storyboard</h2>
+              <p className="secondary" style={{ marginTop: 'var(--space-2)' }}>
+                {storyboard.scenes.length} scenes · {storyboardDuration(storyboard).toFixed(1)}s ·
+                version {storyboard.version}
+              </p>
+            </div>
+          </div>
+          <StoryboardPanel
+            projectId={project.id}
+            storyboard={storyboard}
+            animaticAssetId={animatic?.masterAssetId ?? null}
+            animaticPosterAssetId={animatic?.posterAssetId ?? null}
+            animaticProgress={animaticJob ? animaticJob.progress : null}
+            revisions={{ used: revisions.used, limit: revisions.limit, reason: revisions.reason }}
+            exchanges={exchanges}
+          />
+        </section>
+      ) : null}
+
+      {/*
+        Everything the work was made from, under one heading.
+
+        Named rather than simply moved down, because an unlabelled run of panels
+        reads as more decisions to make. This is the reference: it is here to be
+        consulted and changed, not answered.
+      */}
+      <section className={styles.head} style={{ marginTop: 'var(--space-7)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.3rem', letterSpacing: '-0.03em' }}>Behind the film</h2>
+          <p className="secondary" style={{ marginTop: 'var(--space-2)', maxWidth: '62ch' }}>
+            What we read, what we can use, what you asked for, and what we understood. Change any
+            of it and the next step is made against the change.
+          </p>
+        </div>
+      </section>
+
       {/* What the research read, kept with the project for good. */}
       {sources.length > 0 ? (
         <div className={styles.panels} style={{ marginBottom: 'var(--space-5)' }}>
@@ -335,44 +401,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <BrandConfirm projectId={project.id} brand={brand} />
         ) : null}
       </div>
-
-      {concepts.length > 0 ? (
-        <section style={{ marginTop: 'var(--space-7)' }}>
-          <div className={styles.head}>
-            <div>
-              <h2 style={{ fontSize: '1.3rem', letterSpacing: '-0.03em' }}>Three directions</h2>
-              <p className="secondary" style={{ marginTop: 'var(--space-2)', maxWidth: '62ch' }}>
-                Genuinely different arguments, not one idea in three fonts. Each has its own
-                narrative structure and its own creative language.
-              </p>
-            </div>
-          </div>
-          <ConceptChoice projectId={project.id} concepts={concepts} />
-        </section>
-      ) : null}
-
-      {storyboard ? (
-        <section style={{ marginTop: 'var(--space-7)' }}>
-          <div className={styles.head}>
-            <div>
-              <h2 style={{ fontSize: '1.3rem', letterSpacing: '-0.03em' }}>Storyboard</h2>
-              <p className="secondary" style={{ marginTop: 'var(--space-2)' }}>
-                {storyboard.scenes.length} scenes · {storyboardDuration(storyboard).toFixed(1)}s ·
-                version {storyboard.version}
-              </p>
-            </div>
-          </div>
-          <StoryboardPanel
-            projectId={project.id}
-            storyboard={storyboard}
-            animaticAssetId={animatic?.masterAssetId ?? null}
-            animaticPosterAssetId={animatic?.posterAssetId ?? null}
-            animaticProgress={animaticJob ? animaticJob.progress : null}
-            revisions={{ used: revisions.used, limit: revisions.limit, reason: revisions.reason }}
-            exchanges={exchanges}
-          />
-        </section>
-      ) : null}
     </>
   );
 }

@@ -32,6 +32,7 @@ const NAV = [
   { href: '/admin/voice', label: 'Voice' },
   { href: '/admin/plans', label: 'Plans & pricing' },
   { href: '/admin/customers', label: 'Customers' },
+  { href: '/admin/revenue', label: 'Revenue' },
   { href: '/admin/costs', label: 'Costs & margin' },
   { href: '/admin/logs', label: 'Logs' },
   { href: '/admin/standards', label: 'Standards' },

@@ -60,6 +60,33 @@ export const PlanLimits = z.object({
 });
 export type PlanLimits = z.infer<typeof PlanLimits>;
 
+/**
+ * A limit an operator has lifted, and only the ones they actually lifted.
+ *
+ * Written out rather than `PlanLimits.partial()`, which does not do what it
+ * reads as: every field there carries a `.default()`, and Zod applies a
+ * default before optionality, so parsing `{}` returns all eight defaults. A
+ * workspace with no grants at all would come back "granted" the schema's own
+ * numbers — sixty seconds instead of the free plan's thirty, one production a
+ * month instead of two — and every plan in the catalogue would quietly be
+ * overridden by a set of numbers nobody chose.
+ *
+ * So: optional, no defaults, and an absent key means "whatever the plan says".
+ */
+const grantedLimit = z.number().int().min(-1).optional();
+
+export const PlanLimitGrants = z.object({
+  projectsPerMonth: grantedLimit,
+  rendersPerProject: grantedLimit,
+  revisionsPerProject: grantedLimit,
+  maxMasterDurationSeconds: grantedLimit,
+  maxSeats: grantedLimit,
+  maxBrands: grantedLimit,
+  monthlyCredits: grantedLimit,
+  maxGenerativeSecondsPerFilm: grantedLimit,
+});
+export type PlanLimitGrants = z.infer<typeof PlanLimitGrants>;
+
 export const Plan = z.object({
   id: z.string(),
   name: z.string(),
@@ -299,13 +326,99 @@ export function subscriptionIsLive(status: SubscriptionStatus): boolean {
  */
 export function effectivePlan(params: {
   plans: Plan[];
-  organization: Pick<Organization, 'planId'>;
+  /*
+   * The grants are optional here, and a caller that omits them gets exactly
+   * the behaviour it had before they existed. Requiring them would mean every
+   * place that asks "what plan is this" has to carry three fields it does not
+   * care about, and the answer would still be the same.
+   */
+  organization: Pick<Organization, 'planId'> & Partial<OrganizationGrants>;
   subscription: { planId: string; status: SubscriptionStatus } | null;
 }): Plan {
   const { plans, organization, subscription } = params;
-  if (subscription && !subscriptionIsLive(subscription.status)) return planById(plans, 'free');
-  return planById(plans, subscription ? subscription.planId : organization.planId);
+
+  /*
+   * A workspace the operator runs is not a customer.
+   *
+   * It is not billed, so it has no subscription, so it used to fall to the
+   * free plan — and the person who owns the platform was told their film may
+   * not exceed thirty seconds. Nothing below this line applies to it: there is
+   * no limit to lift and no entitlement to grant, because it has all of them.
+   */
+  if (organization.isInternal) return INTERNAL_PLAN;
+
+  const subscribed =
+    subscription && !subscriptionIsLive(subscription.status)
+      ? planById(plans, 'free')
+      : planById(plans, subscription ? subscription.planId : organization.planId);
+
+  return withGrants(subscribed, organization);
 }
+
+/**
+ * The plan, with what an operator has granted this workspace on top.
+ *
+ * Applied after the plan is chosen rather than folded into it, so a customer
+ * who upgrades keeps their grants and a customer who lapses keeps them too —
+ * a limit lifted by hand was lifted for a reason, and a failed card is not
+ * that reason.
+ */
+export function withGrants(plan: Plan, organization: Partial<OrganizationGrants>): Plan {
+  const extra = organization.extraEntitlements ?? [];
+  /*
+   * Undefined is not a grant.
+   *
+   * `{ ...plan.limits, ...overrides }` spreads an explicit `undefined` over a
+   * real number, so a grants object carrying keys with no value would wipe the
+   * plan's own limits rather than leave them alone.
+   */
+  const overrides = Object.fromEntries(
+    Object.entries(organization.limitOverrides ?? {}).filter(([, value]) => value !== undefined),
+  );
+  if (Object.keys(overrides).length === 0 && extra.length === 0) return plan;
+
+  return {
+    ...plan,
+    limits: { ...plan.limits, ...overrides },
+    entitlements: [...new Set([...plan.entitlements, ...extra])],
+  };
+}
+
+/** What an operator may have granted a workspace beyond its plan. */
+export type OrganizationGrants = Pick<
+  Organization,
+  'limitOverrides' | 'extraEntitlements' | 'isInternal'
+>;
+
+/**
+ * The plan an operator's own workspace is on.
+ *
+ * Not in the catalogue and not sellable: it exists so `isInternal` has
+ * something to resolve to, and so the console can name what the operator is
+ * seeing rather than showing them a blank.
+ */
+export const INTERNAL_PLAN: Plan = {
+  id: 'internal',
+  name: 'Internal',
+  description: 'A workspace the operator runs. Not billed, not limited, not counted as revenue.',
+  monthlyPriceCents: 0,
+  yearlyPriceCents: 0,
+  stripeMonthlyPriceId: null,
+  stripeYearlyPriceId: null,
+  entitlements: Entitlement.options,
+  limits: {
+    projectsPerMonth: -1,
+    rendersPerProject: -1,
+    revisionsPerProject: -1,
+    maxMasterDurationSeconds: 3600,
+    maxSeats: -1,
+    maxBrands: -1,
+    monthlyCredits: 0,
+    maxGenerativeSecondsPerFilm: 600,
+  },
+  isPublic: false,
+  sortOrder: 99,
+};
 
 /**
  * The resolution a plan is owed for its master.

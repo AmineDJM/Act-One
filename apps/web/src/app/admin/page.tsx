@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { creditsToUsd } from '@act-one/core';
+import { DEFAULT_PLANS, creditsToUsd, planById, subscriptionIsLive } from '@act-one/core';
 import { getStore } from '@/server/store.ts';
-import { PROVIDER_SLOTS, listProviderState } from '@/server/platform.ts';
+import { PROVIDER_SLOTS, getPlatformConfig, listProviderState } from '@/server/platform.ts';
 import { BreakdownBars, Sparkline } from '@/components/Chart.tsx';
 import styles from './admin.module.css';
 
@@ -22,18 +22,61 @@ export default async function AdminOverview() {
   const from = new Date(to.getTime() - WINDOW_DAYS * 86_400_000);
   const since = from.toISOString();
 
-  const [organizations, users, jobStates, summary, series, providers, activeRenders, levels, topEvents] =
-    await Promise.all([
-      store.organizations.count(),
-      store.users.count(),
-      store.jobs.countByState(),
-      store.costs.platformSummary(since),
-      store.costs.dailySeries(since),
-      listProviderState(),
-      store.renders.listActive(20),
-      store.log.levelCounts(since),
-      store.log.topEvents(since, 5),
-    ]);
+  const [
+    organizations,
+    users,
+    jobStates,
+    summary,
+    series,
+    providers,
+    activeRenders,
+    levels,
+    topEvents,
+    subscriptions,
+    workspaces,
+    { plans: configured },
+  ] = await Promise.all([
+    store.organizations.count(),
+    store.users.count(),
+    store.jobs.countByState(),
+    store.costs.platformSummary(since),
+    store.costs.dailySeries(since),
+    listProviderState(),
+    store.renders.listActive(20),
+    store.log.levelCounts(since),
+    store.log.topEvents(since, 5),
+    store.subscriptions.list(500),
+    store.organizations.list(500),
+    getPlatformConfig(),
+  ]);
+
+  /*
+   * Recurring revenue, which is the number an operator actually wants.
+   *
+   * Credit revenue below is what customers were charged for work in this
+   * window; this is what arrives every month whether or not anybody makes a
+   * film. Internal workspaces are excluded: they are ours, they are not
+   * billed, and counting them would flatter every figure here.
+   */
+  const plans = configured.length > 0 ? configured : DEFAULT_PLANS;
+  const internal = new Set(
+    workspaces.filter((workspace) => workspace.isInternal).map((workspace) => workspace.id),
+  );
+  const live = subscriptions.filter(
+    (subscription) =>
+      subscriptionIsLive(subscription.status) && !internal.has(subscription.organizationId),
+  );
+  const mrrCents = live.reduce(
+    (sum, subscription) =>
+      sum +
+      planById(plans, subscription.planId).monthlyPriceCents * Math.max(1, subscription.seats),
+    0,
+  );
+  const failing = subscriptions.filter((subscription) => subscription.status === 'past_due').length;
+  const granted = workspaces.filter(
+    (workspace) =>
+      Object.keys(workspace.limitOverrides).length > 0 || workspace.extraEntitlements.length > 0,
+  ).length;
 
   const revenue = creditsToUsd(summary.totalCreditsCharged);
   const margin = revenue - summary.totalCostUsd;
@@ -59,6 +102,19 @@ export default async function AdminOverview() {
 
   const usd = (value: number) => `$${value.toFixed(2)}`;
   const plain = (value: number) => value.toLocaleString('en-US');
+
+  /*
+   * Both facts on this line are about workspaces, so both belong on the
+   * workspace tile: a count of lifted limits sitting under "Users" reads as a
+   * count of users.
+   */
+  const workspaceNote =
+    [
+      internal.size > 0 ? `${internal.size} ours` : null,
+      granted > 0 ? `${granted} on lifted limits` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined;
 
   return (
     <>
@@ -107,9 +163,26 @@ export default async function AdminOverview() {
         </div>
       ) : null}
 
+      {failing > 0 ? (
+        <div className={styles.notice} data-tone="danger">
+          <strong>
+            {failing} subscription{failing === 1 ? '' : 's'} failing to collect
+          </strong>{' '}
+          — already fallen back to the free plan&rsquo;s entitlements.{' '}
+          <Link href="/admin/revenue" style={{ color: 'var(--accent-text)' }}>
+            See them →
+          </Link>
+        </div>
+      ) : null}
+
       {/* Margin first: if this is negative, nothing else on the page matters. */}
       <div className={styles.metrics}>
         <Metric label="Gross margin" value={`${marginPct.toFixed(0)}%`} note={usd(margin)} />
+        <Metric
+          label="Monthly recurring"
+          value={usd(mrrCents / 100)}
+          note={`${live.length} live subscription${live.length === 1 ? '' : 's'}`}
+        />
         <Metric label="Credit revenue" value={usd(revenue)} note="What we charged customers" />
         <Metric label="Provider spend" value={usd(summary.totalCostUsd)} note="What vendors charged us" />
         <Metric
@@ -123,7 +196,7 @@ export default async function AdminOverview() {
           value={plain(jobStates['queued'] ?? 0)}
           note={`${plain(jobStates['failed'] ?? 0)} failed`}
         />
-        <Metric label="Organisations" value={plain(organizations)} />
+        <Metric label="Organisations" value={plain(organizations)} note={workspaceNote} />
         <Metric label="Users" value={plain(users)} />
       </div>
 

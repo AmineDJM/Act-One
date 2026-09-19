@@ -1,8 +1,11 @@
 import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, Referral as ReferralSchema } from '@act-one/core';
+import { z } from 'zod';
 import {
   AppError,
+  Entitlement,
   newId,
   notFound,
+  PlanLimitGrants,
   plainText,
   redactDetail,
   redactMessage,
@@ -47,6 +50,7 @@ import type {
   Membership,
   MemberRole,
   Organization,
+  NewOrganization,
   ProductCredential,
   ProductUnderstanding,
   Project,
@@ -122,12 +126,13 @@ export class PgStore implements Store {
   // --- tenancy ------------------------------------------------------------
 
   readonly organizations = {
-    create: async (org: Organization): Promise<Organization> =>
+    create: async (org: NewOrganization): Promise<Organization> =>
       this.asPlatform(async (c) => {
         const result = await c.query(
           `INSERT INTO organizations
-             (id, name, slug, plan_id, stripe_customer_id, credit_balance, max_project_cost_usd, is_suspended, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             (id, name, slug, plan_id, stripe_customer_id, credit_balance, max_project_cost_usd,
+              is_suspended, limit_overrides, extra_entitlements, is_internal, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
            RETURNING *`,
           [
             org.id,
@@ -138,6 +143,9 @@ export class PgStore implements Store {
             org.creditBalance,
             org.maxProjectCostUsd,
             org.isSuspended,
+            JSON.stringify(org.limitOverrides ?? {}),
+            JSON.stringify(org.extraEntitlements ?? []),
+            org.isInternal ?? false,
             org.createdAt,
           ],
         ).catch((error: unknown) => {
@@ -178,7 +186,10 @@ export class PgStore implements Store {
              stripe_customer_id = COALESCE($4, stripe_customer_id),
              credit_balance = COALESCE($5, credit_balance),
              max_project_cost_usd = COALESCE($6, max_project_cost_usd),
-             is_suspended = COALESCE($7, is_suspended)
+             is_suspended = COALESCE($7, is_suspended),
+             limit_overrides = COALESCE($8, limit_overrides),
+             extra_entitlements = COALESCE($9, extra_entitlements),
+             is_internal = COALESCE($10, is_internal)
            WHERE id = $1 RETURNING *`,
           [
             id,
@@ -188,6 +199,9 @@ export class PgStore implements Store {
             patch.creditBalance ?? null,
             patch.maxProjectCostUsd ?? null,
             patch.isSuspended ?? null,
+            patch.limitOverrides ? JSON.stringify(patch.limitOverrides) : null,
+            patch.extraEntitlements ? JSON.stringify(patch.extraEntitlements) : null,
+            patch.isInternal ?? null,
           ],
         );
         if (!r.rows[0]) throw notFound('Organization');
@@ -557,6 +571,15 @@ export class PgStore implements Store {
       this.asPlatform(async (c) => {
         const r = await c.query('SELECT * FROM subscriptions WHERE stripe_subscription_id = $1', [id]);
         return r.rows[0] ? toSubscription(r.rows[0]) : null;
+      }),
+
+    list: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          'SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT $1',
+          [limit],
+        );
+        return r.rows.map(toSubscription);
       }),
   };
 
@@ -2867,6 +2890,11 @@ function toOrganization(row: Row): Organization {
     creditBalance: num(row['credit_balance']),
     maxProjectCostUsd: num(row['max_project_cost_usd']),
     isSuspended: Boolean(row['is_suspended']),
+    // Parsed rather than trusted: a grant that came back malformed must not
+    // silently become "unlimited". Anything unreadable falls to the plan.
+    limitOverrides: PlanLimitGrants.catch({}).parse(row['limit_overrides'] ?? {}),
+    extraEntitlements: z.array(Entitlement).catch([]).parse(row['extra_entitlements'] ?? []),
+    isInternal: Boolean(row['is_internal']),
     createdAt: iso(row['created_at']),
   };
 }

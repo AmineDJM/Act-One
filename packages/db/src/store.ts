@@ -39,6 +39,7 @@ import type {
   Membership,
   MemberRole,
   Organization,
+  NewOrganization,
   ProductCredential,
   ProductUnderstanding,
   Project,
@@ -109,7 +110,7 @@ export interface Store {
 }
 
 export interface OrganizationRepo {
-  create(org: Organization): Promise<Organization>;
+  create(org: NewOrganization): Promise<Organization>;
   get(id: string): Promise<Organization | null>;
   getBySlug(slug: string): Promise<Organization | null>;
   getByStripeCustomerId(customerId: string): Promise<Organization | null>;
@@ -196,6 +197,8 @@ export interface SubscriptionRepo {
   upsert(subscription: Subscription): Promise<Subscription>;
   getForOrganization(organizationId: string): Promise<Subscription | null>;
   getByStripeSubscriptionId(id: string): Promise<Subscription | null>;
+  /** Every subscription, newest first. Operator-facing: who is paying, on what. */
+  list(limit?: number): Promise<Subscription[]>;
 }
 
 export interface BrandRepo {

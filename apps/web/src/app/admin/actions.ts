@@ -7,6 +7,7 @@ import {
   parseEnvBlock,
   routeEnvEntries,
   type Entitlement,
+  type Organization,
 } from '@act-one/core';
 import { ProviderConfig } from '@act-one/providers';
 import { requireSuperAdmin } from '@/server/auth.ts';
@@ -22,6 +23,7 @@ import {
   type ProviderSlotId,
 } from '@/server/platform.ts';
 import { getStore } from '@/server/store.ts';
+import { GRANTABLE_LIMITS } from './limits.ts';
 
 /**
  * Console mutations.
@@ -566,4 +568,108 @@ export async function grantCreditsAction(
   );
 
   return { ok: true, message: `${organization.name} now has ${updated.creditBalance} credits.` };
+}
+
+/**
+ * Lifts a limit for one workspace, on top of whatever plan is in force.
+ *
+ * A plan is a product; a customer is a person. A deal, a pilot, an apology, a
+ * friend of the company — each is a limit lifted for exactly one workspace,
+ * and the alternative is inventing a plan per customer until the price list is
+ * unreadable.
+ *
+ * Every field is optional and a blank one means "take this back to the plan",
+ * so a grant can be undone without knowing what the plan said.
+ */
+export async function setOrganizationLimitsAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await requireSuperAdmin();
+  const organizationId = String(formData.get('organizationId') ?? '');
+
+  const store = getStore();
+  const organization = await store.organizations.get(organizationId);
+  if (!organization) return { ok: false, message: 'No such workspace.' };
+
+  const overrides: Organization['limitOverrides'] = {};
+  const problems: string[] = [];
+  for (const field of GRANTABLE_LIMITS) {
+    const raw = String(formData.get(field.name) ?? '').trim();
+    if (raw === '') continue;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < -1) {
+      problems.push(`${field.label} must be a whole number, or -1 for unlimited.`);
+      continue;
+    }
+    if (field.ceiling !== undefined && value > field.ceiling) {
+      // Not a policy so much as a typo guard: the difference between 600 and
+      // 6000 seconds is an hour of render nobody meant to authorise.
+      problems.push(`${field.label} above ${field.ceiling} needs a second operator.`);
+      continue;
+    }
+    overrides[field.name] = value;
+  }
+  if (problems.length > 0) return { ok: false, message: problems.join(' ') };
+
+  const updated = await store.organizations.update(organizationId, { limitOverrides: overrides });
+
+  revalidatePath('/admin/customers');
+  const granted = Object.entries(overrides)
+    .map(([name, value]) => `${name}=${value}`)
+    .join(', ');
+  await recordAdminEvent(
+    actor.id,
+    'limits.granted',
+    granted
+      ? `Lifted limits for ${organization.name}: ${granted}.`
+      : `Cleared every lifted limit for ${organization.name}.`,
+    { organizationId, overrides },
+  );
+
+  return {
+    ok: true,
+    message: granted
+      ? `${updated.name} now runs on its plan plus ${Object.keys(overrides).length} lifted limit${
+          Object.keys(overrides).length === 1 ? '' : 's'
+        }.`
+      : `${updated.name} is back to exactly what its plan sells.`,
+  };
+}
+
+/**
+ * Marks a workspace as one the operator runs rather than sells to.
+ *
+ * Not billed, not limited, not counted as revenue. It is set automatically
+ * when a super admin signs up, and this is how it is granted to a second
+ * internal workspace — or taken back from one that should be paying.
+ */
+export async function setOrganizationInternalAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await requireSuperAdmin();
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const internal = formData.get('internal') === 'true';
+
+  const store = getStore();
+  const organization = await store.organizations.get(organizationId);
+  if (!organization) return { ok: false, message: 'No such workspace.' };
+
+  await store.organizations.update(organizationId, { isInternal: internal });
+  revalidatePath('/admin/customers');
+
+  await recordAdminEvent(
+    actor.id,
+    internal ? 'workspace.internal' : 'workspace.external',
+    `${organization.name} is ${internal ? 'now an internal workspace' : 'no longer internal'}.`,
+    { organizationId },
+  );
+
+  return {
+    ok: true,
+    message: internal
+      ? `${organization.name} is internal: not billed, not limited, not counted as revenue.`
+      : `${organization.name} is a customer again, on ${organization.planId}.`,
+  };
 }

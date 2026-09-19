@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newId, type Job, type Organization, type Project, type User } from '@act-one/core';
+import { newId, type Job, type NewOrganization, type Organization, type Project, type User } from '@act-one/core';
 import type { Store } from '../store.ts';
 import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
 
@@ -8,7 +8,7 @@ import { storeCases, uniqueEmail, uniqueSlug } from './stores.ts';
  * the platform, narrowed by state, kind, workspace and project; any job by
  * id; and the log narrowed to one job.
  */
-function org(name: string): Organization {
+function org(name: string): NewOrganization {
   return {
     id: newId('org'), name, slug: uniqueSlug(name), planId: 'pro', stripeCustomerId: null,
     creditBalance: 0, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),

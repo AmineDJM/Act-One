@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { newId, type Comment, type Organization, type Project, type User } from '@act-one/core';
+import { newId, type Comment, type NewOrganization, type Organization, type Project, type User } from '@act-one/core';
 import { MemoryStore } from '../memory-store.ts';
 
-function org(name: string): Organization {
+function org(name: string): NewOrganization {
   return {
     id: newId('org'), name, slug: name.toLowerCase(), planId: 'free', stripeCustomerId: null,
     creditBalance: 0, maxProjectCostUsd: 100, isSuspended: false, createdAt: new Date().toISOString(),
@@ -32,11 +32,9 @@ describe('comments', () => {
 
   beforeEach(async () => {
     store = new MemoryStore();
-    acme = org('Acme');
-    rival = org('Rival');
+    acme = await store.organizations.create(org('Acme'));
+    rival = await store.organizations.create(org('Rival'));
     author = user('lead@acme.com');
-    await store.organizations.create(acme);
-    await store.organizations.create(rival);
     await store.users.create(author);
   });
 

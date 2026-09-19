@@ -23,10 +23,12 @@ import {
  * into a different next step.
  */
 let store: MemoryStore;
+let addresses = 0;
 
 async function founder(name: string): Promise<Session> {
   resetRequest();
-  request().headers.set('x-forwarded-for', `203.0.113.${Math.floor(Math.random() * 200) + 1}`);
+  addresses += 1;
+  request().headers.set('x-forwarded-for', `203.0.113.${addresses}`);
   return signUp({ email: `${name}-${newId('usr').slice(-6)}@example.com`, password: 'a-very-long-password', name });
 }
 
@@ -42,10 +44,15 @@ async function failure(promise: Promise<unknown>): Promise<AppError> {
 
 const sample = { data: new Uint8Array([82, 73, 70, 70]), contentType: 'audio/wav', filename: 'take.wav' };
 
-beforeEach(() => {
+beforeEach(async () => {
   store = new MemoryStore();
   globalThis.__actOneStore = store;
+  addresses = 0;
   resetRequest();
+  // The first account on a fresh install is the operator, and the operator's
+  // own workspace is not held to a plan. These doors are a customer's doors,
+  // so the suite opens the install first and signs the customer up second.
+  await founder('operator');
 });
 
 describe('a brand voice', () => {

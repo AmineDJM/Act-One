@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { nonEmpty } from '../zod-helpers.ts';
+/*
+ * Values, not types, so the schemas below can use them — and safe from a
+ * cycle because billing takes only the *type* of Organization back.
+ */
+import { Entitlement, PlanLimitGrants, type OrganizationGrants } from './billing.ts';
 
 export const MemberRole = z.enum(['owner', 'admin', 'editor', 'reviewer']);
 export type MemberRole = z.infer<typeof MemberRole>;
@@ -67,9 +72,47 @@ export const Organization = z.object({
   /** Hard ceiling per project. Protects us from a runaway render loop. */
   maxProjectCostUsd: z.number().min(0).default(120),
   isSuspended: z.boolean().default(false),
+  /**
+   * Limits an operator has lifted for this workspace, on top of its plan.
+   *
+   * A partial set: anything not named here comes from the plan, so a grant of
+   * "films up to five minutes" does not silently also grant unlimited seats.
+   * -1 means unlimited, the same as everywhere else.
+   *
+   * This exists because a plan is a product and a customer is a person. A
+   * deal, a pilot, an apology, a friend of the company — every one of those is
+   * a limit lifted for one workspace, and doing it by inventing a plan per
+   * customer is how a price list becomes unreadable.
+   */
+  limitOverrides: PlanLimitGrants.default({}),
+  /** Features granted to this workspace alone, on top of its plan's. */
+  extraEntitlements: z.array(Entitlement).default([]),
+  /**
+   * A workspace the operator runs rather than sells to.
+   *
+   * Not billed, not limited, and not counted in revenue. It is set when a
+   * super admin creates a workspace, and it is what stops the person who owns
+   * the platform being told their film may not exceed thirty seconds.
+   *
+   * Stored rather than derived from "does a super admin belong to this", so
+   * the worker can answer it without a second query and so an operator can see
+   * and change it.
+   */
+  isInternal: z.boolean().default(false),
   createdAt: z.string(),
 });
 export type Organization = z.infer<typeof Organization>;
+
+/**
+ * What it takes to open a workspace.
+ *
+ * The three grant fields are an operator's business, not a founder's: a
+ * workspace opens on its plan, and what is lifted for it is lifted later. So
+ * they are optional here, and only the code that actually decides one — the
+ * sign-up that marks the operator's own workspace, the console that lifts a
+ * limit — has to say anything about them.
+ */
+export type NewOrganization = Omit<Organization, keyof OrganizationGrants> & Partial<OrganizationGrants>;
 
 export const User = z.object({
   id: z.string(),

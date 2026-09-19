@@ -136,6 +136,9 @@ describe('tenancy at the edge', () => {
 
 describe('roles', () => {
   it('checks the role before a mutation, whatever the caller claims', async () => {
+    // The operator opens the install, and their own workspace is not held to a
+    // plan. The person under test here is a customer, so she signs up second.
+    await founder('operator');
     const ada = await founder('ada');
     const reviewer: Session = {
       ...ada.session,
