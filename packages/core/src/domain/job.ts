@@ -32,6 +32,14 @@ export const JobKind = z.enum([
   'render_film',
   'render_variant',
   'repair_scene',
+  /*
+   * The Creative Director rewriting a beat, above the renderer.
+   *
+   * Its own job so no model call happens inside a render: the render stage
+   * hands up a diagnosis, the queue carries it here, this decides what the
+   * beat should be instead, and a fresh render job follows. Nothing recurses.
+   */
+  'creative_replan',
   'generate_campaign',
   'generate_copy',
   'produce_audio',

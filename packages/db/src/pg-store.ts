@@ -1,4 +1,4 @@
-import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, QaReport as QaReportSchema, Referral as ReferralSchema } from '@act-one/core';
+import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
   AppError,
@@ -15,6 +15,7 @@ import {
   type RateLimitRule,
 } from '@act-one/core';
 import type {
+  CreativeReplan,
   CopyKit,
   Invitation,
   LogLevel,
@@ -1109,8 +1110,9 @@ export class PgStore implements Store {
         await c.query(
           `INSERT INTO storyboards
              (id, organization_id, project_id, concept_id, treatment_id, version, status,
-              voice_strategy, music_direction, created_at, updated_at, language)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+              voice_strategy, music_direction, created_at, updated_at, language,
+              parent_storyboard_id, revision_reason)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
           [
             storyboard.id,
             organizationId,
@@ -1124,6 +1126,8 @@ export class PgStore implements Store {
             storyboard.createdAt,
             storyboard.updatedAt,
             storyboard.language ?? null,
+            storyboard.parentStoryboardId,
+            storyboard.revisionReason,
           ],
         );
         await insertScenes(c, organizationId, storyboard.id, storyboard.scenes);
@@ -1564,6 +1568,64 @@ export class PgStore implements Store {
         );
         if (!r.rows[0]) throw notFound('Variant');
         return toVariant(r.rows[0]);
+      }),
+  };
+
+  readonly replans = {
+    create: async (replan: CreativeReplan, organizationId: string) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO creative_replans
+             (id, organization_id, project_id, render_id, from_storyboard_id, to_storyboard_id,
+              scene_ids, check_name, diagnosis, strategy, reasoning, options, rejected, attempt,
+              direction_cost_usd, estimated_cost_usd, model,
+              scenes_reused, scenes_recomposed, scenes_regenerated, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+          [
+            replan.id, organizationId, replan.projectId, replan.renderId,
+            replan.fromStoryboardId, replan.toStoryboardId,
+            JSON.stringify(replan.sceneIds), replan.check, replan.diagnosis,
+            replan.strategy, replan.reasoning,
+            JSON.stringify(replan.options), JSON.stringify(replan.rejected), replan.attempt,
+            replan.directionCostUsd, replan.estimatedCostUsd, replan.model,
+            replan.scenesReused, replan.scenesRecomposed, replan.scenesRegenerated,
+            replan.createdAt,
+          ],
+        );
+        return replan;
+      }),
+
+    listForProject: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT * FROM creative_replans WHERE project_id = $1 AND organization_id = $2
+           ORDER BY created_at DESC`,
+          [projectId, organizationId],
+        );
+        return r.rows.map(toReplan);
+      }),
+
+    listForRender: async (organizationId: string, renderId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT * FROM creative_replans WHERE render_id = $1 AND organization_id = $2
+           ORDER BY created_at ASC`,
+          [renderId, organizationId],
+        );
+        return r.rows.map(toReplan);
+      }),
+
+    /** Operator-facing: every beat this product has rewritten on its own. */
+    list: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          'SELECT * FROM creative_replans ORDER BY created_at DESC LIMIT $1',
+          [Math.max(1, Math.min(1000, limit))],
+        );
+        return r.rows.map((row) => ({
+          ...toReplan(row),
+          organizationId: row['organization_id'] as string,
+        }));
       }),
   };
 
@@ -3269,6 +3331,32 @@ function toProject(row: Row): Project {
   };
 }
 
+function toReplan(row: Row): CreativeReplan {
+  return CreativeReplanSchema.parse({
+    id: row['id'],
+    organizationId: row['organization_id'],
+    projectId: row['project_id'],
+    renderId: row['render_id'] ?? null,
+    fromStoryboardId: row['from_storyboard_id'] ?? null,
+    toStoryboardId: row['to_storyboard_id'] ?? null,
+    sceneIds: row['scene_ids'] ?? [],
+    check: row['check_name'] ?? '',
+    diagnosis: row['diagnosis'] ?? '',
+    strategy: row['strategy'] ?? '',
+    reasoning: row['reasoning'] ?? '',
+    options: row['options'] ?? [],
+    rejected: row['rejected'] ?? [],
+    attempt: num(row['attempt']),
+    directionCostUsd: num(row['direction_cost_usd']),
+    estimatedCostUsd: num(row['estimated_cost_usd']),
+    model: row['model'] ?? '',
+    scenesReused: num(row['scenes_reused']),
+    scenesRecomposed: num(row['scenes_recomposed']),
+    scenesRegenerated: num(row['scenes_regenerated']),
+    createdAt: iso(row['created_at']),
+  });
+}
+
 function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
   return resequence({
     id: row['id'] as string,
@@ -3280,6 +3368,8 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
     voiceStrategy: row['voice_strategy'] as Storyboard['voiceStrategy'],
     language: (row['language'] as string | null) ?? null,
     musicDirection: (row['music_direction'] as string) ?? '',
+    parentStoryboardId: (row['parent_storyboard_id'] as string | null) ?? null,
+    revisionReason: (row['revision_reason'] as string) ?? '',
     status: row['status'] as Storyboard['status'],
     createdAt: iso(row['created_at']),
     updatedAt: iso(row['updated_at']),

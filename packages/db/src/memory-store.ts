@@ -15,6 +15,7 @@ import {
   type RateLimitRule,
 } from '@act-one/core';
 import type {
+  CreativeReplan,
   CopyKit,
   Invitation,
   LogLevel,
@@ -113,6 +114,7 @@ export class MemoryStore implements Store {
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
+    replans: new Map<string, CreativeReplan & { organizationId: string }>(),
     jobs: new Map<string, Job>(),
     costs: new Map<string, GenerationCost>(),
     copy: new Map<string, CopyKit>(),
@@ -1023,6 +1025,25 @@ export class MemoryStore implements Store {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null,
     list: async (limit = 200) =>
       [...this.tables.qaReports.values()]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit),
+  };
+
+  readonly replans = {
+    create: async (replan: CreativeReplan, organizationId: string) => {
+      this.tables.replans.set(replan.id, { ...replan, organizationId });
+      return replan;
+    },
+    listForProject: async (organizationId: string, projectId: string) =>
+      this.scoped(this.tables.replans, organizationId)
+        .filter((entry) => entry.projectId === projectId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    listForRender: async (organizationId: string, renderId: string) =>
+      this.scoped(this.tables.replans, organizationId)
+        .filter((entry) => entry.renderId === renderId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    list: async (limit = 200) =>
+      [...this.tables.replans.values()]
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, limit),
   };

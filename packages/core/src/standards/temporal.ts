@@ -1,3 +1,4 @@
+import { readingSecondsFor } from './typography.ts';
 import type { Standard } from './standard.ts';
 
 /**
@@ -125,6 +126,23 @@ export const SPEECH_OVERRUN_TOLERANCE = 0.25;
 
 /** How long a frame may stay identical, by cut. */
 export const HELD_FRAME_CEILING = { feature: 1.2, short: 0.6 } as const;
+
+/**
+ * The longest a still shot may run, given what is written on it.
+ *
+ * One definition, used by the check that finds a held frame and by the
+ * director that must not author one. They drifted apart the first time they
+ * were written separately — the planner allowed a shot its reading time plus
+ * a beat, the check allowed the larger of the two — and the difference is a
+ * film that passes planning and fails QA, once per beat, for ever.
+ *
+ * A viewer reading is not waiting, so a shot earns the time its copy takes.
+ * Past that it is a hold, whoever decided it.
+ */
+export function holdCeilingFor(copy: string, cut: 'feature' | 'short'): number {
+  const beat = HELD_FRAME_CEILING[cut === 'short' ? 'short' : 'feature'];
+  return Math.max(beat, readingSecondsFor(copy));
+}
 
 /** How long the track may be silent mid-film, by cut. */
 export const DEAD_AIR_CEILING = { feature: 1.2, short: 0.4 } as const;

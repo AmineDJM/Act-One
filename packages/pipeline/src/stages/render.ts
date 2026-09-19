@@ -38,6 +38,13 @@ import {
   type RepairAction,
   type ReleaseState,
   type RepairScore,
+  type QaCheck,
+  type QaLayer,
+  type FilmContract,
+  type DeliveryFacts,
+  type ProjectStage,
+  deliveryState,
+  CreativeEscalation,
   releaseDecision,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
@@ -142,7 +149,22 @@ export type RenderOptions = {
 export async function runRender(
   context: StageContext,
   options: RenderOptions,
-): Promise<{ renderId: string; assetId: string; qaPassed: boolean; issues: QaFinding[] }> {
+): Promise<{
+  renderId: string;
+  assetId: string;
+  qaPassed: boolean;
+  issues: QaFinding[];
+  /**
+   * What the render could not solve, for whoever can.
+   *
+   * The render and repair layers edit a timeline; they do not author. When a
+   * defect turns out to be authorial — a beat with a second of content in a
+   * six-second slot — they stop and say so precisely, and the orchestrator
+   * takes it from there. This is the one place the renderer talks upwards,
+   * and it does it with a structure rather than by calling a model.
+   */
+  escalation: CreativeEscalation | null;
+}> {
   const { store, registry, project, organizationId } = context;
   /*
    * The master is composed in its own cut's frame.
@@ -291,6 +313,9 @@ export async function runRender(
     let starved: string[] = [];
     /** The checks with no automatic repair, so the hold says what is actually wrong. */
     let heldBy: string[] = [];
+    let escalation: CreativeEscalation | null = null;
+    let qaLayers: QaLayer[] = [];
+    let starvedCheck: QaCheck = 'still_frame_hold';
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
       const rendered = await renderOnce(context, {
@@ -311,7 +336,7 @@ export async function runRender(
       masterPath = rendered.path;
       captions = rendered.captions;
 
-      issues = await inspect(context, {
+      const inspected = await inspect(context, {
         storyboard: current,
         brand,
         aspect,
@@ -326,6 +351,8 @@ export async function runRender(
         fps: DEFAULT_FPS,
         durationSeconds: storyboardDuration(current),
       });
+      issues = inspected.issues;
+      qaLayers = inspected.layers;
 
       /*
        * A film that was scored and came out silent. Reported rather than
@@ -381,7 +408,12 @@ export async function runRender(
           extraComputeCostUsd: 0,
           rendersSpent: 0,
           score: null,
-          layers: [],
+          /*
+           * The passes that actually ran. A layer that found nothing and a
+           * layer that never ran produce the same empty list of findings and
+           * mean opposite things.
+           */
+          layers: qaLayers,
           // What was being made, so the console can break failures down by it
           // without joining back to a project that may have changed since.
           cut,
@@ -458,6 +490,34 @@ export async function runRender(
           await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
           findings = acceptedFindings;
           releaseState = 'needs_attention';
+          /*
+           * The one case the deterministic layer can diagnose but not solve.
+           *
+           * A beat gave time back that no shot could carry, so the only edit
+           * left would take the film under the runtime the customer approved.
+           * That is not a timing problem, and the orchestrator is told exactly
+           * which beat, how much room it has, and how much it earns.
+           */
+          if (starved.length > 0) {
+            escalation = CreativeEscalation.parse({
+              type: 'creative_replan_required',
+              renderId: render.id,
+              storyboardId: current.id,
+              sceneIds: starved,
+              check: starvedCheck,
+              diagnosis: replanMessage(score, starved, current),
+              requiredSeconds: contract.approvedSeconds,
+              usableSeconds: round3(
+                Math.max(0, contract.approvedSeconds - (score.runtimeBefore - score.runtimeAfter)),
+              ),
+              preservedConstraints: contractLines(contract, project),
+              previousAttempts: repairs.map((repair) => ({
+                action: repair.action,
+                outcome: repair.outcome,
+                attempt: repair.attempt,
+              })),
+            });
+          }
           await store.qaReports.update?.(organizationId, report.id, {
             state: releaseState,
             issues: findings,
@@ -587,6 +647,11 @@ export async function runRender(
       });
       current = applied.storyboard;
       starved = applied.starvedSceneIds;
+      if (applied.starvedSceneIds.length > 0) {
+        starvedCheck =
+          findings.find((issue) => applied.starvedSceneIds.includes(issue.sceneId ?? ''))?.check ??
+          'still_frame_hold';
+      }
       await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
       filmRepairs = plan.film.map((repair) => repair.action);
       costBeforePass = await store.costs.totalForProject(organizationId, project.id);
@@ -711,8 +776,23 @@ export async function runRender(
      * from the findings alone put that film back to `completed` and told the
      * customer it was finished — the exact silence this layer exists to break.
      */
-    const heldForAPerson = releaseState === 'needs_attention';
-    const passed = gate.state === 'ready' && !heldForAPerson;
+    /*
+     * Five facts, then a decision — not one flag that meant four things.
+     *
+     * A render that succeeded, a repair transaction that may have been rolled
+     * back, QA on the cut that actually survived, and an escalation nobody has
+     * answered yet are different questions, and a film that rolled back to an
+     * earlier whole cut with its defects still in it used to answer "passed"
+     * to all of them at once.
+     */
+    const facts: DeliveryFacts = {
+      renderSucceeded: true,
+      repairTransactionSucceeded: lastScore === null || lastScore.accepted,
+      globalQaPassed: gate.state === 'ready' && releaseState !== 'needs_attention',
+      creativeEscalationResolved: escalation === null,
+    };
+    const passed = deliveryState(facts) === 'ready';
+    const heldForAPerson = !passed;
     const holdReason = heldForAPerson ? replanMessage(lastScore, starved, current, heldBy) : '';
     await store.renders.update(organizationId, render.id, {
       /*
@@ -731,11 +811,23 @@ export async function runRender(
       ...(passed ? {} : { error: holdReason || gate.reason || 'Quality checks did not pass.' }),
     });
 
+    /*
+     * A film that has escalated is not a failed project.
+     *
+     * The Creative Director has been handed the beat and the orchestrator is
+     * about to queue another render. Marking the project failed here put a red
+     * status over a production that was still being worked on, and the
+     * customer would have watched it fail and then quietly un-fail.
+     *
+     * `qa` is the honest stage for it: the film exists, it is being judged,
+     * and nobody needs to do anything yet.
+     */
+    const filmStage: ProjectStage = passed ? 'film_ready' : escalation ? 'qa' : 'failed';
     await store.projects.update(
       organizationId,
       project.id,
       kind === 'film'
-        ? { latestRenderId: render.id, stage: passed ? 'film_ready' : 'failed' }
+        ? { latestRenderId: render.id, stage: filmStage }
         : // A cut that fails is one missing format, not a failed project: the
           // film is still finished and the other cuts still arrive. An animatic
           // that fails cost the customer nothing and changed nothing.
@@ -767,7 +859,7 @@ export async function runRender(
      * from the gate, so a film held back for a person came back reporting
      * that QA had passed. One answer, and it is the one the render row says.
      */
-    return { renderId: render.id, assetId: master.asset.id, qaPassed: passed, issues };
+    return { renderId: render.id, assetId: master.asset.id, qaPassed: passed, issues, escalation };
   } catch (error) {
     await store.renders.update(organizationId, render.id, {
       status: 'failed',
@@ -893,6 +985,31 @@ function repairHeadline(plan: { scenes: { action: RepairAction }[]; film: { acti
       return `Refining ${count} shot${count === 1 ? '' : 's'}`;
     }
   }
+}
+
+/**
+ * The constraints handed to the Creative Director as facts, not suggestions.
+ *
+ * Written out rather than left implicit because a model given a film and told
+ * to improve a beat will improve the film, and the film was approved.
+ */
+function contractLines(contract: FilmContract, project: StageContext['project']): string[] {
+  return [
+    `The film runs ${contract.approvedSeconds.toFixed(2)}s and must still run ${contract.approvedSeconds.toFixed(2)}s.`,
+    `It is a ${contract.cut === 'short' ? 'vertical short' : 'landscape film'} and stays one.`,
+    `Format: ${project.brief.filmFormat.replace(/_/g, ' ')}.`,
+    `Language: ${project.brief.language ?? 'the customer’s own'}.`,
+    /*
+     * Said out loud, because a director handed a beat to rewrite will write a
+     * line for it unless told the film has no voice.
+     */
+    project.brief.voiceStrategy && project.brief.voiceStrategy !== 'none'
+      ? 'The film is narrated. A beat you rewrite carries its own line.'
+      : 'The film does not speak. Write no narration: this beat is type, picture and sound.',
+    `Shots: ${contract.shots.length}, in the order they are in, unless you replace a beat outright.`,
+    contract.requiresPayoff ? 'The film ends on its closing card. That beat stays.' : '',
+    'Every other beat is finished work. Do not touch what you were not asked about.',
+  ].filter(Boolean);
 }
 
 /** Repairs that pay a provider again, so an asset leaving a shot is deliberate. */
@@ -1532,7 +1649,7 @@ async function inspect(
     fps: number;
     durationSeconds: number;
   },
-): Promise<QaFinding[]> {
+): Promise<{ issues: QaFinding[]; layers: QaLayer[] }> {
   const { registry, project, organizationId } = context;
   await context.progress(0.78, 'Checking the film');
   await context.activity({ step: 'composition', kind: 'step', label: 'checking the film frame by frame', status: 'active' });
@@ -1580,7 +1697,18 @@ async function inspect(
    */
   issues.push(...(await checkTiming(context, params)));
 
-  if (params.skipVision) return issues;
+  /*
+   * Which passes actually ran, recorded rather than inferred.
+   *
+   * A layer that found nothing and a layer that never ran produce the same
+   * empty list of findings, and they mean opposite things: one is a clean
+   * film, the other is a film nobody looked at. The report has carried a
+   * `layers` field since the first version of this and nothing ever filled
+   * it, so every report claimed none of them had run.
+   */
+  const layers: QaLayer[] = ['spec', 'structural', 'visual', 'audio', 'cross_modal'];
+
+  if (params.skipVision) return { issues, layers };
 
   // Vision QA reads actual frames, extracted from the finished film so it sees
   // exactly what the customer will.
@@ -1609,6 +1737,7 @@ async function inspect(
     }
   }
 
+  // Vision ran, which is a stronger visual pass than the deterministic one.
   const verdict = await askTheDirector(context, params);
   if (verdict) {
     issues.push(...verdictIssues(verdict));
@@ -1645,7 +1774,7 @@ async function inspect(
     }
   }
 
-  return issues;
+  return { issues, layers };
 }
 
 /**

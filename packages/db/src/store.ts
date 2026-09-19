@@ -44,6 +44,7 @@ import type {
   ProductUnderstanding,
   Project,
   ProjectStage,
+  CreativeReplan,
   QaReport,
   Render,
   RevisionRequest,
@@ -90,6 +91,7 @@ export interface Store {
   readonly renders: RenderRepo;
   readonly variants: VariantRepo;
   readonly qaReports: QaReportRepo;
+  readonly replans: CreativeReplanRepo;
   readonly jobs: JobRepo;
   readonly copy: CopyRepo;
   readonly costs: CostRepo;
@@ -372,6 +374,21 @@ export interface VariantRepo {
   createMany(variants: Variant[]): Promise<Variant[]>;
   listForRender(organizationId: string, renderId: string): Promise<Variant[]>;
   update(organizationId: string, id: string, patch: Partial<Variant>): Promise<Variant>;
+}
+
+/**
+ * The record of the Creative Director rewriting a beat.
+ *
+ * Operator-facing and permanent. Every replan is a decision a machine made
+ * about a customer's film on its own initiative, and the only thing that makes
+ * that defensible is being able to read afterwards what it decided and why.
+ */
+export interface CreativeReplanRepo {
+  create(replan: CreativeReplan, organizationId: string): Promise<CreativeReplan>;
+  listForProject(organizationId: string, projectId: string): Promise<CreativeReplan[]>;
+  listForRender(organizationId: string, renderId: string): Promise<CreativeReplan[]>;
+  /** Every replan, newest first, across every workspace. */
+  list(limit?: number): Promise<(CreativeReplan & { organizationId: string })[]>;
 }
 
 export interface QaReportRepo {

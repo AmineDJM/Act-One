@@ -1,4 +1,9 @@
 import {
+  CreativeEscalation,
+  DEFAULT_PRODUCTION_BUDGET,
+  ProductionBudget,
+  budgetAllowsReplan,
+  spendReplan,
   jobAdvancesProject,
   newId,
   jobIsTerminal,
@@ -23,6 +28,7 @@ import { runAnimatic } from './stages/animatic.ts';
 import { runAudioEdition } from './stages/audio-edition.ts';
 import { runRevision } from './stages/revision.ts';
 import { runSceneAssets } from './stages/assets.ts';
+import { runCreativeReplan } from './stages/replan.ts';
 
 /**
  * The job runner.
@@ -60,6 +66,7 @@ const RUNNING_STATE: Record<JobKind, JobState> = {
   render_film: 'rendering_motion',
   render_variant: 'rendering_motion',
   repair_scene: 'storyboarding',
+  creative_replan: 'storyboarding',
   generate_campaign: 'rendering_motion',
   generate_copy: 'writing_copy',
   produce_audio: 'sound',
@@ -185,12 +192,73 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
         ...(typeof payload['conceptId'] === 'string' ? { conceptId: payload['conceptId'] } : {}),
       });
 
-    case 'render_film':
+    case 'render_film': {
+      /*
+       * The film orchestrator.
+       *
+       * The render stage makes a film and repairs what a timeline edit can
+       * repair. When it hands up a `creative_replan_required` the problem is
+       * authorial, and this — not the renderer — decides what happens next:
+       * spend a creative replan if the budget has one, and queue another
+       * render of the beat the Director rewrote.
+       *
+       * The budget travels on the job rather than being read from
+       * configuration each time, so a loop cannot refill its own tank by
+       * enqueueing itself.
+       */
+      const budget = ProductionBudget.parse(
+        (payload['budget'] as Record<string, unknown>) ?? DEFAULT_PRODUCTION_BUDGET,
+      );
       // No watermark flag in the payload: the plan decides, in the worker,
       // at the moment the film is made.
-      return runRender(context, {
+      const outcome = await runRender(context, {
         storyboardId: String(payload['storyboardId'] ?? context.project.activeStoryboardId ?? ''),
+        maxRepairAttempts: budget.deterministicPasses,
       });
+
+      if (outcome.escalation && budgetAllowsReplan(budget)) {
+        await enqueueNext(
+          context,
+          'creative_replan',
+          {
+            escalation: outcome.escalation,
+            budget: spendReplan(budget, outcome.escalation.sceneIds.length > 1),
+            attempt: DEFAULT_PRODUCTION_BUDGET.creativeReplans - budget.creativeReplans,
+          },
+          9,
+        );
+      }
+      return outcome;
+    }
+
+    case 'creative_replan': {
+      const escalation = CreativeEscalation.parse(payload['escalation']);
+      const budget = ProductionBudget.parse(
+        (payload['budget'] as Record<string, unknown>) ?? DEFAULT_PRODUCTION_BUDGET,
+      );
+      const replanned = await runCreativeReplan(context, {
+        escalation,
+        budget,
+        attempt: Number(payload['attempt'] ?? 0),
+      });
+
+      /*
+       * A replan that produced nothing usable stops here.
+       *
+       * The film the customer gets is the last whole one, which the render
+       * already committed and already explained; queueing another render of
+       * the same storyboard would spend the budget proving the same thing.
+       */
+      if (!replanned.storyboardId) return replanned;
+
+      await enqueueNext(
+        context,
+        'render_film',
+        { storyboardId: replanned.storyboardId, budget },
+        9,
+      );
+      return replanned;
+    }
 
     case 'render_variant':
       return runRender(context, {

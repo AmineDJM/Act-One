@@ -17,6 +17,57 @@ export type HttpOptions = {
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
 /**
+ * Egress through a proxy.
+ *
+ * Node's `fetch` ignores `HTTPS_PROXY` unless `NODE_USE_ENV_PROXY=1` is set at
+ * startup (Node 22.21 and later). Without it a deployment behind an egress
+ * proxy reaches its database and its own health check and cannot reach a
+ * single provider — curl works, the app does not, and from inside the app the
+ * only evidence is a 401 or a timeout.
+ *
+ * The flag rather than a dispatcher of our own, and that is a decision made
+ * twice. Building a `ProxyAgent` from the installed undici and handing it to
+ * the global `fetch` fails deep inside with `invalid onRequestStart method`,
+ * because Node bundles its own separate copy of undici. Routing through the
+ * installed undici's `fetch` instead fixes that and breaks every multipart
+ * upload — its `FormData` is a different class again, so a voice clone and a
+ * transcription both arrive as the string "[object FormData]". The platform's
+ * own switch has neither problem.
+ *
+ * This only reports the mismatch: an app that needs a proxy and was not told
+ * to use one should say so at startup rather than at the first provider call,
+ * two minutes into a customer's film.
+ */
+export function proxyConfigured(): boolean {
+  return Boolean(
+    process.env['HTTPS_PROXY'] ??
+      process.env['https_proxy'] ??
+      process.env['HTTP_PROXY'] ??
+      process.env['http_proxy'],
+  );
+}
+
+export function proxyEnabledInNode(): boolean {
+  const flag = process.env['NODE_USE_ENV_PROXY'];
+  return flag === '1' || flag === 'true';
+}
+
+/**
+ * The warning to print at startup, or nothing.
+ *
+ * Returned rather than logged so the caller decides where it goes and so it
+ * can be tested without capturing console output.
+ */
+export function proxyMisconfiguration(): string | null {
+  if (!proxyConfigured() || proxyEnabledInNode()) return null;
+  return (
+    'A proxy is configured (HTTPS_PROXY) but Node was not started with ' +
+    'NODE_USE_ENV_PROXY=1, so outbound provider calls will bypass it and fail. ' +
+    'Set NODE_USE_ENV_PROXY=1 on the process.'
+  );
+}
+
+/**
  * One HTTP client for every provider so timeout, retry, backoff and — most
  * importantly — credential redaction behave identically everywhere. A leaked
  * API key in an error message that gets written to the job log is the kind of

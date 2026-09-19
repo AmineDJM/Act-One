@@ -92,6 +92,7 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
       generativeNeeds: [],
       threeDSceneId: null,
       status: 'draft',
+      parentStoryboardId: null, revisionReason: '',
       claimEvidenceIds: [],
       notes: '',
       estimatedCostUsd: 0,
@@ -102,6 +103,7 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
     language: null,
     musicDirection,
     status: 'draft',
+    parentStoryboardId: null, revisionReason: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   });

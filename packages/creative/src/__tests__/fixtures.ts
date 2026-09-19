@@ -189,7 +189,7 @@ export function storyboardFixture(scenes: Scene[], over: Partial<Storyboard> = {
     scenes,
     voiceStrategy: 'none',
     language: null,
-    musicDirection: '',
+    musicDirection: '', parentStoryboardId: null, revisionReason: '',
     status: 'draft',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

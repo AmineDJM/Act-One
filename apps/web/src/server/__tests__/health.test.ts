@@ -35,8 +35,29 @@ describe('GET /api/health', () => {
     const store = globalThis.__actOneStore;
     if (store instanceof PgStore) await store.close();
     useDatabase(original);
+    restoreEgress();
     logged.mockClear();
   });
+
+  /** Sets the egress environment for one test, and remembers how to put it back. */
+  const EGRESS_KEYS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NODE_USE_ENV_PROXY'] as const;
+  let savedEgress: Record<string, string | undefined> | null = null;
+
+  function withEgressConfigured(apply: () => void): void {
+    savedEgress ??= Object.fromEntries(EGRESS_KEYS.map((key) => [key, process.env[key]]));
+    for (const key of EGRESS_KEYS) delete process.env[key];
+    apply();
+  }
+
+  function restoreEgress(): void {
+    if (!savedEgress) return;
+    for (const key of EGRESS_KEYS) {
+      const value = savedEgress[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    savedEgress = null;
+  }
 
   it('reports the in-memory store as development only', async () => {
     useDatabase(undefined);
@@ -47,9 +68,39 @@ describe('GET /api/health', () => {
 
   it.skipIf(!url)('passes a database whose schema matches the code', async () => {
     useDatabase(url);
+    // This machine may well be behind a proxy; the egress check below is what
+    // that case is for, and it must not decide this one.
+    withEgressConfigured(() => undefined);
     const { status, body } = await check();
     expect(status).toBe(200);
     expect(body).toEqual({ ok: true, store: 'postgres' });
+  });
+
+  it.skipIf(!url)('fails a service that cannot reach its providers, and says why', async () => {
+    /*
+     * The quietest deployment failure there is: a proxy configured for the
+     * machine that Node was not told to use. The database works, the health
+     * check works, and the first provider call two minutes into a customer's
+     * film comes back 401. Healthy has to mean "can make a film".
+     */
+    useDatabase(url);
+    withEgressConfigured(() => {
+      process.env['HTTPS_PROXY'] = 'http://127.0.0.1:3128';
+      delete process.env['NODE_USE_ENV_PROXY'];
+    });
+    const { status, body } = await check();
+    expect(status).toBe(503);
+    expect(body.reason).toMatch(/NODE_USE_ENV_PROXY=1/);
+  });
+
+  it.skipIf(!url)('passes once the process is started to use the proxy', async () => {
+    useDatabase(url);
+    withEgressConfigured(() => {
+      process.env['HTTPS_PROXY'] = 'http://127.0.0.1:3128';
+      process.env['NODE_USE_ENV_PROXY'] = '1';
+    });
+    const { status } = await check();
+    expect(status).toBe(200);
   });
 
   it.skipIf(!url)('fails a database that has no schema, and says what to run', async () => {

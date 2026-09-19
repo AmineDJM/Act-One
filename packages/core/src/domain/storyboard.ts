@@ -406,6 +406,16 @@ export const Storyboard = z.object({
   language: z.string().min(2).max(12).nullable().default(null),
   musicDirection: z.string().max(600).default(''),
   status: StoryboardStatus.default('draft'),
+  /*
+   * Lineage.
+   *
+   * A creative replan writes a new storyboard rather than editing the one the
+   * customer approved, so the previous accepted creative state survives and an
+   * operator can see what changed and why. Null on a storyboard that was
+   * written rather than revised.
+   */
+  parentStoryboardId: z.string().nullable().default(null),
+  revisionReason: z.string().max(600).default(''),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

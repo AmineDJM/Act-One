@@ -1,6 +1,7 @@
 export * from './systems/index.ts';
 export * from './strategy-engine.ts';
 export * from './creative-director.ts';
+export * from './beat-replan.ts';
 export * from './shot-routing.ts';
 export * from './storyboard-engine.ts';
 export * from './timing.ts';

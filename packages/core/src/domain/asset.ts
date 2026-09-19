@@ -22,6 +22,30 @@ export const AssetKind = z.enum([
 ]);
 export type AssetKind = z.infer<typeof AssetKind>;
 
+/**
+ * Material a film can be made FROM, as against what a film is made INTO.
+ *
+ * A project's assets include everything it has produced — the master, its
+ * poster, every scene render, the audio stems — and a planner that reads that
+ * list as "footage we hold" concludes the film can use itself. It then writes
+ * a shot of b-roll that does not exist, which is refused, and the loop spends
+ * a replan finding out.
+ */
+export const SOURCE_MATERIAL_KINDS: readonly AssetKind[] = [
+  'screenshot',
+  'screen_recording',
+  'logo',
+  'brand_image',
+  'generated_image',
+  'generated_video',
+  'threed_render',
+  'user_upload',
+];
+
+export function isSourceMaterial(asset: Pick<Asset, 'kind'>): boolean {
+  return SOURCE_MATERIAL_KINDS.includes(asset.kind);
+}
+
 export const AssetOrigin = z.enum([
   'captured',      // our browser agent observed it in the real product
   'generated',     // a generative model made it

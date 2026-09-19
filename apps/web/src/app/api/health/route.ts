@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
+import { proxyMisconfiguration } from '@act-one/providers';
 import { getDatabase, getStore, isUsingMemoryStore } from '@/server/store.ts';
 
 export const runtime = 'nodejs';
@@ -37,6 +38,14 @@ export async function GET(): Promise<NextResponse> {
         },
         { status: 503 },
       );
+    }
+    /*
+     * Egress too, because a service whose database is fine and whose
+     * providers are unreachable reports healthy and cannot make a film.
+     */
+    const egress = proxyMisconfiguration();
+    if (egress) {
+      return NextResponse.json({ ok: false, store: 'postgres', reason: egress }, { status: 503 });
     }
     return NextResponse.json({ ok: true, store: 'postgres' });
   } catch (error) {

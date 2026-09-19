@@ -1,6 +1,6 @@
 import { PLATFORM_ORGANIZATION_ID } from '@act-one/core';
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
-import { installProxyFromEnvironment } from '@act-one/providers';
+import { installProxyFromEnvironment , proxyConfigured, proxyMisconfiguration } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -169,6 +169,7 @@ async function preflight(): Promise<void> {
     log(`motion bundle unavailable, render jobs will fail: ${(error as Error).message}`);
   }
 
+  checkEgress();
   await checkSoundLibrary();
 }
 
@@ -185,6 +186,21 @@ async function preflight(): Promise<void> {
  * take down a worker that can do everything else. Loud, because the failure is
  * otherwise invisible until somebody plays a master.
  */
+/**
+ * Says out loud whether this worker can reach the outside world.
+ *
+ * A proxy configured for the machine that Node was not told to use is the
+ * quietest deployment failure there is: the database works, the health check
+ * works, and the first provider call two minutes into a customer's film comes
+ * back 401 or times out. Said at startup it costs a line; discovered later it
+ * costs an incident.
+ */
+function checkEgress(): void {
+  const problem = proxyMisconfiguration();
+  if (problem) log(`egress: ${problem}`);
+  else if (proxyConfigured()) log('egress: through the configured proxy');
+}
+
 async function checkSoundLibrary(): Promise<void> {
   const storage = process.env['ACT_ONE_STORAGE_DIR'];
   if (!storage) {

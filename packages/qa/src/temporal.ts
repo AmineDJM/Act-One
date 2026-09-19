@@ -2,6 +2,7 @@ import {
   CAPTION_LINGER_CEILING,
   DEAD_AIR_CEILING,
   HELD_FRAME_CEILING,
+  holdCeilingFor,
   LEVEL_JUMP_CEILING_LU,
   SPEECH_OVERRUN_TOLERANCE,
   TAIL_FADE_SECONDS,
@@ -242,8 +243,9 @@ export function heldFrameIssues(params: {
   return params.freezes
     .map((freeze) => {
       const scene = sceneAt(params.scenes, freeze.start);
+      const copy = scene?.onScreenText.join(' ') ?? '';
       const reading = readingAllowance(scene);
-      return { freeze, scene, ceiling: Math.max(beat, reading), reading };
+      return { freeze, scene, ceiling: holdCeilingFor(copy, params.cut === 'short' ? 'short' : 'feature'), reading };
     })
     // Compared at the precision the measurement is reported at. FFmpeg gives
     // these back as floats, and `3.2 - 2 > 1.2` is true in binary — a rule

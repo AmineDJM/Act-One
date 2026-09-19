@@ -703,6 +703,9 @@ export class StoryboardEngine {
       language: input.brief.language ?? null,
       musicDirection: input.treatment.soundStyle,
       status: 'draft',
+      // Written rather than revised: a replan is what sets these.
+      parentStoryboardId: null,
+      revisionReason: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

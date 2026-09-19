@@ -26,6 +26,7 @@
     "demo": "vite-node scripts/demo.ts",
     "reference-films": "vite-node scripts/reference-films.ts",
     "prove:repair-loop": "vite-node scripts/prove-repair-loop.ts",
+    "prove:creative-replan": "vite-node scripts/prove-creative-replan.ts",
     "sound-library": "vite-node scripts/build-sound-library.ts",
     "browsers": "node --experimental-strip-types scripts/install-browsers.ts",
     "blender": "node --experimental-strip-types scripts/install-blender.ts",

@@ -140,16 +140,27 @@ describe.each(storeCases())('qa reports ($name)', ({ open, close }) => {
     try {
       const acme = await filmed(store, 'Acme');
       const rival = await filmed(store, 'Rival');
+      /*
+       * Dated from now rather than from a fixed date in the calendar.
+       *
+       * The Postgres case runs against a database that outlives the test
+       * process, so a fixture dated January 2026 sinks below the newest fifty
+       * rows once the suite has run enough times — and the test starts failing
+       * on a machine that has simply been used. What is being checked is the
+       * order, not the archaeology.
+       */
+      const older = new Date(Date.now() - 2000).toISOString();
+      const newer = new Date(Date.now() - 1000).toISOString();
       await store.qaReports.create(
         report(acme.project.id, acme.render.id, {
           passed: false,
-          createdAt: '2026-01-01T00:00:00.000Z',
+          createdAt: older,
           issues: [issue('safe_area', 'hard_fail')],
         }),
         acme.organization.id,
       );
       await store.qaReports.create(
-        report(rival.project.id, rival.render.id, { createdAt: '2026-06-01T00:00:00.000Z' }),
+        report(rival.project.id, rival.render.id, { createdAt: newer }),
         rival.organization.id,
       );
 
