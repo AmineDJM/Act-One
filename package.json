@@ -25,6 +25,7 @@
     "verify": "npm run typecheck && npm run test",
     "demo": "vite-node scripts/demo.ts",
     "reference-films": "vite-node scripts/reference-films.ts",
+    "prove:repair-loop": "vite-node scripts/prove-repair-loop.ts",
     "sound-library": "vite-node scripts/build-sound-library.ts",
     "browsers": "node --experimental-strip-types scripts/install-browsers.ts",
     "blender": "node --experimental-strip-types scripts/install-blender.ts",
