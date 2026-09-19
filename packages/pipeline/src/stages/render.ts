@@ -37,6 +37,7 @@ import {
   type RepairRecord,
   type RepairAction,
   type ReleaseState,
+  type RepairScore,
   releaseDecision,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
@@ -86,6 +87,9 @@ import {
   beginRepair,
   settleRepairs,
   retimeCaptionsToSpeech,
+  contractFor,
+  scoreRepair,
+  type RepairIntent,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
@@ -257,9 +261,36 @@ export async function runRender(
     let filmRepairs: RepairAction[] = [];
     let extraCostUsd = 0;
     let extraLatencyMs = 0;
+    let extraComputeMs = 0;
+    let rendersSpent = 0;
     let releaseState: ReleaseState = 'generating';
     let costBeforePass = await store.costs.totalForProject(organizationId, project.id);
     let passStartedAt = Date.now();
+
+    /*
+     * A repair pass is a transaction.
+     *
+     * `accepted` is the last cut that was rendered and judged whole: the film
+     * as it stands. A pass builds a `candidate` from it, renders that, and
+     * scores it against the contract. Only a candidate that keeps every
+     * constraint replaces the accepted cut; one that does not is rolled back,
+     * and the film the customer gets is the one from before rather than a
+     * half-repaired thing nobody approved.
+     *
+     * Without this the loop could only move forwards. A trim that removed
+     * every held frame and half the runtime was applied, saved over the
+     * storyboard, and delivered — there was no state to go back to and
+     * nothing that would have wanted to.
+     */
+    const contract = contractFor(storyboard, { cut });
+    let accepted = storyboard;
+    let acceptedFindings: QaIssue[] = [];
+    let lastScore: RepairScore | null = null;
+    let intent: RepairIntent = {};
+    let targeted: QaIssue[] = [];
+    let starved: string[] = [];
+    /** The checks with no automatic repair, so the hold says what is actually wrong. */
+    let heldBy: string[] = [];
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
       const rendered = await renderOnce(context, {
@@ -332,7 +363,8 @@ export async function runRender(
        * is where the defaults are filled and each check is stamped with the
        * layer it belongs to, so nothing downstream has to guess.
        */
-      const findings = normalizeFindings(issues);
+      let findings = normalizeFindings(issues);
+      rendersSpent += 1;
       const report = await store.qaReports.create(
         {
           id: newId('ast'),
@@ -345,6 +377,10 @@ export async function runRender(
           repairs: [],
           extraCostUsd: 0,
           extraLatencyMs: 0,
+          extraComputeMs: 0,
+          extraComputeCostUsd: 0,
+          rendersSpent: 0,
+          score: null,
           layers: [],
           // What was being made, so the console can break failures down by it
           // without joining back to a project that may have changed since.
@@ -369,33 +405,120 @@ export async function runRender(
        * pass, which is the honest attribution when they shared a render.
        */
       if (attempted.length > 0) {
+        /*
+         * Judge the whole film, not only the defect that was repaired.
+         *
+         * `scoreRepair` asks four questions: did the targeted defects go, did
+         * anything new arrive, does the cut still satisfy the contract the
+         * customer approved, and is the material still all there. A candidate
+         * that fails any of them is rolled back — which is the difference
+         * between a repair loop and a loop that grinds a film down.
+         */
+        const score = scoreRepair({
+          contract,
+          candidate: current,
+          before: acceptedFindings,
+          after: findings,
+          targeted,
+          intent,
+        });
+        lastScore = score;
+
+        const wallClockMs = Date.now() - passStartedAt;
+        const computeMs = wallClockMs;
         const settled = settleRepairs({
           attempted,
           before: previousFindings,
           after: findings,
-          costUsd: Math.max(0, (await store.costs.totalForProject(organizationId, project.id)) - costBeforePass),
-          latencyMs: Date.now() - passStartedAt,
+          providerCostUsd: Math.max(
+            0,
+            (await store.costs.totalForProject(organizationId, project.id)) - costBeforePass,
+          ),
+          computeMs,
+          estimatedComputeCostUsd: computeCostUsd(computeMs),
+          wallClockMs,
+          rejected: !score.accepted,
         });
         repairs.push(...settled);
-        extraCostUsd += settled.reduce((sum, record) => sum + record.costUsd, 0);
-        extraLatencyMs += Date.now() - passStartedAt;
+        extraCostUsd += settled.reduce((sum, record) => sum + record.providerCostUsd, 0);
+        extraLatencyMs += wallClockMs;
+        extraComputeMs += computeMs;
         attempted = [];
+
+        if (!score.accepted) {
+          /*
+           * Roll back, and stop pretending a repair is available.
+           *
+           * The candidate is discarded, the storyboard goes back to the cut
+           * that was last whole, and the film is handed to a person with the
+           * reason in plain words. Trying the same class of repair again would
+           * produce the same rejection and spend another render proving it.
+           */
+          current = accepted;
+          await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
+          findings = acceptedFindings;
+          releaseState = 'needs_attention';
+          await store.qaReports.update?.(organizationId, report.id, {
+            state: releaseState,
+            issues: findings,
+            repairs,
+            score,
+            extraCostUsd: round3(extraCostUsd),
+            extraLatencyMs,
+            extraComputeMs,
+            extraComputeCostUsd: computeCostUsd(extraComputeMs),
+            rendersSpent,
+          });
+          await store.renders.update(organizationId, render.id, {
+            qaReportId: report.id,
+            status: 'needs_attention',
+            error: replanMessage(score, starved, current),
+          });
+          await context.activity({
+            step: 'motion',
+            kind: 'refine',
+            label: 'final quality pass',
+            detail: score.reason,
+            status: 'done',
+          });
+          break;
+        }
+
+        /*
+         * Accepted: this is the film now, and the diagnosis goes with it.
+         *
+         * `starved` names the beats whose recovered time had nowhere to go.
+         * Left standing after an accepted pass it described a problem that no
+         * longer existed, and the film was held with a reason about a beat
+         * that had just been fixed.
+         */
+        accepted = current;
+        starved = [];
       }
+      acceptedFindings = findings;
       previousFindings = findings;
 
       const plan = planRepairs({ report, attempt, maxAttempts, history: repairs, deliverable: kind !== 'animatic' });
 
       if (plan.shippable || plan.deadEnd) {
         releaseState = plan.state;
+        heldBy = plan.manual.map((issue) => issue.check);
         await store.qaReports.update?.(organizationId, report.id, {
           state: plan.state,
           repairs,
+          score: lastScore,
           extraCostUsd: round3(extraCostUsd),
           extraLatencyMs,
+          extraComputeMs,
+          extraComputeCostUsd: computeCostUsd(extraComputeMs),
+          rendersSpent,
         });
         await store.renders.update(organizationId, render.id, {
           qaReportId: report.id,
           status: plan.state === 'ready' ? 'qa' : 'needs_attention',
+          ...(plan.state === 'ready'
+            ? {}
+            : { error: replanMessage(lastScore, starved, current, heldBy) }),
         });
         // Whatever was being refined is finished, one way or the other.
         if (attempt > 0) {
@@ -413,12 +536,23 @@ export async function runRender(
       releaseState = 'repairing';
       const total = plan.scenes.length + plan.film.length;
       await store.renders.update(organizationId, render.id, { status: 'repairing' });
-      await context.progress(0.8, repairHeadline(plan));
+      /*
+       * One line, the same every time.
+       *
+       * The customer used to read the repair: "Repairing the timing",
+       * "Optimising the captions". Said once it sounds like craft; said on
+       * every small defect of every film it sounds like an engine struggling,
+       * and it invites a question — what was wrong with my film? — that the
+       * answer to is "nothing you will ever see". The detail is on the
+       * console, in the report and in the logs, where somebody acts on it.
+       */
+      await context.progress(0.8, 'Polishing the final cut');
       await context.activity({
         step: 'motion',
         kind: 'refine',
-        label: `${repairHeadline(plan).toLowerCase()} (${total})`,
-        detail: 'It did not meet the standard, so it is being worked on again.',
+        label: 'final quality pass',
+        // Operator-facing, and the only place the actions are named.
+        detail: `${repairHeadline(plan)} · ${total} repair${total === 1 ? '' : 's'}`,
         status: 'active',
       });
 
@@ -429,10 +563,30 @@ export async function runRender(
         attempted.push(beginRepair({ ...repair, sceneId: null, attempt }));
       }
 
-      // Only what broke. Re-rendering everything would change scenes the
-      // customer already approved.
-      const applied = applyRepairs(current, plan, { issues: findings, cut });
+      /*
+       * Only what broke, and the film keeps its length.
+       *
+       * Re-rendering everything would change scenes the customer already
+       * approved. Handing the approved runtime to `applyRepairs` is what keeps
+       * a trim from being a deletion: the seconds a dead hold gives back go to
+       * the shots that can carry them, and what cannot be placed is reported.
+       */
+      targeted = [...plan.scenes, ...plan.film].flatMap((repair) =>
+        findings.filter((issue) => issue.id === repair.issueId),
+      );
+      intent = {
+        removing: plan.scenes.filter((r) => r.action === 'remove_scene').map((r) => r.sceneId),
+        refetching: plan.scenes
+          .filter((r) => REGENERATES.has(r.action))
+          .map((r) => r.sceneId),
+      };
+      const applied = applyRepairs(current, plan, {
+        issues: findings,
+        cut,
+        preserveSeconds: contract.approvedSeconds,
+      });
       current = applied.storyboard;
+      starved = applied.starvedSceneIds;
       await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
       filmRepairs = plan.film.map((repair) => repair.action);
       costBeforePass = await store.costs.totalForProject(organizationId, project.id);
@@ -548,7 +702,18 @@ export async function runRender(
       maxAttempts,
       deliverable: kind !== 'animatic',
     });
-    const passed = gate.state === 'ready';
+    /*
+     * The loop's verdict stands where it is the stricter of the two.
+     *
+     * `releaseDecision` reads the findings, and a rolled-back pass is not a
+     * finding: the film that survived is whole and one of its beats does not
+     * earn the room it was given, which no check can say. Recomputing the gate
+     * from the findings alone put that film back to `completed` and told the
+     * customer it was finished — the exact silence this layer exists to break.
+     */
+    const heldForAPerson = releaseState === 'needs_attention';
+    const passed = gate.state === 'ready' && !heldForAPerson;
+    const holdReason = heldForAPerson ? replanMessage(lastScore, starved, current, heldBy) : '';
     await store.renders.update(organizationId, render.id, {
       /*
        * `needs_attention`, not `failed`.
@@ -563,7 +728,7 @@ export async function runRender(
       captionsAssetId: captionAsset?.asset.id ?? null,
       durationSeconds: storyboardDuration(current),
       completedAt: new Date().toISOString(),
-      ...(passed ? {} : { error: gate.reason || 'Quality checks did not pass.' }),
+      ...(passed ? {} : { error: holdReason || gate.reason || 'Quality checks did not pass.' }),
     });
 
     await store.projects.update(
@@ -591,13 +756,18 @@ export async function runRender(
     await context.activity({
       step: 'composition',
       kind: 'step',
-      label: gate.blocking.length > 0 ? 'finished, with issues to look at' : 'film mastered and saved',
+      label: passed ? 'film mastered and saved' : 'finished, with issues to look at',
       status: 'done',
     });
-    await context.progress(1, gate.blocking.length > 0 ? 'Finished with issues' : 'Done');
-    // The honest QA result, not the delivery decision above: an animatic that
-    // completes with blockers still has blockers, and the caller is told so.
-    return { renderId: render.id, assetId: master.asset.id, qaPassed: gate.blocking.length === 0, issues };
+    await context.progress(1, passed ? 'Done' : 'Finished — one thing needs your eye');
+    /*
+     * The honest QA result, which is the delivery decision.
+     *
+     * These used to differ: `qaPassed` counted blockers and the status came
+     * from the gate, so a film held back for a person came back reporting
+     * that QA had passed. One answer, and it is the one the render row says.
+     */
+    return { renderId: render.id, assetId: master.asset.id, qaPassed: passed, issues };
   } catch (error) {
     await store.renders.update(organizationId, render.id, {
       status: 'failed',
@@ -725,6 +895,71 @@ function repairHeadline(plan: { scenes: { action: RepairAction }[]; film: { acti
   }
 }
 
+/** Repairs that pay a provider again, so an asset leaving a shot is deliberate. */
+const REGENERATES: ReadonlySet<RepairAction> = new Set<RepairAction>([
+  'regenerate_shot',
+  'alternate_provider',
+  'alternate_archetype',
+  'recapture_product',
+  'swap_asset',
+  'recrop',
+]);
+
+/**
+ * What a second of render time costs us.
+ *
+ * A deterministic repair pays no provider and is not free — it costs a render
+ * worker, and reporting it as $0.0000 is how "one trim costs nothing" became
+ * a thing this system believed about itself. A flat rate from the worker's
+ * hourly price is enough to make the number honest and to make a loop that
+ * re-renders four times visible in the ledger; nobody is billed from it.
+ */
+const COMPUTE_USD_PER_HOUR = 0.45;
+
+export function computeCostUsd(ms: number): number {
+  return Math.round((ms / 3_600_000) * COMPUTE_USD_PER_HOUR * 10000) / 10000;
+}
+
+/**
+ * Why a film is waiting for a person, in words that say what to change.
+ *
+ * "The cut came out the wrong length" tells nobody anything. The beat that
+ * could not fill its slot, and by how much, is a note a writer can act on.
+ */
+function replanMessage(
+  score: RepairScore | null,
+  starvedSceneIds: readonly string[],
+  storyboard: Storyboard,
+  heldBy: readonly string[] = [],
+): string {
+  // Only while the diagnosis is current: an accepted pass fixed the beat it
+  // was about, and repeating it describes a problem that no longer exists.
+  if (starvedSceneIds.length > 0 && score !== null && !score.accepted) {
+    const beats = storyboard.scenes
+      .map((scene, index) => ({ scene, number: index + 1 }))
+      .filter(({ scene }) => starvedSceneIds.includes(scene.id));
+    const named = beats.map(({ number }) => `beat ${number}`).join(', ');
+    return (
+      `${named} ${beats.length === 1 ? 'has' : 'have'} less to say than the time the film gives ` +
+      `${beats.length === 1 ? 'it' : 'them'}. Shortening ${beats.length === 1 ? 'it' : 'them'} ` +
+      `would take the film under the length you approved, so it needs a change to what the beat ` +
+      `says rather than to its timing.`
+    );
+  }
+  if (heldBy.length > 0) {
+    const named = [...new Set(heldBy)].map((check) => check.replace(/_/g, ' ')).join(', ');
+    const plural = new Set(heldBy).size > 1;
+    return (
+      `The film is finished. ${named} ${plural ? 'need' : 'needs'} a person: ` +
+      'nothing here can be repaired automatically.'
+    );
+  }
+  return (
+    (score && !score.accepted ? score.reason : '') ||
+    'The film needs a look from a person before it goes out.'
+  );
+}
+
 /** How much of the tail the fade repair covers. */
 const TAIL_FADE_REPAIR_SECONDS = 0.25;
 
@@ -831,11 +1066,23 @@ async function renderOnce(
     });
   }
 
-  await context.progress(0.15, params.attempt === 0 ? 'Composing the master' : 'Directing the refined shots again');
+  /*
+   * The same words on every pass.
+   *
+   * "Directing the refined shots again" told the customer there had been a
+   * first attempt they were not shown and that it had not been good enough.
+   * They did not ask, they cannot act on it, and the honest summary of what
+   * is happening is that the master is being composed.
+   */
+  await context.progress(0.15, 'Composing the master');
   await context.activity({
     step: 'motion',
     kind: 'step',
-    label: params.attempt === 0 ? `rendering ${storyboard.scenes.length} scenes` : 'directing the refined shots again',
+    // Operator-facing: the pass number belongs here and nowhere the customer looks.
+    label:
+      params.attempt === 0
+        ? `rendering ${storyboard.scenes.length} scenes`
+        : `rendering ${storyboard.scenes.length} scenes · pass ${params.attempt + 1}`,
     status: 'active',
   });
 

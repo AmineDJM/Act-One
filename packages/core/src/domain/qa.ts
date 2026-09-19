@@ -180,12 +180,75 @@ export const RepairAction = z.enum([
   'realign_audio',
   'refade_audio',
   'replan_opening',
+  /*
+   * Repairs that act on the film's own shape rather than on a defect.
+   *
+   * `redistribute_time` is what stops a trim from being a deletion: the
+   * seconds a dead hold gives back belong to the film, and go to the shots
+   * that can carry them.
+   */
+  'redistribute_time',
   /* Escalations: the same repair has already failed. */
   'alternate_provider',
   'alternate_archetype',
+  /*
+   * Not a timeline defect: a creative one.
+   *
+   * A shot with one second of content in a six-second slot cannot be repaired
+   * by editing the slot. Either the beat carries more, or it belongs somewhere
+   * else in the film — and both are the Creative Director's decisions, not the
+   * repair planner's.
+   */
+  'replan_scene',
   'manual_review',
 ]);
 export type RepairAction = z.infer<typeof RepairAction>;
+
+/**
+ * What a repair costs to attempt, as a ladder rather than a number.
+ *
+ * The planner always takes the lowest rung that can preserve the film, and
+ * the rungs are about kind rather than about dollars: a timeline edit is free
+ * and instant, a deterministic edit costs a render, a recomposition costs a
+ * render and changes what a shot looks like, a cheap generation costs a small
+ * model call, and a provider regeneration costs real money and real minutes.
+ *
+ * A person is rung four alongside the expensive machines, which is not a
+ * joke: an operator's afternoon is the most expensive thing this system can
+ * spend, and a loop that reaches for it early is a loop that does not work.
+ */
+export type RepairLevel = 0 | 1 | 2 | 3 | 4;
+
+export const REPAIR_LEVEL: Record<RepairAction, RepairLevel> = {
+  /* 0 — the timeline and its metadata. Nothing is recomposed, nothing is paid for. */
+  redistribute_time: 0,
+  retime_captions: 0,
+  reposition_captions: 0,
+  /* 1 — a deterministic edit to material that already exists. */
+  trim_hold: 1,
+  retime_scene: 1,
+  reduce_duration: 1,
+  remove_scene: 1,
+  realign_audio: 1,
+  refade_audio: 1,
+  remix_audio: 1,
+  recrop: 1,
+  adjust_contrast: 1,
+  /* 2 — deterministic recomposition: the same material, composed differently. */
+  relayout_text: 2,
+  alternate_archetype: 2,
+  /* 3 — a small generation: words, a voice segment, a modest asset. */
+  rewrite_copy: 3,
+  regenerate_voice: 3,
+  replan_opening: 3,
+  replan_scene: 3,
+  /* 4 — an expensive regeneration, or a person's time. */
+  regenerate_shot: 4,
+  alternate_provider: 4,
+  recapture_product: 4,
+  swap_asset: 4,
+  manual_review: 4,
+};
 
 /** Where a finding stands with the repair loop. */
 export const RepairStatus = z.enum(['open', 'repairing', 'repaired', 'unrepairable', 'accepted']);
@@ -258,9 +321,16 @@ const CHECK_LAYER: Partial<Record<QaCheck, QaLayer>> = {
   awkward_hold: 'structural', direction: 'structural', fake_product_ui: 'structural',
 };
 
-/** Whether this finding is one the loop can act on without a person. */
+/**
+ * Whether this finding is one the loop can act on without a person.
+ *
+ * `replan_scene` is not one of them, and that is the point of having it: a
+ * beat with a second of content in a six-second slot is not a defect in the
+ * timeline, and no amount of editing the timeline will make it one. It goes
+ * to whoever can change what the beat says.
+ */
 export function repairableAutomatically(issue: Pick<QaIssue, 'repair'>): boolean {
-  return issue.repair !== null && issue.repair !== 'manual_review';
+  return issue.repair !== null && issue.repair !== 'manual_review' && issue.repair !== 'replan_scene';
 }
 
 /** The family a check belongs to, for counting across films. */
@@ -308,11 +378,22 @@ export const RepairRecord = z.object({
   sceneId: z.string().nullable().default(null),
   action: RepairAction,
   attempt: z.number().int().min(0),
-  outcome: z.enum(['fixed', 'unchanged', 'worse', 'failed', 'escalated']),
-  /** What the repair itself cost us, on top of the original render. */
-  costUsd: z.number().min(0).default(0),
-  /** How long the customer waited for it. */
-  latencyMs: z.number().int().min(0).default(0),
+  outcome: z.enum(['fixed', 'unchanged', 'worse', 'failed', 'escalated', 'rejected']),
+  /** Which rung of the ladder this was, so the console can see what the loop reaches for. */
+  level: z.number().int().min(0).max(4).default(1),
+  /*
+   * Three costs, because they are three different things and reporting one of
+   * them as "the cost" is how a deterministic repair came to look free.
+   *
+   * A trim pays no provider and is not free: it costs a render, which is
+   * machine time we pay for and wall-clock the customer waits through. The
+   * customer is never shown any of this; the ledger is.
+   */
+  providerCostUsd: z.number().min(0).default(0),
+  computeMs: z.number().int().min(0).default(0),
+  estimatedComputeCostUsd: z.number().min(0).default(0),
+  /** What the customer actually waited, which includes everything. */
+  wallClockMs: z.number().int().min(0).default(0),
   note: z.string().max(400).default(''),
 });
 export type RepairRecord = z.infer<typeof RepairRecord>;
@@ -336,6 +417,101 @@ export const ReleaseState = z.enum([
 ]);
 export type ReleaseState = z.infer<typeof ReleaseState>;
 
+/**
+ * What a repair is not allowed to break, whatever it fixes.
+ *
+ * The loop used to ask one question — did the defect go away — and a repair
+ * that answered yes was a success. A trim that took a ten-second film to four
+ * and nine passed that test: the held frames were gone, and so was half the
+ * film. A local defect and a global constraint are different things, and the
+ * local one is never the more important.
+ */
+export const FilmInvariant = z.enum([
+  /** The runtime the customer approved, within the tolerance of the cut. */
+  'runtime',
+  /** Shots do not disappear, and do not change their order. */
+  'structure',
+  /** No shot so brief it reads as a flash rather than a shot. */
+  'minimum_shot',
+  /** Every shot still gives its own copy the time it takes to read. */
+  'readability',
+  /** A film that owes a closing payoff still has one. */
+  'payoff',
+  /** No material dropped by accident on the way through. */
+  'assets',
+  /** The candidate came back with defects the accepted cut did not have. */
+  'new_defects',
+]);
+export type FilmInvariant = z.infer<typeof FilmInvariant>;
+
+export const InvariantViolation = z.object({
+  invariant: FilmInvariant,
+  message: z.string().max(400),
+  sceneId: z.string().nullable().default(null),
+});
+export type InvariantViolation = z.infer<typeof InvariantViolation>;
+
+/**
+ * How far a repair may move the runtime the customer approved.
+ *
+ * Five per cent, with a floor so that a short film is not held to a precision
+ * nobody can see: on a ten-second film that is half a second, and half a
+ * second is about where a viewer who approved a cut would notice it had
+ * changed. The floor is twelve frames at thirty, which is the smallest
+ * difference worth arguing about.
+ */
+export const RUNTIME_TOLERANCE = 0.05;
+export const RUNTIME_TOLERANCE_FLOOR_SECONDS = 0.4;
+
+export function runtimeToleranceFor(approvedSeconds: number): number {
+  return Math.max(approvedSeconds * RUNTIME_TOLERANCE, RUNTIME_TOLERANCE_FLOOR_SECONDS);
+}
+
+/** What a repair pass must hand back a film that still satisfies. */
+export type FilmContract = {
+  /** The runtime of the cut the customer approved. */
+  approvedSeconds: number;
+  cut: string;
+  /** Whether the film owes a closing beat — an end card, a CTA. */
+  requiresPayoff: boolean;
+  /**
+   * The accepted cut's shots, in order, with what each one used.
+   *
+   * The mapping and not two flat lists, because the question a repair has to
+   * answer is not "is this asset still somewhere" but "did the shot that used
+   * it leave on purpose" — and a flat list cannot say.
+   */
+  shots: readonly { id: string; assetRefs: readonly string[] }[];
+};
+
+/**
+ * The verdict on a repair pass, as a thing rather than as a feeling.
+ *
+ * Written before the candidate is allowed to replace the accepted cut. Every
+ * named flag is derived from `violations` by `scoreRepair`, so the summary and
+ * the detail cannot disagree — which they would, eventually, if a person had
+ * to remember to set both.
+ */
+export const RepairScore = z.object({
+  targetDefectsResolved: z.number().int().min(0).default(0),
+  targetDefectsRemaining: z.number().int().min(0).default(0),
+  newHardDefects: z.number().int().min(0).default(0),
+  newSoftDefects: z.number().int().min(0).default(0),
+  runtimeBefore: z.number().min(0).default(0),
+  runtimeAfter: z.number().min(0).default(0),
+  runtimeTolerance: z.number().min(0).default(0),
+  durationConstraintSatisfied: z.boolean().default(true),
+  readabilitySatisfied: z.boolean().default(true),
+  narrativeSatisfied: z.boolean().default(true),
+  assetsSatisfied: z.boolean().default(true),
+  noNewDefects: z.boolean().default(true),
+  violations: z.array(InvariantViolation).default([]),
+  /** Whether the candidate may replace the accepted cut. */
+  accepted: z.boolean().default(false),
+  reason: z.string().max(400).default(''),
+});
+export type RepairScore = z.infer<typeof RepairScore>;
+
 export const QaReport = z.object({
   id: z.string(),
   renderId: z.string(),
@@ -352,6 +528,20 @@ export const QaReport = z.object({
   extraCostUsd: z.number().min(0).default(0),
   /** Wall-clock the repairs added. */
   extraLatencyMs: z.number().int().min(0).default(0),
+  /** What those repairs cost in machine time, which is never zero. */
+  extraComputeMs: z.number().int().min(0).default(0),
+  extraComputeCostUsd: z.number().min(0).default(0),
+  /** How many renders this pass cost. One per pass is the target. */
+  rendersSpent: z.number().int().min(0).default(0),
+  /*
+   * Whether the repairs of the previous pass were allowed to stand.
+   *
+   * Null on the first pass, where there is nothing to judge. A rejected score
+   * means the candidate was rolled back and the accepted cut is still the one
+   * from before — which the console must be able to see, because a rejected
+   * repair and a repair that was never tried look identical otherwise.
+   */
+  score: RepairScore.nullable().default(null),
   /** Which layers actually ran. A layer that was skipped proved nothing. */
   layers: z.array(QaLayer).default([]),
   /*

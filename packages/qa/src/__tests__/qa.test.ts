@@ -231,7 +231,8 @@ describe('repair planning', () => {
 
   const failed = (over: Partial<RepairRecord>): RepairRecord => ({
     id: newId('evt'), issueId: 'evt_old', check: 'image_artifact', sceneId: 's1',
-    action: 'regenerate_shot', attempt: 0, outcome: 'unchanged', costUsd: 0, latencyMs: 0, note: '',
+    action: 'regenerate_shot', attempt: 0, outcome: 'unchanged', level: 4,
+    providerCostUsd: 0, computeMs: 0, estimatedComputeCostUsd: 0, wallClockMs: 0, note: '',
     ...over,
   });
 
@@ -343,7 +344,8 @@ describe('repair planning', () => {
 describe('what a repair achieved', () => {
   const record = (over: Partial<RepairRecord> = {}): RepairRecord => ({
     id: newId('evt'), issueId: 'evt_1', check: 'still_frame_hold', sceneId: 's1',
-    action: 'trim_hold', attempt: 0, outcome: 'unchanged', costUsd: 0, latencyMs: 0, note: '',
+    action: 'trim_hold', attempt: 0, outcome: 'unchanged', level: 1,
+    providerCostUsd: 0, computeMs: 0, estimatedComputeCostUsd: 0, wallClockMs: 0, note: '',
     ...over,
   });
   const finding = (check: QaIssue['check'], sceneId: string | null = 's1'): QaIssue =>
@@ -354,10 +356,18 @@ describe('what a repair achieved', () => {
       attempted: [record()],
       before: [finding('still_frame_hold')],
       after: [],
-      costUsd: 0.4,
-      latencyMs: 20_000,
+      providerCostUsd: 0.4,
+      computeMs: 20_000,
+      estimatedComputeCostUsd: 0.0025,
+      wallClockMs: 20_000,
     });
-    expect(settled).toMatchObject({ outcome: 'fixed', costUsd: 0.4, latencyMs: 20_000 });
+    expect(settled).toMatchObject({
+      outcome: 'fixed',
+      providerCostUsd: 0.4,
+      wallClockMs: 20_000,
+      // Not zero. A deterministic repair pays no provider and still costs a render.
+      estimatedComputeCostUsd: 0.0025,
+    });
   });
 
   it('calls it unchanged when it does, which is what drives the escalation', () => {
@@ -367,8 +377,10 @@ describe('what a repair achieved', () => {
       // would have reported every repair as a success.
       before: [finding('still_frame_hold')],
       after: [finding('still_frame_hold')],
-      costUsd: 0,
-      latencyMs: 0,
+      providerCostUsd: 0,
+      computeMs: 0,
+      estimatedComputeCostUsd: 0,
+      wallClockMs: 0,
     });
     expect(settled).toMatchObject({ outcome: 'unchanged', note: 'The finding came back.' });
   });
@@ -378,8 +390,10 @@ describe('what a repair achieved', () => {
       attempted: [record()],
       before: [finding('still_frame_hold')],
       after: [finding('text_overflow', 's2')],
-      costUsd: 0,
-      latencyMs: 0,
+      providerCostUsd: 0,
+      computeMs: 0,
+      estimatedComputeCostUsd: 0,
+      wallClockMs: 0,
     });
     expect(settled!.outcome).toBe('worse');
     expect(settled!.note).toMatch(/introduced 1 new finding/);
@@ -390,11 +404,22 @@ describe('what a repair achieved', () => {
       attempted: [record(), record({ sceneId: 's2', check: 'text_overflow' })],
       before: [],
       after: [],
-      costUsd: 1,
-      latencyMs: 30_000,
+      providerCostUsd: 1,
+      computeMs: 30_000,
+      estimatedComputeCostUsd: 0.004,
+      wallClockMs: 30_000,
     });
-    expect(settled.map((entry) => entry.costUsd)).toEqual([0.5, 0.5]);
-    expect(settled.map((entry) => entry.latencyMs)).toEqual([15_000, 15_000]);
+    expect(settled.map((entry) => entry.providerCostUsd)).toEqual([0.5, 0.5]);
+    /*
+     * Shares of one pass, not two measurements.
+     *
+     * Several deterministic repairs go into one candidate and one render, so
+     * reporting the pass's whole wall clock against each record would say the
+     * pass took twice as long as it did — which is how "one render" came to
+     * read as "two renders" in a report.
+     */
+    expect(settled.map((entry) => entry.wallClockMs)).toEqual([15_000, 15_000]);
+    expect(settled.map((entry) => entry.computeMs)).toEqual([15_000, 15_000]);
   });
 });
 

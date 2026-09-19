@@ -30,7 +30,18 @@ export type Production = {
   worst: QaSeverity | null;
   blocking: string[];
   repairs: number;
+  /** Repairs the score refused, so the film went back to its last whole cut. */
+  rolledBack: number;
+  /** What providers were paid on top of the film itself. */
   costUsd: number;
+  /** What the repair passes cost in machine time, which is never zero. */
+  computeCostUsd: number;
+  /** Renders spent on this production, first pass included. */
+  renders: number;
+  /** The runtime the customer approved, and what was delivered against it. */
+  runtimeApproved: number;
+  runtimeDelivered: number;
+  runtimeHeld: boolean;
   msToFirstPass: number;
   msToFinal: number;
 };
@@ -62,7 +73,21 @@ export function groupByRender(reports: readonly (QaReport & { organizationId: st
         worst: worstOf(last.issues),
         blocking: [...new Set(blocking.map((issue) => issue.check as string))],
         repairs: ordered.reduce((sum, report) => sum + report.repairs.length, 0),
+        rolledBack: ordered.reduce(
+          (sum, report) => sum + report.repairs.filter((repair) => repair.outcome === 'rejected').length,
+          0,
+        ),
         costUsd: ordered.reduce((sum, report) => sum + report.extraCostUsd, 0),
+        computeCostUsd: ordered.reduce((sum, report) => sum + report.extraComputeCostUsd, 0),
+        renders: ordered.reduce((sum, report) => sum + Math.max(1, report.rendersSpent), 0),
+        /*
+         * Whether the film that shipped is the length of the film that was
+         * approved. The question the loop could not answer while it was
+         * trimming ten-second films down to five and calling them ready.
+         */
+        runtimeApproved: last.score?.runtimeBefore ?? last.durationSeconds,
+        runtimeDelivered: last.score?.runtimeAfter ?? last.durationSeconds,
+        runtimeHeld: last.score ? last.score.durationConstraintSatisfied : true,
         msToFirstPass: clean ? Math.max(0, Date.parse(clean.createdAt) - started) : 0,
         msToFinal: Math.max(0, Date.parse(last.createdAt) - started),
       };
@@ -160,6 +185,30 @@ export function durationBand(seconds: number): string {
 export function average(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+/**
+ * How often the loop reached for each rung of the repair ladder.
+ *
+ * The shape of this is the health of the planner: a loop reaching level four
+ * routinely is one that cannot fix anything cheaply, and a level-four repair
+ * is a provider bill or an operator's afternoon.
+ */
+export function repairsByLevel(repairs: readonly RepairRecord[]): Map<number, number> {
+  const byLevel = new Map<number, number>();
+  for (const repair of repairs) byLevel.set(repair.level, (byLevel.get(repair.level) ?? 0) + 1);
+  return new Map([...byLevel.entries()].sort(([left], [right]) => left - right));
+}
+
+/** Which invariant most often refuses a repaired cut. */
+export function violationsByInvariant(reports: readonly QaReport[]): Map<string, number> {
+  const byInvariant = new Map<string, number>();
+  for (const report of reports) {
+    for (const violation of report.score?.violations ?? []) {
+      byInvariant.set(violation.invariant, (byInvariant.get(violation.invariant) ?? 0) + 1);
+    }
+  }
+  return new Map([...byInvariant.entries()].sort(([, left], [, right]) => right - left));
 }
 
 /** Repairs that pay a provider again rather than editing what we already have. */

@@ -50,7 +50,8 @@ function report(over: Partial<QaReport> = {}): QaReport & { organizationId: stri
 function repair(over: Partial<RepairRecord> = {}): RepairRecord {
   return {
     id: newId('evt'), issueId: 'evt_1', check: 'safe_area', sceneId: 'scn_1',
-    action: 'reposition_captions', attempt: 0, outcome: 'fixed', costUsd: 0, latencyMs: 0, note: '',
+    action: 'reposition_captions', attempt: 0, outcome: 'fixed', level: 0,
+    providerCostUsd: 0, computeMs: 0, estimatedComputeCostUsd: 0, wallClockMs: 0, note: '',
     ...over,
   };
 }

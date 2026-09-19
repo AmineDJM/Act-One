@@ -140,10 +140,11 @@ describe('a defect found on a real file, repaired, and gone on the recheck', () 
     expect(recheck).toEqual([]);
 
     const settled = settleRepairs({
-      attempted, before: findings, after: recheck, costUsd: 0, latencyMs: 4_200,
+      attempted, before: findings, after: recheck,
+      providerCostUsd: 0, computeMs: 4_200, estimatedComputeCostUsd: 0.0005, wallClockMs: 4_200,
     });
     expect(settled).toEqual([
-      expect.objectContaining({ check: 'still_frame_hold', sceneId: 'scn_1', outcome: 'fixed', costUsd: 0 }),
+      expect.objectContaining({ check: 'still_frame_hold', sceneId: 'scn_1', outcome: 'fixed', providerCostUsd: 0 }),
     ]);
 
     // And the film may ship.

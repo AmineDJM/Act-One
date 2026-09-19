@@ -9,6 +9,8 @@ import {
   groupByRender,
   providersByScene,
   repairSuccessByCheck,
+  repairsByLevel,
+  violationsByInvariant,
   tallyIssues,
   tallyLabels,
   type Tally,
@@ -98,6 +100,21 @@ export default async function QualityPage() {
   // How well the loop does against each defect, which is the number that says
   // whether a check is worth having.
   const repairByCheck = repairSuccessByCheck(repairs);
+  /*
+   * What the loop costs when nobody is paying a provider.
+   *
+   * A deterministic repair is free in dollars and costs a render — machine
+   * time and a customer's waiting. Reported as $0.00 it looked like the loop
+   * could run for ever at no cost, which is how a system talks itself into
+   * re-rendering four times.
+   */
+  const computeCost = productions.reduce((sum, run) => sum + run.computeCostUsd, 0);
+  const extraRenders = productions.reduce((sum, run) => sum + Math.max(0, run.renders - 1), 0);
+  const rolledBack = productions.filter((run) => run.rolledBack > 0).length;
+  const repaired = productions.filter((run) => run.repairs > 0).length;
+  const heldRuntime = productions.filter((run) => run.repairs > 0 && run.runtimeHeld).length;
+  const levels = repairsByLevel(repairs);
+  const violations = violationsByInvariant(reports);
 
   const verdicts = reports
     .flatMap((report) =>
@@ -153,12 +170,27 @@ export default async function QualityPage() {
         <Metric
           label="Repair spend"
           value={`$${repairCost.toFixed(2)}`}
-          note="On top of the films themselves"
+          note="Providers, on top of the films themselves"
+        />
+        <Metric
+          label="Repair compute"
+          value={`$${computeCost.toFixed(4)}`}
+          note={`${plain(extraRenders)} re-render${extraRenders === 1 ? '' : 's'} — never free`}
         />
         <Metric
           label="Repair wait"
           value={repairLatency > 0 ? duration(repairLatency) : '—'}
           note="Customer time the loop has cost"
+        />
+        <Metric
+          label="Rolled back"
+          value={rate(rolledBack, analysed)}
+          note="Repaired, then refused: the film went back"
+        />
+        <Metric
+          label="Kept its length"
+          value={rate(heldRuntime, repaired || 1)}
+          note="Of the films the loop touched"
         />
       </div>
 
@@ -204,6 +236,70 @@ export default async function QualityPage() {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2>What the loop reaches for</h2>
+        </div>
+        <p className={styles.empty} style={{ marginBottom: '1rem' }}>
+          The planner always takes the cheapest rung that can preserve the film. A loop reaching
+          level four routinely is one that cannot fix anything cheaply, and level four is a
+          provider bill or somebody&rsquo;s afternoon.
+        </p>
+        {levels.size === 0 ? (
+          <p className={styles.empty}>Nothing has needed repairing yet.</p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Rung</th>
+                <th>What it is</th>
+                <th className={styles.num}>Times</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...levels.entries()].map(([level, count]) => (
+                <tr key={level}>
+                  <td className="mono">L{level}</td>
+                  <td className="secondary">{LEVEL_NAMES[level] ?? 'unknown'}</td>
+                  <td className={styles.num}>{plain(count)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2>Why a repair was refused</h2>
+        </div>
+        <p className={styles.empty} style={{ marginBottom: '1rem' }}>
+          A repair is accepted only if the defect goes, nothing new arrives, and the film still
+          satisfies what the customer approved. These are the constraints that sent a repaired cut
+          back.
+        </p>
+        {violations.size === 0 ? (
+          <p className={styles.empty}>No repaired cut has been refused.</p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Constraint</th>
+                <th className={styles.num}>Refusals</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...violations.entries()].map(([invariant, count]) => (
+                <tr key={invariant}>
+                  <td className="mono">{words(invariant)}</td>
+                  <td className={styles.num}>{plain(count)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
@@ -257,6 +353,7 @@ export default async function QualityPage() {
                 <th>Verdict</th>
                 <th className={styles.num}>Passes</th>
                 <th className={styles.num}>Repairs</th>
+                <th className={styles.num}>Runtime</th>
                 <th className={styles.num}>Cost</th>
                 <th>What held it</th>
               </tr>
@@ -272,8 +369,26 @@ export default async function QualityPage() {
                     </span>
                   </td>
                   <td className={styles.num}>{plain(run.attempts + 1)}</td>
-                  <td className={styles.num}>{plain(run.repairs)}</td>
-                  <td className={styles.num}>{run.costUsd > 0 ? `$${run.costUsd.toFixed(2)}` : '—'}</td>
+                  <td className={styles.num}>
+                    {plain(run.repairs)}
+                    {run.rolledBack > 0 ? ` (${plain(run.rolledBack)} back)` : ''}
+                  </td>
+                  <td className={styles.num}>
+                    {run.repairs === 0 ? (
+                      '—'
+                    ) : (
+                      <span className={styles.pill} data-tone={run.runtimeHeld ? 'ok' : 'danger'}>
+                        {run.runtimeDelivered.toFixed(1)}s / {run.runtimeApproved.toFixed(1)}s
+                      </span>
+                    )}
+                  </td>
+                  <td className={styles.num}>
+                    {run.costUsd > 0
+                      ? `$${run.costUsd.toFixed(2)}`
+                      : run.computeCostUsd > 0
+                        ? `$${run.computeCostUsd.toFixed(4)}`
+                        : '—'}
+                  </td>
                   <td style={{ color: 'var(--text-secondary)' }}>
                     {run.blocking.length === 0 ? '—' : truncate(run.blocking.map(words).join(', '), 60)}
                   </td>
@@ -286,6 +401,15 @@ export default async function QualityPage() {
     </>
   );
 }
+
+/** The repair ladder, in the words an operator would use for each rung. */
+const LEVEL_NAMES: Record<number, string> = {
+  0: 'the timeline — nothing recomposed, nothing paid for',
+  1: 'a deterministic edit to material we already have',
+  2: 'the same material, composed differently',
+  3: 'a small generation — words, a voice segment',
+  4: 'an expensive regeneration, or a person',
+};
 
 /** One row per kind of film, provider, archetype — whatever was counted. */
 function Breakdown({

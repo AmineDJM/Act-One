@@ -218,6 +218,41 @@ export function coherentRecipe(
   return options.find((option) => option !== avoid) ?? options[0]!;
 }
 
+/**
+ * Recipes whose composition is driven by the camera.
+ *
+ * The renderer hands `cameraRecipe` to these and to nothing else: a push on a
+ * `hold` or a `word_reveal` is stored, and ignored. Which matters to QA rather
+ * than to the picture — a repair that gives recovered seconds to a shot it
+ * believes is moving, on the strength of a field the renderer never reads,
+ * manufactures the held frame it was trying to remove. The real render caught
+ * exactly that; `film-motion.test.ts` keeps this list honest against it.
+ */
+export const CAMERA_DRIVEN_RECIPES: readonly MotionRecipeName[] = [
+  'product_window',
+  'product_sequence',
+  'floating_ui',
+  'feature_stack',
+  'footage',
+  'photo_hold',
+  'depth_transition',
+];
+
+/**
+ * Whether a shot is in motion for its whole length.
+ *
+ * True of real footage, which plays; and of a camera-driven composition whose
+ * camera is actually travelling. Everything else arrives, settles and holds —
+ * which is not a fault, and is the reason those shots cannot be given more
+ * time than their own content earns.
+ */
+export function movesThroughout(scene: Pick<Scene, 'motionRecipe' | 'cameraRecipe'>): boolean {
+  if (scene.motionRecipe.name === 'footage') return true;
+  return (
+    CAMERA_DRIVEN_RECIPES.includes(scene.motionRecipe.name) && scene.cameraRecipe.move !== 'static'
+  );
+}
+
 export const EasingName = z.enum([
   'linear',
   'out_quint',        // the workhorse for confident UI motion

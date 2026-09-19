@@ -1,5 +1,7 @@
 import {
   HELD_FRAME_CEILING,
+  movesThroughout,
+  REPAIR_LEVEL,
   SEVERITY_ORDER,
   newId,
   qaVerdict,
@@ -99,6 +101,17 @@ const ESCALATION: Partial<Record<RepairAction, RepairAction>> = {
   alternate_archetype: 'manual_review',
   recapture_product: 'alternate_archetype',
   swap_asset: 'alternate_provider',
+  /*
+   * A hold that will not trim is not a timing problem.
+   *
+   * The trim has a floor — the time the shot's own copy takes to read — and
+   * when the floor is the whole shot there is nothing to cut. Asking again is
+   * asking the same question; the next question is whether the beat has
+   * enough to say for the room it was given, and that is a creative one.
+   */
+  trim_hold: 'replan_scene',
+  retime_scene: 'replan_scene',
+  replan_scene: 'manual_review',
 };
 
 export function planRepairs(params: {
@@ -158,11 +171,14 @@ export function planRepairs(params: {
   }
 
   /*
-   * One repair per scene, most severe wins.
+   * One repair per scene: the most severe finding, and at equal severity the
+   * cheapest rung that addresses it.
    *
    * Two instructions for the same shot — "recrop" and "regenerate" — would
    * fight each other, and the result would depend on which finding happened to
-   * come back first.
+   * come back first. Ordering by the ladder as well as by severity means a
+   * shot that could be recropped is never regenerated from a provider just
+   * because that finding was collected first.
    */
   const byScene = new Map<string, SceneRepair & { severity: number }>();
   const film: FilmRepair[] = [];
@@ -170,8 +186,18 @@ export function planRepairs(params: {
 
   for (const issue of repairable) {
     const action = escalate(issue, history);
-    if (action === 'manual_review') {
-      manual.push(issue);
+    /*
+     * The escalated action decides, not the finding's original one.
+     *
+     * A hold whose trim was rolled back escalates to `replan_scene`, which is
+     * a question for a person however automatic the finding looked when it
+     * was collected. Asking `repairableAutomatically` of the action rather
+     * than naming `manual_review` here means a new escalation target is
+     * routed correctly the day it is added, rather than being planned as a
+     * scene repair nothing knows how to carry out.
+     */
+    if (!repairableAutomatically({ repair: action })) {
+      manual.push({ ...issue, repair: action });
       continue;
     }
     const escalated = action !== issue.repair;
@@ -185,10 +211,27 @@ export function planRepairs(params: {
       continue;
     }
 
-    if (!issue.sceneId) continue;
+    /*
+     * A shot repair with no shot to aim at.
+     *
+     * `brand_consistency` is about the film rather than a scene, and its
+     * repair is `regenerate_shot` — so it named an action the planner could
+     * not place and was dropped on the floor: never repaired, never escalated,
+     * and absent from the reason the film was held. A finding that cannot be
+     * acted on automatically is a finding for a person, which is the one thing
+     * it must never silently stop being.
+     */
+    if (!issue.sceneId) {
+      manual.push(issue);
+      continue;
+    }
     const severity = SEVERITY_ORDER[issue.severity];
     const existing = byScene.get(issue.sceneId);
-    if (!existing || severity > existing.severity) {
+    const wins =
+      !existing ||
+      severity > existing.severity ||
+      (severity === existing.severity && REPAIR_LEVEL[action] < REPAIR_LEVEL[existing.action]);
+    if (wins) {
       byScene.set(issue.sceneId, {
         sceneId: issue.sceneId,
         action,
@@ -229,7 +272,17 @@ function escalate(issue: QaIssue, history: readonly RepairRecord[]): RepairActio
     (record) =>
       record.check === issue.check &&
       record.sceneId === issue.sceneId &&
-      (record.outcome === 'unchanged' || record.outcome === 'failed' || record.outcome === 'worse'),
+      /*
+       * A rollback is a failure, and the most informative kind.
+       *
+       * `rejected` means the repair did what it was asked and the film came
+       * back worse by a measure the repair could not see. Trying it again
+       * produces the same rejection and spends another render proving it.
+       */
+      (record.outcome === 'unchanged' ||
+        record.outcome === 'failed' ||
+        record.outcome === 'worse' ||
+        record.outcome === 'rejected'),
   );
   if (failures.length === 0) return wanted;
 
@@ -253,8 +306,21 @@ function escalate(issue: QaIssue, history: readonly RepairRecord[]): RepairActio
 export function applyRepairs(
   storyboard: Storyboard,
   plan: RepairPlan,
-  context: { issues?: readonly QaIssue[]; cut?: FilmCut } = {},
-): { storyboard: Storyboard; needsProvider: { sceneId: string; action: RepairAction }[] } {
+  context: {
+    issues?: readonly QaIssue[];
+    cut?: FilmCut;
+    /**
+     * The runtime to hand back.
+     *
+     * Without it a trim is a deletion: the seconds a dead hold gives back
+     * leave the film, and a ten-second cut comes back at five with every
+     * local defect resolved. With it, the time is put back into the shots
+     * that can carry it, and what cannot be placed is reported rather than
+     * quietly dropped.
+     */
+    preserveSeconds?: number | null;
+  } = {},
+): ApplyResult {
   const actions = new Map(plan.scenes.map((entry) => [entry.sceneId, entry]));
   const needsProvider: { sceneId: string; action: RepairAction }[] = [];
   const issues = context.issues ?? [];
@@ -374,8 +440,23 @@ export function applyRepairs(
     })
     .filter((scene): scene is Scene => scene !== null);
 
+  /*
+   * Put back what the trims took out.
+   *
+   * Only into shots that keep moving for their whole length: giving seconds
+   * to a static shot manufactures the exact defect the trim just removed, so
+   * a film made entirely of held typography has nowhere to put them. That is
+   * not a failure of the arithmetic — it is the plan telling us it has less
+   * content than the slot it was written for, which is a creative question
+   * and is reported as one.
+   */
+  const trimmed = round3(scenes.reduce((total, scene) => total + scene.duration, 0));
+  const target = context.preserveSeconds ?? null;
+  const recovered = target === null ? 0 : round3(Math.max(0, target - trimmed));
+  const { scenes: balanced, placed } = recovered > 0 ? redistribute(scenes, recovered) : { scenes, placed: 0 };
+
   let cursor = 0;
-  const resequenced = scenes.map((scene, index) => {
+  const resequenced = balanced.map((scene, index) => {
     const next = { ...scene, index, startTime: round3(cursor) };
     cursor += scene.duration;
     return next;
@@ -384,7 +465,73 @@ export function applyRepairs(
   return {
     storyboard: { ...storyboard, scenes: resequenced, updatedAt: new Date().toISOString() },
     needsProvider,
+    recoveredSeconds: recovered,
+    placedSeconds: placed,
+    /** Shots with time to give back and nowhere to put it: a plan short of content. */
+    starvedSceneIds: recovered - placed > 0.05 ? starved(scenes, issues) : [],
   };
+}
+
+export type ApplyResult = {
+  storyboard: Storyboard;
+  needsProvider: { sceneId: string; action: RepairAction }[];
+  /** Seconds the trims took out of the film. */
+  recoveredSeconds: number;
+  /** How many of them found a shot that could carry them. */
+  placedSeconds: number;
+  /** The shots whose slot the plan cannot fill. Escalated, not trimmed further. */
+  starvedSceneIds: string[];
+};
+
+/**
+ * How much more time a shot can take without becoming a held frame.
+ *
+ * A shot that moves for its whole length — real footage, or a camera that is
+ * travelling — can hold a viewer longer. A static composition cannot: the
+ * still-frame check would find it, correctly, and the loop would trim it
+ * again. So a static shot absorbs nothing, however tempting its slot looks.
+ *
+ * Capped at half its own length, because a two-second cutaway stretched to
+ * seven is not the same shot any more, and nobody approved that one.
+ */
+const MAX_SHOT_GROWTH = 0.5;
+
+function absorbableSeconds(scene: Scene): number {
+  if (!movesThroughout(scene)) return 0;
+  return round3(scene.duration * MAX_SHOT_GROWTH);
+}
+
+/** Gives recovered seconds to the shots that can carry them, largest capacity first. */
+function redistribute(scenes: readonly Scene[], seconds: number): { scenes: Scene[]; placed: number } {
+  const capacity = scenes.map(absorbableSeconds);
+  const total = round3(capacity.reduce((sum, value) => sum + value, 0));
+  if (total <= 0) return { scenes: [...scenes], placed: 0 };
+
+  const placing = Math.min(seconds, total);
+  const next = scenes.map((scene, index) => {
+    const share = capacity[index] ?? 0;
+    if (share <= 0) return scene;
+    const extra = round3((share / total) * placing);
+    return extra > 0 ? { ...scene, duration: round3(scene.duration + extra), status: 'draft' as const } : scene;
+  });
+  const placed = round3(
+    next.reduce((sum, scene) => sum + scene.duration, 0) - scenes.reduce((sum, scene) => sum + scene.duration, 0),
+  );
+  return { scenes: next, placed };
+}
+
+/**
+ * The shots that gave time back and left it homeless.
+ *
+ * Named so the escalation can say which beat is short of content rather than
+ * reporting that the film came out the wrong length, which tells nobody what
+ * to change.
+ */
+function starved(scenes: readonly Scene[], issues: readonly QaIssue[]): string[] {
+  const held = new Set(
+    issues.filter((issue) => issue.check === 'still_frame_hold' && issue.sceneId).map((issue) => issue.sceneId!),
+  );
+  return scenes.filter((scene) => held.has(scene.id)).map((scene) => scene.id);
 }
 
 /** Opens a record for an attempted repair. The outcome is written after. */
@@ -403,8 +550,11 @@ export function beginRepair(params: {
     action: params.action,
     attempt: params.attempt,
     outcome: 'unchanged',
-    costUsd: 0,
-    latencyMs: 0,
+    level: REPAIR_LEVEL[params.action],
+    providerCostUsd: 0,
+    computeMs: 0,
+    estimatedComputeCostUsd: 0,
+    wallClockMs: 0,
     note: '',
   };
 }
@@ -420,8 +570,15 @@ export function settleRepairs(params: {
   attempted: readonly RepairRecord[];
   before: readonly QaIssue[];
   after: readonly QaIssue[];
-  costUsd: number;
-  latencyMs: number;
+  /** What providers were paid for this pass. Zero for a deterministic edit. */
+  providerCostUsd: number;
+  /** Machine time the pass consumed, which is never zero. */
+  computeMs: number;
+  estimatedComputeCostUsd: number;
+  /** What the customer waited, wall clock. */
+  wallClockMs: number;
+  /** Rejected by the score: the candidate was rolled back, so nothing was achieved. */
+  rejected?: boolean;
 }): RepairRecord[] {
   const key = (issue: { check: QaCheck; sceneId: string | null }) => `${issue.check}:${issue.sceneId ?? 'film'}`;
   const stillThere = new Set(params.after.map(key));
@@ -433,19 +590,38 @@ export function settleRepairs(params: {
   // another is not a success.
   const introduced = params.after.filter((issue) => !wasThere.has(key(issue)));
 
+  /*
+   * The costs are shares of the pass, not per-repair measurements.
+   *
+   * Several deterministic repairs go into one candidate and one render, so
+   * there is one bill and one wait to attribute. Reporting the pass's whole
+   * wall clock against each record would say a two-repair pass took twice as
+   * long as it did, which is how "one render" came to read as "two renders".
+   */
   return params.attempted.map((record) => {
     const gone = !stillThere.has(key(record));
     const brokeSomething = introduced.length > 0;
+    const outcome: RepairRecord['outcome'] = params.rejected
+      ? 'rejected'
+      : gone
+        ? brokeSomething
+          ? 'worse'
+          : 'fixed'
+        : 'unchanged';
     return {
       ...record,
-      outcome: gone ? (brokeSomething ? 'worse' : 'fixed') : 'unchanged',
-      costUsd: round3(params.costUsd * share),
-      latencyMs: Math.round(params.latencyMs * share),
-      note: gone
-        ? brokeSomething
-          ? `Repaired, but the pass introduced ${introduced.length} new finding(s).`
-          : ''
-        : 'The finding came back.',
+      outcome,
+      providerCostUsd: round3(params.providerCostUsd * share),
+      computeMs: Math.round(params.computeMs * share),
+      estimatedComputeCostUsd: round4(params.estimatedComputeCostUsd * share),
+      wallClockMs: Math.round(params.wallClockMs * share),
+      note: params.rejected
+        ? 'Rolled back: the repaired cut broke a constraint the film has to keep.'
+        : gone
+          ? brokeSomething
+            ? `Repaired, but the pass introduced ${introduced.length} new finding(s).`
+            : ''
+          : 'The finding came back.',
     };
   });
 }
@@ -478,4 +654,9 @@ function heldFindingFor(issues: readonly QaIssue[], sceneId: string): QaIssue | 
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+/** Compute costs are fractions of a cent, so three places would round them to nothing. */
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }
