@@ -243,13 +243,32 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
       });
 
       /*
-       * A replan that produced nothing usable stops here.
+       * A replan that produced nothing usable spends its attempt and asks
+       * again, while there is budget for it.
        *
-       * The film the customer gets is the last whole one, which the render
-       * already committed and already explained; queueing another render of
-       * the same storyboard would spend the budget proving the same thing.
+       * The director is not deterministic: two calls on the same beat produce
+       * different options, and a proposal that fell half a second short of
+       * filling the beat is not evidence that no proposal can. Stopping on the
+       * first empty answer left the budget unspent and the film held for a
+       * person over something the next attempt would have fixed. When the
+       * budget is gone the film stands as the last whole one, which the render
+       * has already committed and already explained.
        */
-      if (!replanned.storyboardId) return replanned;
+      if (!replanned.storyboardId) {
+        if (budgetAllowsReplan(budget)) {
+          await enqueueNext(
+            context,
+            'creative_replan',
+            {
+              escalation,
+              budget: spendReplan(budget, escalation.sceneIds.length > 1),
+              attempt: Number(payload['attempt'] ?? 0) + 1,
+            },
+            9,
+          );
+        }
+        return replanned;
+      }
 
       await enqueueNext(
         context,

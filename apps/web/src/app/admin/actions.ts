@@ -143,6 +143,15 @@ export async function saveRoutingAction(
   const user = await requireSuperAdmin();
   const current = await getPlatformConfig();
 
+  /** A price the operator typed, or nothing — a blank field never zeroes one. */
+  function priceFromForm(form: FormData, tier: string, model: string) {
+    const input = Number(form.get(`${tier}.input`));
+    const output = Number(form.get(`${tier}.output`));
+    if (!model || !Number.isFinite(input) || !Number.isFinite(output)) return {};
+    if (input <= 0 && output <= 0) return {};
+    return { [model]: { input: Math.max(0, input), output: Math.max(0, output) } };
+  }
+
   const parsed = ProviderConfig.safeParse({
     ...current.providers,
     llm: {
@@ -151,6 +160,20 @@ export async function saveRoutingAction(
         fast: String(formData.get('llm.fast') ?? current.providers.llm.routing.fast),
         balanced: String(formData.get('llm.balanced') ?? current.providers.llm.routing.balanced),
         deep: String(formData.get('llm.deep') ?? current.providers.llm.routing.deep),
+      },
+      /*
+       * What each routed model costs, per million tokens.
+       *
+       * Kept beside the routing because they are the same decision: pointing
+       * a tier at a model whose price nobody has entered means every call on
+       * that tier is billed to the customer at whatever the dearest rate on
+       * record happens to be.
+       */
+      prices: {
+        ...current.providers.llm.prices,
+        ...priceFromForm(formData, 'llm.fast', String(formData.get('llm.fast') ?? '')),
+        ...priceFromForm(formData, 'llm.balanced', String(formData.get('llm.balanced') ?? '')),
+        ...priceFromForm(formData, 'llm.deep', String(formData.get('llm.deep') ?? '')),
       },
     },
     browser: {

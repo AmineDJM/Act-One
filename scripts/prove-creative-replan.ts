@@ -210,8 +210,11 @@ while (outcome.escalation && budgetAllowsReplan(budget)) {
   replans += 1;
 
   if (!replanned.storyboardId) {
-    console.log('  the director produced nothing usable.');
-    break;
+    // Spends the attempt and asks again while the budget holds: the director
+    // is not deterministic, and one thin proposal is not proof there is none.
+    console.log('  nothing usable this time.');
+    if (!budgetAllowsReplan(budget)) break;
+    continue;
   }
   strategy = replanned.strategy;
   directionCostUsd += replanned.replan?.directionCostUsd ?? 0;

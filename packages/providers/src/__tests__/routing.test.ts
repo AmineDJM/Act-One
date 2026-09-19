@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   DEFAULT_ROUTING,
   IMAGE_RESOLUTION,
@@ -6,6 +6,7 @@ import {
   VIDEO_RESOLUTION,
   priceFor,
   pricedModels,
+  setModelPrices,
   unpricedModels,
 } from '../index.ts';
 
@@ -65,5 +66,34 @@ describe('how small a generated shot is allowed to be', () => {
     for (const tier of ['authentic', 'studio', 'cinematic'] as const) {
       expect(rank[IMAGE_RESOLUTION[tier]], tier).toBeGreaterThanOrEqual(rank[VIDEO_RESOLUTION[tier]]);
     }
+  });
+});
+
+describe('what a model costs, set by whoever pays the bill', () => {
+  afterEach(() => setModelPrices({}));
+
+  it('bills a model the operator priced at that price', () => {
+    setModelPrices({ 'gpt-5.4': { input: 1.25, output: 10 } });
+    // A million in, a million out.
+    expect(priceFor('gpt-5.4', 1_000_000, 1_000_000)).toBeCloseTo(11.25);
+  });
+
+  it('stops calling a model unpriced once it has a price', () => {
+    priceFor('some-model-nobody-priced', 1000, 1000);
+    expect(unpricedModels()).toContain('some-model-nobody-priced');
+    setModelPrices({ 'some-model-nobody-priced': { input: 1, output: 2 } });
+    expect(unpricedModels()).not.toContain('some-model-nobody-priced');
+  });
+
+  it('keeps guessing high for a model nobody has priced', () => {
+    /*
+     * The safe direction. A price list compiled into a build goes stale the
+     * week after it ships, and the models this product routes to by default
+     * are newer than any table anyone remembered to update — so the fallback
+     * over-bills rather than under-bills, and the console says which models
+     * it is guessing about.
+     */
+    const dearest = Math.max(...pricedModels().map((model) => priceFor(model, 1_000_000, 1_000_000)));
+    expect(priceFor('a-model-from-next-year', 1_000_000, 1_000_000)).toBe(dearest);
   });
 });

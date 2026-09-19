@@ -116,6 +116,7 @@ export default async function ProvidersPage() {
         ))}
 
         <RoutingForm
+          prices={config.providers.llm.prices}
           routing={{
             llm: config.providers.llm.routing,
             browser: {

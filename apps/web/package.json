@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_USE_ENV_PROXY=1 next dev",
     "build": "next build",
-    "start": "next start -p ${PORT:-3000}",
+    "start": "NODE_USE_ENV_PROXY=1 next start -p ${PORT:-3000}",
     "lint": "next lint"
   },
   "dependencies": {

@@ -60,18 +60,43 @@ const DEFAULT_ROUTING: OpenAiModelRouting = {
  * that overstates is a report somebody double-checks and one that understates
  * is one they act on.
  */
-const PRICING: Record<string, { input: number; output: number }> = {
+const BUILT_IN_PRICING: Record<string, { input: number; output: number }> = {
   'gpt-4.1': { input: 2.0, output: 8.0 },
   'gpt-4.1-mini': { input: 0.4, output: 1.6 },
   'gpt-4o': { input: 2.5, output: 10.0 },
   'gpt-4o-mini': { input: 0.15, output: 0.6 },
 };
 
-/** The dearest rate in the table, for a model nobody has priced. */
-const UNPRICED = Object.values(PRICING).reduce(
-  (dearest, rate) => ({ input: Math.max(dearest.input, rate.input), output: Math.max(dearest.output, rate.output) }),
-  { input: 0, output: 0 },
-);
+/**
+ * What a model costs, per million tokens, as something an operator can set.
+ *
+ * A price list compiled into a build goes stale the week after it ships, and
+ * the models this product actually routes to are newer than any table anyone
+ * remembered to update — so every call was billed at the dearest rate in the
+ * table and the ledger was quietly wrong about what the business spends. It
+ * still falls back to that rate, because guessing high is the safe direction,
+ * but the operator can now put the real number in without a deploy and the
+ * console says which models are still guesses.
+ */
+let PRICING: Record<string, { input: number; output: number }> = { ...BUILT_IN_PRICING };
+
+export function setModelPrices(prices: Record<string, { input: number; output: number }>): void {
+  PRICING = { ...BUILT_IN_PRICING, ...prices };
+  // A model that has just been given a price is no longer a model we warned
+  // about, and an operator who fixed it should stop being told off for it.
+  for (const model of Object.keys(prices)) warned.delete(model);
+}
+
+/** The dearest rate on record, for a model nobody has priced. Guessing high is safe. */
+function unpriced(): { input: number; output: number } {
+  return Object.values(PRICING).reduce(
+    (dearest, rate) => ({
+      input: Math.max(dearest.input, rate.input),
+      output: Math.max(dearest.output, rate.output),
+    }),
+    { input: 0, output: 0 },
+  );
+}
 
 const warned = new Set<string>();
 
@@ -358,7 +383,7 @@ export function priceFor(model: string, inputTokens: number, outputTokens: numbe
     warned.add(model);
     console.warn(`[openai] no price on record for ${model}; the ledger is charging it at the dearest rate we know.`);
   }
-  const pricing = known ?? UNPRICED;
+  const pricing = known ?? unpriced();
   return (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
 }
 

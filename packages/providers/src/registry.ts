@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AppError, type SpeechQuality } from '@act-one/core';
 import { NullCostSink, ProviderError, type CostSink, type ProviderHealth } from './types.ts';
-import { DEFAULT_ROUTING, OpenAiLlmProvider } from './llm/openai.ts';
+import { DEFAULT_ROUTING, OpenAiLlmProvider, setModelPrices } from './llm/openai.ts';
 import type { LlmProvider } from './llm/types.ts';
 import { BrowserbaseProvider } from './browser/browserbase.ts';
 import { LocalChromiumProvider } from './browser/local.ts';
@@ -42,6 +42,17 @@ const LlmConfig = z.object({
       deep: z.string().default(DEFAULT_ROUTING.deep),
     })
     .default(() => ({ ...DEFAULT_ROUTING })),
+  /*
+   * What each model costs per million tokens, set by the operator.
+   *
+   * A price list compiled into a build goes stale the week after it ships,
+   * and the models this product routes to by default are newer than any table
+   * anyone remembered to update — so the ledger charged every call at the
+   * dearest rate it knew and was quietly wrong about what the business spends.
+   */
+  prices: z
+    .record(z.string(), z.object({ input: z.number().min(0), output: z.number().min(0) }))
+    .default({}),
 });
 
 const BrowserConfig = z.object({
@@ -157,10 +168,13 @@ export class ProviderRegistry {
     return this.memo(
       'llm',
       () =>
-        new OpenAiLlmProvider({
-          costSink: this.costSink,
-          routing: this.config.llm.routing,
-        }),
+        (() => {
+          setModelPrices(this.config.llm.prices);
+          return new OpenAiLlmProvider({
+            costSink: this.costSink,
+            routing: this.config.llm.routing,
+          });
+        })(),
     );
   }
 

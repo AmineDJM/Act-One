@@ -13,8 +13,10 @@ import styles from '../admin.module.css';
  */
 export function RoutingForm({
   routing,
+  prices,
   budget,
 }: {
+  prices: Record<string, { input: number; output: number }>;
   routing: {
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
@@ -55,17 +57,110 @@ export function RoutingForm({
             <div className="field">
               <label htmlFor="llm-fast">Fast tier</label>
               <input id="llm-fast" name="llm.fast" className="input" defaultValue={routing.llm.fast} />
-              <span className="hint">Classification, revisions, short calls.</span>
+              <span className="hint">
+                Classification, revisions, short calls.{' '}
+                {prices[routing.llm.fast]
+                  ? `$${prices[routing.llm.fast]!.input} in / $${prices[routing.llm.fast]!.output} out per 1M tokens.`
+                  : 'No price on record — every call on this tier is billed at the dearest rate we know.'}
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="llm-fast-input">Fast price, per 1M tokens</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  id="llm-fast-input"
+                  name="llm.fast.input"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="input"
+                  defaultValue={prices[routing.llm.fast]?.input ?? ''}
+                />
+                <input
+                  name="llm.fast.output"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="output"
+                  defaultValue={prices[routing.llm.fast]?.output ?? ''}
+                  aria-label="Fast output price per 1M tokens"
+                />
+              </div>
+              <span className="hint">From the provider&rsquo;s own billing page. Blank leaves it as it is.</span>
             </div>
             <div className="field">
               <label htmlFor="llm-balanced">Balanced tier</label>
               <input id="llm-balanced" name="llm.balanced" className="input" defaultValue={routing.llm.balanced} />
-              <span className="hint">Navigation planning, moment selection.</span>
+              <span className="hint">
+                Navigation planning, moment selection.{' '}
+                {prices[routing.llm.balanced]
+                  ? `$${prices[routing.llm.balanced]!.input} in / $${prices[routing.llm.balanced]!.output} out per 1M tokens.`
+                  : 'No price on record — every call on this tier is billed at the dearest rate we know.'}
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="llm-balanced-input">Balanced price, per 1M tokens</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  id="llm-balanced-input"
+                  name="llm.balanced.input"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="input"
+                  defaultValue={prices[routing.llm.balanced]?.input ?? ''}
+                />
+                <input
+                  name="llm.balanced.output"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="output"
+                  defaultValue={prices[routing.llm.balanced]?.output ?? ''}
+                  aria-label="Balanced output price per 1M tokens"
+                />
+              </div>
+              <span className="hint">From the provider&rsquo;s own billing page. Blank leaves it as it is.</span>
             </div>
             <div className="field">
               <label htmlFor="llm-deep">Deep tier</label>
               <input id="llm-deep" name="llm.deep" className="input" defaultValue={routing.llm.deep} />
-              <span className="hint">Product understanding, concepts, storyboard.</span>
+              <span className="hint">
+                Product understanding, concepts, storyboard.{' '}
+                {prices[routing.llm.deep]
+                  ? `$${prices[routing.llm.deep]!.input} in / $${prices[routing.llm.deep]!.output} out per 1M tokens.`
+                  : 'No price on record — every call on this tier is billed at the dearest rate we know.'}
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="llm-deep-input">Deep price, per 1M tokens</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  id="llm-deep-input"
+                  name="llm.deep.input"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="input"
+                  defaultValue={prices[routing.llm.deep]?.input ?? ''}
+                />
+                <input
+                  name="llm.deep.output"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="output"
+                  defaultValue={prices[routing.llm.deep]?.output ?? ''}
+                  aria-label="Deep output price per 1M tokens"
+                />
+              </div>
+              <span className="hint">From the provider&rsquo;s own billing page. Blank leaves it as it is.</span>
             </div>
             <div className="field">
               <label htmlFor="browser-primary">Browser</label>
