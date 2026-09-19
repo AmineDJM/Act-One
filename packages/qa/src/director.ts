@@ -62,6 +62,16 @@ function systemPrompt(format: FilmFormat, cut: FilmCut): string {
     '',
     `This is a ${spec.title.toLowerCase()}, cut as a ${cutSpec.title.toLowerCase()}: ${cutSpec.aspect}, ${cutSpec.seconds[0]}\u2013${cutSpec.seconds[1]} seconds. ${spec.blurb} ${spec.never}`,
     cutSpec.direction,
+    ...(cut === 'short'
+      ? [
+          '',
+          'Judge it as short form, which is a different medium rather than a shorter film. Do not',
+          'praise a held opening, an image given room or a slow build \u2014 those are what a film',
+          'somebody chose to watch is made of, and here they are why nobody saw it. Do not reward',
+          'the opposite either: a cut on a metronome, a zoom on every beat and a caption on every',
+          'word are what this format looks like when somebody confused retention with noise.',
+        ]
+      : []),
     'That was the customer\u2019s decision and it is not yours to review. Judge the film they asked',
     'for, and never grade it down for being that film.',
     '',

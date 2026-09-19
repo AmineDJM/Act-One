@@ -26,6 +26,39 @@ export const REAL_PRODUCT_VISUAL_TYPES: readonly VisualType[] = [
 ] as const;
 
 /**
+ * Showing the product, and being led by it, are two different things.
+ *
+ * `product_ui` is the live interface being driven: a cursor crossing it, a
+ * sequence playing through it, a panel opening. That is what a tour is made
+ * of — the film's argument is carried by watching the thing work.
+ *
+ * The other two are the product *seen*: a capture staged flat and moved
+ * through, or staged in space as an object. They are a glimpse, the way a
+ * brand film cuts to the thing it has been talking about, and a film can use
+ * one without becoming a demonstration.
+ *
+ * The split exists because "a pitch shows no interface" turned out to be the
+ * wrong rule. Plenty of pitch films are better for one shot of the real thing;
+ * what ruins them is being *structured* around it.
+ */
+export const PRODUCT_NAVIGATION_VISUAL_TYPES: readonly VisualType[] = ['product_ui'] as const;
+
+export const PRODUCT_GLIMPSE_VISUAL_TYPES: readonly VisualType[] = [
+  'screenshot_motion',
+  'product_ui_3d',
+] as const;
+
+/** Whether this shot is the interface being driven rather than merely seen. */
+export function navigatesTheProduct(visualType: VisualType): boolean {
+  return PRODUCT_NAVIGATION_VISUAL_TYPES.includes(visualType);
+}
+
+/** Whether this shot puts the product on screen at all, driven or not. */
+export function showsTheProduct(visualType: VisualType): boolean {
+  return REAL_PRODUCT_VISUAL_TYPES.includes(visualType);
+}
+
+/**
  * Visual types that draw themselves and need nothing handed to them.
  *
  * A logo reveal composes the brand lockup, and a transition is a deliberate

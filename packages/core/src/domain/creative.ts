@@ -19,12 +19,21 @@ export type CreativeMode = z.infer<typeof CreativeMode>;
  * `pitch` is the film for everybody else. A school, a studio, a fund, a
  * consultancy — and plenty of software companies, whose interface is a
  * spreadsheet nobody wants to watch and whose actual argument is what happens
- * because of it. Nothing navigates. The film is carried by image, figure,
- * voice and cut, which is what most of the work people admire actually is.
+ * because of it. It is carried by image, figure, voice and cut, which is what
+ * most of the work people admire actually is.
  *
- * The distinction is load-bearing rather than cosmetic: a pitch never opens an
- * authenticated session against the customer's product, never routes a shot to
- * a product visual type, and is judged on a different question in the edit.
+ * A pitch is not forbidden to show the product. It may cut to a screen, a
+ * page or a capture where that genuinely helps — a brand film cutting to the
+ * thing it has been talking about is an old and good move, and banning it
+ * outright made the format poorer than it needed to be. What it may not do is
+ * become a product tour wearing a pitch's clothes: the interface may not open
+ * the film, may not carry consecutive beats, and may not occupy enough of the
+ * runtime that the film is really a demonstration with an atmospheric
+ * introduction.
+ *
+ * So the line is structural rather than categorical. A tour is led by
+ * navigation; a pitch is led by the story, and shows the product when the
+ * story calls for it.
  */
 export const FilmFormat = z.enum(['product_tour', 'pitch']);
 export type FilmFormat = z.infer<typeof FilmFormat>;
@@ -64,15 +73,18 @@ export const FILM_FORMATS: Record<
   },
   pitch: {
     title: 'Pitch film',
-    blurb: 'No navigation. The film argues, it does not demonstrate.',
+    blurb: 'Led by the story, not by the interface.',
     suits: 'A school, an institution, a studio — or software that would rather be talked about.',
     carries:
       'Image, figure, voice and cut. Photography the customer already owns, commissioned ' +
       'footage, light and form in three dimensions, and typography that is designed rather ' +
-      'than defaulted to.',
+      'than defaulted to. One glimpse of the real thing is allowed where it earns its place — ' +
+      'a screen, a page, a capture — the way a brand film cuts to the object it has been ' +
+      'talking about.',
     never:
-      'Never a screenshot, never a cursor, never an interface of any kind — not the real one ' +
-      'and certainly not an invented one. The product is spoken about, never navigated.',
+      'Never a tour in disguise. The interface does not open the film, does not carry two beats ' +
+      'in a row, and never becomes what the film is about — and an invented interface is out of ' +
+      'the question here exactly as it is everywhere else.',
   },
 };
 

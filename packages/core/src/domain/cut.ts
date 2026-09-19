@@ -50,7 +50,12 @@ export type CutSpec = {
    * arrives after the decision has been made.
    */
   hookSeconds: number;
-  /** Whether the captions go into the picture. In a feed, always. */
+  /**
+   * Whether the captions go into the picture.
+   *
+   * In a feed, always: most playback is muted, so the captions are the words
+   * rather than an accessibility track, and they are composed with the frame.
+   */
   captionsBurned: boolean;
   /** Handed to every writing agent verbatim, so they all cut to the same film. */
   direction: string;
@@ -83,12 +88,19 @@ export const FILM_CUTS: Record<FilmCut, CutSpec> = {
     hookSeconds: 1,
     captionsBurned: true,
     direction:
-      'This film is scrolled past by default, in a vertical frame, with the sound off. The first ' +
-      'second decides whether there is a second one, so open on the strongest thing in the film ' +
-      'rather than building to it — no title card before the idea, no logo before the hook. ' +
-      'Every shot carries its meaning in the picture and in the words on it, because the voice ' +
-      'is not heard. Compose in the middle of the frame: the top and the bottom belong to the ' +
-      'platform. Fewer ideas, held for less time, and the end card is short.',
+      'This is a different medium from a classic film, not a shorter one. It is scrolled past by ' +
+      'default, in a vertical frame, with the sound off, and the viewer leaves at any moment at ' +
+      'no cost. The first second decides whether there is a second one, so it opens on the ' +
+      'strongest thing in the film rather than building to it — no title card before the idea, ' +
+      'no logo before the hook, no establishing shot. Every shot earns its place: nothing is ' +
+      'held for atmosphere alone, and every beat carries its meaning in the picture and in the ' +
+      'words on it, because the voice is not heard. Something changes at least every two ' +
+      'seconds. The payoff lands before the last fifth. Higher information density, shorter ' +
+      'pauses, shorter shots, an earlier emotional peak and a tighter ending than a classic ' +
+      'film. Composed natively for a phone — subjects framed for a vertical screen, and the top ' +
+      'and bottom of the frame left to the platform. And still premium: this is attention ' +
+      'engineering, not decoration. A cut on a metronome, a zoom on every beat and a caption on ' +
+      'every word are what this format looks like when somebody confuses retention with noise.',
   },
 };
 

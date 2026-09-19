@@ -1,7 +1,7 @@
 import { AppError, cutAspect, rankLibraryAssets, storyboardEstimatedCost } from '@act-one/core';
 import { planFor } from '../entitlements.ts';
 import { CreativeDirector, StoryboardEngine, detectLanguage } from '@act-one/creative';
-import { runDeterministicChecks } from '@act-one/qa';
+import { runDeterministicChecks, runShortFormChecks } from '@act-one/qa';
 import type { StageContext } from '../context.ts';
 
 /**
@@ -117,6 +117,16 @@ export async function runStoryboard(
     aspect: cutAspect(project.brief.filmCut),
     knownEvidenceIds: new Set(understanding.evidence.map((evidence) => evidence.id)),
   });
+  /*
+   * And the checks a feed cut has that a classic film does not. A short that
+   * opens on setup, holds a still frame or lands its payoff on the last shot
+   * is broken before a frame is rendered, and finding that out afterwards
+   * costs a render and tells the customer something they cannot act on.
+   */
+  if (project.brief.filmCut === 'short') {
+    issues.push(...runShortFormChecks(built.storyboard));
+  }
+
   const blockers = issues.filter((issue) => issue.severity === 'blocker');
 
   // The language the film was written in, so the voice can be chosen for

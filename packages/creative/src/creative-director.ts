@@ -131,7 +131,7 @@ export class CreativeDirector {
             ...formatDirectionLines(input.brief.filmFormat),
             ...cutDirectionLines(input.brief.filmCut),
             input.brief.filmFormat === 'pitch'
-              ? '"productUiUsage" is how this film refuses the interface: what it cuts to at the moments a lesser film would cut to a screen. Write it as direction, not as an apology.'
+              ? '"productUiUsage" is the rule for the interface in this film: at most one held look at the real thing, where it is the strongest shot available, with the story either side of it. Never the opening, never two in a row, never a walkthrough. Say which moment earns it, or say that none does.'
               : '',
             `Runtime: about ${input.brief.durationSeconds ?? input.concept.estimatedDurationSeconds} seconds.`,
             input.brief.creativeMode === 'authentic'
@@ -188,7 +188,7 @@ export class CreativeDirector {
           ? ['No slow build — the first second is the strongest frame in the film']
           : []),
         ...(input.brief.filmFormat === 'pitch'
-          ? ['No interface of any kind — this film argues about the product, it does not navigate it']
+          ? ['No walkthrough — the interface is a cutaway here, never what the film is about']
           : []),
         ...value.exclusions,
         ...system.prohibitions.slice(0, 2),

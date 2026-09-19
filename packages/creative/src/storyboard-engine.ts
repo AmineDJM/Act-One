@@ -9,6 +9,7 @@ import {
   findMoment,
   newId,
   coherentRecipe,
+  navigatesTheProduct,
   REAL_PRODUCT_VISUAL_TYPES,
   resequence,
   round3,
@@ -35,9 +36,17 @@ import {
   type VisualType,
 } from '@act-one/core';
 import type { CallContext, LlmProvider } from '@act-one/providers';
-import { archetypesFor, getSystem, pacedForCut, type CreativeSystem, type SceneArchetype } from './systems/index.ts';
+import {
+  archetypesFor,
+  getSystem,
+  pacedForCut,
+  PITCH_MOMENTS_OFFERED,
+  type CreativeSystem,
+  type SceneArchetype,
+} from './systems/index.ts';
 import { routeShot, enforceBudget, checkBudget, type BudgetViolation } from './shot-routing.ts';
 import { copyFits, fitToDuration, narrationSeconds, readingSeconds, varyRhythm, type TimingConstraint } from './timing.ts';
+import { canOpenAShort, shortRhythm, shortStructureLines, withAttentionReset } from './short-form.ts';
 
 /**
  * The Storyboard Engine.
@@ -139,7 +148,7 @@ export class StoryboardEngine {
      * The vocabulary this film is allowed to speak in.
      *
      * Everything else in this method reads from here rather than from the
-     * system directly, so a pitch cannot reach a product archetype by any
+     * system directly, so a pitch cannot reach a navigation archetype by any
      * route — not through the planner, not through a fuzzy id match, not
      * through the positional fallback.
      */
@@ -265,10 +274,19 @@ export class StoryboardEngine {
   ): Promise<z.infer<typeof ScenePlan>> {
     const format = input.brief.filmFormat;
     const cut = input.brief.filmCut;
-    // A pitch is not shown the moments at all. Listing captures it may not use
-    // is how a planner talks itself into a product beat and then writes copy
-    // that only makes sense over a screenshot nobody will see.
-    const moments = format === 'pitch' ? [] : input.understanding.productMoments;
+    /*
+     * A pitch is shown the moments, and shown fewer of them.
+     *
+     * It may cut to the real thing once, so hiding the captures entirely left
+     * it nothing to cut to. Offering the whole list is the other failure: a
+     * planner given eight product moments plans a walkthrough, whatever the
+     * brief above it says. The three strongest is enough for a cutaway and
+     * not enough for a tour.
+     */
+    const moments =
+      format === 'pitch'
+        ? input.understanding.productMoments.slice(0, PITCH_MOMENTS_OFFERED)
+        : input.understanding.productMoments;
     const claims = [
       ...input.understanding.keyBenefits,
       ...input.understanding.differentiators,
@@ -314,11 +332,11 @@ export class StoryboardEngine {
             ),
             ``,
             ...formatLines(format),
-            ...cutLines(cut),
+            ...cutLines(cut, target),
             ``,
             `# Product moments available (id — what happens — what we can actually show)`,
-            ...(format === 'pitch'
-              ? ['- none. This film does not navigate the product. Leave every "momentId" null.']
+            ...(format === 'pitch' && moments.length === 0
+              ? ['- none. Carry the film on image, figure and type.']
               : moments.length > 0
                 ? moments.map(
                     (m) =>
@@ -394,6 +412,11 @@ export class StoryboardEngine {
      * beat to the same typographic recipe and reads as a template.
      */
     let previousRecipe: MotionRecipeName | null = null;
+    /*
+     * Carried for the same reason as the recipe: two identical camera moves in
+     * a row is one long move with a cut in it, which resets nothing.
+     */
+    let previousMove: CameraRecipe['move'] | null = null;
 
     /*
      * Real pictures first. A scene the planner gave a library picture shows
@@ -411,20 +434,13 @@ export class StoryboardEngine {
 
     const drafted = plan.scenes.map((planned, index): { scene: Scene; planned: typeof planned } => {
       const archetype = this.resolveArchetype(archetypes, planned.archetypeId, index, plan.scenes.length);
-      // A pitch never films a moment, so a moment id the planner supplied
-      // anyway is dropped here rather than carried into assetRefs.
-      const moment =
-        format !== 'pitch' && planned.momentId
-          ? findMoment(input.understanding, planned.momentId)
-          : undefined;
+      const moment = planned.momentId ? findMoment(input.understanding, planned.momentId) : undefined;
       const picked = planned.libraryAssetId && !used.has(planned.libraryAssetId) ? library.get(planned.libraryAssetId) : undefined;
       if (picked) used.add(picked.id);
-      // In a pitch a product capture from the archive is still a product
-      // capture, and the format says no interface. It is simply not used.
       const pickedIsProduct = Boolean(picked && isRealProductAsset(picked));
       const pickedIsPhoto = Boolean(picked && !pickedIsProduct);
-      const usablePicture = format === 'pitch' ? pickedIsPhoto : Boolean(picked);
-      const hasRealAsset = format !== 'pitch' && (Boolean(moment && moment.screenshots.length > 0) || pickedIsProduct);
+      const usablePicture = Boolean(picked);
+      const hasRealAsset = Boolean(moment && moment.screenshots.length > 0) || pickedIsProduct;
 
       const routed = routeShot({
         purpose: purposeFor(archetype, planned.generativeBrief.length > 0),
@@ -448,7 +464,9 @@ export class StoryboardEngine {
        */
       const vetoed =
         (archetype.requiresProductAsset && !hasRealAsset) ||
-        (format === 'pitch' && REAL_PRODUCT_VISUAL_TYPES.includes(archetype.visualType)) ||
+        // A pitch may cut to the product. It may not work through it — that is
+        // the other format, and the one thing the customer said no to.
+        (format === 'pitch' && navigatesTheProduct(archetype.visualType)) ||
         (archetype.visualType === 'real_media' && !usablePicture) ||
         (!allowGenerative &&
           !usablePicture &&
@@ -487,6 +505,19 @@ export class StoryboardEngine {
       );
       previousRecipe = motionRecipe.name;
 
+      /*
+       * In a feed, a frame that does nothing for two seconds is a scroll. The
+       * reset is a property of the shot rather than a note in a brief, so it
+       * is decided here where the shot is built.
+       */
+      const cameraRecipe =
+        cut === 'short'
+          ? withAttentionReset(cameraFor(archetype, input.brand), {
+              ...(previousMove ? { previousMove } : {}),
+            })
+          : cameraFor(archetype, input.brand);
+      previousMove = cameraRecipe.move;
+
       const scene: Scene = {
         id: sceneId,
         storyboardId,
@@ -500,7 +531,7 @@ export class StoryboardEngine {
         assetRefs: usablePicture && picked ? [picked.id, ...(moment?.screenshots ?? [])] : (moment?.screenshots ?? []),
         momentIds: moment ? [moment.id] : [],
         motionRecipe,
-        cameraRecipe: cameraFor(archetype, input.brand),
+        cameraRecipe,
         soundCues: [],
         voiceOver: narration.length > 0,
         generativeNeeds:
@@ -555,7 +586,30 @@ export class StoryboardEngine {
      * to the scenes that do have something to say when the timing is solved.
      */
     const kept = drafted.filter((entry) => sceneShowsSomething(entry.scene));
-    const scenes: Scene[] = kept.map((entry, index) => ({ ...entry.scene, index }));
+
+    /*
+     * A short never opens on setup.
+     *
+     * The mark, a bare transition and an empty frame are all introduction, and
+     * introduction at the top of a reel is the most reliable way there is to
+     * lose the audience — by the time it clears the screen the decision has
+     * been made. So the first shot that actually says something is moved to
+     * the front rather than dropped: it is the film's strongest material, and
+     * it was sitting behind a title card.
+     *
+     * Moved rather than refused, because refusing hands the customer a failed
+     * production over a fixable ordering mistake.
+     */
+    const ordered =
+      cut === 'short' && kept.length > 1 && !canOpenAShort(kept[0]!.scene)
+        ? (() => {
+            const opener = kept.findIndex((entry) => canOpenAShort(entry.scene));
+            if (opener <= 0) return kept;
+            return [kept[opener]!, ...kept.filter((_, index) => index !== opener)];
+          })()
+        : kept;
+
+    const scenes: Scene[] = ordered.map((entry, index) => ({ ...entry.scene, index }));
 
     /*
      * Close the film on the brand.
@@ -572,7 +626,7 @@ export class StoryboardEngine {
     const constraints: TimingConstraint[] = scenes.map((scene, index) => {
       const archetype = this.resolveArchetype(
         archetypes,
-        kept[index]?.planned.archetypeId ?? '',
+        ordered[index]?.planned.archetypeId ?? '',
         index,
         scenes.length,
       );
@@ -591,7 +645,20 @@ export class StoryboardEngine {
       };
     });
 
-    const fitted = varyRhythm(fitToDuration(constraints, target), constraints);
+    /*
+     * The cut's own rhythm.
+     *
+     * `varyRhythm` stops a classic film reading as a metronome by nudging
+     * similar shots apart. A short needs the opposite kind of help: a shape.
+     * It opens at its fastest, because the first second is the only one it is
+     * guaranteed, breathes slightly once the viewer has committed, and tightens
+     * again at the close — and the total stays exactly what it was, so the film
+     * is the length the customer asked for.
+     */
+    const fitted =
+      cut === 'short'
+        ? shortRhythm(fitToDuration(constraints, target), constraints)
+        : varyRhythm(fitToDuration(constraints, target), constraints);
     const timed = scenes.map((scene) => ({
       ...scene,
       duration: fitted.get(scene.id) ?? scene.duration,
@@ -620,7 +687,14 @@ export class StoryboardEngine {
           ...scene,
           soundCues: soundCuesFor(
             scene,
-            this.resolveArchetype(archetypes, plan.scenes[index]?.archetypeId ?? '', index, scenes.length),
+            /*
+             * The scene's own archetype, not the plan's entry at the same
+             * position. They were already different whenever a scene was
+             * dropped for having nothing on it, and a short may reorder its
+             * opening as well — so a film could take its sound cues from a
+             * beat that is no longer there.
+             */
+            this.resolveArchetype(archetypes, ordered[index]?.planned.archetypeId ?? '', index, scenes.length),
             system,
             index,
             sequenced.scenes.length,
@@ -721,21 +795,46 @@ export function stagedForCapture(
  * rather than the writer's: where the hook goes, and that a film watched
  * without sound has to carry its meaning in the picture.
  */
-function cutLines(cut: FilmCut): string[] {
+function cutLines(cut: FilmCut, target: number): string[] {
   const spec = FILM_CUTS[cut];
+  if (cut !== 'short') {
+    return [``, `# How it is cut: ${spec.title}`, ...cutDirectionLines(cut)];
+  }
+
+  /*
+   * A short is briefed as its own medium, not as a faster classic film.
+   *
+   * The structure is offered rather than imposed — good work in this format
+   * breaks its own shape, and a planner told a template produces one. What is
+   * not negotiable is the top: the strongest thing in the film goes first,
+   * because everything after the first second is played to whoever stayed.
+   */
   return [
     ``,
     `# How it is cut: ${spec.title}`,
     ...cutDirectionLines(cut),
-    ...(cut === 'short'
-      ? [
-          'Scene 1 is the strongest thing in this film, not an introduction to it. Do not plan a',
-          'title card, a logo or a question before the idea — by the time they clear the screen the',
-          'viewer has gone.',
-          'The voice is not heard. Every scene that says something must also show it or write it:',
-          'a scene whose meaning lives only in the narration is a silent scene here.',
-        ]
-      : []),
+    ``,
+    `This is not a shorter version of a classic film. It is a different medium: the viewer did`,
+    `not choose it, is not listening, and leaves at any moment at no cost.`,
+    ``,
+    `The shape it usually takes, over ${target} seconds. Depart from it where the concept genuinely`,
+    `calls for something else, and make that departure deliberate:`,
+    ...shortStructureLines(target),
+    ``,
+    `Scene 1 is the strongest thing in this film, not an introduction to it. No title card, no`,
+    `logo, no establishing shot, no question before the idea — by the time those clear the screen`,
+    `the viewer has gone.`,
+    `Every shot earns its place. There is no beat here for atmosphere alone: at ${target} seconds a`,
+    `breath is a fraction of the whole film and reads as the film having ended.`,
+    `Something changes at least every two seconds — the framing, the scale, the subject, or what`,
+    `the type is doing. That is not a cut every two seconds: a film cut on a metronome is what`,
+    `this format looks like when somebody confuses retention with noise.`,
+    `The voice is not heard. Every scene that says something must also show it or write it: a`,
+    `scene whose meaning lives only in the narration is a silent scene here.`,
+    `The payoff lands before the last fifth. A film whose point arrives at the end is a film most`,
+    `of its audience never reached.`,
+    ``,
+    standardsBrief('short_form'),
   ];
 }
 
@@ -746,13 +845,20 @@ function formatLines(format: FilmFormat): string[] {
     ...formatDirectionLines(format),
     ...(format === 'pitch'
       ? [
-          'There is no interface in this film and there is no capture to reach for. Do not plan a',
-          'scene that shows a screen, a cursor, a dashboard or a window, and do not write a',
-          'generative brief that describes one. You may say what the product does; you may not',
-          'show it being done.',
-          'The pictures you have are the archive, commissioned footage, form and light in three',
-          'dimensions, figures and type. Use them. A pitch planned entirely as title cards is the',
-          'failure mode of this format and it will be sent back.',
+          'This film is led by the story, not by the interface. It is allowed one look at the real',
+          'thing — a screen, a page, a capture — where it genuinely earns its place, the way a',
+          'brand film cuts to the object it has been talking about. Use the "glimpse" archetype for',
+          'that, and hold it: never a cursor moving, never a sequence played through, never a',
+          'walkthrough.',
+          'Four things turn this into a product tour wearing a pitch\u2019s clothes, and all four are',
+          'checked: opening on the product, two product shots in a row, more than a fifth of the',
+          'film spent on the interface, or any scene that works through it. Keep the story either',
+          'side of the glimpse.',
+          'Never write a generative brief that describes an interface \u2014 generated footage must',
+          'never stand in for the real product.',
+          'The rest of the film is the archive, commissioned footage, form and light in three',
+          'dimensions, figures and type. A pitch planned entirely as title cards is the other',
+          'failure mode of this format and it will be sent back too.',
         ]
       : []),
   ];

@@ -74,6 +74,9 @@ export const DIRECTION_DIMENSIONS = [
     id: 'argument',
     title: 'One thing, said once',
     asks: 'Does the film argue a single idea, or list features and hope one lands?',
+    asksOfAShort:
+      'Does every shot earn its place? At this length a beat that is only texture is a beat ' +
+      'that cost you a viewer.',
   },
   {
     id: 'product',
@@ -93,8 +96,9 @@ export const DIRECTION_DIMENSIONS = [
      * and most of them do not.
      */
     asksOfAPitch:
-      'The film cannot demonstrate, so does it make the thing real by other means — a picture, ' +
-      'a figure, a voice that has actually seen it — or does it only assert?',
+      'This film argues rather than demonstrates. Does it make the thing real — a picture, a ' +
+      'figure, one well-placed look at it — or does it only assert? And if it does cut to the ' +
+      'product, is that a cutaway the story earned, or has it quietly become a walkthrough?',
   },
   {
     id: 'rhythm',
@@ -116,6 +120,9 @@ export const DIRECTION_DIMENSIONS = [
     id: 'ending',
     title: 'The last two seconds',
     asks: 'Does the film land, or does it stop because it ran out of scenes?',
+    asksOfAShort:
+      'Does the payoff arrive while people are still watching, and does the film close rather ' +
+      'than trail off into an end card nobody stayed for?',
   },
   {
     id: 'image',

@@ -1,5 +1,5 @@
 import type { CameraMove, FilmFormat, SoundCueType } from '@act-one/core';
-import { REAL_PRODUCT_VISUAL_TYPES } from '@act-one/core';
+import { PRODUCT_NAVIGATION_VISUAL_TYPES } from '@act-one/core';
 import type { CreativeSystem, SceneArchetype } from './types.ts';
 
 /**
@@ -97,9 +97,16 @@ const PITCH_BEATS: readonly PitchBeat[] = [
 export function archetypesFor(system: CreativeSystem, format: FilmFormat): SceneArchetype[] {
   if (format !== 'pitch') return system.archetypes;
 
+  /*
+   * Navigation goes; the glimpse stays.
+   *
+   * What a pitch cannot have is an archetype whose job is to work through the
+   * interface — that is the other format. An archetype that stages a capture
+   * as an image is a cutaway, and a pitch is allowed one: the runtime ceiling
+   * and the structural checks decide whether it stayed a cutaway.
+   */
   const kept = system.archetypes.filter(
-    (archetype) =>
-      !archetype.requiresProductAsset && !REAL_PRODUCT_VISUAL_TYPES.includes(archetype.visualType),
+    (archetype) => !PRODUCT_NAVIGATION_VISUAL_TYPES.includes(archetype.visualType),
   );
   const covered = new Set(kept.map((archetype) => archetype.visualType));
   const ids = new Set(kept.map((archetype) => archetype.id));
@@ -108,7 +115,39 @@ export function archetypesFor(system: CreativeSystem, format: FilmFormat): Scene
     (beat) => fit(beat, system),
   );
 
-  return [...kept, ...added];
+  /*
+   * And one glimpse, for a system that had no way to show the product except
+   * by driving it. Without this, a pitch for a company whose one asset is a
+   * screenshot has nothing to cut to.
+   */
+  const glimpse: SceneArchetype[] = covered.has('screenshot_motion')
+    ? []
+    : [
+        {
+          id: 'glimpse',
+          purpose:
+            'One look at the real thing, as evidence — held, not driven, and never twice in a row',
+          visualType: 'screenshot_motion',
+          motion: 'product_zoom',
+          camera: system.archetypes.some((archetype) => archetype.camera !== 'static')
+            ? 'crop_push'
+            : 'static',
+          durationRange: glimpseRange(system),
+          maxWords: 6,
+          requiresProductAsset: true,
+          soundCues: system.sound.impactsOnCuts ? ['impact'] : ['texture'],
+        },
+      ];
+
+  return [...kept, ...added, ...glimpse];
+}
+
+/** A glimpse is shorter than the system's own beats: it is a cutaway. */
+function glimpseRange(system: CreativeSystem): [number, number] {
+  const [floor, ceiling] = system.pacing.sceneRange;
+  const average = system.pacing.averageSceneSeconds;
+  const min = clamp(round1(average * 0.5), floor, ceiling);
+  return [min, clamp(round1(average * 0.9), min + 0.4, ceiling)];
 }
 
 /** Whether a system can carry a pitch at all, which every one of them can. */
@@ -173,3 +212,12 @@ function clamp(value: number, low: number, high: number): number {
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+/**
+ * How many product moments a pitch is offered.
+ *
+ * Enough to cut to the strongest one; not enough to plan a sequence from.
+ * Hiding them entirely left a pitch nothing to cut to; offering all of them
+ * produced a walkthrough whatever the brief said.
+ */
+export const PITCH_MOMENTS_OFFERED = 3;

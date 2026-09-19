@@ -305,17 +305,6 @@ async function exploreProduct(context: StageContext, vault?: SecretVault) {
   const empty = { moments: [], captures: new Map<string, { before: Uint8Array; after: Uint8Array | null }>() };
   const { store, registry, project, organizationId } = context;
 
-  /*
-   * A pitch never signs in.
-   *
-   * The film does not navigate the product, so there is nothing an
-   * authenticated session could capture that the film is allowed to use — and
-   * opening one anyway would mean driving a browser through somebody's real
-   * account, with their real credentials, to take screenshots nobody will ever
-   * see. The least access that does the job is none.
-   */
-  if (project.brief.filmFormat === 'pitch') return empty;
-
   if (!project.productCredentialId || !vault) return empty;
 
   const credential = await store.credentials.getForProject(organizationId, project.id);

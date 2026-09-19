@@ -5,6 +5,7 @@ import {
   AppError,
   cutAspect,
   FILM_CUTS,
+  pitchDrift,
   AUDIO_STANDARDS,
   DEFAULT_FPS,
   DIALOGUE_LEAD_MIN,
@@ -495,19 +496,25 @@ async function assertProductIsReal(context: StageContext, storyboard: Storyboard
   );
 
   /*
-   * And in a pitch, the rule inverts: a real interface is as wrong as an
-   * invented one, because the customer asked for a film that does not show
-   * their product at all. Checked here for the same reason as everything else
-   * in this function — planning is upstream of the revision, the repair pass
-   * and the campaign cut, and any of those can put a screen back.
+   * And a pitch is refused when it has become a product tour.
+   *
+   * Not when it shows the product — one glimpse is the point of allowing it —
+   * but when the interface opens the film, carries two beats in a row, runs
+   * past a fifth of the runtime, or is being worked through. Checked here for
+   * the same reason as everything else in this function: planning is upstream
+   * of a revision, a repair pass and a campaign cut, and any of those can turn
+   * a cutaway into a walkthrough.
    */
-  if (context.project.brief.filmFormat === 'pitch' && productScenes.length > 0) {
-    throw new AppError(
-      'unsafe_operation',
-      `This production is a pitch film, which never shows the product's interface, but ` +
-        `${productScenes.length} scene${productScenes.length === 1 ? '' : 's'} would put one on ` +
-        'screen. Switch the production to a product tour, or direct those scenes another way.',
-    );
+  if (context.project.brief.filmFormat === 'pitch') {
+    const drift = pitchDrift(storyboard.scenes);
+    if (drift.length > 0) {
+      throw new AppError(
+        'unsafe_operation',
+        `This production is a pitch film, and it has become a product tour. ${drift
+          .map((entry) => entry.message)
+          .join(' ')} Switch the production to a product tour, or direct those scenes another way.`,
+      );
+    }
   }
 
   const ids = [...new Set(productScenes.flatMap((scene) => scene.assetRefs))];

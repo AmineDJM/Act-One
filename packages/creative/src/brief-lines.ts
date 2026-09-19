@@ -80,5 +80,14 @@ export function cutDirectionLines(cut: FilmCut): string[] {
     `How it is cut: ${spec.title}, ${spec.aspect}, ${spec.seconds[0]}\u2013${spec.seconds[1]} seconds.`,
     spec.direction,
     `The opening has ${spec.hookSeconds} second${spec.hookSeconds === 1 ? '' : 's'} to earn the rest of the film.`,
+    ...(cut === 'short'
+      ? [
+          'This is a different medium from a classic film, not a shorter one. Higher information',
+          'density, shorter shots, a stronger hook, an earlier emotional peak and a tighter ending.',
+          'And still premium: engineered for attention, never decorated for it. A cut on a',
+          'metronome, a zoom on every beat and a caption on every word are what this format looks',
+          'like when somebody confuses retention with noise.',
+        ]
+      : []),
   ];
 }

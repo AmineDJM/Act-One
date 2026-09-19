@@ -128,30 +128,13 @@ export function ProductAccess({
   if (!canManage) return null;
 
   /*
-   * A pitch is not asked for credentials.
+   * Offered for both kinds of film, described honestly for each.
    *
-   * Nothing would sign in with them — the pitch format never opens a session —
-   * so a form here would be asking for a password we have already decided not
-   * to use. Said plainly instead, with the way to change it, because somebody
-   * who wanted their product filmed and chose the wrong kind of film should
-   * find out here rather than when the master arrives without it.
+   * A pitch is led by the story rather than the interface, and it is still
+   * allowed one look at the real thing. Refusing the credential outright was
+   * the wrong call: it left a pitch with nothing to cut to at the one moment
+   * where showing the product is the strongest possible move.
    */
-  if (filmFormat === 'pitch') {
-    return (
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <h3>Your product</h3>
-          <span className="badge">Not used</span>
-        </div>
-        <p className="secondary" style={{ fontSize: '0.9rem' }}>
-          This is a pitch film: it argues about {productHost} rather than navigating it, so we do
-          not sign in and never ask for a password. Change the film to a product tour in the brief
-          above and this becomes available.
-        </p>
-      </section>
-    );
-  }
-
   return (
     <section className={styles.panel}>
       <div className={styles.panelHead}>
@@ -160,9 +143,19 @@ export function ProductAccess({
       </div>
 
       <p className="secondary" style={{ fontSize: '0.9rem' }}>
-        Without this we film your product in type and motion, using what {productHost} says
-        publicly. With it we sign in, find the moments worth showing, and film the real interface —
-        which is the difference between a film about your product and a film of it.
+        {filmFormat === 'pitch' ? (
+          <>
+            A pitch is led by the story, not the interface — but one look at the real thing, at the
+            right moment, is often the strongest shot in it. With this we sign in, find the moment
+            worth cutting to, and film it. Never a walkthrough: that is the other kind of film.
+          </>
+        ) : (
+          <>
+            Without this we film your product in type and motion, using what {productHost} says
+            publicly. With it we sign in, find the moments worth showing, and film the real
+            interface — which is the difference between a film about your product and a film of it.
+          </>
+        )}
       </p>
 
       <ul className={styles.promises}>

@@ -46,10 +46,16 @@ export function pacedForCut(
         ...system.pacing,
         averageSceneSeconds: scale(system.pacing.averageSceneSeconds),
         sceneRange: [scale(system.pacing.sceneRange[0]), scale(system.pacing.sceneRange[1])],
-        // Silence is the first luxury a feed cut loses: two seconds of nothing
-        // in a twenty-second film is a tenth of it, and a viewer who is not
-        // listening reads it as the film having stopped.
-        silenceBudget: round1(system.pacing.silenceBudget * pace),
+        /*
+         * No silence at all in a feed.
+         *
+         * A pause is a gift to somebody who chose to watch and an exit to
+         * somebody who did not: two seconds of nothing in a twenty-second
+         * film is a tenth of it, and a viewer who is not listening reads it
+         * as the film having stopped. Scaled rather than zeroed, this was
+         * still a beat of dead air in the middle of a reel.
+         */
+        silenceBudget: cut === 'short' ? 0 : round1(system.pacing.silenceBudget * pace),
       },
     },
     archetypes: archetypes.map((archetype) => ({

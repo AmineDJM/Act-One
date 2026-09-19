@@ -1,5 +1,6 @@
 import {
   budgetFor,
+  pitchDrift,
   REAL_PRODUCT_VISUAL_TYPES,
   visualMix,
   type CreativeBudget,
@@ -67,19 +68,29 @@ export type RoutingParams = {
  * What a scene is *for* decides the technique, not what would look coolest.
  */
 export function routeShot(params: RoutingParams): RoutingDecision {
-  const { purpose, allowGenerative, allowThreeD } = params;
+  const { purpose, hasRealProductAsset, allowGenerative, allowThreeD } = params;
   const format = params.format ?? 'product_tour';
   const pitch = format === 'pitch';
-  // A pitch has no product on screen, whatever the storyboard believes it
-  // captured. This is the single lock: every product branch below reads this
-  // rather than the raw flag.
-  const hasRealProductAsset = pitch ? false : params.hasRealProductAsset;
 
   switch (purpose) {
     case 'workflow':
     case 'result':
     case 'feature':
     case 'agent_behaviour':
+      /*
+       * A pitch may cut to the product; it may not work through it. So a beat
+       * about what the product does becomes a held capture rather than a live
+       * interface — the picture the film is talking over, not the thing the
+       * film is teaching. Whether it stayed a cutaway is decided across the
+       * whole storyboard, not here.
+       */
+      if (hasRealProductAsset && pitch) {
+        return {
+          visualType: 'screenshot_motion',
+          technique: 'real_product',
+          reason: 'A pitch cuts to the real thing and holds it; it never drives it.',
+        };
+      }
       if (hasRealProductAsset) {
         return {
           visualType: purpose === 'result' ? 'screenshot_motion' : 'product_ui',
@@ -90,7 +101,7 @@ export function routeShot(params: RoutingParams): RoutingDecision {
       if (pitch) {
         return {
           ...withoutTheProduct(allowGenerative, allowThreeD),
-          reason: 'A pitch talks about what the product does; it never navigates it.',
+          reason: 'No capture to cut to, so the film says it another way.',
         };
       }
       // No capture: fall back to typography rather than invent an interface.
@@ -101,6 +112,10 @@ export function routeShot(params: RoutingParams): RoutingDecision {
       };
 
     case 'hero':
+      // The hero of a pitch is an image. A capture staged in space is one —
+      // the product as an object rather than as an interface — so a pitch with
+      // real material gets it, and the ceiling decides how much of that there
+      // can be.
       if (hasRealProductAsset && allowThreeD) {
         return {
           visualType: 'product_ui_3d',
@@ -118,7 +133,7 @@ export function routeShot(params: RoutingParams): RoutingDecision {
       if (pitch) {
         return {
           ...withoutTheProduct(allowGenerative, allowThreeD),
-          reason: 'The hero of a pitch is an image, not an interface.',
+          reason: 'No capture to stage, so the image carries the hero.',
         };
       }
       return {
@@ -189,7 +204,14 @@ function withoutTheProduct(
 }
 
 export type BudgetViolation = {
-  kind: 'too_much_generative' | 'too_little_deterministic' | 'too_little_real' | 'fake_product' | 'over_cost';
+  kind:
+    | 'too_much_generative'
+    | 'too_little_deterministic'
+    | 'too_little_real'
+    | 'fake_product'
+    /** A pitch drifting into a product tour. See `pitchDrift`. */
+    | 'pitch_drift'
+    | 'over_cost';
   message: string;
   /** Scenes that should change to fix it, worst first. */
   sceneIds: string[];
@@ -265,23 +287,18 @@ export function checkBudget(
       mentionsProductSurface(scene),
   );
   /*
-   * And in a pitch the rule is absolute rather than proportional: a product
-   * visual type is not a budget overrun, it is the format broken. The customer
-   * chose a film that does not navigate their product; a single screenshot in
-   * it is the one thing they said no to.
+   * And a pitch is checked for drift rather than for purity.
+   *
+   * The customer did not ask for a film with no interface in it; they asked
+   * for a film that is not *about* the interface. So one glimpse passes, and
+   * the four ways a pitch turns into a tour — driving it, opening on it,
+   * cutting two of them together, or spending a fifth of the film on it —
+   * each come back as their own violation.
    */
-  const navigated =
-    format === 'pitch'
-      ? storyboard.scenes.filter((scene) => REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType))
-      : [];
-  if (navigated.length > 0) {
-    violations.push({
-      kind: 'fake_product',
-      message:
-        'This film is a pitch: it argues about the product rather than navigating it. ' +
-        `${navigated.length} scene${navigated.length === 1 ? '' : 's'} put the interface on screen.`,
-      sceneIds: navigated.map((scene) => scene.id),
-    });
+  if (format === 'pitch') {
+    for (const drift of pitchDrift(storyboard.scenes)) {
+      violations.push({ kind: 'pitch_drift', message: drift.message, sceneIds: drift.sceneIds });
+    }
   }
   if (fakeProduct.length > 0) {
     violations.push({

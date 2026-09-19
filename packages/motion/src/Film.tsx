@@ -104,6 +104,12 @@ export const Film: React.FC<FilmProps> = ({
  *
  * No animation. A caption that fades is a caption that is unreadable for the
  * first two hundred milliseconds of the second and a half it has.
+ *
+ * One word may be marked. In a feed the captions *are* the words, because most
+ * playback is muted, so they are composition rather than an accessibility
+ * track laid over the bottom of the frame — and the figure or the name a
+ * sentence turns on is set in the brand's own accent. Only where the cue has
+ * one: a caption that emphasises something in every line emphasises nothing.
  */
 const Captions: React.FC<{ cues: CaptionCue[]; tokens: DesignTokens; aspect: string }> = ({
   cues,
@@ -155,13 +161,34 @@ const Captions: React.FC<{ cues: CaptionCue[]; tokens: DesignTokens; aspect: str
               textWrap: 'balance',
             }}
           >
-            {line}
+            {marked(line, cue.emphasis, tokens.onCanvas.accent)}
           </span>
         ))}
       </div>
     </AbsoluteFill>
   );
 };
+
+/**
+ * The line, with its one word marked.
+ *
+ * Split on the emphasis rather than wrapped around it, so a word appearing
+ * twice is marked once — the first time, which is where the eye lands — and a
+ * cue whose emphasis broke onto the other line is returned untouched rather
+ * than half-marked.
+ */
+function marked(line: string, emphasis: string | null, accent: string): React.ReactNode {
+  if (!emphasis) return line;
+  const at = line.indexOf(emphasis);
+  if (at < 0) return line;
+  return (
+    <>
+      {line.slice(0, at)}
+      <span style={{ color: accent }}>{emphasis}</span>
+      {line.slice(at + emphasis.length)}
+    </>
+  );
+}
 
 type SceneRendererProps = {
   scene: Scene;

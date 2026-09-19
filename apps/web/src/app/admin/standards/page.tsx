@@ -115,6 +115,7 @@ const CRAFT_LABEL: Record<Craft, string> = {
   narration: 'the narration',
   sound: 'the composer',
   editing: 'the edit',
+  short_form: 'the feed cut',
   localization: 'the localiser',
 };
 

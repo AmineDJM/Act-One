@@ -34,6 +34,19 @@ export type CaptionCue = {
   text: string;
   /** One or two lines, broken where the language allows. */
   lines: string[];
+  /**
+   * The word this cue turns on, marked when the captions are in the picture.
+   *
+   * In a feed the captions *are* the words — most playback is muted — so they
+   * are composition rather than an accessibility track laid over the bottom of
+   * the frame. Marking the figure, the name or the verb the sentence hinges on
+   * is what makes a caption read as typography somebody set rather than as a
+   * subtitle bar somebody switched on.
+   *
+   * Null where nothing stands out, which is most of the time and is correct:
+   * a caption that emphasises a word in every cue emphasises nothing.
+   */
+  emphasis: string | null;
 };
 
 export type CaptionOptions = {
@@ -115,7 +128,28 @@ export function captionsFrom(
     end: round3(cue.end),
     text: cue.text,
     lines: captionLines(cue.text, perLine, script),
+    emphasis: emphasisIn(cue.text),
   }));
+}
+
+/**
+ * The word a caption turns on, or nothing.
+ *
+ * A figure first, because a number is the single most retained thing in any
+ * sentence and it is what the viewer will repeat. Then a capitalised word
+ * that is not the first — a name, a product, a place. Nothing otherwise: a
+ * sentence with no hinge does not get one invented, and emphasis everywhere
+ * is emphasis nowhere.
+ */
+export function emphasisIn(text: string): string | null {
+  const figure = /\b\d[\d.,%]*\s?(?:%|x|×|m|bn|k)?\b/i.exec(text);
+  if (figure) return figure[0].trim();
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const named = words.slice(1).find((word) => /^[A-Z][a-z]{2,}/.test(word));
+  if (named) return named.replace(/[.,;:!?]+$/, '');
+
+  return null;
 }
 
 type Grouped = { start: number; end: number; text: string };

@@ -215,7 +215,9 @@ describe('what comes back from the director', () => {
     const prompt = llm.calls[0]!.messages.map((message) => message.content).join('\n');
 
     expect(prompt).not.toMatch(/Is the product seen doing the thing/i);
-    expect(prompt).toMatch(/cannot demonstrate/i);
+    // A pitch may cut to the product; what it may not do is become a tour.
+    expect(prompt).toMatch(/argues rather than demonstrates/i);
+    expect(prompt).toMatch(/walkthrough/i);
     expect(prompt).toMatch(/never grade it down for being that film/i);
     // And the bar has not moved.
     expect(prompt).toMatch(/competent is a\s+fail/i);

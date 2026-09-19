@@ -6,6 +6,7 @@ import { EDITORIAL_STANDARDS } from './editorial.ts';
 import { LAYOUT_STANDARDS } from './layout.ts';
 import { LOCALIZATION_STANDARDS } from './localization.ts';
 import { MOTION_STANDARDS } from './motion.ts';
+import { SHORT_FORM_STANDARDS } from './short-form.ts';
 import { TYPE_STANDARDS } from './typography.ts';
 import { cite, type Standard } from './standard.ts';
 
@@ -43,7 +44,9 @@ export type Craft =
   /** The cut. */
   | 'editing'
   /** The same film, written again in another language. */
-  | 'localization';
+  | 'localization'
+  /** The cut for a feed, which is a different medium rather than a shorter one. */
+  | 'short_form';
 
 const CRAFTS: Record<Craft, Standard[]> = {
   direction: [
@@ -113,6 +116,26 @@ const CRAFTS: Record<Craft, Standard[]> = {
     EDITORIAL_STANDARDS.superlatives,
     TYPE_STANDARDS.measure,
     CAPTION_STANDARDS.readingRate,
+  ],
+  short_form: [
+    SHORT_FORM_STANDARDS.patternInterrupt,
+    SHORT_FORM_STANDARDS.noSlowOpen,
+    SHORT_FORM_STANDARDS.attentionReset,
+    SHORT_FORM_STANDARDS.density,
+    SHORT_FORM_STANDARDS.earlyPayoff,
+    SHORT_FORM_STANDARDS.captionsComposed,
+    SHORT_FORM_STANDARDS.nativeFraming,
+    SHORT_FORM_STANDARDS.notCheap,
+    /*
+     * Two from elsewhere that do the most work here.
+     *
+     * A muted film is the normal case in a feed rather than the awkward one,
+     * and the shortest shot that registers matters more when every shot is
+     * near it — a film cut below that floor is not fast, it is illegible.
+     */
+    CONVERSION_STANDARDS.soundOff,
+    MOTION_STANDARDS.minimumShot,
+    LAYOUT_STANDARDS.platformChrome,
   ],
   editing: [
     MOTION_STANDARDS.minimumShot,

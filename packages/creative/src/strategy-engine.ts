@@ -305,9 +305,9 @@ export class CreativeStrategyEngine {
               : ['- none; do not imply any metrics or customer names']),
             ``,
             input.brief.filmFormat === 'pitch'
-              ? `Filmable product moments: none. This film does not navigate the product.`
+              ? `Product moments (id — what happens). At most one of these reaches the film:`
               : `Filmable product moments (id — what happens):`,
-            ...(input.brief.filmFormat === 'pitch' ? [] : moments).map(
+            ...(input.brief.filmFormat === 'pitch' ? moments.slice(0, 3) : moments).map(
               (m) =>
                 `- ${m.id} — ${m.title}: ${m.startState || 'start'} → ${m.endState || 'result'}${
                   m.screenshots.length > 0 ? ' [real capture available]' : ' [not yet captured]'
@@ -333,7 +333,7 @@ export class CreativeStrategyEngine {
             ...formatDirectionLines(input.brief.filmFormat),
             `Channels must be chosen from: ${Channel.options.join(', ')}`,
             input.brief.filmFormat === 'pitch'
-              ? `There is no product footage in this film and there will not be. "productUiUsage" describes how you refuse the interface — what the film shows instead of a screen, at the moments a lesser film would cut to one. Every beat is carried by image, figure, voice or type.`
+              ? `This film is led by the story, not the interface. It may cut to the real thing once, held, where that is the strongest shot available — never a walkthrough, never two in a row, never the opening. "productUiUsage" is where you say which single moment, if any, earns it, and what carries every other beat.`
               : hasRealFootage
                 ? `We have real captured footage of the product. Use it for anything that shows the product working.`
                 : `We have NO captured product footage. Do not describe scenes that depend on showing the real UI in detail, and never invent a fake interface.`,

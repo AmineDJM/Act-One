@@ -101,6 +101,7 @@ describe.skipIf(browser === undefined)('captions burned into a vertical cut', ()
             end: 1.6,
             text: 'Four systems, one ledger',
             lines: ['Four systems,', 'one ledger'],
+            emphasis: null,
           },
         ],
       },

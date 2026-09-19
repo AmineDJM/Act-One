@@ -6,3 +6,4 @@ export * from './flash.ts';
 export * from './container.ts';
 export * from './palette.ts';
 export * from './director.ts';
+export * from './short-form.ts';

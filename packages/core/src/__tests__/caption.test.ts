@@ -168,7 +168,7 @@ describe('scripts that are not written in Latin letters', () => {
 describe('the track a browser reads', () => {
   it('writes WebVTT with the two lines on two lines', () => {
     const vtt = toWebVtt([
-      { start: 0, end: 2.5, text: 'Four systems, one ledger', lines: ['Four systems,', 'one ledger'] },
+      { start: 0, end: 2.5, text: 'Four systems, one ledger', lines: ['Four systems,', 'one ledger'], emphasis: null },
     ]);
     expect(vtt.startsWith('WEBVTT')).toBe(true);
     expect(vtt).toContain('00:00:00.000 --> 00:00:02.500');
@@ -184,14 +184,15 @@ describe('the track a browser reads', () => {
 
 describe('the checks, against a track built by hand to fail them', () => {
   const bad: CaptionCue[] = [
-    { start: 0, end: 0.3, text: 'Too fast', lines: ['Too fast'] },
+    { start: 0, end: 0.3, text: 'Too fast', lines: ['Too fast'], emphasis: null },
     {
       start: 0.3,
       end: 9,
       text: 'A line long past the limit for how many characters may sit on one line at once',
       lines: ['A line long past the limit for how many characters may sit on one line at once'],
+      emphasis: null,
     },
-    { start: 9, end: 10, text: 'Third', lines: ['a', 'b', 'c'] },
+    { start: 9, end: 10, text: 'Third', lines: ['a', 'b', 'c'], emphasis: null },
   ];
 
   it('names the standard each failure broke', () => {

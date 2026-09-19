@@ -16,7 +16,7 @@ import {
  * The film then fails a check for a rule it was told something different
  * about, and nobody can see why.
  */
-const CRAFTS: Craft[] = ['direction', 'storyboard', 'copy', 'narration', 'sound', 'editing', 'localization'];
+const CRAFTS: Craft[] = ['direction', 'storyboard', 'copy', 'narration', 'sound', 'editing', 'short_form', 'localization'];
 
 describe('briefing an agent on the standards', () => {
   it('gives every craft rules that are actually in the corpus', () => {

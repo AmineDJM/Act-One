@@ -429,29 +429,18 @@ export async function authorizeProductAction(
     });
 
     const project = await getProjectOr404(session, projectId);
-    /*
-     * Explore straight away. Somebody who just handed over access expects
-     * something to happen, and the capture is what makes their film different.
-     *
-     * Unless the production is a pitch, which never navigates the product. The
-     * credential is kept — the customer may switch the format later, and
-     * asking for it twice is worse than holding it — but nothing signs in with
-     * it, and the message says so rather than claiming a session that is not
-     * opening.
-     */
-    if (project.brief.filmFormat === 'pitch') {
-      revalidatePath(`/app/projects/${projectId}`);
-      return {
-        error: null,
-        message:
-          'Access saved. This production is a pitch film, so nothing signs in — switch it to a ' +
-          'product tour and we will look around.',
-      };
-    }
+    // Explore straight away. Somebody who just handed over access expects
+    // something to happen, and the capture is what makes their film different.
     await enqueue(project, 'capture_product_moments', {}, 7);
 
     revalidatePath(`/app/projects/${projectId}`);
-    return { error: null, message: 'Signing in and looking around your product now.' };
+    return {
+      error: null,
+      message:
+        project.brief.filmFormat === 'pitch'
+          ? 'Signing in and looking around. A pitch uses one look at the real thing, not a tour.'
+          : 'Signing in and looking around your product now.',
+    };
   } catch (error) {
     return { error: reportError('authorizeProductAction', error).publicMessage };
   }
