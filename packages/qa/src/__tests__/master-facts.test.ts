@@ -20,6 +20,7 @@ function facts(over: Partial<MasterFacts> = {}): MasterFacts {
     sampled: 12,
     flatFrames: 3,
     distinctFrames: 9,
+    loudness: [],
     ...over,
   };
 }

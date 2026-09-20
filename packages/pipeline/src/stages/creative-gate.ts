@@ -9,10 +9,20 @@ import {
   type CriticReview,
   type DirectorDecision,
   type DirectorsVerdict,
+  type QaFinding,
   type Storyboard,
 } from '@act-one/core';
 import { CriticPanel, DirectorBrain } from '@act-one/creative';
-import { buildContactSheet, masterFloor, readMasterFacts, type MasterFacts } from '@act-one/qa';
+import {
+  buildContactSheet,
+  listenBlind,
+  masterFloor,
+  readMasterFacts,
+  senseIssues,
+  watchBoth,
+  watchMuted,
+  type MasterFacts,
+} from '@act-one/qa';
 import { posterArgs, runFfmpeg } from '@act-one/sound';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -76,6 +86,14 @@ export type CreativeGateResult = {
   facts: MasterFacts;
   /** What the measurements alone refused, before anybody was asked. */
   floorReasons: string[];
+  /**
+   * What the film said when it was watched muted and listened to blind.
+   *
+   * Soft fails, every one: a film may knowingly be any of them. What they may
+   * not be is invisible, which is what they were while the only viewing this
+   * system ever did was with everything switched on.
+   */
+  senseFindings: QaFinding[];
   /** Which entries of the negative corpus this film fell into, by id. */
   matched: string[];
   reviews: CriticReview[];
@@ -95,6 +113,15 @@ export async function runCreativeMasterGate(
     workDir: string;
     /** What the director already said watching it back, so it is not paid for twice. */
     watched?: DirectorsVerdict | null;
+    /**
+     * Whether speech was actually mixed into this master.
+     *
+     * Produced material, never `voiceStrategy`. A film that was written with a
+     * voiceover and came out with none has to fail the blind viewing, and a
+     * check that read the plan would have given it full marks — which is the
+     * exact mistake this system keeps making in new places.
+     */
+    speechInTheMix?: boolean;
   },
 ): Promise<CreativeGateResult> {
   const { store, registry, organizationId, project } = context;
@@ -107,6 +134,39 @@ export async function runCreativeMasterGate(
   const floor = masterFloor(facts, {
     typographicByDesign: project.brief.filmFormat === 'pitch',
   });
+
+  /*
+   * Three viewings, on the delivered file.
+   *
+   * Muted, blind, then both — because a film that only works with everything
+   * switched on is usually a film where neither channel is doing its job. The
+   * cuts come from the storyboard because a cut IS the storyboard; every other
+   * number is read out of the master, including the loudness trace, so a cue
+   * that was placed and then buried counts as the silence a listener hears
+   * rather than as the cue somebody wrote.
+   */
+  const cuts = params.storyboard.scenes
+    .map((scene) => scene.startTime)
+    .filter((at) => at > 0.01);
+  const blind = listenBlind({
+    facts,
+    windows: facts.loudness,
+    cuts,
+    hasNarration: params.speechInTheMix ?? false,
+  });
+  const muted = watchMuted({ facts, storyboard: params.storyboard });
+  const both = watchBoth(params.storyboard, muted, blind);
+  const senseFindings = senseIssues({ storyboard: params.storyboard, muted, blind, both });
+
+  for (const finding of senseFindings) {
+    await context.activity({
+      step: 'composition',
+      kind: 'note',
+      label: 'watched muted, listened to blind',
+      detail: finding.message,
+      status: 'done',
+    });
+  }
 
   for (const reason of floor.reasons) {
     await context.activity({
@@ -135,6 +195,7 @@ export async function runCreativeMasterGate(
       changes: [],
       facts,
       floorReasons: floor.reasons,
+      senseFindings,
       matched: floor.matched,
       reviews: [],
       decision: null,
@@ -151,6 +212,7 @@ export async function runCreativeMasterGate(
       changes: [],
       facts,
       floorReasons: floor.reasons,
+      senseFindings,
       matched: floor.matched,
       reviews: [],
       decision: null,
@@ -159,7 +221,11 @@ export async function runCreativeMasterGate(
     };
   }
 
-  const artifact = describeMaster(params.storyboard, facts, floor.reasons, params.watched ?? null);
+  const artifact = describeMaster(params.storyboard, facts, floor.reasons, params.watched ?? null, {
+    muted,
+    blind,
+    findings: senseFindings,
+  });
   const panel = new CriticPanel(registry.llm());
   const brain = new DirectorBrain(registry.llm());
   let costUsd = 0;
@@ -225,6 +291,7 @@ export async function runCreativeMasterGate(
     changes: [...floor.reasons, ...gate.changes].slice(0, 8),
     facts,
     floorReasons: floor.reasons,
+    senseFindings,
     matched: floor.matched,
     reviews: panelled.reviews,
     decision: gate.decision,
@@ -299,6 +366,11 @@ function describeMaster(
   facts: MasterFacts,
   floorReasons: readonly string[],
   watched: DirectorsVerdict | null,
+  senses: {
+    muted: ReturnType<typeof watchMuted>;
+    blind: ReturnType<typeof listenBlind>;
+    findings: readonly QaFinding[];
+  },
 ): string {
   const lines: string[] = [
     'THE FINISHED FILM, AS MEASURED',
@@ -309,6 +381,19 @@ function describeMaster(
       : 'There is no audio track. The film plays in silence.',
     `${facts.sampled} moments sampled evenly across the film: ${facts.flatFrames} of them are a flat ` +
       `field of colour with marks on it, and they produce ${facts.distinctFrames} distinct images between them.`,
+    '',
+    'WATCHED MUTED, THEN LISTENED TO BLIND',
+    'Two viewings of the delivered file, each with one channel switched off.',
+    `Muted: words are on screen for ${senses.muted.wordsOnScreenSeconds.toFixed(1)}s and the real ` +
+      `product for ${senses.muted.productSeconds.toFixed(1)}s. ` +
+      (senses.muted.spokenOnly.length === 0
+        ? 'Nothing the film says out loud goes unshown.'
+        : `${senses.muted.spokenOnly.length} spoken sentences are never shown: ` +
+          `${senses.muted.spokenOnly.slice(0, 3).map((line) => `"${line}"`).join(' ')}`),
+    `Blind: the loudness moves over a range of ${senses.blind.loudnessRangeLu} LU and marks ` +
+      `${Math.round(senses.blind.cutsMarked * 100)}% of the cuts. ` +
+      (senses.blind.hasNarration ? 'There is speech in the mix.' : 'There is no speech in the mix.'),
+    ...senses.findings.map((finding) => `- ${finding.message}`),
   ];
 
   if (floorReasons.length > 0) {

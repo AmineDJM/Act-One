@@ -5,7 +5,7 @@ import { mkdtemp } from 'node:fs/promises';
 import sharp from 'sharp';
 import { posterArgs, runFfmpeg } from '@act-one/sound';
 import { readContainer } from './container.ts';
-import { measureFilm } from './temporal.ts';
+import { measureFilm, type LoudnessWindow } from './temporal.ts';
 
 /**
  * What the finished file actually is, read out of the finished file.
@@ -54,6 +54,16 @@ export type MasterFacts = {
    * one image held for the running time, whatever the shot list says.
    */
   distinctFrames: number;
+  /**
+   * The short-term loudness trace, as measured.
+   *
+   * Already computed here — the silences above come from the same pass — and
+   * previously thrown away, so anything that wanted to ask whether the sound
+   * does anything had to scan the file a second time. It is the only honest
+   * answer to "does the mix react to the cut", because a cue that was placed
+   * and then buried is, to a listener, a cue nobody wrote.
+   */
+  loudness: LoudnessWindow[];
 };
 
 /**
@@ -128,6 +138,7 @@ export async function readMasterFacts(
       sampled,
       flatFrames: flat,
       distinctFrames: countDistinct(signatures),
+      loudness: measured.windows,
     };
   } finally {
     if (owned) await rm(owned, { recursive: true, force: true }).catch(() => undefined);

@@ -356,6 +356,14 @@ export async function runRender(
     let starvedCheck: QaCheck = 'still_frame_hold';
     /** The manifest the delivered cut was rendered from. Null until the first pass. */
     let lastReadiness: MasterReadiness | null = null;
+    /*
+     * Where each line was actually heard in the finished mix.
+     *
+     * Carried out of the loop so the creative gate can tell "there is speech
+     * in this film" from "somebody asked for speech in this film" — which are
+     * the same sentence until the day the voice provider is down.
+     */
+    let spokenLines: readonly SpokenLine[] = [];
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
       const rendered = await renderOnce(context, {
@@ -394,6 +402,7 @@ export async function runRender(
         durationSeconds: storyboardDuration(current),
         hasSound: rendered.hasSound,
       });
+      spokenLines = rendered.spoken;
       issues = inspected.issues;
       qaLayers = inspected.layers;
       // Carried out of the loop so the creative gate can read what the
@@ -973,6 +982,12 @@ export async function runRender(
             masterPath,
             workDir,
             watched: directorsVerdict,
+            /*
+             * Produced, not planned. `spoken` is where each line was actually
+             * heard in the mixed audio, so a film written with a voiceover
+             * that came out with none reads as having none.
+             */
+            speechInTheMix: spokenLines.length > 0,
           }).catch((error: unknown) => {
             /*
              * A gate that could not run has not passed. It is recorded as
@@ -984,6 +999,16 @@ export async function runRender(
             console.error('[render] the creative gate could not run:', (error as Error).message.slice(0, 200));
             return null;
           });
+
+    /*
+     * The three viewings join the record.
+     *
+     * After the release decision, deliberately. They are soft fails and none
+     * of them is a reason to withhold a film on its own — the creative gate's
+     * verdict already carries that weight, and it has read every one of them.
+     * What they must never be is absent from the film's own account of itself.
+     */
+    if (creative) issues = [...issues, ...creative.senseFindings];
 
     const creativeOk =
       creative === null || creative.verdict === 'pass' || creative.verdict === 'pass_with_concerns';
