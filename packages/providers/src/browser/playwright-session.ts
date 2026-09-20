@@ -31,6 +31,12 @@ export type AuditHook = (event: {
  * state hygiene — is identical and lives here so it cannot drift between
  * providers.
  */
+/**
+ * Past this the file is large and the detail is invented by the scaler.
+ * Three device pixels per CSS pixel is what a retina screenshot already is.
+ */
+const MAX_CAPTURE_SCALE = 4;
+
 export class PlaywrightSession implements BrowserSession {
   readonly id: string;
 
@@ -44,6 +50,13 @@ export class PlaywrightSession implements BrowserSession {
   private closed = false;
   /** HTTP status of the last navigation. A capture of a 404 page is not evidence. */
   private lastStatus = 200;
+  /**
+   * Device pixels per CSS pixel this context normally draws with, so the
+   * imagery pass can raise it and put it back exactly where it was.
+   */
+  private readonly deviceScale: number;
+  /** Held open while a scale override is in force; an override dies with its session. */
+  private emulation: Awaited<ReturnType<BrowserContext['newCDPSession']>> | null = null;
 
   constructor(params: {
     browser: Browser;
@@ -53,11 +66,14 @@ export class PlaywrightSession implements BrowserSession {
     audit?: AuditHook;
     ownsBrowser?: boolean;
     id?: string;
+    /** What the context was created with, so it can be restored after a raise. */
+    deviceScaleFactor?: number;
   }) {
     this.browser = params.browser;
     this.context = params.context;
     this.page = params.page;
     this.policy = params.policy;
+    this.deviceScale = params.deviceScaleFactor ?? 2;
     this.audit = params.audit;
     this.ownsBrowser = params.ownsBrowser ?? true;
     this.id = params.id ?? newId('sec');
@@ -169,7 +185,26 @@ export class PlaywrightSession implements BrowserSession {
         await locator.scrollIntoViewIfNeeded({ timeout: 5_000 });
         await this.page.waitForTimeout(250);
         await this.page.evaluate(shieldCapture, candidate.selector).catch(() => 0);
-        const bytes = await locator.screenshot({ type: 'png', animations: 'disabled', timeout: 10_000 });
+
+        /*
+         * Captured at the resolution the source actually has.
+         *
+         * A marketing page draws a 4096-pixel screenshot into a 582-pixel
+         * slot, and an element screenshot at the page's own scale keeps 1164
+         * of them. That is enough to put the whole picture on screen as a
+         * slide and nothing else \u2014 at 1164 the capture is already a 1.65\u00d7
+         * upscale to fill a 1920 frame, so there is no room to frame anything
+         * inside it, and "show the part that matters, big" is unavailable
+         * before anybody considers it. Which is one reason product shots end
+         * up as whole screenshots centred on a field.
+         *
+         * The debugger's own clip takes a scale, so this asks for the extra
+         * pixels directly rather than emulating a denser screen: Playwright
+         * sets its own device metrics while screenshotting, and an override
+         * around that call is silently undone.
+         */
+        const bytes = await this.captureElement(candidate.selector, candidate.naturalWidth, candidate.width);
+        if (!bytes) continue;
         captured.push({
           bytes,
           alt: candidate.alt,
@@ -184,9 +219,60 @@ export class PlaywrightSession implements BrowserSession {
         await this.page.evaluate(unshieldCapture).catch(() => undefined);
       }
     }
-
     await this.page.evaluate(() => window.scrollTo(0, 0)).catch(() => undefined);
     return captured;
+  }
+
+  /**
+   * One element, at up to the resolution its source holds.
+   *
+   * `Page.captureScreenshot` takes a clip with its own scale, which is the
+   * only way to ask for more device pixels than the page is drawn with
+   * without moving the layout: setting a width or a transform on the element
+   * reflows the page, and an ancestor with `overflow: hidden` then clips the
+   * very thing being captured.
+   */
+  private async captureElement(
+    selector: string,
+    naturalWidth: number,
+    renderedWidth: number,
+  ): Promise<Buffer | null> {
+    const rect = await this.page
+      .evaluate((css) => {
+        const node = document.querySelector(css);
+        if (!node) return null;
+        const box = node.getBoundingClientRect();
+        return {
+          x: box.left + window.scrollX,
+          y: box.top + window.scrollY,
+          width: box.width,
+          height: box.height,
+        };
+      }, selector)
+      .catch(() => null);
+    if (!rect || rect.width < 1 || rect.height < 1) return null;
+
+    // Never past what the source itself holds: beyond that the extra pixels
+    // are invented by the scaler and the file is larger for nothing.
+    const available = naturalWidth > 0 ? naturalWidth / Math.max(1, renderedWidth) : 1;
+    const scale = Math.max(1, Math.min(MAX_CAPTURE_SCALE, Math.floor(available * 10) / 10));
+
+    try {
+      const session = (this.emulation ??= await this.page.context().newCDPSession(this.page));
+      const shot = (await session.send('Page.captureScreenshot', {
+        format: 'png',
+        captureBeyondViewport: true,
+        clip: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale },
+      })) as { data: string };
+      return Buffer.from(shot.data, 'base64');
+    } catch {
+      // A browser that will not do this still gives us the ordinary capture.
+      return this.page
+        .locator(selector)
+        .first()
+        .screenshot({ type: 'png', animations: 'disabled', timeout: 10_000 })
+        .catch(() => null);
+    }
   }
 
   /** Minimal, maximally-robust extraction for when the full probe fails. */

@@ -334,6 +334,13 @@ export function findProductImagery(max: number): {
   height: number;
   top: number;
   src: string;
+  /**
+   * The source's own pixel width, which is usually larger than the box it is
+   * drawn in: a site serving a 2320px screenshot into a 580px slot is the
+   * normal case, and capturing the slot throws three quarters of the detail
+   * away. Zero when unknown, as for a video poster.
+   */
+  naturalWidth: number;
 }[] {
   const NOISE =
     /logo|avatar|icon|badge|portrait|headshot|team|founder|award|partner|testimonial|profile|emoji|flag|photo|people|person|author|map/i;
@@ -352,6 +359,7 @@ export function findProductImagery(max: number): {
     height: number;
     top: number;
     src: string;
+    naturalWidth: number;
     score: number;
   };
   const candidates: Candidate[] = [];
@@ -403,6 +411,7 @@ export function findProductImagery(max: number): {
       height: Math.round(height),
       top: Math.round(top),
       src: src.slice(0, 500),
+      naturalWidth: node instanceof HTMLImageElement ? node.naturalWidth : 0,
       // Big and high on the page: the hero product shot, which is the one the
       // company chose to lead with.
       score: (width * height) / (1 + top / 1500),
@@ -421,6 +430,7 @@ export function findProductImagery(max: number): {
     height: candidate.height,
     top: candidate.top,
     src: candidate.src,
+    naturalWidth: candidate.naturalWidth,
   }));
 }
 
