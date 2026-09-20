@@ -7,6 +7,7 @@ import {
   SPEECH_OVERRUN_TOLERANCE,
   TAIL_FADE_SECONDS,
   SILENT_MASTER_FLOOR_DB,
+  TAIL_FADE_DROP_DB,
   TAIL_SILENCE_FLOOR_DB,
   TEMPORAL_STANDARDS,
   captionSyncTolerance,
@@ -430,8 +431,20 @@ export function levelJumpIssues(windows: readonly LoudnessWindow[]): QaFinding[]
 export function abruptEndIssue(params: {
   tailPeakDb: number;
   durationSeconds: number;
+  /** The loudest sample in the whole film, as the level the tail is judged against. */
+  peakDb?: number;
 }): QaFinding[] {
+  // Already silent: nothing to fade.
   if (params.tailPeakDb <= TAIL_SILENCE_FLOOR_DB) return [];
+  /*
+   * Judged against the film's own level rather than an absolute floor. The
+   * absolute version could only be satisfied by silence, so the repair that
+   * lengthens the fade could never satisfy it however long the fade got.
+   */
+  const reference = params.peakDb;
+  if (reference !== undefined && Number.isFinite(reference) && reference - params.tailPeakDb >= TAIL_FADE_DROP_DB) {
+    return [];
+  }
   return [
     finding({
       check: 'abrupt_music_end',
@@ -443,7 +456,12 @@ export function abruptEndIssue(params: {
       repair: 'refade_audio',
       message:
         `The track is still at ${params.tailPeakDb.toFixed(1)} dBFS in its final ` +
-        `${(TAIL_FADE_SECONDS * 1000).toFixed(0)}ms: it stops rather than ends.`,
+        `${(TAIL_FADE_SECONDS * 1000).toFixed(0)}ms` +
+        (reference !== undefined && Number.isFinite(reference)
+          ? `, ${(reference - params.tailPeakDb).toFixed(1)} dB under the film's own ${reference.toFixed(1)} dBFS ` +
+            `where ${TAIL_FADE_DROP_DB} dB is an ending`
+          : '') +
+        `: it stops rather than ends.`,
       because: cite(TEMPORAL_STANDARDS.endedNotStopped),
     }),
   ];

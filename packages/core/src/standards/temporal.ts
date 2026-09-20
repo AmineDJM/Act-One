@@ -181,5 +181,25 @@ export const TAIL_SILENCE_FLOOR_DB = -40;
  */
 export const SILENT_MASTER_FLOOR_DB = -60;
 
+/**
+ * How far below the film's own level the tail must sit to count as an ending.
+ *
+ * The check used to be absolute: the peak of the final 200ms had to be under
+ * −40 dBFS. Nothing but digital silence can be, and the repair that existed to
+ * satisfy it — lengthen the music's fade to 250ms — cannot possibly: a linear
+ * fade of a quarter second is still at four fifths of its level when that
+ * window opens, about two decibels down. So the loop dutifully applied the
+ * repair, measured no improvement, tried once more and escalated to a person,
+ * on every film with music in it. The repair could never have worked and
+ * nothing said so.
+ *
+ * Relative instead, which is also what the ear is doing: a track that has
+ * dropped twelve decibels below the film's own level by the last fifth of a
+ * second has ended; one that has not has been cut. Twelve decibels needs a
+ * fade of roughly a second, which is what an ending sounds like anyway — a
+ * quarter of a second is a duck, not a resolution.
+ */
+export const TAIL_FADE_DROP_DB = 12;
+
 /** How much of the end must have faded. */
 export const TAIL_FADE_SECONDS = 0.2;

@@ -1,6 +1,7 @@
 import { AppError } from '@act-one/core';
 import { planFor } from '../entitlements.ts';
 import { CreativeStrategyEngine } from '@act-one/creative';
+import { runDirection, type DirectionResult } from './direction.ts';
 import type { StageContext } from '../context.ts';
 
 /**
@@ -12,8 +13,8 @@ import type { StageContext } from '../context.ts';
  */
 export async function runConcepts(
   context: StageContext,
-  options: { rejectedConceptIds?: string[] } = {},
-): Promise<{ conceptIds: string[]; divergence: number }> {
+  options: { rejectedConceptIds?: string[]; direct?: boolean } = {},
+): Promise<{ conceptIds: string[]; divergence: number; direction: DirectionResult | null }> {
   const { store, registry, project, organizationId } = context;
 
   await context.progress(0.05, 'Reading the brief');
@@ -37,7 +38,29 @@ export async function runConcepts(
       ).filter((concept): concept is NonNullable<typeof concept> => concept !== null)
     : [];
 
-  await context.progress(0.2, 'Developing three directions');
+  /*
+   * The direction comes first, and the concepts execute it.
+   *
+   * Without this the strategy engine is the whole of Act One's creative
+   * thinking: three concepts, written straight off the research, compared
+   * against each other and one of them picked. Three is not a search — it is
+   * the first idea and two alternates written to make the first look
+   * considered — and nothing anywhere had stated what the film was supposed
+   * to do to the person watching it.
+   *
+   * So the Director Brain runs first: it builds what the film is for, who is
+   * watching and how the brand behaves, explores a wide field of structurally
+   * different directions, puts the whole wall to a panel kept apart so it can
+   * disagree, and chooses one with the reason recorded. The concepts below are
+   * then three ways of executing that choice.
+   *
+   * Optional and defaulted on, so a caller that predates it still works: a
+   * production run with `direct: false` behaves exactly as this stage always
+   * did.
+   */
+  const direction = options.direct === false ? null : await runDirection(context);
+
+  await context.progress(0.6, 'Developing three directions');
   await context.activity({ step: 'strategy', kind: 'step', label: 'developing three directions', status: 'active' });
 
   /*
@@ -60,6 +83,16 @@ export async function runConcepts(
       brief: project.brief,
       maxDurationSeconds: plan.limits.maxMasterDurationSeconds,
       rejectedConcepts: rejected,
+      ...(direction
+        ? {
+            direction: {
+              territory: direction.territory,
+              brief: direction.brief,
+              audience: direction.audience,
+              genome: direction.genome,
+            },
+          }
+        : {}),
     },
     { organizationId, projectId: project.id, signal: context.signal },
   );
@@ -82,5 +115,6 @@ export async function runConcepts(
   return {
     conceptIds: result.concepts.map((concept) => concept.id),
     divergence: result.divergence,
+    direction,
   };
 }

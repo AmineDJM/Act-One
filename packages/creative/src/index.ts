@@ -14,3 +14,8 @@ export { detectLanguage } from './language.ts';
 export * from './narration/index.ts';
 export * from './composer.ts';
 export * from './localizer.ts';
+export * from './director/brain.ts';
+export * from './director/critics.ts';
+export * from './director/signatures.ts';
+export * from './director/territories.ts';
+export * from './director/understanding.ts';

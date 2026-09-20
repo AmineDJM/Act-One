@@ -192,9 +192,148 @@ const SCENE_PLAN = {
   ],
 };
 
+/**
+ * The Director Brain's answers, scripted.
+ *
+ * Matched on the system prompt like everything else here, so the pipeline runs
+ * its real direction stage — understanding, a wide search, a panel that
+ * disagrees, an arbitration — against a model that returns the same thing
+ * every time. What is being tested is the wiring and the arithmetic, not the
+ * model: that the chosen direction actually reaches the concepts, that a
+ * rejected direction is written down with its reason, and that a critic
+ * conflict arrives at the director rather than being averaged away.
+ */
+const BRIEF_RESPONSE = {
+  goal: {
+    business: 'demo_request', desiredAction: 'Book a walkthrough of the close',
+    friction: 'medium', awarenessStage: 'problem_aware',
+    proofRequired: ['A real close, end to end'], ctaStrength: 'stated',
+  },
+  transformation: {
+    before: 'Closing the books takes a week and there is no way around it.',
+    after: 'The close can run once, unattended, and be trusted.',
+    pivot: 'Seeing a real month close in one run.',
+  },
+  creativeObjective:
+    'A finance lead should believe, within ten seconds, that the month can close in one run and that the run is trustworthy.',
+  constraints: [], avoid: ['stock people at laptops'], because: 'Read from their own pricing and docs.',
+};
+
+const AUDIENCE_RESPONSE = {
+  who: 'Finance leads at 200–2000 person companies',
+  economicBuyer: 'The CFO', knows: ['Reconciliation is manual'], doesNotKnow: ['That it can be automated safely'],
+  statusQuo: 'A week of spreadsheets and a shared inbox',
+  frustrations: ['The same week every month'], desires: ['To leave on time in the first week'],
+  objections: ['Automation will be wrong and I will not know'],
+  decisionCriteria: ['Auditability'], likelyMisconceptions: ['That this is another reporting tool'],
+  sophistication: 'practitioner', attentionContext: 'On a laptop, in a tab, probably muted',
+  riskTolerance: 'low', categoryLanguage: ['close', 'reconciliation'], because: 'Read from the site.',
+};
+
+const GENOME_RESPONSE = {
+  dimensions: {
+    rationality: 0.85, expressiveness: 0.25, visualDensity: 0.3, motionEnergy: 0.35,
+    humour: 0.05, sophistication: 0.8, warmth: 0.3, confidence: 0.7, minimalism: 0.8, technicality: 0.7,
+  },
+  archetype: 'the_engineer',
+  productPresentation: 'The real interface, held, never staged.',
+  languageBehaviour: 'Short declaratives. No exclamation marks.',
+  motionBehaviour: 'Single-axis, slow, never two moves at once.',
+  taboos: ['never animates the logo', 'never uses an exclamation mark'],
+  because: 'Read from their own writing.',
+};
+
+const TERRITORIES_RESPONSE = {
+  territories: [
+    {
+      name: 'The quiet close', premise: 'A month closes in one run while nobody watches.',
+      mechanism: 'data_proof', rationale: 'It answers the auditability objection directly.',
+      emotion: 'relief', productRole: 'evidence', opening: 'A ledger, already closed.',
+      risk: 'It could read as cold.',
+    },
+    {
+      name: 'The week that vanished', premise: 'A person who used to dread the first week now leaves at six.',
+      mechanism: 'human_transformation', rationale: 'The pain is felt, not described.',
+      emotion: 'release', productRole: 'context', opening: 'An empty desk at six in the evening.',
+      risk: 'It could read as sentimental and prove nothing.',
+    },
+    {
+      name: 'Everything at once', premise: 'Every ledger in the company, reconciled in a single sweep.',
+      mechanism: 'world_building', rationale: 'Scale is the argument.',
+      emotion: 'awe', productRole: 'hero', opening: 'A city of ledgers at night.',
+      risk: 'Spectacle with no proof under it.',
+    },
+  ],
+};
+
+/** A panel that genuinely disagrees, which is what the director is for. */
+const CRITIC_RESPONSES: { when: RegExp; respond: unknown }[] = [
+  {
+    when: /you are the conversion specialist/i,
+    respond: {
+      verdict: 'revise',
+      findings: [
+        {
+          severity: 'high', observation: 'The quiet close never asks for anything.',
+          evidence: ['the quiet close'], risk: 'No demo requests.',
+          recommendation: 'End on a spoken call to action.', confidence: 0.8,
+        },
+      ],
+      headline: 'Nothing is asked for.',
+    },
+  },
+  {
+    when: /you are the film critic/i,
+    respond: {
+      verdict: 'pass',
+      findings: [
+        {
+          severity: 'medium', observation: 'A spoken call to action would land on the held beat.',
+          evidence: ['the quiet close'], risk: 'The ending stops working.',
+          recommendation: 'Keep the ending silent.', confidence: 0.75,
+        },
+      ],
+      headline: 'The ending is the film.',
+    },
+  },
+  { when: /you are the brand guardian/i, respond: { verdict: 'pass', findings: [], headline: '' } },
+  { when: /you are the product marketer/i, respond: { verdict: 'pass_with_concerns', findings: [], headline: '' } },
+  { when: /you are the originality critic/i, respond: { verdict: 'pass', findings: [], headline: '' } },
+];
+
+const SELECTION_RESPONSE = {
+  selectedId: 'PLACEHOLDER',
+  reason: 'It proves the thing the audience objects to, which the other two only assert.',
+  thesis: 'A month closes in one run, and you can watch it happen.',
+  rejections: [],
+  arbitrations: [
+    {
+      between: ['conversion', 'film'],
+      conflict: 'Conversion wants a spoken call to action; film says it would land on the held beat.',
+      resolution: 'The address is on screen at the end. Nothing is spoken.',
+    },
+  ],
+  weakest: 'The opening asks for patience it has not yet earned.',
+};
+
 function scriptedLlm() {
   return new ScriptedLlmProvider([
     { when: /research lead at a creative studio/i, respond: UNDERSTANDING_RESPONSE },
+    { when: /you are a strategist writing the brief/i, respond: BRIEF_RESPONSE },
+    { when: /you model the person who will watch/i, respond: AUDIENCE_RESPONSE },
+    { when: /you read brands as behaviour/i, respond: GENOME_RESPONSE },
+    { when: /put genuinely different directions on the table/i, respond: TERRITORIES_RESPONSE },
+    ...CRITIC_RESPONSES,
+    {
+      when: /you are the creative director of a studio/i,
+      /*
+       * The director names an id it cannot know in advance. Returning one that
+       * is not on the shortlist exercises the path that matters more: the
+       * brain falls back to the strongest shortlisted direction and records
+       * that its choice was not honoured, rather than failing the production.
+       */
+      respond: SELECTION_RESPONSE,
+    },
     {
       when: /how a brand speaks/i,
       respond: { language: 'en', vocabulary: ['reconcile', 'ledger'], positioning: 'The reconciliation layer.', claims: [], naming: 'Northwind', tagline: 'Reconcile everything.', wordsToAvoid: ['cheap'] },
@@ -641,5 +780,83 @@ describe('pipeline', () => {
     expect(outcome.status).toBe('skipped');
     // And Acme's project is untouched.
     expect((await store.projects.get(org.id, project.id))!.stage).toBe('created');
+  });
+
+  /**
+   * The direction stage, doing the thing it was built for.
+   *
+   * Not "does it run" — the tests above already prove that, because the
+   * concept stage now goes through it. These are the claims the stage
+   * actually makes, and every one of them was false before it existed.
+   */
+  describe('the film is directed before it is written', () => {
+    it('understands, explores, arbitrates, and writes all of it down', async () => {
+      await runJob(deps, await enqueued(store, org.id, project.id, 'research_product'));
+      await runJob(deps, await enqueued(store, org.id, project.id, 'generate_concepts'));
+
+      // 1. It understood something. The transformation is the line every
+      //    later decision is argued from, and nothing before this stated one.
+      const brief = (await store.creative.latestModel(org.id, project.id, 'brief')) as {
+        transformation: { before: string; after: string };
+        creativeObjective: string;
+        goal: { business: string };
+      } | null;
+      expect(brief?.transformation.before).toContain('takes a week');
+      expect(brief?.creativeObjective).toContain('one run');
+      // The business objective and the creative objective are different
+      // fields because they are different sentences.
+      expect(brief?.goal.business).toBe('demo_request');
+
+      const audience = (await store.creative.latestModel(org.id, project.id, 'audience')) as { objections: string[] } | null;
+      expect(audience?.objections[0]).toContain('will be wrong');
+
+      const genome = (await store.creative.latestModel(org.id, project.id, 'genome')) as { taboos: string[] } | null;
+      expect(genome?.taboos).toContain('never animates the logo');
+
+      // 2. It explored a field, and kept the ones that died.
+      const territories = await store.creative.listTerritories(org.id, project.id);
+      expect(territories.length).toBeGreaterThanOrEqual(3);
+      expect(territories.filter((row) => row.selected)).toHaveLength(1);
+      const rejected = territories.filter((row) => !row.selected);
+      expect(rejected.length).toBeGreaterThanOrEqual(2);
+      // A rejected direction survives whole: a negative example nobody can
+      // read is not an example.
+      expect(rejected.every((row) => row.territory.premise.length > 0)).toBe(true);
+
+      // 3. The panel disagreed, and both opinions were kept apart.
+      const reviews = await store.creative.listReviews(org.id, project.id);
+      expect(reviews.map((review) => review.critic).sort()).toEqual([
+        'brand', 'conversion', 'film', 'originality', 'product_marketing',
+      ]);
+      expect(reviews.find((review) => review.critic === 'conversion')?.verdict).toBe('revise');
+      // The film critic said "pass" and listed a medium finding; its own
+      // evidence is the stricter of the two, and that is what is recorded.
+      expect(reviews.find((review) => review.critic === 'film')?.verdict).toBe('pass_with_concerns');
+
+      // 4. The director settled it, in writing.
+      const [decision] = await store.creative.listDecisions(org.id, project.id);
+      expect(decision?.stage).toBe('territories');
+      expect(decision?.arbitrations[0]?.between).toEqual(['conversion', 'film']);
+      expect(decision?.arbitrations[0]?.resolution).toContain('Nothing is spoken');
+      // Everything it did not choose, so the road not taken is recoverable.
+      expect(decision?.rejected.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('survives a director that names a direction nobody offered', async () => {
+      /*
+       * The scripted selection returns an id that is not on the shortlist,
+       * which is what a model does when it answers a question nobody asked. A
+       * production must not die of it: the strongest shortlisted direction
+       * stands and the record says the choice was not honoured.
+       */
+      await runJob(deps, await enqueued(store, org.id, project.id, 'research_product'));
+      await runJob(deps, await enqueued(store, org.id, project.id, 'generate_concepts'));
+
+      const [decision] = await store.creative.listDecisions(org.id, project.id);
+      expect(decision?.reason).toContain('not on the shortlist');
+      expect(
+        (await store.creative.listTerritories(org.id, project.id)).filter((row) => row.selected),
+      ).toHaveLength(1);
+    });
   });
 });

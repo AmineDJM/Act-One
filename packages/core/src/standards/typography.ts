@@ -161,8 +161,33 @@ export const MIN_TYPE_SIZE_RATIO = 0.02;
 /** Words per second. Used to time on-screen copy and to pace narration. */
 export const READING_WORDS_PER_SECOND = 2.6;
 export const NARRATION_WORDS_PER_SECOND = 2.35;
-/** Seconds before animated type is stable enough to start reading. */
-export const TEXT_ARRIVAL_SECONDS = 0.45;
+/**
+ * How long the renderer's type reveal actually takes, and its line stagger.
+ *
+ * Read off the motion package rather than estimated, and `type-arrival.test.ts`
+ * keeps them in agreement, because the estimate was wrong and the wrongness
+ * was expensive. The planner believed animated type was readable 0.45s in; a
+ * `WordReveal` line finishes arriving at 0.72s, and each line after the first
+ * starts 0.06s later still. So every beat the planner wrote was about four
+ * tenths of a second shorter on content than the freeze detector would demand
+ * of it — and on a three-line beat, half a second.
+ *
+ * What that produced: the Creative Director, asked to rewrite a beat so it
+ * earns its eight seconds, kept proposing copy that measured 7.8s against a
+ * ceiling it could not see, and every option was refused. The film held, the
+ * loop escalated, and a person was asked about a beat whose arithmetic was
+ * never wrong by more than the length of the animation nobody had measured.
+ */
+export const TYPE_ENTRY_SECONDS = 0.72;
+export const TYPE_LINE_STAGGER_SECONDS = 0.06;
+
+/** Seconds before a block of animated type is stable enough to start reading. */
+export function typeArrivalFor(lines: number): number {
+  return TYPE_ENTRY_SECONDS + Math.max(0, lines - 1) * TYPE_LINE_STAGGER_SECONDS;
+}
+
+/** Seconds before animated type is stable enough to start reading. One line. */
+export const TEXT_ARRIVAL_SECONDS = typeArrivalFor(1);
 
 export function readingSecondsFor(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;

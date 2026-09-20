@@ -67,7 +67,14 @@ const project: Project = await store.projects.create({
   productUnderstandingId: null, selectedConceptId: null, activeStoryboardId: null,
   latestRenderId: null, stage: 'rendering',
   brief: {
-    filmFormat: 'product_tour', filmCut: 'feature', targetAudience: 'Finance teams closing the month',
+    /*
+     * A pitch, because that is what this fixture actually is: three type cards
+     * on near-black with no capture anywhere in it. Calling it a product tour
+     * made it a film that never shows the product, which the picture check
+     * blocks — correctly, and for a reason that has nothing to do with the
+     * repair loop this proof is about.
+     */
+    filmFormat: 'pitch', filmCut: 'feature', targetAudience: 'Finance teams closing the month',
     goal: null, keyMessage: 'The close, end to end, in one run.', durationSeconds: 10,
     channels: [], creativeMode: 'studio', voiceStrategy: 'none', formats: [], excludedClaims: [],
     realMediaOnly: false, language: 'en', tone: null, voiceGender: null, voiceAccent: null,

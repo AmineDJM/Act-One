@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readingSecondsFor } from '@act-one/core';
+import { readingSecondsFor, TEXT_ARRIVAL_SECONDS } from '@act-one/core';
 import {
   allowedVisualTypesFor,
   estimateOptionCostUsd,
@@ -35,7 +35,14 @@ function option(over: Partial<ReplanOption> = {}): ReplanOption {
 describe('the director authors, the arithmetic is ours', () => {
   it('takes a proposal that already fills the room exactly', () => {
     expect(rejectOption(option(), 6)).toBeNull();
-    expect(normalizeOption(option(), 6).durations).toEqual([2, 2.4, 1.6]);
+    /*
+     * Not round numbers, and that is the point: the shot ceilings are derived
+     * from how long the renderer's own type reveal takes, so the arithmetic
+     * moves when the animation does rather than when somebody remembers.
+     */
+    const durations = normalizeOption(option(), 6).durations!;
+    expect(round(sum(durations))).toBe(6);
+    expect(durations).toHaveLength(3);
   });
 
   it('corrects a shot that overshoots what its copy earns, rather than refusing the idea', () => {
@@ -56,7 +63,9 @@ describe('the director authors, the arithmetic is ours', () => {
      * the shot may run the time the type takes to arrive on top of that — and
      * not a frame more, which is the rule the film is judged by.
      */
-    expect(fixed.durations![2]).toBeLessThanOrEqual(0.45 + Math.max(1.2, readingSecondsFor('Gone.')) + 0.001);
+    expect(fixed.durations![2]).toBeLessThanOrEqual(
+      TEXT_ARRIVAL_SECONDS + Math.max(1.2, readingSecondsFor('Gone.')) + 0.001,
+    );
   });
 
   it('stretches a shot that was given less time than its copy needs', () => {
@@ -104,10 +113,11 @@ describe('the director authors, the arithmetic is ours', () => {
      */
     const mismatched = option({
       shots: [
-        { purpose: 'a', duration: 1.8, visualType: 'kinetic_typography', motionRecipe: 'cursor_sequence', onScreenText: ['Close the books.'], narration: '', justification: '' },
+        { purpose: 'a', duration: 2.1, visualType: 'kinetic_typography', motionRecipe: 'cursor_sequence', onScreenText: ['Close the books.'], narration: '', justification: '' },
       ],
     });
-    expect(rejectOption(mismatched, 1.8)).toBeNull();
+    // Room for the three words and for the reveal that puts them there.
+    expect(rejectOption(mismatched, 2.1)).toBeNull();
   });
 
   it('offers only the kinds of shot the film can actually make', () => {

@@ -47,7 +47,17 @@ export type IdPrefix =
   | 'pay'
   | 'cle'
   | 'mom'
-  | 'cpy';
+  | 'cpy'
+  /* The creative intelligence layer. */
+  | 'cbf'
+  | 'aud'
+  | 'gen'
+  | 'ter'
+  | 'crv'
+  | 'ddn'
+  | 'cev'
+  | 'cpf'
+  | 'sig';
 
 /**
  * Prefixed, sortable-ish ids. The timestamp prefix keeps ids roughly ordered by

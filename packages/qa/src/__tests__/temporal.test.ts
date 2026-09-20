@@ -136,7 +136,7 @@ describe('what the film is allowed to hold', () => {
       freezes: [{ start: 0.3, end: 0.3 + reading + 0.5 }], scenes, cut: 'feature', fps: 30,
     });
     expect(held).toMatchObject({ check: 'still_frame_hold', repair: 'trim_hold' });
-    expect(held!.message).toMatch(/takes 1.60s to read/);
+    expect(held!.message).toMatch(new RegExp(`takes ${reading.toFixed(2)}s to read`));
   });
 
   it('gives no allowance to a shot with nothing to read', () => {
@@ -237,6 +237,50 @@ describe('the parsers, against output FFmpeg actually wrote', () => {
 
   it('reads -inf as silence rather than as nothing', () => {
     expect(parseShortTermLoudness('pts_time:1\nlavfi.r128.S=-inf')).toEqual([{ at: 1, lufs: -70 }]);
+  });
+});
+
+/**
+ * A fade that could not have worked.
+ *
+ * The tail check used to be absolute — the final 200ms had to peak under
+ * −40 dBFS — and nothing but digital silence can be. So the repair that
+ * existed to satisfy it, lengthening the music fade, could never satisfy it
+ * however long the fade got: the loop applied it, measured no change, tried
+ * again and escalated to a person, on every film with music in it.
+ */
+describe('a film that ends rather than stops', () => {
+  const at = (tail: number, peak?: number) =>
+    abruptEndIssue({ tailPeakDb: tail, durationSeconds: 10, ...(peak === undefined ? {} : { peakDb: peak }) });
+
+  it('says nothing when the track has already gone quiet', () => {
+    expect(at(-55, -3)).toHaveLength(0);
+  });
+
+  it('accepts a tail that dropped away from the film’s own level', () => {
+    // Twelve decibels under, which is what a one-second fade produces.
+    expect(at(-16, -3)).toHaveLength(0);
+    expect(at(-15.1, -3)).toHaveLength(0);
+  });
+
+  it('still catches a track that was cut at level', () => {
+    const [issue] = at(-2, -3);
+    expect(issue).toMatchObject({ check: 'abrupt_music_end', repair: 'refade_audio' });
+    expect(issue!.message).toContain('it stops rather than ends');
+  });
+
+  it('catches the quarter-second fade that the old repair applied', () => {
+    /*
+     * A 250ms linear fade is at 0.8 of its level when the final 200ms opens:
+     * about 1.9 dB down. Under the old absolute floor that was a fail, and it
+     * was also a fail after the repair, and after the repair again.
+     */
+    expect(at(-4.9, -3)).toHaveLength(1);
+  });
+
+  it('falls back to the absolute floor when the film’s level is unknown', () => {
+    expect(at(-2)).toHaveLength(1);
+    expect(at(-55)).toHaveLength(0);
   });
 });
 

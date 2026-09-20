@@ -1183,7 +1183,16 @@ function replanMessage(
 }
 
 /** How much of the tail the fade repair covers. */
-const TAIL_FADE_REPAIR_SECONDS = 0.25;
+/*
+ * A second, not a quarter of one.
+ *
+ * The old value could not satisfy the check it existed for: a linear fade of
+ * 250ms is still four fifths up when the final 200ms begins, so the loop
+ * applied it, measured no change, and escalated to a person on every film that
+ * had music. A second is what an ending sounds like, and it clears the
+ * twelve-decibel drop the check now asks for with room to spare.
+ */
+const TAIL_FADE_REPAIR_SECONDS = 1;
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
@@ -1827,7 +1836,11 @@ async function checkTiming(
         scenes: params.storyboard.scenes,
       }),
       ...levelJumpIssues(measured.windows),
-      ...abruptEndIssue({ tailPeakDb: measured.tailPeakDb, durationSeconds: params.durationSeconds }),
+      ...abruptEndIssue({
+        tailPeakDb: measured.tailPeakDb,
+        peakDb: measured.peakDb,
+        durationSeconds: params.durationSeconds,
+      }),
       /*
        * The question none of the above can ask. Dead air is measured between
        * the head and the tail, and a film that is silent end to end has no

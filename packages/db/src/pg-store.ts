@@ -1,3 +1,10 @@
+import {
+  CreativePreference,
+  CreativeSignature,
+  CreativeTerritory,
+  CriticReview,
+  DirectorDecision,
+} from '@act-one/core';
 import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
@@ -1626,6 +1633,180 @@ export class PgStore implements Store {
           ...toReplan(row),
           organizationId: row['organization_id'] as string,
         }));
+      }),
+  };
+
+  /**
+   * The creative intelligence layer.
+   *
+   * JSONB throughout, with the fields an operator filters on lifted into
+   * columns. The shape of a brief or a critic's findings is still being
+   * learned; a schema migration every time a field is added would slow that
+   * down for no benefit anybody can see, and the columns that exist are the
+   * ones the Director Lab actually queries by.
+   */
+  readonly creative = {
+    putModel: async (
+      organizationId: string,
+      model: { id: string; projectId: string; kind: 'brief' | 'audience' | 'genome'; version: number; data: unknown; createdAt: string },
+    ) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO creative_models (id, organization_id, project_id, kind, version, data, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+           ON CONFLICT (project_id, kind, version) DO UPDATE SET data = EXCLUDED.data`,
+          [model.id, organizationId, model.projectId, model.kind, model.version, model.data, model.createdAt],
+        );
+      }),
+
+    latestModel: async (organizationId: string, projectId: string, kind: 'brief' | 'audience' | 'genome') =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM creative_models
+           WHERE organization_id = $1 AND project_id = $2 AND kind = $3
+           ORDER BY version DESC LIMIT 1`,
+          [organizationId, projectId, kind],
+        );
+        return (r.rows[0]?.['data'] as unknown) ?? null;
+      }),
+
+    putTerritories: async (
+      organizationId: string,
+      projectId: string,
+      rows: readonly { territory: CreativeTerritory; kept: boolean; selected: boolean; rejectionReason: string | null }[],
+    ) =>
+      this.tenant(organizationId, async (c) => {
+        for (const row of rows) {
+          await c.query(
+            `INSERT INTO creative_territories
+               (id, organization_id, project_id, mechanism, kept, selected, rejection_reason, data, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             ON CONFLICT (id) DO UPDATE SET
+               kept = EXCLUDED.kept, selected = EXCLUDED.selected, rejection_reason = EXCLUDED.rejection_reason`,
+            [
+              row.territory.id, organizationId, projectId, row.territory.mechanism,
+              row.kept, row.selected, row.rejectionReason, row.territory, row.territory.createdAt,
+            ],
+          );
+        }
+      }),
+
+    listTerritories: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data, kept, selected, rejection_reason FROM creative_territories
+           WHERE organization_id = $1 AND project_id = $2 ORDER BY created_at ASC`,
+          [organizationId, projectId],
+        );
+        return r.rows.map((row) => ({
+          territory: CreativeTerritory.parse(row['data']),
+          kept: Boolean(row['kept']),
+          selected: Boolean(row['selected']),
+          rejectionReason: (row['rejection_reason'] as string | null) ?? null,
+        }));
+      }),
+
+    putReviews: async (organizationId: string, reviews: readonly CriticReview[]) =>
+      this.tenant(organizationId, async (c) => {
+        for (const review of reviews) {
+          await c.query(
+            `INSERT INTO critic_reviews
+               (id, organization_id, project_id, artifact_kind, artifact_id, critic, verdict,
+                critic_version, model, cost_usd, data, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+             ON CONFLICT (id) DO NOTHING`,
+            [
+              review.id, organizationId, review.projectId, review.artifactKind, review.artifactId,
+              review.critic, review.verdict, review.criticVersion, review.model, review.costUsd,
+              review, review.createdAt,
+            ],
+          );
+        }
+      }),
+
+    listReviews: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM critic_reviews WHERE organization_id = $1 AND project_id = $2
+           ORDER BY created_at ASC`,
+          [organizationId, projectId],
+        );
+        return r.rows.map((row) => CriticReview.parse(row['data']));
+      }),
+
+    putDecision: async (organizationId: string, decision: DirectorDecision) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO director_decisions
+             (id, organization_id, project_id, stage, director_version, data, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO NOTHING`,
+          [decision.id, organizationId, decision.projectId, decision.stage, decision.directorVersion, decision, decision.createdAt],
+        );
+      }),
+
+    listDecisions: async (organizationId: string, projectId: string) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM director_decisions WHERE organization_id = $1 AND project_id = $2
+           ORDER BY created_at ASC`,
+          [organizationId, projectId],
+        );
+        return r.rows.map((row) => DirectorDecision.parse(row['data']));
+      }),
+
+    putSignatures: async (organizationId: string, signatures: readonly CreativeSignature[]) =>
+      this.tenant(organizationId, async (c) => {
+        for (const signature of signatures) {
+          await c.query(
+            `INSERT INTO creative_signatures (id, organization_id, project_id, kind, device, key, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO NOTHING`,
+            [signature.id, organizationId, signature.projectId, signature.kind, signature.device, signature.key, signature.createdAt],
+          );
+        }
+      }),
+
+    recentSignatures: async (organizationId: string, limit = 60) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT id, organization_id, project_id, kind, device, key, created_at
+           FROM creative_signatures WHERE organization_id = $1
+           ORDER BY created_at DESC LIMIT $2`,
+          [organizationId, limit],
+        );
+        return r.rows.map((row) =>
+          CreativeSignature.parse({
+            id: row['id'],
+            organizationId: row['organization_id'],
+            projectId: row['project_id'],
+            kind: row['kind'],
+            device: row['device'],
+            key: row['key'],
+            createdAt: iso(row['created_at']),
+          }),
+        );
+      }),
+
+    putPreference: async (organizationId: string, preference: CreativePreference) =>
+      this.tenant(organizationId, async (c) => {
+        await c.query(
+          `INSERT INTO creative_preferences
+             (id, organization_id, brief_id, artifact_a, artifact_b, judge, winner, dimension, blind, data, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (id) DO NOTHING`,
+          [
+            preference.id, organizationId, preference.briefId, preference.artifactA, preference.artifactB,
+            preference.judge, preference.winner, preference.dimension, preference.blind, preference, preference.createdAt,
+          ],
+        );
+      }),
+
+    listPreferences: async (organizationId: string, limit = 200) =>
+      this.tenant(organizationId, async (c) => {
+        const r = await c.query(
+          `SELECT data FROM creative_preferences WHERE organization_id = $1
+           ORDER BY created_at DESC LIMIT $2`,
+          [organizationId, limit],
+        );
+        return r.rows.map((row) => CreativePreference.parse(row['data']));
       }),
   };
 

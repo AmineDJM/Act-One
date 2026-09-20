@@ -44,7 +44,12 @@ import type {
   ProductUnderstanding,
   Project,
   ProjectStage,
+  CreativePreference,
   CreativeReplan,
+  CreativeSignature,
+  CreativeTerritory,
+  CriticReview,
+  DirectorDecision,
   QaReport,
   Render,
   RevisionRequest,
@@ -92,6 +97,7 @@ export interface Store {
   readonly variants: VariantRepo;
   readonly qaReports: QaReportRepo;
   readonly replans: CreativeReplanRepo;
+  readonly creative: CreativeIntelligenceRepo;
   readonly jobs: JobRepo;
   readonly copy: CopyRepo;
   readonly costs: CostRepo;
@@ -389,6 +395,61 @@ export interface CreativeReplanRepo {
   listForRender(organizationId: string, renderId: string): Promise<CreativeReplan[]>;
   /** Every replan, newest first, across every workspace. */
   list(limit?: number): Promise<(CreativeReplan & { organizationId: string })[]>;
+}
+
+/**
+ * The creative intelligence layer, kept.
+ *
+ * What Act One understood, what it explored, what its specialists said, and
+ * what its director decided — persisted rather than discarded when the film is
+ * delivered. The rejected directions matter as much as the chosen one: they
+ * are the negative half of a preference dataset, and nobody keeps those.
+ */
+export interface CreativeIntelligenceRepo {
+  /** The brief, the audience and the genome, versioned per project. */
+  putModel(
+    organizationId: string,
+    model: { id: string; projectId: string; kind: 'brief' | 'audience' | 'genome'; version: number; data: unknown; createdAt: string },
+  ): Promise<void>;
+  latestModel(
+    organizationId: string,
+    projectId: string,
+    kind: 'brief' | 'audience' | 'genome',
+  ): Promise<unknown | null>;
+
+  /** Every direction explored, with the reason each one died. */
+  putTerritories(
+    organizationId: string,
+    projectId: string,
+    rows: readonly {
+      territory: CreativeTerritory;
+      kept: boolean;
+      selected: boolean;
+      rejectionReason: string | null;
+    }[],
+  ): Promise<void>;
+  listTerritories(
+    organizationId: string,
+    projectId: string,
+  ): Promise<{ territory: CreativeTerritory; kept: boolean; selected: boolean; rejectionReason: string | null }[]>;
+
+  putReviews(organizationId: string, reviews: readonly CriticReview[]): Promise<void>;
+  listReviews(organizationId: string, projectId: string): Promise<CriticReview[]>;
+
+  putDecision(organizationId: string, decision: DirectorDecision): Promise<void>;
+  listDecisions(organizationId: string, projectId: string): Promise<DirectorDecision[]>;
+
+  /**
+   * Devices this workspace has used lately.
+   *
+   * Scoped to the organisation and to nothing wider: what one customer's films
+   * have done is never a reason to change another customer's film.
+   */
+  putSignatures(organizationId: string, signatures: readonly CreativeSignature[]): Promise<void>;
+  recentSignatures(organizationId: string, limit?: number): Promise<CreativeSignature[]>;
+
+  putPreference(organizationId: string, preference: CreativePreference): Promise<void>;
+  listPreferences(organizationId: string, limit?: number): Promise<CreativePreference[]>;
 }
 
 export interface QaReportRepo {

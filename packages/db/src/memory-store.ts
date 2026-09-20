@@ -15,7 +15,12 @@ import {
   type RateLimitRule,
 } from '@act-one/core';
 import type {
+  CreativePreference,
   CreativeReplan,
+  CreativeSignature,
+  CreativeTerritory,
+  CriticReview,
+  DirectorDecision,
   CopyKit,
   Invitation,
   LogLevel,
@@ -115,6 +120,25 @@ export class MemoryStore implements Store {
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
     replans: new Map<string, CreativeReplan & { organizationId: string }>(),
+    creativeModels: new Map<
+      string,
+      { id: string; organizationId: string; projectId: string; kind: string; version: number; data: unknown; createdAt: string }
+    >(),
+    creativeTerritories: new Map<
+      string,
+      {
+        organizationId: string;
+        projectId: string;
+        territory: CreativeTerritory;
+        kept: boolean;
+        selected: boolean;
+        rejectionReason: string | null;
+      }
+    >(),
+    criticReviews: new Map<string, CriticReview & { organizationId: string }>(),
+    directorDecisions: new Map<string, DirectorDecision & { organizationId: string }>(),
+    creativeSignatures: new Map<string, CreativeSignature>(),
+    creativePreferences: new Map<string, CreativePreference>(),
     jobs: new Map<string, Job>(),
     costs: new Map<string, GenerationCost>(),
     copy: new Map<string, CopyKit>(),
@@ -1044,6 +1068,90 @@ export class MemoryStore implements Store {
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     list: async (limit = 200) =>
       [...this.tables.replans.values()]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit),
+  };
+
+  /**
+   * The creative intelligence layer.
+   *
+   * A second real implementation of the same contract, not a mock — which is
+   * what makes the conformance suite meaningful and what caught the storyboard
+   * resequencing that Postgres did on read and this did not.
+   */
+  readonly creative = {
+    putModel: async (
+      organizationId: string,
+      model: { id: string; projectId: string; kind: 'brief' | 'audience' | 'genome'; version: number; data: unknown; createdAt: string },
+    ) => {
+      this.tables.creativeModels.set(`${model.projectId}:${model.kind}:${model.version}`, {
+        ...model,
+        organizationId,
+      });
+    },
+
+    latestModel: async (organizationId: string, projectId: string, kind: 'brief' | 'audience' | 'genome') => {
+      const rows = [...this.tables.creativeModels.values()]
+        .filter((row) => row.organizationId === organizationId && row.projectId === projectId && row.kind === kind)
+        .sort((a, b) => b.version - a.version);
+      return rows[0]?.data ?? null;
+    },
+
+    putTerritories: async (
+      organizationId: string,
+      projectId: string,
+      rows: readonly { territory: CreativeTerritory; kept: boolean; selected: boolean; rejectionReason: string | null }[],
+    ) => {
+      for (const row of rows) {
+        this.tables.creativeTerritories.set(row.territory.id, { ...row, organizationId, projectId });
+      }
+    },
+
+    listTerritories: async (organizationId: string, projectId: string) =>
+      [...this.tables.creativeTerritories.values()]
+        .filter((row) => row.organizationId === organizationId && row.projectId === projectId)
+        .sort((a, b) => a.territory.createdAt.localeCompare(b.territory.createdAt))
+        .map(({ territory, kept, selected, rejectionReason }) => ({ territory, kept, selected, rejectionReason })),
+
+    putReviews: async (organizationId: string, reviews: readonly CriticReview[]) => {
+      for (const review of reviews) this.tables.criticReviews.set(review.id, { ...review, organizationId });
+    },
+
+    listReviews: async (organizationId: string, projectId: string) =>
+      [...this.tables.criticReviews.values()]
+        .filter((row) => row.organizationId === organizationId && row.projectId === projectId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map(({ organizationId: _org, ...review }) => review),
+
+    putDecision: async (organizationId: string, decision: DirectorDecision) => {
+      this.tables.directorDecisions.set(decision.id, { ...decision, organizationId });
+    },
+
+    listDecisions: async (organizationId: string, projectId: string) =>
+      [...this.tables.directorDecisions.values()]
+        .filter((row) => row.organizationId === organizationId && row.projectId === projectId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map(({ organizationId: _org, ...decision }) => decision),
+
+    putSignatures: async (organizationId: string, signatures: readonly CreativeSignature[]) => {
+      for (const signature of signatures) {
+        this.tables.creativeSignatures.set(signature.id, { ...signature, organizationId });
+      }
+    },
+
+    recentSignatures: async (organizationId: string, limit = 60) =>
+      [...this.tables.creativeSignatures.values()]
+        .filter((row) => row.organizationId === organizationId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit),
+
+    putPreference: async (organizationId: string, preference: CreativePreference) => {
+      this.tables.creativePreferences.set(preference.id, { ...preference, organizationId });
+    },
+
+    listPreferences: async (organizationId: string, limit = 200) =>
+      [...this.tables.creativePreferences.values()]
+        .filter((row) => row.organizationId === organizationId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, limit),
   };

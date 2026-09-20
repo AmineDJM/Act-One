@@ -17,6 +17,10 @@ import {
   type FilmCut,
   type ProductUnderstanding,
   type ProjectBrief,
+  type AudienceModel,
+  type BrandGenome,
+  type CreativeBrief,
+  type CreativeTerritory,
 } from '@act-one/core';
 import type { CallContext, LlmProvider } from '@act-one/providers';
 import { rankSystems, getSystem } from './systems/index.ts';
@@ -123,6 +127,21 @@ export type StrategyInput = {
   maxDurationSeconds?: number;
   /** Regenerate away from these, when the customer asked for new directions. */
   rejectedConcepts?: Concept[];
+  /**
+   * The direction the Director Brain chose, and the assignment behind it.
+   *
+   * Optional, so a production that predates the direction stage still works
+   * exactly as it did. When it is here it governs: the three concepts are
+   * three ways of executing one chosen direction rather than three unrelated
+   * ideas, which is the difference between a studio that explored and picked
+   * and a studio that generates alternatives and hopes.
+   */
+  direction?: {
+    territory: CreativeTerritory;
+    brief: CreativeBrief;
+    audience: AudienceModel;
+    genome: BrandGenome;
+  };
 };
 
 export type StrategyResult = {
@@ -340,6 +359,38 @@ export class CreativeStrategyEngine {
             `Gradients allowed: ${input.brand.allowsGradient}. Glow allowed: ${input.brand.allowsGlow}.`,
             `Brand tone: ${input.brand.tone}`,
             ``,
+            ...(input.direction
+              ? [
+                  `# The direction, already chosen. This is not a suggestion.`,
+                  `"${input.direction.territory.name}" — ${input.direction.territory.premise}`,
+                  `It works by: ${input.direction.territory.mechanism.replace(/_/g, ' ')}. The product is ${input.direction.territory.productRole}.`,
+                  `It opens on: ${input.direction.territory.opening}`,
+                  `Its risk, which you must not walk into: ${input.direction.territory.risk}`,
+                  ``,
+                  `# What the film has to do to the person watching`,
+                  `They walk in believing: ${input.direction.brief.transformation.before}`,
+                  `They should walk out believing: ${input.direction.brief.transformation.after}`,
+                  `The one thing that has to land: ${input.direction.brief.transformation.pivot}`,
+                  `The film must: ${input.direction.brief.creativeObjective}`,
+                  `Call to action: ${input.direction.brief.goal.ctaStrength}.`,
+                  ``,
+                  `# Who is watching`,
+                  `${input.direction.audience.who} (${input.direction.audience.sophistication}). ${input.direction.audience.attentionContext}`,
+                  input.direction.audience.objections.length > 0
+                    ? `They will object: ${input.direction.audience.objections.slice(0, 4).join('; ')}.`
+                    : '',
+                  input.direction.audience.statusQuo ? `Today they instead: ${input.direction.audience.statusQuo}.` : '',
+                  ``,
+                  `# How this brand behaves`,
+                  `${input.direction.genome.archetype.replace(/_/g, ' ')}. ${input.direction.genome.languageBehaviour}`,
+                  input.direction.genome.taboos.length > 0
+                    ? `It would never: ${input.direction.genome.taboos.slice(0, 5).join('; ')}.`
+                    : '',
+                  ``,
+                  `Your concept is one way of executing that direction. Do not replace it.`,
+                  ``,
+                ]
+              : []),
             `# Your assignment for THIS concept`,
             `Angle (non-negotiable): ${assignment.angle}`,
             `Narrative structure (non-negotiable): ${assignment.structure}`,
