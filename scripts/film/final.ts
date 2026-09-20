@@ -287,7 +287,18 @@ const scenes: Graph[] = [
     objects: [
       {
         kind: 'ui_layer', id: 'f4_product', assetId: 'ast_home_hero',
-        crop: { x: 0, y: 0, width: 1, height: 1 },
+        /*
+         * Cropped in from the capture's own edges.
+         *
+         * An independent reviewer found two things in this shot before it
+         * found anything else: "product mockup is cut off on the right, with a
+         * partial white letter visible" and "bottom paragraph is clipped, line
+         * ends mid-thought". Both were in the capture itself — a sliver of the
+         * next card at the right edge, and a paragraph the crop cut through.
+         * A plate is a framing decision, and framing through the middle of a
+         * word is the thing that reads as a mistake rather than as a choice.
+         */
+        crop: { x: 0, y: 0, width: 0.86, height: 0.88 },
         /*
          * Sized so the page still shows under it.
          *

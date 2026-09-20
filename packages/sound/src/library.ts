@@ -116,18 +116,40 @@ export const DEFAULT_LIBRARY: SoundLibrary = {
     },
   ],
   sfx: [
-    { id: 'sfx_impact_soft', kind: 'impact_soft', durationSeconds: 1.2, storageKey: 'library/sfx/impact-soft.wav', lufs: -18, preRoll: 0.04 },
-    { id: 'sfx_impact_hard', kind: 'impact_hard', durationSeconds: 1.6, storageKey: 'library/sfx/impact-hard.wav', lufs: -14, preRoll: 0.06 },
-    { id: 'sfx_sub_drop', kind: 'sub_drop', durationSeconds: 2.4, storageKey: 'library/sfx/sub-drop.wav', lufs: -12, preRoll: 0.08 },
+  /*
+   * PRE-ROLL IS MEASURED, NOT ASSERTED.
+   *
+   * These numbers were written by hand beside the filenames and ten of the
+   * twelve were wrong by more than a frame. The sound director subtracts the
+   * pre-roll when it places a cue, so a sample claiming 80ms of air it does
+   * not have is started 80ms early and HEARD 80ms early — and the defect is
+   * invisible, because every timeline in the system says the cue is exactly
+   * where it was asked for. An independent measurement of a finished master
+   * found the sub-drop landing 72ms ahead of its frame, which is what the
+   * 78ms of imaginary air predicts.
+   *
+   * The claims assumed recorded samples with room tone in front. These are
+   * synthesised by `npm run sound-library` and begin at their transient, so
+   * the honest value is near zero for anything with a hit in it.
+   *
+   * Risers and the air texture keep zero, and that is a different decision
+   * rather than an oversight: a riser HAS no transient to align — its job is
+   * to arrive, so its cue time is when it begins and the swell leads into
+   * whatever follows. `scripts/analysis/preroll_check.py` measures all of
+   * them, and a test asserts these numbers against the actual files.
+   */
+    { id: 'sfx_impact_soft', kind: 'impact_soft', durationSeconds: 1.2, storageKey: 'library/sfx/impact-soft.wav', lufs: -18, preRoll: 0 },
+    { id: 'sfx_impact_hard', kind: 'impact_hard', durationSeconds: 1.6, storageKey: 'library/sfx/impact-hard.wav', lufs: -14, preRoll: 0 },
+    { id: 'sfx_sub_drop', kind: 'sub_drop', durationSeconds: 2.4, storageKey: 'library/sfx/sub-drop.wav', lufs: -12, preRoll: 0.002 },
     { id: 'sfx_riser_short', kind: 'riser_short', durationSeconds: 1.5, storageKey: 'library/sfx/riser-short.wav', lufs: -18, preRoll: 0 },
     { id: 'sfx_riser_long', kind: 'riser_long', durationSeconds: 3.5, storageKey: 'library/sfx/riser-long.wav', lufs: -18, preRoll: 0 },
-    { id: 'sfx_whoosh_short', kind: 'whoosh_short', durationSeconds: 0.6, storageKey: 'library/sfx/whoosh-short.wav', lufs: -20, preRoll: 0.12 },
-    { id: 'sfx_whoosh_long', kind: 'whoosh_long', durationSeconds: 1.4, storageKey: 'library/sfx/whoosh-long.wav', lufs: -20, preRoll: 0.2 },
+    { id: 'sfx_whoosh_short', kind: 'whoosh_short', durationSeconds: 0.6, storageKey: 'library/sfx/whoosh-short.wav', lufs: -20, preRoll: 0.033 },
+    { id: 'sfx_whoosh_long', kind: 'whoosh_long', durationSeconds: 1.4, storageKey: 'library/sfx/whoosh-long.wav', lufs: -20, preRoll: 0.043 },
     { id: 'sfx_ui_click', kind: 'ui_click', durationSeconds: 0.18, storageKey: 'library/sfx/ui-click.wav', lufs: -22, preRoll: 0 },
     { id: 'sfx_ui_confirm', kind: 'ui_confirm', durationSeconds: 0.4, storageKey: 'library/sfx/ui-confirm.wav', lufs: -20, preRoll: 0 },
     { id: 'sfx_texture_air', kind: 'texture_air', durationSeconds: 4, storageKey: 'library/sfx/texture-air.wav', lufs: -24, preRoll: 0 },
-    { id: 'sfx_logo_warm', kind: 'logo_sting_warm', durationSeconds: 2.2, storageKey: 'library/sfx/logo-warm.wav', lufs: -14, preRoll: 0.05 },
-    { id: 'sfx_logo_clean', kind: 'logo_sting_clean', durationSeconds: 1.8, storageKey: 'library/sfx/logo-clean.wav', lufs: -14, preRoll: 0.05 },
+    { id: 'sfx_logo_warm', kind: 'logo_sting_warm', durationSeconds: 2.2, storageKey: 'library/sfx/logo-warm.wav', lufs: -14, preRoll: 0 },
+    { id: 'sfx_logo_clean', kind: 'logo_sting_clean', durationSeconds: 1.8, storageKey: 'library/sfx/logo-clean.wav', lufs: -14, preRoll: 0 },
   ],
 };
 

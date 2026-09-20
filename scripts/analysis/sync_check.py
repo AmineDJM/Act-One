@@ -59,6 +59,31 @@ def audio(path):
     return np.frombuffer(out.stdout, dtype=np.float32)
 
 
+
+def stereo_peak_dbfs(path):
+    """
+    The peak of the delivered file, not of a mono downmix.
+
+    `audio()` above folds to mono because onset detection wants one signal, and
+    a mono fold SUMS the channels: two correlated channels at -6 dBFS each add
+    to 0 dBFS, and in float they happily go above it. Reading the peak off that
+    signal reported a master at +0.37 dBFS — apparently clipping, alarmingly —
+    when the file itself peaked at -1.98 and was never anywhere near the
+    ceiling. An instrument that invents a delivery defect costs more than no
+    instrument, because somebody then goes and "fixes" a mastering chain that
+    was correct.
+    """
+    out = subprocess.run(
+        [FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-i", path,
+         "-map", "a:0", "-ac", "2", "-ar", str(SR), "-f", "f32le", "-"],
+        capture_output=True,
+    )
+    if not out.stdout:
+        return None
+    channels = np.frombuffer(out.stdout, dtype=np.float32)
+    return round(float(20 * np.log10(max(1e-9, np.abs(channels).max()))), 2)
+
+
 def onset_envelope(x, hop=256, win=1024):
     """
     Spectral flux: how much the spectrum GAINED energy, frame to frame.
@@ -135,7 +160,7 @@ def main():
     report = {
         "file": os.path.basename(path),
         "durationSeconds": round(len(x) / SR, 2),
-        "peakDbfs": round(float(20 * np.log10(max(1e-9, np.abs(x).max()))), 2),
+        "peakDbfs": stereo_peak_dbfs(path),
         "cues": rows,
         "pipelineOffsetMs": pipeline,
         "audible": len(measured),
