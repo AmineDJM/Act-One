@@ -600,3 +600,38 @@ export function objectPresent(
   const exit = object.exitAt ?? sceneDuration;
   return sceneSeconds >= object.enterAt && sceneSeconds <= exit;
 }
+
+/**
+ * How much a layer at depth `z` is magnified and displaced by the camera.
+ *
+ * Defined here rather than in the renderer, and that move has a reason. The
+ * renderer owned this formula, and QA — which cannot import the renderer,
+ * because a structural check that needs a browser is a check nobody runs at
+ * plan time — had no access to it. So QA reasoned about where an object sits
+ * using its authored transform alone, and every question about what is
+ * actually in frame was answered as if the camera did not exist.
+ *
+ * That gap is not academic. A headline laid out inside the frame, on a near
+ * plane, under a dolly, is magnified past both edges and clipped, and a check
+ * that reads only the authored `x` and `scale` reports the scene as clean.
+ *
+ * Clamped, because the unclamped term goes through zero and out the far side.
+ * A wide lens on a far layer — 20mm, a full dolly, z of 0.8 — computes to
+ * -0.6, and a layer at negative scale is a layer mirrored and pushed back
+ * through the camera. The floor is what a layer at the far plane may shrink
+ * to; the ceiling stops a near layer swallowing the frame. Depth separates; it
+ * never inverts.
+ */
+export function parallaxScale(
+  z: number,
+  camera: CameraSpec,
+  t: number,
+  curves: Record<CurveName, CurveFn>,
+): number {
+  const dolly = valueAt(camera.dollyZ, t, curves);
+  // 50mm is neutral. Wider separates depths faster, longer flattens them. Read
+  // on the clock, so a zoom during a dolly changes the perspective the way it
+  // does on a real lens.
+  const strength = 50 / Math.max(18, valueAt(camera.focalLengthMm, t, curves));
+  return Math.max(0.15, Math.min(4, 1 + dolly * strength * -z));
+}

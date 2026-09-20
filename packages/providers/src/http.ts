@@ -68,6 +68,32 @@ export function proxyMisconfiguration(): string | null {
 }
 
 /**
+ * Says it once, on the first call that would have bypassed the proxy.
+ *
+ * `proxyMisconfiguration()` has existed all along and two entry points consult
+ * it. Everything else — a script, a test, a one-off probe — did not, and the
+ * failure it produces is the most expensive kind of wrong: the call succeeds,
+ * the vendor answers 200, and the answer is the one it gives a stranger. That
+ * reads exactly like a rejected credential, and it cost a real "this provider
+ * is unusable" verdict on a provider that was fine.
+ *
+ * A warning rather than a throw, because a process with direct egress and a
+ * stale HTTPS_PROXY in its environment should still work. Once rather than per
+ * call, because the second copy tells nobody anything.
+ */
+let warnedAboutProxy = false;
+function warnIfBypassingProxy(): void {
+  if (warnedAboutProxy) return;
+  const problem = proxyMisconfiguration();
+  if (!problem) return;
+  warnedAboutProxy = true;
+  console.warn(
+    `[act-one] ${problem} Calls will leave unauthenticated and a vendor may answer 200 ` +
+      'with an empty account, which looks like a bad key.',
+  );
+}
+
+/**
  * One HTTP client for every provider so timeout, retry, backoff and — most
  * importantly — credential redaction behave identically everywhere. A leaked
  * API key in an error message that gets written to the job log is the kind of
@@ -78,6 +104,7 @@ export async function httpRequest<T = unknown>(
   url: string,
   options: HttpOptions = {},
 ): Promise<T> {
+  warnIfBypassingProxy();
   const attempts = Math.max(1, options.attempts ?? 3);
   const timeoutMs = options.timeoutMs ?? 60_000;
   let lastError: unknown;
@@ -184,6 +211,7 @@ export async function httpStream(
     onChunk: (text: string) => void;
   },
 ): Promise<void> {
+  warnIfBypassingProxy();
   const attempts = Math.max(1, options.attempts ?? 3);
   const idleTimeoutMs = options.idleTimeoutMs ?? 45_000;
   let lastError: unknown;

@@ -117,6 +117,56 @@ describe('the scene language', () => {
 
     expect(inspectScenes([scene], EASINGS).filter((f) => f.severity === 'hard_fail')).toEqual([]);
   });
+
+  /**
+   * The check has to see the frame the renderer draws, not the one authored.
+   *
+   * Three creative directions clipped their headlines on the first render —
+   * "Six" came out as "ix" — and the structural pass reported no hard
+   * failures, because it tested an object's anchor POINT against the safe area
+   * while a text object is a box `maxWidth` wide that the camera then
+   * magnifies. The pair below is the whole lesson: identical text, identical
+   * placement, and the only difference is whether the camera pushes in. One is
+   * clipped and one is not, so a check that reads only the authored transform
+   * cannot tell them apart — which is exactly the state it shipped in.
+   */
+  it('catches a headline the camera pushes off the frame, and clears the same one when the camera is locked', () => {
+    const headline = (cameraScale: number) =>
+      SceneGraph.parse({
+        id: 'scn_bounds',
+        durationSeconds: 2,
+        intent: 'One wide headline, with and without a push.',
+        camera: { scale: cameraScale, focalLengthMm: 50 },
+        objects: [
+          {
+            kind: 'text',
+            id: 'line',
+            content: 'Six',
+            token: 'display',
+            color: 'onCanvas.primary',
+            align: 'left',
+            maxWidth: 0.8,
+            maxLines: 1,
+            staggerBy: 'none',
+            staggerSeconds: 0,
+            role: 'payload',
+            reason: 'The word the film opens on.',
+            transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+          } as SceneObject,
+        ],
+        macro: null,
+      });
+
+    const clipped = inspectScenes([headline(1.6)], EASINGS).filter(
+      (f) => f.check === 'text_outside_frame',
+    );
+    expect(clipped).toHaveLength(1);
+    expect(clipped[0]?.severity).toBe('hard_fail');
+
+    expect(
+      inspectScenes([headline(1)], EASINGS).filter((f) => f.check === 'text_outside_frame'),
+    ).toEqual([]);
+  });
 });
 
 describe.skipIf(browser === undefined)('a scene graph, rendered', () => {

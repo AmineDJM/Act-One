@@ -9,3 +9,4 @@ export * from './scores.ts';
 export * from './build-library.ts';
 export * from './dialogue-lead.ts';
 export * from './voice-tools.ts';
+export * from "./scene-sound.ts";

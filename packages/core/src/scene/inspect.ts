@@ -1,6 +1,7 @@
 import {
   objectPresent,
   valueAt,
+  parallaxScale,
   type Animatable,
   type CurveFn,
   type CurveName,
@@ -33,6 +34,7 @@ export type SceneFinding = {
   objectId: string | null;
   check:
     | 'unreadable_duration'
+    | 'text_outside_frame'
     | 'outside_safe_area'
     | 'competing_payloads'
     | 'excessive_simultaneous_motion'
@@ -82,6 +84,17 @@ const UI_MIN_FRAME_SHARE = 0.34;
  * catches — a film that changes its words and never changes its image.
  */
 const SIMILARITY_CEILING = 0.86;
+
+/**
+ * How far a text box may hang past the frame before it is a defect.
+ *
+ * Not zero. A box is a wrap width, not an ink bound, and a trailing space or a
+ * hair of letter-spacing on the last glyph routinely puts the box a pixel or
+ * two over an edge with nothing visibly cut. A hard zero would fail correct
+ * scenes; 1% of the frame is about a character, which is the smallest amount
+ * of clipping anybody can actually see.
+ */
+const TEXT_BLEED = 0.01;
 
 /** The sample rate for walking a timeline. Fine enough to catch a one-frame jump. */
 const SAMPLE_HZ = 30;
@@ -174,6 +187,73 @@ export function inspectScene(
         });
         break;
       }
+    }
+  }
+
+  // --- text that leaves the frame -------------------------------------------
+  /*
+   * The check the safe-area one looks like it is doing and is not.
+   *
+   * Safe area tests an object's anchor POINT. A text object is not a point: it
+   * is a box `maxWidth` wide that the renderer wraps inside, placed by its
+   * anchor. A headline with `maxWidth: 0.8` anchored at its centre on x = 0.08
+   * has an anchor comfortably inside the safe area and a box that starts at
+   * -0.32 — a third of a frame off the left edge — so the film renders the
+   * word "Six" as "ix" and every check passes.
+   *
+   * That is not hypothetical. Two of three creative directions clipped their
+   * headlines and their body copy on the first render, the QA pass reported no
+   * hard failures, and the only way to find it was to look at the frames. A
+   * structural check that cannot see the most visible defect in the output is
+   * the check that needed writing.
+   *
+   * Horizontal only, and deliberately. The box width is known exactly; its
+   * height depends on how the text wraps, which depends on the font, which
+   * this package cannot see without a browser. A guessed vertical bound would
+   * produce false failures on every correct scene, and a check people learn to
+   * ignore protects nothing.
+   */
+  for (const object of scene.objects) {
+    if (object.kind !== 'text') continue;
+    for (const t of [0, 0.5, 1]) {
+      /*
+       * Measured through the camera, not off the authored transform.
+       *
+       * The first version of this check read `x` and `scale` alone and passed
+       * a direction whose headline the dolly magnified straight off both
+       * edges — a near plane under a push is bigger and further from centre
+       * than it was authored, and a check blind to that is only correct for a
+       * locked camera. Mirrors the renderer exactly: the same magnification
+       * applies to the layer's size and to its distance from frame centre.
+       */
+      const depth = parallaxScale(valueAt(object.transform.z, t, curves), scene.camera, t, curves);
+      const camScale = valueAt(scene.camera.scale, t, curves);
+      const camX = valueAt(scene.camera.x, t, curves);
+
+      // Two transforms, composed in the renderer's order: the dolly magnifies
+      // and displaces each layer by its own depth, then the camera scales and
+      // translates the whole frame around its centre.
+      const scale = valueAt(object.transform.scale, t, curves) * depth * camScale;
+      const width = object.maxWidth * scale;
+      const parallaxed = 0.5 + (valueAt(object.transform.x, t, curves) - 0.5) * depth;
+      const x = 0.5 + (parallaxed - 0.5) * camScale + camX;
+      const left = x - object.transform.anchor.x * width;
+      const right = left + width;
+      if (left >= -TEXT_BLEED && right <= 1 + TEXT_BLEED) continue;
+
+      const edge = left < -TEXT_BLEED ? 'left' : 'right';
+      const over = edge === 'left' ? -left : right - 1;
+      say({
+        objectId: object.id,
+        check: 'text_outside_frame',
+        severity: object.role === 'payload' ? 'hard_fail' : 'soft_fail',
+        message:
+          `"${object.content.slice(0, 40)}" is laid out in a box ${(width * 100).toFixed(0)}% of the ` +
+          `frame wide, which puts its ${edge} edge ${(over * 100).toFixed(0)}% past the frame. ` +
+          `The words are cut off. Narrow maxWidth, move x, or change the anchor.`,
+        atSeconds: null,
+      });
+      break;
     }
   }
 

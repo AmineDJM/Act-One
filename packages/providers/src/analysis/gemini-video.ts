@@ -303,9 +303,19 @@ export class GeminiVideoAnalyst implements VideoAnalyst {
         // A close reading thinks for a long time before it writes; the gap
         // between chunks once it starts is short.
         idleTimeoutMs: depth === 'deep' ? 180_000 : 90_000,
-        // Retried only before the first byte, which `httpStream` enforces:
-        // after that a retry would discard a partial answer we are paying for.
-        attempts: 2,
+        /*
+         * Retried only before the first byte, which `httpStream` enforces:
+         * after that a retry would discard a partial answer we are paying for.
+         *
+         * Four on a deep pass rather than two. The failure this protects
+         * against is the proxy cutting the silence BEFORE the first byte —
+         * a close reading of a twelve-second film thinks for a minute or two
+         * before it writes anything, and whether that silence lands inside the
+         * gateway's window is close to a coin flip. Two attempts lost two of
+         * four films in one evaluation run; the retries are cheap because
+         * nothing was generated on the attempt that was cut.
+         */
+        attempts: depth === 'deep' ? 4 : 2,
         ...(context.signal ? { signal: context.signal } : {}),
         onChunk: (chunk) => {
           buffer += chunk;

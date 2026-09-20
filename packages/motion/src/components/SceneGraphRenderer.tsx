@@ -5,6 +5,7 @@ import {
   objectPresent,
   objectProgress,
   valueAt,
+  parallaxScale,
   type Animatable,
   type CameraSpec,
   type SceneGraph,
@@ -95,26 +96,17 @@ function cameraTransform(camera: CameraSpec, t: number): { transform: string } {
 }
 
 /** How much a layer at depth `z` is moved by the camera's dolly. */
+/**
+ * The camera's effect on one layer, from the scene language.
+ *
+ * A thin wrapper rather than a second implementation: the formula lives in
+ * core so that QA, which must never import a renderer, reasons about the same
+ * frame the renderer draws. Two copies of it drifted once already — QA passed
+ * a headline the camera pushed off both edges — and one of them being right is
+ * indistinguishable from both being right until somebody watches the film.
+ */
 function parallax(z: number, camera: CameraSpec, t: number): number {
-  const dolly = num(camera.dollyZ, t);
-  // 50mm is neutral. Wider separates depths faster, longer flattens them.
-  // Read on the clock, so a zoom during a dolly changes the perspective the
-  // way it does on a real lens.
-  const strength = 50 / Math.max(18, num(camera.focalLengthMm, t));
-  /*
-   * Clamped, because the unclamped term goes through zero and out the far side.
-   *
-   * A wide lens on a far layer — 20mm, a full dolly, z of 0.8 — computes to
-   * -0.6, and a layer at negative scale is a layer mirrored and pushed back
-   * through the camera. An integration test measuring how far two depths
-   * travelled found it by looking for a green square that was no longer
-   * anywhere in the frame.
-   *
-   * The floor is what a layer at the far plane may shrink to, and the ceiling
-   * stops a near layer swallowing the frame. Depth separates; it never
-   * inverts.
-   */
-  return Math.max(0.15, Math.min(4, 1 + dolly * strength * -z));
+  return parallaxScale(z, camera, t, EASINGS);
 }
 
 /** Defocus by distance from the focal plane, when the camera asks for any. */

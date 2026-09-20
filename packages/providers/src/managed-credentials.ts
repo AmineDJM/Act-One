@@ -42,7 +42,9 @@ export type ManagedProvider =
   | 'gemini'
   | 'runway'
   | 'recraft'
-  | 'ideogram';
+  | 'ideogram'
+  /** The one general-purpose GPU. Rented machines, not a vendor's model. */
+  | 'runpod';
 
 const ALL: readonly ManagedProvider[] = [
   'openai',
@@ -53,6 +55,7 @@ const ALL: readonly ManagedProvider[] = [
   'runway',
   'recraft',
   'ideogram',
+  'runpod',
 ];
 
 /**

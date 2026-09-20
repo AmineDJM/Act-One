@@ -239,6 +239,8 @@ export type RenderScenesOptions = {
   outputPath: string;
   concurrency?: number;
   browserExecutable?: string;
+  /** The canvas the director chose, rather than the one the brand defaults to. */
+  theme?: 'dark' | 'light' | 'auto';
   onProgress?: (progress: {
     renderedFrames: number;
     encodedFrames: number;
@@ -269,6 +271,7 @@ export async function renderScenes(options: RenderScenesOptions): Promise<Render
     scenes: options.scenes,
     brand: options.brand,
     assetUrls: options.assetUrls ?? {},
+    ...(options.theme ? { theme: options.theme } : {}),
   } as unknown as Record<string, unknown>;
 
   const composition = await selectComposition({

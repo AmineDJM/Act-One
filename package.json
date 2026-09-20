@@ -34,6 +34,8 @@
     "db:app-role": "node --experimental-strip-types packages/db/src/cli/app-role.ts",
     "prove:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-director.ts",
     "bench:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/bench-director.ts",
+    "evaluate:directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/evaluate-directions.ts",
+    "directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/directions.ts",
     "watch:film": "vite-node scripts/watch-film.ts"
   },
   "devDependencies": {

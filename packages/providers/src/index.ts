@@ -62,3 +62,4 @@ export {
 export * from './media/still-types.ts';
 export { RecraftProvider, type RecraftConfig } from './media/recraft.ts';
 export { IdeogramProvider, type IdeogramConfig } from './media/ideogram.ts';
+export { RunPodProvider, type RunPodConfig, type ComputeKind } from './compute/runpod.ts';
