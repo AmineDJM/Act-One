@@ -264,3 +264,123 @@ async function frameAt(video: string, seconds: number): Promise<Buffer> {
   const { readFile } = await import('node:fs/promises');
   return readFile(still);
 }
+
+describe('type as the reference films set it', () => {
+  /**
+   * The three capabilities the reference readings named, together.
+   *
+   * A model watching the films this system is asked to match described, in its
+   * own words, "2026 — glowing red outline", "3-5x more replies — massive
+   * scale, orange gradient", and lines like "Your problem isn't `what you
+   * sell`" set in two colours. None of those was expressible: a text object
+   * had one colour and no treatment, so every line came out as a slide.
+   *
+   * Asserted on the parsed scene rather than on pixels, because what broke
+   * before was the SCHEMA refusing to carry the intent, and a render test
+   * costs a browser to tell you the same thing.
+   */
+  it('carries spans, gradients, outlines and glow through the schema', () => {
+    const scene = SceneGraph.parse({
+      id: 'scn_type',
+      // Four seconds, not two: the reading-time check is right that nobody
+      // finishes a seven-word headline in two, and a fixture that trips a
+      // correct check teaches the wrong lesson about the check.
+      durationSeconds: 4,
+      intent: 'A line with emphasis inside it, and a number that is lit.',
+      objects: [
+        {
+          kind: 'text',
+          id: 'line',
+          content: "Your problem isn't what you sell",
+          token: 'display',
+          color: 'onCanvas.primary',
+          align: 'left',
+          maxWidth: 0.5,
+          maxLines: 2,
+          staggerBy: 'word',
+          staggerSeconds: 0.05,
+          role: 'payload',
+          reason: 'Emphasis inside a sentence, which is how every reference film writes.',
+          spans: [
+            { text: "Your problem isn't " },
+            { text: 'what you sell', color: '#FF4D1F', weight: 700 },
+          ],
+          transform: Transform.parse({ x: 0.3, y: 0.4, anchor: { x: 0, y: 0.5 } }),
+        },
+        {
+          kind: 'text',
+          id: 'year',
+          content: '2026',
+          token: 'display',
+          color: 'transparent',
+          align: 'left',
+          maxWidth: 0.3,
+          maxLines: 1,
+          staggerBy: 'none',
+          staggerSeconds: 0,
+          role: 'payload',
+          reason: 'A hollow outline that glows.',
+          treatment: {
+            gradient: null,
+            stroke: { color: '#FF4D1F', widthPx: 2, hollow: true },
+            glow: { color: '#FF4D1F', radiusPx: { from: 8, to: 30, curve: 'out_expo' }, strength: 1 },
+          },
+          transform: Transform.parse({ x: 0.3, y: 0.7, anchor: { x: 0, y: 0.5 } }),
+        },
+      ],
+      macro: null,
+    });
+
+    const [line, year] = scene.objects as [
+      Extract<SceneObject, { kind: 'text' }>,
+      Extract<SceneObject, { kind: 'text' }>,
+    ];
+
+    expect(line.spans).toHaveLength(2);
+    expect(line.spans[1]?.color).toBe('#FF4D1F');
+    expect(line.spans[1]?.weight).toBe(700);
+    expect(year.treatment.stroke?.hollow).toBe(true);
+    expect(year.treatment.glow).not.toBeNull();
+
+    expect(inspectScenes([scene], EASINGS).filter((f) => f.severity === 'hard_fail')).toEqual([]);
+  });
+
+  /**
+   * Spans decorate the line; they never replace it.
+   *
+   * `content` is what reading time, similarity and every other check reason
+   * about. A film that displays one sentence while the checks reason about
+   * another is worse than a film with no emphasis in it, so the two are not
+   * allowed to disagree.
+   */
+  it('refuses spans that do not join back to the line', () => {
+    const build = (spans: { text: string }[]) =>
+      SceneGraph.parse({
+        id: 'scn_bad',
+        durationSeconds: 2,
+        intent: 'Spans that say something else.',
+        objects: [
+          {
+            kind: 'text',
+            id: 'line',
+            content: 'Six weeks',
+            token: 'display',
+            color: 'onCanvas.primary',
+            align: 'left',
+            maxWidth: 0.5,
+            maxLines: 1,
+            staggerBy: 'none',
+            staggerSeconds: 0,
+            role: 'payload',
+            reason: 'The line.',
+            spans,
+            transform: Transform.parse({ x: 0.3, y: 0.4 }),
+          },
+        ],
+        macro: null,
+      });
+
+    expect(() => build([{ text: 'Six ' }, { text: 'months' }])).toThrow();
+    expect(() => build([{ text: 'Six ' }, { text: 'weeks' }])).not.toThrow();
+  });
+});

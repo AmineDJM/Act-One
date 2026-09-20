@@ -184,6 +184,100 @@ const objectBase = {
   reason: z.string().max(240).default(''),
 };
 
+/**
+ * A run of words inside a line, set differently from the rest of it.
+ *
+ * WHY THE LANGUAGE NEEDED THIS. Every reference film this system is asked to
+ * match emphasises INSIDE a sentence, not across sentences: "Your problem
+ * isn't `what you sell`", "and clearly defines who you should `target`", "c'est
+ * le format `qu'on regarde` encore" — one line, two colours, sometimes two
+ * weights. A text object with a single `color` cannot say that, so every line
+ * this system set was one flat colour and every emphasis had to become its own
+ * object on its own line. That is not a smaller version of the same idea; it
+ * is a different sentence.
+ *
+ * Spans DECORATE content rather than replacing it. `content` stays the line as
+ * a person would read it aloud, which is what reading time, similarity and
+ * every other check are asking about, and the spans must concatenate back to
+ * exactly that string. A schema that let the two disagree would let a film
+ * display one sentence while every check reasoned about another.
+ */
+export const TextSpan = z.object({
+  text: z.string().max(400),
+  /** Null keeps the text object's own colour. */
+  color: AnimatableColor.nullable().default(null),
+  /** Null keeps the type token's weight. 400 is regular, 700 bold. */
+  weight: z.number().int().min(100).max(900).nullable().default(null),
+  italic: z.boolean().default(false),
+  /** Null keeps the token's size. A multiplier, so 0.6 is small caps-ish. */
+  scale: z.number().min(0.3).max(3).nullable().default(null),
+});
+export type TextSpan = z.infer<typeof TextSpan>;
+
+/**
+ * How type is filled, outlined and lit.
+ *
+ * FROM THE REFERENCE READINGS, not from a wish list. A model watching the
+ * three films this system is asked to match described, in its own words:
+ * "2026 — glowing red outline, large, center", "3-5x more replies — massive
+ * scale, orange gradient, centered", "60 secondes — center, white, glowing red
+ * dot". Every one of those is a fill, a stroke or a glow, and a text object
+ * whose colour was a single flat value could express none of them. That is not
+ * a styling nicety: it is why every line this system set looked like a slide
+ * and every line in those films looks like a title.
+ *
+ * Three properties, all optional, all off by default, so a scene written
+ * before this existed renders exactly as it did.
+ */
+export const TextTreatment = z.object({
+  /**
+   * A gradient across the glyphs instead of a flat colour.
+   *
+   * Two stops and an angle rather than an arbitrary stop list: every instance
+   * in the references is a simple two-colour sweep, and a general gradient
+   * editor is a feature nobody asked for that QA would then have to reason
+   * about.
+   */
+  gradient: z
+    .object({
+      from: z.string().max(40),
+      to: z.string().max(40),
+      angleDeg: Animatable.default(90),
+    })
+    .nullable()
+    .default(null),
+  /**
+   * An outline, with the fill optionally knocked out.
+   *
+   * `hollow` is what makes "2026" read as a neon outline rather than as
+   * heavy type: the glyphs are stroked and the inside is the background.
+   */
+  stroke: z
+    .object({
+      color: AnimatableColor,
+      widthPx: Animatable.default(2),
+      hollow: z.boolean().default(false),
+    })
+    .nullable()
+    .default(null),
+  /**
+   * Light coming off the type.
+   *
+   * A radius and a colour, animatable so a word can bloom as it lands. This is
+   * the one part of these films that reads as lit rather than printed, and it
+   * costs a text-shadow.
+   */
+  glow: z
+    .object({
+      color: AnimatableColor,
+      radiusPx: Animatable.default(24),
+      strength: Animatable.default(0.6),
+    })
+    .nullable()
+    .default(null),
+});
+export type TextTreatment = z.infer<typeof TextTreatment>;
+
 export const TextObject = z.object({
   ...objectBase,
   kind: z.literal('text'),
@@ -200,7 +294,26 @@ export const TextObject = z.object({
   tracking: Animatable.optional(),
   /** Overrides the type token's leading. Animatable: lines can open as they settle. */
   lineHeight: Animatable.optional(),
-});
+  /**
+   * The line broken into differently-set runs.
+   *
+   * Empty means the whole line takes the object's own colour and the token's
+   * weight, which is what it always did. When present the runs must join back
+   * to `content` exactly — checked below, because a film that displays one
+   * sentence while every check reasons about another is worse than a film with
+   * no emphasis in it.
+   */
+  spans: z.array(TextSpan).max(24).default([]),
+  /** Fill, outline and glow. Empty by default; a flat colour is still a colour. */
+  treatment: TextTreatment.default(() => TextTreatment.parse({})),
+}).refine(
+  (object) => object.spans.length === 0 || object.spans.map((s) => s.text).join('') === object.content,
+  {
+    message:
+      'The spans do not join back to `content`. They set the same line differently, they do not replace it.',
+    path: ['spans'],
+  },
+);
 
 export const ShapeObject = z.object({
   ...objectBase,

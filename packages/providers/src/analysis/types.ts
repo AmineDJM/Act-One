@@ -116,12 +116,32 @@ const reportedAs = z.string().max(80).optional();
  * Every interpretation carries the same two fields.
  *
  * `evidence` is what in the film supports the claim, in the analyst's own
- * words, and it is required. A reading with nothing behind it is the failure
- * mode this whole schema exists to make visible.
+ * words. A reading with nothing behind it is the failure mode this whole
+ * schema exists to make visible.
+ *
+ * REQUIRED IS NOT THE SAME AS ENFORCED BY DELETION, and that distinction cost
+ * a whole reading. These were strictly required, so an entry the model wrote
+ * without them failed to parse and was DROPPED — fifteen scene boundaries and
+ * eight beats vanished out of one reference film, and the reading that came
+ * back reported zero boundaries in a film that plainly cuts. Insisting on
+ * evidence and then discarding the observation when it is missing does not
+ * produce better-evidenced readings; it produces emptier ones, and it hides
+ * exactly the parts the model was least sure about.
+ *
+ * So an entry with no stated confidence is `uncertain` rather than absent, and
+ * missing evidence says so in words a reader cannot mistake for a finding. The
+ * prompt still asks for both, and a pass full of "the analyst stated no
+ * evidence" is itself a signal about that pass.
  */
 const interpreted = {
-  confidence: Confidence,
-  evidence: z.string().max(600),
+  // Unstated confidence is `uncertain`, never `observed`: the one direction a
+  // default must never guess in is towards more certainty than was claimed.
+  confidence: vocabulary(['observed', 'inferred', 'uncertain'], 'uncertain'),
+  evidence: z
+    .string()
+    .max(600)
+    .default('The analyst stated no evidence for this.')
+    .catch('The analyst stated no evidence for this.'),
 };
 
 // ---------------------------------------------------------------------------

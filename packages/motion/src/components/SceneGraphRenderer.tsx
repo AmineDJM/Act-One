@@ -281,7 +281,36 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: background }}>
-      <AbsoluteFill style={{ ...cameraTransform(scene.camera, sceneT), willChange: 'transform' }}>
+      <AbsoluteFill
+        style={{
+          ...cameraTransform(scene.camera, sceneT),
+          /*
+           * A vanishing point, without which 3D rotation is a squash.
+           *
+           * `rotationX` and `rotationY` have been in the language since it was
+           * written and the renderer has always applied them — into a flat
+           * container, where `rotateY(20deg)` makes an element NARROWER and
+           * nothing else. No near edge, no far edge, no foreshortening. Every
+           * reference film we are asked to match floats cards in real space,
+           * and the reason this one could not was one missing property.
+           *
+           * Tied to the lens rather than picked: a 35mm frame is 36mm wide, so
+           * the distance that reproduces a given focal length is the frame's
+           * width scaled by `focalLength / 36`. A long lens flattens the
+           * perspective and a wide one exaggerates it, which is what those
+           * numbers mean everywhere else in the language.
+           *
+           * On the camera container so every layer shares one vanishing point.
+           * Per-object perspective gives each card its own vanishing point,
+           * which is what makes a group of them look like stickers rather than
+           * like objects in a room.
+           */
+          perspective: tokens.frame.width * (num(scene.camera.focalLengthMm, sceneT) / 36),
+          perspectiveOrigin: '50% 50%',
+          transformStyle: 'preserve-3d',
+          willChange: 'transform',
+        }}
+      >
         {drawable.map((object) => {
           const t = objectProgress(object, seconds, scene.durationSeconds);
           const z = num(object.transform.z, t);
@@ -310,6 +339,23 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
             left: `${px * 100}%`,
             top: `${py * 100}%`,
             opacity: Math.max(0, Math.min(1, num(object.transform.opacity, t))),
+            /*
+             * The anchor is where the transform is applied FROM, and it was
+             * only being used to place the object.
+             *
+             * `anchor` translates the element so the named point sits at
+             * `x, y` — correct. But `transform-origin` was left at its default
+             * of 50% 50%, so scale and rotation still happened around the
+             * element's centre. An object anchored at its left edge and scaled
+             * up therefore grew leftwards THROUGH its own anchor: a headline
+             * pinned to the page margin at 1.7x ran off the left of the frame
+             * while every check, reasoning from the schema's definition, put
+             * it comfortably inside.
+             *
+             * The schema says "where the transform is applied from". This is
+             * what makes that sentence true.
+             */
+            transformOrigin: `${object.transform.anchor.x * 100}% ${object.transform.anchor.y * 100}%`,
             transform:
               `translate(${-object.transform.anchor.x * 100}%, ${-object.transform.anchor.y * 100}%) ` +
               `scale(${(num(object.transform.scale, t) * depthScale).toFixed(5)}) ` +
@@ -342,15 +388,15 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
                         ? token.lineHeight
                         : num(object.lineHeight, t),
                     letterSpacing: `${num(object.tracking ?? token.tracking, t)}em`,
-                    color: animColor(object.color, t, tokens),
                     textAlign: object.align,
                     width: tokens.frame.width * object.maxWidth,
                     whiteSpace: 'pre-wrap',
+                    ...textTreatment(object, t, tokens),
                   }}
                 >
                   {object.staggerBy === 'none' || object.staggerSeconds <= 0
-                    ? object.content
-                    : staggeredText(object, seconds)}
+                    ? spannedText(object, t, tokens)
+                    : staggeredText(object, seconds, t, tokens)}
                 </div>,
               );
             }
@@ -597,13 +643,194 @@ const Particles: React.FC<{
 };
 
 /** Words arriving one after another, on the object's own stagger. */
-function staggeredText(object: SceneObject & { kind: 'text' }, seconds: number): React.ReactNode {
-  const units =
-    object.staggerBy === 'line' ? object.content.split('\n') : object.content.split(' ');
+/**
+ * The style a character at this position carries, from the object's spans.
+ *
+ * Built once per line as a lookup by character index, because the two things
+ * that decorate a line — spans and the stagger — cut it in different places.
+ * Spans are runs of characters chosen by a director; the stagger splits on
+ * words. Rendering one inside the other would make the emphasis jump to the
+ * nearest word boundary, so both are resolved against the same coordinate: the
+ * index of the character in `content`.
+ */
+
+/**
+ * Fill, outline and glow for a line of type.
+ *
+ * ORDER MATTERS AND IS NOT OBVIOUS. A gradient fill is painted by clipping a
+ * background to the glyphs, which requires `color: transparent` — so anything
+ * that also wants to set a colour has to come after it, and a stroke that
+ * knocks out the fill has to survive both. The sequence below is the one that
+ * composes: colour first, gradient over it, stroke last, glow on top of
+ * whatever resulted.
+ *
+ * `paint-order: stroke fill` rather than the default, because a stroke drawn
+ * over its own glyph eats half its weight from the inside and a 2px outline
+ * reads as 1px. This is the difference between an outline that looks drawn and
+ * one that looks like a rendering artefact.
+ */
+function textTreatment(
+  object: SceneObject & { kind: 'text' },
+  t: number,
+  tokens: DesignTokens,
+): React.CSSProperties {
+  const { gradient, stroke, glow } = object.treatment;
+  const style: React.CSSProperties = { color: animColor(object.color, t, tokens) };
+
+  if (gradient) {
+    const from = colorOf(gradient.from, tokens);
+    const to = colorOf(gradient.to, tokens);
+    style.backgroundImage = `linear-gradient(${num(gradient.angleDeg, t).toFixed(1)}deg, ${from}, ${to})`;
+    /*
+     * Clipped to the glyphs AND shrink-wrapped to them.
+     *
+     * `background-clip: text` clips the background to the letters, but the
+     * background still spans the element's box — which is the WRAP WIDTH, not
+     * the width of the words. A short number inside a wide box therefore sits
+     * in one narrow slice of the sweep and comes out looking like a flat
+     * colour, which is exactly what the first render of this showed: a "3-5x"
+     * that was supposed to run orange to amber and was uniformly orange.
+     *
+     * `width: fit-content` makes the box the text, so the gradient spans what
+     * you can actually see. The alignment has to be re-applied with a margin,
+     * because a shrink-wrapped box no longer has room to align inside.
+     */
+    style.backgroundClip = 'text';
+    style.WebkitBackgroundClip = 'text';
+    style.color = 'transparent';
+    style.width = 'fit-content';
+    style.maxWidth = tokens.frame.width * object.maxWidth;
+    if (object.align === 'center') style.marginInline = 'auto';
+    if (object.align === 'right') style.marginLeft = 'auto';
+  }
+
+  if (stroke) {
+    const width = num(stroke.widthPx, t);
+    style.WebkitTextStrokeWidth = `${width}px`;
+    style.WebkitTextStrokeColor = animColor(stroke.color, t, tokens);
+    style.paintOrder = 'stroke fill';
+    // Hollow means the outline IS the type: the inside shows the field behind
+    // it, which is what makes a stroked word read as neon rather than as bold.
+    if (stroke.hollow && !gradient) style.color = 'transparent';
+  }
+
+  if (glow) {
+    const radius = num(glow.radiusPx, t);
+    const strength = Math.max(0, Math.min(1, num(glow.strength, t)));
+    const colour = animColor(glow.color, t, tokens);
+    /*
+     * `drop-shadow` for hollow type, `text-shadow` for solid.
+     *
+     * A text-shadow is cast by the glyph's FILLED shape, whatever the fill's
+     * opacity. On hollow type — transparent inside, stroked outside — it
+     * therefore paints a solid glowing slab in the hole the outline was meant
+     * to leave, and the word that was supposed to read as neon reads as bold.
+     * That is what the first render of "2026" did. `drop-shadow` follows what
+     * is actually painted, so an outline glows as an outline.
+     *
+     * Layered at growing radius either way: one tight halo for the edge, one
+     * for the bloom, one wide and faint for the light in the air. A single
+     * shadow at a large radius reads as a blur behind the word rather than as
+     * light coming off it.
+     */
+    const radii = strength < 1 ? [0.35, 0.6 + strength] : [0.35, 1, 2.4];
+    if (stroke?.hollow) {
+      const existing = style.filter ? `${style.filter} ` : '';
+      style.filter = existing + radii.map((r) => `drop-shadow(0 0 ${(radius * r).toFixed(1)}px ${colour})`).join(' ');
+    } else {
+      style.textShadow = radii.map((r) => `0 0 ${(radius * r).toFixed(1)}px ${colour}`).join(', ');
+    }
+  }
+
+  return style;
+}
+
+function spanStyles(
+  object: SceneObject & { kind: 'text' },
+  t: number,
+  tokens: DesignTokens,
+): (React.CSSProperties | undefined)[] {
+  const styles: (React.CSSProperties | undefined)[] = new Array(object.content.length).fill(
+    undefined,
+  );
+  let cursor = 0;
+  for (const span of object.spans) {
+    const style: React.CSSProperties = {};
+    if (span.color !== null) style.color = animColor(span.color, t, tokens);
+    if (span.weight !== null) style.fontWeight = span.weight;
+    if (span.italic) style.fontStyle = 'italic';
+    if (span.scale !== null) style.fontSize = `${span.scale}em`;
+    const decorated = Object.keys(style).length > 0 ? style : undefined;
+    for (let i = 0; i < span.text.length && cursor < styles.length; i += 1, cursor += 1) {
+      styles[cursor] = decorated;
+    }
+  }
+  return styles;
+}
+
+/** A run of text, split into <span>s wherever its styling changes. */
+function decorate(
+  text: string,
+  offset: number,
+  styles: (React.CSSProperties | undefined)[],
+  keyPrefix: string,
+): React.ReactNode {
+  if (styles.length === 0) return text;
+  const parts: React.ReactNode[] = [];
+  let run = '';
+  let runStyle = styles[offset];
+  const flush = (index: number) => {
+    if (run === '') return;
+    parts.push(
+      runStyle ? (
+        <span key={`${keyPrefix}-${index}`} style={runStyle}>
+          {run}
+        </span>
+      ) : (
+        run
+      ),
+    );
+    run = '';
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const style = styles[offset + i];
+    if (style !== runStyle) {
+      flush(i);
+      runStyle = style;
+    }
+    run += text[i];
+  }
+  flush(text.length);
+  return parts;
+}
+
+/** A line with no stagger, set with whatever emphasis its spans carry. */
+function spannedText(
+  object: SceneObject & { kind: 'text' },
+  t: number,
+  tokens: DesignTokens,
+): React.ReactNode {
+  if (object.spans.length === 0) return object.content;
+  return decorate(object.content, 0, spanStyles(object, t, tokens), object.id);
+}
+
+function staggeredText(
+  object: SceneObject & { kind: 'text' },
+  seconds: number,
+  t: number,
+  tokens: DesignTokens,
+): React.ReactNode {
+  const separator = object.staggerBy === 'line' ? '\n' : ' ';
+  const units = object.content.split(separator);
+  const styles = object.spans.length > 0 ? spanStyles(object, t, tokens) : [];
+
+  let offset = 0;
   return units.map((unit, index) => {
     const start = object.enterAt + index * object.staggerSeconds;
     const local = Math.max(0, Math.min(1, (seconds - start) / 0.5));
     const eased = EASINGS.out_quint(local);
+    const at = offset;
+    offset += unit.length + separator.length;
     return (
       <span
         key={index}
@@ -615,7 +842,7 @@ function staggeredText(object: SceneObject & { kind: 'text' }, seconds: number):
           ...(object.staggerBy === 'line' ? { width: '100%' } : {}),
         }}
       >
-        {unit}
+        {decorate(unit, at, styles, `${object.id}-${index}`)}
       </span>
     );
   });
