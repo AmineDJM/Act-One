@@ -1,7 +1,7 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 import type { DesignTokens, TypeToken } from '@act-one/design';
-import { applyCase, breakLines, measureText } from '@act-one/design';
+import { applyCase, breakLines, fitToLines, measureText } from '@act-one/design';
 import type { EasingName } from '@act-one/core';
 import { ease, exitProgress, interpolate, staggered } from '../easing.ts';
 
@@ -10,8 +10,9 @@ import { ease, exitProgress, interpolate, staggered } from '../easing.ts';
  *
  * Text is rendered by the browser at its real size and broken by our own
  * metrics, so what the fitting code promised at storyboard time is what the
- * frame actually contains. Nothing here scales text to fit after the fact —
- * that produces the slightly-different-size-every-scene look that reads as
+ * frame actually contains. Text is only ever scaled DOWN, and only as far as
+ * it must go to say the whole line — never up, and never past the floor,
+ * which produces the slightly-different-size-every-scene look that reads as
  * automated.
  */
 export type TypeProps = {
@@ -28,25 +29,38 @@ export type TypeProps = {
   durationSeconds: number;
 };
 
-function useLines(props: TypeProps): string[] {
-  return React.useMemo(
-    () =>
-      breakLines(applyCase(props.text, props.token), {
-        family: props.token.family,
-        fontSizePx: props.token.sizePx,
-        tracking: props.token.tracking,
-        weight: props.token.weight,
-        maxWidthPx: props.maxWidth,
-        maxLines: props.maxLines,
-      }),
-    [props.text, props.token, props.maxWidth, props.maxLines],
-  );
+/**
+ * The lines, and the size that lets them all be said.
+ *
+ * Breaking at the intended size and keeping the first three lines is how a
+ * customer's film came to read "Draft a candidate update from" — a sentence
+ * stopped mid-phrase, on screen, as though that were the whole of it. A
+ * headline a step smaller and complete beats one at the intended size with
+ * its last words missing: the second is not a typographic compromise, it is
+ * the film saying something other than what was written.
+ */
+function useFitted(props: TypeProps): { lines: string[]; sizePx: number } {
+  return React.useMemo(() => {
+    const fitted = fitToLines(applyCase(props.text, props.token), {
+      family: props.token.family,
+      fontSizePx: props.token.sizePx,
+      tracking: props.token.tracking,
+      weight: props.token.weight,
+      maxWidthPx: props.maxWidth,
+      maxLines: props.maxLines ?? 3,
+    });
+    return { lines: fitted.lines, sizePx: fitted.fontSizePx };
+  }, [props.text, props.token, props.maxWidth, props.maxLines]);
 }
 
-function baseStyle(props: TypeProps): React.CSSProperties {
+function useLines(props: TypeProps): string[] {
+  return useFitted(props).lines;
+}
+
+function baseStyle(props: TypeProps, sizePx?: number): React.CSSProperties {
   return {
     fontFamily: `${props.token.family}, system-ui, sans-serif`,
-    fontSize: props.token.sizePx,
+    fontSize: sizePx ?? props.token.sizePx,
     fontWeight: props.token.weight,
     lineHeight: props.token.lineHeight,
     letterSpacing: `${props.token.tracking}em`,
@@ -68,12 +82,12 @@ function baseStyle(props: TypeProps): React.CSSProperties {
 export const WordReveal: React.FC<TypeProps> = (props) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const lines = useLines(props);
-  const lineHeightPx = props.token.sizePx * props.token.lineHeight;
+  const { lines, sizePx } = useFitted(props);
+  const lineHeightPx = sizePx * props.token.lineHeight;
   const exit = exitProgress(frame, fps, props.durationSeconds);
 
   return (
-    <div style={{ ...baseStyle(props), opacity: 1 - exit }}>
+    <div style={{ ...baseStyle(props, sizePx), opacity: 1 - exit }}>
       {lines.map((line, index) => {
         const t = ease(
           props.easing ?? 'out_quint',
@@ -104,15 +118,15 @@ export const WordReveal: React.FC<TypeProps> = (props) => {
 export const KineticHeadline: React.FC<TypeProps> = (props) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const lines = useLines(props);
+  const { lines, sizePx } = useFitted(props);
   const exit = exitProgress(frame, fps, props.durationSeconds, 0.18);
 
   let wordIndex = -1;
 
   return (
-    <div style={{ ...baseStyle(props), opacity: 1 - exit }}>
+    <div style={{ ...baseStyle(props, sizePx), opacity: 1 - exit }}>
       {lines.map((line, lineNumber) => (
-        <div key={lineNumber} style={{ display: 'flex', flexWrap: 'wrap', gap: `0 ${props.token.sizePx * 0.26}px`, justifyContent: props.align === 'center' ? 'center' : 'flex-start' }}>
+        <div key={lineNumber} style={{ display: 'flex', flexWrap: 'wrap', gap: `0 ${sizePx * 0.26}px`, justifyContent: props.align === 'center' ? 'center' : 'flex-start' }}>
           {line.split(' ').map((word) => {
             wordIndex += 1;
             const t = ease(
@@ -129,7 +143,7 @@ export const KineticHeadline: React.FC<TypeProps> = (props) => {
                 style={{
                   display: 'inline-block',
                   opacity: t,
-                  transform: `translateY(${interpolate(t, props.token.sizePx * 0.22, 0)}px)`,
+                  transform: `translateY(${interpolate(t, sizePx * 0.22, 0)}px)`,
                 }}
               >
                 {word}
@@ -149,7 +163,7 @@ export const KineticHeadline: React.FC<TypeProps> = (props) => {
 export const EditorialHeadline: React.FC<TypeProps & { rule?: boolean }> = (props) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const lines = useLines(props);
+  const { lines, sizePx } = useFitted(props);
   const t = ease(
     props.easing ?? 'out_expo',
     staggered(0, frame, fps, {
@@ -172,7 +186,7 @@ export const EditorialHeadline: React.FC<TypeProps & { rule?: boolean }> = (prop
           }}
         />
       )}
-      <div style={{ ...baseStyle(props), clipPath: `inset(0 ${(1 - t) * 100}% 0 0)` }}>
+      <div style={{ ...baseStyle(props, sizePx), clipPath: `inset(0 ${(1 - t) * 100}% 0 0)` }}>
         {lines.map((line, index) => (
           <div key={index}>{line}</div>
         ))}

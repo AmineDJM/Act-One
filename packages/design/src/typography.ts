@@ -157,6 +157,52 @@ export function breakLines(text: string, options: LineBreakOptions): string[] {
   return options.maxLines ? balanced.slice(0, options.maxLines) : balanced;
 }
 
+/**
+ * The same break, with nothing dropped.
+ *
+ * `breakLines` slices to `maxLines`, which is what a renderer wants and is a
+ * trap for anything trying to find out whether the text fits: ask it for at
+ * most three lines and it returns three, so "does this fit in three lines"
+ * is always yes. `fitTextToBox` was asking exactly that, of its own output,
+ * and the cost was a line of a customer's film reading "Draft a candidate
+ * update from" — a sentence stopped mid-phrase, on screen, as though that
+ * were the whole of it.
+ */
+export function breakAllLines(text: string, options: Omit<LineBreakOptions, 'maxLines'>): string[] {
+  return breakLines(text, { ...options, maxLines: undefined });
+}
+
+/**
+ * Sized to say the whole thing.
+ *
+ * Shrinks until the text fits the lines it is allowed, and only gives up —
+ * and truncates — when it has run out of room at the smallest size the design
+ * will tolerate. A headline one step smaller and complete beats one at the
+ * intended size with its last three words missing, every time; the second is
+ * not a typographic compromise, it is the film saying something other than
+ * what was written.
+ */
+export function fitToLines(
+  text: string,
+  options: LineBreakOptions & { maxLines: number; minScale?: number },
+): { lines: string[]; fontSizePx: number; truncated: boolean } {
+  const floor = options.fontSizePx * (options.minScale ?? 0.62);
+  let size = options.fontSizePx;
+  for (let step = 0; step < 14; step += 1) {
+    const lines = breakAllLines(text, { ...options, fontSizePx: size });
+    if (lines.length <= options.maxLines || size <= floor) {
+      return {
+        lines: lines.slice(0, options.maxLines),
+        fontSizePx: Math.round(size * 10) / 10,
+        truncated: lines.length > options.maxLines,
+      };
+    }
+    size = Math.max(floor, size * 0.94);
+  }
+  const lines = breakAllLines(text, { ...options, fontSizePx: floor });
+  return { lines: lines.slice(0, options.maxLines), fontSizePx: floor, truncated: lines.length > options.maxLines };
+}
+
 /** Pulls a word down when the last line would carry a single short word. */
 function avoidOrphan(lines: string[], options: LineBreakOptions): string[] {
   if (lines.length < 2) return lines;
@@ -198,11 +244,14 @@ export function fitTextToBox(
   const min = options.minFontSizePx ?? 12;
   let low = min;
   let high = options.maxFontSizePx;
-  let best = { fontSizePx: min, lines: breakLines(text, { ...options, fontSizePx: min, maxWidthPx: box.widthPx }) };
+  let best = { fontSizePx: min, lines: breakAllLines(text, { ...options, fontSizePx: min, maxWidthPx: box.widthPx }) };
 
   for (let i = 0; i < 18 && high - low > 0.5; i += 1) {
     const mid = (low + high) / 2;
-    const lines = breakLines(text, { ...options, fontSizePx: mid, maxWidthPx: box.widthPx });
+    // All the lines, not the first `maxLines` of them: asking whether a list
+    // that has already been cut to three entries has at most three entries is
+    // a check that cannot fail.
+    const lines = breakAllLines(text, { ...options, fontSizePx: mid, maxWidthPx: box.widthPx });
     const height = lines.length * mid * options.lineHeight;
     const widest = Math.max(0, ...lines.map((line) => measureText(line, { ...options, fontSizePx: mid })));
 
