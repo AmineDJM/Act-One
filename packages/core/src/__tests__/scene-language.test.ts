@@ -6,12 +6,18 @@ import {
   Transform,
   assessExperiment,
   compileScene,
+  compileIntent,
+  CreativeIntent,
   inspectScene,
   migratedRecipes,
   objectPresent,
   promoteExperiment,
   routeScene,
   valueAt,
+  ShotBrief,
+  briefToPrompt,
+  checkBrief,
+  sealBrief,
   type CurveFn,
   type CurveName,
   type Scene,
@@ -440,5 +446,193 @@ describe('the experimental door', () => {
       promoteExperiment(registry, 'candidate', { testRenderPath: '/x.mp4', reviewedBy: 'someone' })
         ?.productionReady,
     ).toBe(true);
+  });
+});
+
+describe('the generative shot brief', () => {
+  const brief = (over: Record<string, unknown> = {}) =>
+    ShotBrief.parse({
+      id: 'shot_1',
+      subject: 'A pair of hands closing a laptop on a kitchen table at dusk',
+      shotScale: 'medium_close',
+      cameraMotion: 'push_in',
+      framing: 'Hands lower left, window behind',
+      startFrame: 'Hands open on the keys',
+      endFrame: 'Lid closed, room darker',
+      durationSeconds: 5,
+      ...over,
+    });
+
+  it('refuses a brief that asks a model to draw the product', () => {
+    const problems = checkBrief(
+      brief({ subject: 'A sleek analytics dashboard with charts and a sidebar' }),
+    );
+    expect(problems.some((p) => p.field === 'subject')).toBe(true);
+  });
+
+  it('refuses a shot with no stated opening and closing composition', () => {
+    // Without them the edit gets built around whatever came back.
+    expect(checkBrief(brief({ startFrame: '', endFrame: '' })).length).toBeGreaterThan(0);
+  });
+
+  it('refuses an abstraction, because a model renders the average picture of one', () => {
+    expect(checkBrief(brief({ subject: 'productivity' })).some((p) => p.field === 'subject')).toBe(
+      true,
+    );
+  });
+
+  it('passes a brief somebody could actually shoot', () => {
+    expect(checkBrief(brief())).toEqual([]);
+  });
+
+  it('always carries the refusals, whatever the caller supplied', () => {
+    const sealed = sealBrief(brief({ forbids: ['rain'] }));
+    expect(sealed.forbids).toContain('rain');
+    expect(sealed.forbids.some((entry) => entry.includes('software interface'))).toBe(true);
+  });
+
+  it('compiles to a prompt that carries the decisions, not the adjectives', () => {
+    const { prompt, negative } = briefToPrompt(sealBrief(brief()));
+    expect(prompt).toContain('medium close shot');
+    expect(prompt).toContain('50mm');
+    expect(prompt).toContain('Opens on');
+    expect(negative).toContain('dashboard');
+  });
+});
+
+describe('the product rule does not block real shots', () => {
+  const shoot = (subject: string) =>
+    checkBrief(
+      ShotBrief.parse({
+        id: 's',
+        subject,
+        shotScale: 'wide',
+        cameraMotion: 'locked',
+        framing: 'Subject centre',
+        startFrame: 'a',
+        endFrame: 'b',
+        durationSeconds: 4,
+      }),
+    ).filter((p) => p.field === 'subject' && p.message.includes('software interface'));
+
+  it('allows ordinary words that happen to collide with UI vocabulary', () => {
+    // The first version of this check rejected a kitchen table.
+    expect(shoot('A pair of hands closing a laptop on a kitchen table at dusk')).toEqual([]);
+    expect(
+      shoot('Sunlight moving across a bare concrete wall, a window screen casting a grid'),
+    ).toEqual([]);
+    expect(shoot('A long dining table seen from above, plates being cleared')).toEqual([]);
+  });
+
+  it('still refuses the thing it exists to refuse', () => {
+    expect(shoot('A sleek analytics dashboard with charts and a sidebar').length).toBe(1);
+    expect(shoot('A web application screen showing user data tables').length).toBe(1);
+    expect(shoot('A browser window with a login screen').length).toBe(1);
+  });
+});
+
+describe('compiling a Director’s decisions', () => {
+  const intent = (over: Record<string, unknown> = {}) =>
+    CreativeIntent.parse({
+      id: 'beat_1',
+      durationSeconds: 4,
+      gesture: 'arrival',
+      energy: 0.5,
+      says: 'The product arrives.',
+      copy: ['Know before it happens.'],
+      note: 'It should land rather than appear.',
+      ...over,
+    });
+
+  it('keeps the prose as metadata and never as the instruction', () => {
+    const { scene } = compileIntent(intent());
+    expect(scene.intent).toBe('It should land rather than appear.');
+    // Everything the renderer reads is a value, not the sentence.
+    expect(
+      typeof scene.camera.focalLengthMm === 'number' ||
+        'from' in (scene.camera.focalLengthMm as object),
+    ).toBe(true);
+    expect(scene.objects[0]?.kind).toBe('text');
+  });
+
+  it('gives every gesture a different camera, not a different adjective', () => {
+    const shape = (gesture: string) => {
+      const { scene } = compileIntent(intent({ gesture }));
+      return JSON.stringify(scene.camera);
+    };
+    const shapes = new Set(['arrival', 'departure', 'hold', 'travel', 'reveal'].map(shape));
+    expect(shapes.size).toBe(5);
+  });
+
+  it('never produces a camera move too small to be seen', () => {
+    // A 1.06 scale over four seconds measured as a still frame in a real
+    // render; the floor exists so a gesture cannot compile to one.
+    for (const gesture of ['arrival', 'departure', 'hold', 'travel', 'reveal'] as const) {
+      const { scene } = compileIntent(intent({ gesture, energy: 0 }));
+      const start = valueAt(scene.camera.scale, 0, CURVES);
+      const end = valueAt(scene.camera.scale, 1, CURVES);
+      const dolly = Math.abs(
+        valueAt(scene.camera.dollyZ, 1, CURVES) - valueAt(scene.camera.dollyZ, 0, CURVES),
+      );
+      expect(Math.abs(end - start) + dolly).toBeGreaterThan(0.05);
+    }
+  });
+
+  it('takes a capture apart when the director named regions', () => {
+    const { scene } = compileIntent(
+      intent({
+        captureAssetId: 'ast_home',
+        regions: [
+          {
+            id: 'header',
+            crop: { x: 0, y: 0, width: 1, height: 0.3 },
+            depth: -0.4,
+            semantic: 'header',
+          },
+          {
+            id: 'body',
+            crop: { x: 0, y: 0.3, width: 0.6, height: 0.5 },
+            depth: 0.3,
+            semantic: 'body',
+          },
+        ],
+      }),
+    );
+    const layers = scene.objects.filter((object) => object.kind === 'ui_layer');
+    expect(layers).toHaveLength(2);
+    // Regions replace the whole capture: the same pixels twice is a double exposure.
+    expect(scene.objects.some((object) => object.kind === 'capture')).toBe(false);
+    // And they are at different depths, or they are not regions.
+    const depths = new Set(layers.map((l) => JSON.stringify(l.transform.z)));
+    expect(depths.size).toBe(2);
+  });
+
+  it('staggers regions rather than landing them together', () => {
+    const { scene } = compileIntent(
+      intent({
+        captureAssetId: 'ast_home',
+        energy: 0.8,
+        regions: [0, 1, 2].map((n) => ({
+          id: `r${n}`,
+          crop: { x: 0, y: n * 0.3, width: 1, height: 0.3 },
+          depth: n * 0.2 - 0.2,
+          semantic: `r${n}`,
+        })),
+      }),
+    );
+    const entries = scene.objects.filter((o) => o.kind === 'ui_layer').map((o) => o.enterAt);
+    expect(new Set(entries).size).toBe(3);
+  });
+
+  it('says so when a beat has nothing in it', () => {
+    const { warnings } = compileIntent(intent({ copy: [], captureAssetId: null }));
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain('nothing in it');
+  });
+
+  it('compiles to something that routes and inspects clean', () => {
+    const { scene } = compileIntent(intent());
+    expect(routeScene(scene).problems).toEqual([]);
+    expect(inspectScene(scene, CURVES).filter((f) => f.severity === 'hard_fail')).toEqual([]);
   });
 });

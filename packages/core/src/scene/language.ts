@@ -130,13 +130,21 @@ export const Transform = z.object({
 });
 export type Transform = z.infer<typeof Transform>;
 
-/** A rectangular region of a source, as fractions of it. */
+/**
+ * A rectangular region of a source, as fractions of it.
+ *
+ * Animatable, because a crop that moves is a camera INSIDE the capture — the
+ * difference between panning a screenshot and travelling across an interface.
+ * A static crop is the common case and stays a plain number, so the simple
+ * thing stays simple.
+ */
 export const Crop = z.object({
-  x: z.number().min(0).max(1).default(0),
-  y: z.number().min(0).max(1).default(0),
-  width: z.number().min(0.01).max(1).default(1),
-  height: z.number().min(0.01).max(1).default(1),
+  x: Animatable.default(0),
+  y: Animatable.default(0),
+  width: Animatable.default(1),
+  height: Animatable.default(1),
 });
+export type Crop = z.infer<typeof Crop>;
 
 // ---------------------------------------------------------------------------
 // Objects
@@ -190,6 +198,8 @@ export const TextObject = z.object({
   staggerSeconds: z.number().min(0).max(1).default(0),
   staggerBy: z.enum(['word', 'line', 'none']).default('none'),
   tracking: Animatable.optional(),
+  /** Overrides the type token's leading. Animatable: lines can open as they settle. */
+  lineHeight: Animatable.optional(),
 });
 
 export const ShapeObject = z.object({
@@ -324,6 +334,47 @@ export const FieldObject = z.object({
   seed: z.number().int().min(0).max(1_000_000).default(1),
 });
 
+/**
+ * A light.
+ *
+ * Only meaningful to an executor that has a lighting model, which today is the
+ * geometry renderer. Declared here rather than left out so a director can
+ * express a lit scene, and refused by the router rather than silently ignored
+ * when no executor can light anything — which is the whole reason the registry
+ * exists.
+ */
+export const LightObject = z.object({
+  ...objectBase,
+  kind: z.literal('light'),
+  light: z.enum(['key', 'fill', 'rim', 'ambient', 'practical']),
+  intensity: Animatable.default(1),
+  color: AnimatableColor.default('#ffffff'),
+  /** Where it points, as frame fractions. Ignored by ambient. */
+  targetX: Animatable.default(0.5),
+  targetY: Animatable.default(0.5),
+  temperatureK: z.number().min(1500).max(12000).default(5600),
+});
+
+/**
+ * Particles, where an executor supports them.
+ *
+ * Deliberately narrow: a count, a behaviour and a lifetime, not a simulation.
+ * The thing that makes a particle system a tell is that it looks like a
+ * particle system, so the vocabulary here is the small set that reads as
+ * material — dust in a light, motes settling, sparks off an impact — rather
+ * than anything that would tempt a director into fireworks.
+ */
+export const ParticlesObject = z.object({
+  ...objectBase,
+  kind: z.literal('particles'),
+  behaviour: z.enum(['drift', 'settle', 'burst', 'rise']),
+  count: z.number().int().min(4).max(400),
+  sizePx: z.number().min(0.5).max(40).default(3),
+  color: AnimatableColor.default('onCanvas.muted'),
+  lifetimeSeconds: z.number().min(0.2).max(20).default(3),
+  seed: z.number().int().min(0).max(1_000_000).default(1),
+});
+
 /** A 3D scene, executed by the geometry renderer rather than the browser. */
 export const ThreeDObject = z.object({
   ...objectBase,
@@ -342,6 +393,8 @@ export const SceneObject = z.discriminatedUnion('kind', [
   GradientObject,
   MaskObject,
   FieldObject,
+  LightObject,
+  ParticlesObject,
   ThreeDObject,
 ]);
 export type SceneObject = z.infer<typeof SceneObject>;
@@ -366,11 +419,22 @@ export const CameraSpec = z.object({
   y: Animatable.default(0),
   scale: Animatable.default(1),
   rotationZ: Animatable.default(0),
-  /** Millimetres, 18 to 200. Drives how strongly `z` separates layers. */
-  focalLengthMm: z.number().min(18).max(200).default(50),
+  /**
+   * Millimetres, 18 to 200. Drives how strongly `z` separates layers.
+   *
+   * Animatable, because a zoom and a dolly are different moves and a film that
+   * can only do one of them is missing the one that changes the perspective.
+   */
+  focalLengthMm: Animatable.default(50),
   dollyZ: Animatable.default(0),
-  /** 0 is everything sharp; 1 throws everything off the focal plane away. */
-  depthOfField: z.number().min(0).max(1).default(0),
+  /**
+   * 0 is everything sharp; 1 throws everything off the focal plane away.
+   *
+   * Animatable together with `focusZ`, which is what a rack focus is: the
+   * plane moves and the film hands attention from one depth to another
+   * without cutting or moving anything.
+   */
+  depthOfField: Animatable.default(0),
   focusZ: Animatable.default(0),
   motionBlur: z.number().min(0).max(1).default(0.2),
 });

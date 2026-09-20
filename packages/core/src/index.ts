@@ -67,3 +67,4 @@ export * from './scene/capabilities.ts';
 export * from './scene/compile.ts';
 export * from './scene/inspect.ts';
 export * from './scene/experimental.ts';
+export * from './scene/shot-brief.ts';

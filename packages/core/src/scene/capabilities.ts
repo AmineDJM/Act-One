@@ -163,6 +163,38 @@ export const TRUSTED_CAPABILITIES: Capability[] = [
     notes: 'Parallax and defocus by depth. Honest 2.5D, not a camera model.',
   }),
   Capability.parse({
+    id: 'particles.field',
+    category: 'deterministic.motion',
+    executor: 'remotion',
+    accepts: ['particles'],
+    animates: ['x', 'y', 'opacity'],
+    constraints: { maxObjects: 4, cannot: ['collision', 'physics', 'lighting response'] },
+    cost: { usdPerSecond: 0, renderSecondsPerSecond: 2.2 },
+    productionReady: true,
+    notes:
+      'Material in the air — dust, motes, sparks. Deterministic from a seed, so a re-render is identical.',
+  }),
+  /*
+   * Lighting is declared and NOT production-ready, which is the honest state.
+   *
+   * The browser compositor has no lighting model, so a light object routes
+   * nowhere until a geometry executor is available to honour it. Declaring it
+   * unready rather than omitting it is the difference between a director being
+   * told "not on this host" and a director's light silently doing nothing.
+   */
+  Capability.parse({
+    id: 'lighting.scene',
+    category: 'render.3d',
+    executor: 'geometry',
+    accepts: ['light'],
+    animates: ['intensity', 'targetX', 'targetY'],
+    constraints: { cannot: ['the browser compositor has no lighting model'] },
+    cost: { usdPerSecond: 0, renderSecondsPerSecond: 20 },
+    productionReady: false,
+    notes:
+      'Requires the geometry renderer. A light with no lighting model is refused, never faked.',
+  }),
+  Capability.parse({
     id: 'render.3d',
     category: 'render.3d',
     executor: 'geometry',

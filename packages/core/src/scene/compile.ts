@@ -1,4 +1,5 @@
-import { CameraSpec, SceneGraph, Transform, type SceneObject } from './language.ts';
+import { z } from 'zod';
+import { CameraSpec, SceneGraph, SceneHandover, Transform, type SceneObject } from './language.ts';
 import type { Scene } from '../domain/storyboard.ts';
 
 /**
@@ -267,4 +268,223 @@ export function compileStoryboard(scenes: readonly Scene[]): {
 /** Recipes that have a macro, for anything that needs to know the migration's edge. */
 export function migratedRecipes(): string[] {
   return Object.keys(MACROS).sort();
+}
+
+// ---------------------------------------------------------------------------
+// Creative intent → scene graph
+// ---------------------------------------------------------------------------
+
+/**
+ * What the Director decides, in the form the compiler can execute.
+ *
+ * The separation the architecture turns on. A Director reasons in prose and
+ * should go on doing so — "the product should arrive like something landing"
+ * is a real thought and a useful one. What it must not be is the last
+ * representation before the renderer, because prose cannot be checked, cannot
+ * be diffed, and cannot be asked where the headline is at 1.4 seconds.
+ *
+ * So intent carries BOTH. `note` is the sentence, kept as metadata and read by
+ * people and by critics. Everything else is a decision with a value. A field
+ * here that could only be satisfied by interpreting `note` would be a field in
+ * the wrong place.
+ */
+export const CreativeIntent = z.object({
+  id: z.string().min(1).max(64),
+  /** The director's sentence. Metadata; never executed. */
+  note: z.string().max(600).default(''),
+  durationSeconds: z.number().min(0.3).max(120),
+
+  /** What the beat is about, which decides what gets the payload role. */
+  says: z.string().max(300).default(''),
+
+  /**
+   * The shape of the shot, as a decision rather than an adjective.
+   *
+   * `arrival` brings the subject in; `departure` takes it out and leaves the
+   * space for the next idea; `hold` lets something be read; `travel` moves
+   * through; `reveal` uncovers. Five, because a sixth would be a synonym.
+   */
+  gesture: z.enum(['arrival', 'departure', 'hold', 'travel', 'reveal']),
+
+  /** How hard, 0 to 1. Drives camera amplitude and stagger, not a look. */
+  energy: z.number().min(0).max(1).default(0.5),
+
+  /** The line, when there is one. */
+  copy: z.array(z.string().max(160)).max(4).default([]),
+  /** The capture this beat is about, when it is about one. */
+  captureAssetId: z.string().max(120).nullable().default(null),
+  /** Regions of that capture to separate into depth, when the beat wants them. */
+  regions: z
+    .array(
+      z.object({
+        id: z.string().max(64),
+        crop: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+        depth: z.number().min(-1).max(1).default(0),
+        semantic: z.string().max(80).default(''),
+      }),
+    )
+    .max(8)
+    .default([]),
+
+  /** How this beat hands over. */
+  handover: SceneHandover.default(() => SceneHandover.parse({})),
+});
+export type CreativeIntent = z.infer<typeof CreativeIntent>;
+
+/** Camera amplitudes by gesture and energy, calibrated rather than chosen. */
+function cameraFor(intent: CreativeIntent): CameraSpec {
+  /*
+   * The floor is what a move has to exceed to be a move at all.
+   *
+   * Measured: a 1.06 scale over four seconds reads as a still frame, and Act
+   * One's films sat at a mean optical flow of 0.037 against 0.80 to 1.08 in
+   * the reference films largely because of it. 0.10 is the smallest amplitude
+   * that was felt in a render; energy scales from there.
+   */
+  const amplitude = 0.1 + intent.energy * 0.12;
+  const travel = 0.02 + intent.energy * 0.05;
+
+  switch (intent.gesture) {
+    case 'arrival':
+      return CameraSpec.parse({
+        scale: { from: 1 + amplitude, to: 1, curve: 'out_quint' },
+        x: { from: travel, to: 0, curve: 'out_quint' },
+        dollyZ: { from: 0, to: intent.energy * 0.4, curve: 'out_quint' },
+        focalLengthMm: 34,
+        depthOfField: intent.regions.length > 0 ? 0.3 : 0,
+      });
+    case 'departure':
+      return CameraSpec.parse({
+        scale: { from: 1, to: 1 + amplitude, curve: 'in_cubic' },
+        x: { from: 0, to: -travel, curve: 'in_cubic' },
+        focalLengthMm: 50,
+      });
+    case 'travel':
+      return CameraSpec.parse({
+        scale: { from: 1, to: 1 + amplitude * 0.6, curve: 'in_out_cubic' },
+        x: { from: -travel, to: travel, curve: 'in_out_cubic' },
+        dollyZ: { from: 0, to: intent.energy * 0.6, curve: 'in_out_cubic' },
+        focalLengthMm: 28,
+        depthOfField: 0.35,
+      });
+    case 'reveal':
+      return CameraSpec.parse({
+        scale: { from: 1 + amplitude * 1.4, to: 1, curve: 'out_expo' },
+        dollyZ: { from: intent.energy * 0.5, to: 0, curve: 'out_expo' },
+        focalLengthMm: { from: 24, to: 55, curve: 'out_expo' },
+        depthOfField: { from: 0.5, to: 0.1, curve: 'out_expo' },
+      });
+    case 'hold':
+    default:
+      return CameraSpec.parse({
+        scale: { from: 1, to: 1 + amplitude * 0.55, curve: 'in_out_quart' },
+        focalLengthMm: 70,
+      });
+  }
+}
+
+/**
+ * Compiles a Director's decisions into an executable shot.
+ *
+ * The only place prose is allowed to end and parameters have to begin. What
+ * comes out can be routed, inspected, diffed and rendered; what went in can be
+ * read by a person. Both matter, and keeping them in one object is what stops
+ * the second quietly becoming the first.
+ */
+export function compileIntent(intent: CreativeIntent): CompileResult {
+  const warnings: string[] = [];
+  const objects: SceneObject[] = [];
+  const copy = intent.copy.join(' ').trim();
+
+  if (copy) {
+    objects.push({
+      kind: 'text',
+      id: `${intent.id}_copy`,
+      content: copy,
+      token: intent.copy.length === 1 && copy.length < 40 ? 'display' : 'statement',
+      color: 'onCanvas.primary',
+      align: 'left',
+      maxWidth: 0.62,
+      maxLines: 3,
+      // The stagger band measured across all four reference films.
+      staggerSeconds: 0.04 + intent.energy * 0.08,
+      staggerBy: 'word',
+      enterAt: intent.gesture === 'reveal' ? intent.durationSeconds * 0.45 : 0.15,
+      role: 'payload',
+      reason: intent.says || 'The line this beat was written around.',
+      transform: Transform.parse({ x: 0.08, y: 0.5, anchor: { x: 0, y: 0.5 } }),
+    } as SceneObject);
+  }
+
+  /*
+   * Regions before the whole, when the director asked for regions.
+   *
+   * A capture shown entire and a capture taken apart are different shots, and
+   * only the second is cinematography. Where regions are named they replace
+   * the whole capture rather than sitting on top of it — two of the same
+   * pixels at two depths is a double exposure nobody asked for.
+   */
+  if (intent.captureAssetId && intent.regions.length > 0) {
+    for (const [index, region] of intent.regions.entries()) {
+      objects.push({
+        kind: 'ui_layer',
+        id: `${intent.id}_${region.id}`,
+        assetId: intent.captureAssetId,
+        crop: region.crop,
+        semantic: region.semantic,
+        width: 0.42,
+        cornerRadiusPx: 8,
+        shadow: true,
+        enterAt: 0.2 + index * (0.06 + intent.energy * 0.06),
+        role: 'support',
+        reason: region.semantic
+          ? `The ${region.semantic} of the real interface.`
+          : 'A region of the real interface.',
+        transform: Transform.parse({
+          x: 0.62 + (index % 2 === 0 ? -0.08 : 0.08),
+          y: 0.3 + index * 0.22,
+          z: region.depth,
+          scale: { from: 0.86, to: 1, curve: 'out_quint' },
+          opacity: { from: 0, to: 1, curve: 'out_cubic' },
+        }),
+      } as SceneObject);
+    }
+  } else if (intent.captureAssetId) {
+    objects.push({
+      kind: 'capture',
+      id: `${intent.id}_product`,
+      assetId: intent.captureAssetId,
+      width: 0.72,
+      chrome: false,
+      shadow: true,
+      cornerRadiusPx: 10,
+      enterAt: 0.1,
+      role: 'payload',
+      reason: intent.says || 'The real interface, which is what this beat is about.',
+      transform: Transform.parse({
+        x: 0.5,
+        y: 0.5,
+        scale: { from: 0.94, to: 1, curve: 'out_quint' },
+      }),
+    } as SceneObject);
+  }
+
+  if (objects.length === 0) {
+    warnings.push(
+      `Intent "${intent.id}" names neither copy nor a capture, so the beat has nothing in it. ` +
+        `A gesture is how something happens, not a something.`,
+    );
+  }
+
+  const scene = SceneGraph.parse({
+    id: intent.id,
+    durationSeconds: intent.durationSeconds,
+    intent: intent.note,
+    camera: cameraFor(intent),
+    objects,
+    handover: intent.handover,
+    macro: null,
+  });
+
+  return { scene, warnings };
 }

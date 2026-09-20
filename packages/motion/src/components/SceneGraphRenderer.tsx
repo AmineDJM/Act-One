@@ -98,15 +98,33 @@ function cameraTransform(camera: CameraSpec, t: number): { transform: string } {
 function parallax(z: number, camera: CameraSpec, t: number): number {
   const dolly = num(camera.dollyZ, t);
   // 50mm is neutral. Wider separates depths faster, longer flattens them.
-  const strength = 50 / Math.max(18, camera.focalLengthMm);
-  return 1 + dolly * strength * -z;
+  // Read on the clock, so a zoom during a dolly changes the perspective the
+  // way it does on a real lens.
+  const strength = 50 / Math.max(18, num(camera.focalLengthMm, t));
+  /*
+   * Clamped, because the unclamped term goes through zero and out the far side.
+   *
+   * A wide lens on a far layer — 20mm, a full dolly, z of 0.8 — computes to
+   * -0.6, and a layer at negative scale is a layer mirrored and pushed back
+   * through the camera. An integration test measuring how far two depths
+   * travelled found it by looking for a green square that was no longer
+   * anywhere in the frame.
+   *
+   * The floor is what a layer at the far plane may shrink to, and the ceiling
+   * stops a near layer swallowing the frame. Depth separates; it never
+   * inverts.
+   */
+  return Math.max(0.15, Math.min(4, 1 + dolly * strength * -z));
 }
 
 /** Defocus by distance from the focal plane, when the camera asks for any. */
 function defocusPx(z: number, camera: CameraSpec, t: number): number {
-  if (camera.depthOfField <= 0) return 0;
+  const aperture = num(camera.depthOfField, t);
+  if (aperture <= 0) return 0;
+  // Both read on the clock: a focal plane that travels while the aperture
+  // opens is a rack focus, which hands attention between depths without a cut.
   const focus = num(camera.focusZ, t);
-  return Math.min(24, Math.abs(z - focus) * camera.depthOfField * 14);
+  return Math.min(24, Math.abs(z - focus) * aperture * 14);
 }
 
 export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
@@ -150,10 +168,27 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
           const depthScale = parallax(z, scene.camera, sceneT);
           const blur = num(object.transform.blurPx, t) + defocusPx(z, scene.camera, sceneT);
 
+          /*
+           * Depth moves a layer, it does not only resize it.
+           *
+           * The first version applied the parallax factor to scale alone, and
+           * an integration test measuring how far two depths travelled under
+           * one dolly found both of them travelling essentially zero. The
+           * reason is that a CSS scale grows an element around its own centre:
+           * the layer got bigger and stayed exactly where it was, so two
+           * objects at opposite depths separated in size and never in space.
+           *
+           * Parallax is displacement. A layer's distance from the centre of
+           * the frame grows with the dolly in proportion to its depth, which
+           * is why near things sweep past and far things barely move.
+           */
+          const px = 0.5 + (num(object.transform.x, t) - 0.5) * depthScale;
+          const py = 0.5 + (num(object.transform.y, t) - 0.5) * depthScale;
+
           const style: React.CSSProperties = {
             position: 'absolute',
-            left: `${num(object.transform.x, t) * 100}%`,
-            top: `${num(object.transform.y, t) * 100}%`,
+            left: `${px * 100}%`,
+            top: `${py * 100}%`,
             opacity: Math.max(0, Math.min(1, num(object.transform.opacity, t))),
             transform:
               `translate(${-object.transform.anchor.x * 100}%, ${-object.transform.anchor.y * 100}%) ` +
@@ -182,7 +217,10 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
                     fontFamily: token.family,
                     fontWeight: token.weight,
                     fontSize: token.sizePx,
-                    lineHeight: token.lineHeight,
+                    lineHeight:
+                      object.lineHeight === undefined
+                        ? token.lineHeight
+                        : num(object.lineHeight, t),
                     letterSpacing: `${num(object.tracking ?? token.tracking, t)}em`,
                     color: animColor(object.color, t, tokens),
                     textAlign: object.align,
@@ -227,7 +265,15 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
               const url = assetUrls[object.assetId];
               if (!url) return null;
               const width = num(object.width, t) * tokens.frame.width;
-              const crop = object.crop ?? { x: 0, y: 0, width: 1, height: 1 };
+              // A crop on the clock is a camera inside the capture: the frame
+              // travels across the interface rather than the picture sliding.
+              const source = object.crop ?? { x: 0, y: 0, width: 1, height: 1 };
+              const crop = {
+                x: num(source.x, t),
+                y: num(source.y, t),
+                width: Math.max(0.01, num(source.width, t)),
+                height: Math.max(0.01, num(source.height, t)),
+              };
               return wrapped(
                 <div
                   style={{
@@ -302,6 +348,21 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
             }
 
             /*
+             * A light with no lighting model is nothing, deliberately.
+             *
+             * The browser compositor does not light a scene. Drawing a glow to
+             * stand in for one would be the renderer inventing a look the
+             * director did not ask for; the router already refuses a light that
+             * no executor can honour, so reaching here at all means somebody
+             * allowed it explicitly.
+             */
+            case 'light':
+              return null;
+
+            case 'particles':
+              return wrapped(<Particles object={object} tokens={tokens} seconds={seconds} />);
+
+            /*
              * Geometry is not drawn here.
              *
              * A 3D object arrives already rendered, as frames the geometry
@@ -319,6 +380,89 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
         })}
       </AbsoluteFill>
     </AbsoluteFill>
+  );
+};
+
+/**
+ * Particles: material in the air, not a simulation.
+ *
+ * Deterministic from the seed, because a film that cannot be re-rendered
+ * identically cannot be repaired — a fix to one shot would quietly change
+ * every other. Four behaviours and nothing else; the thing that makes a
+ * particle system a tell is that it looks like one.
+ */
+const Particles: React.FC<{
+  object: SceneObject & { kind: 'particles' };
+  tokens: DesignTokens;
+  seconds: number;
+}> = ({ object, tokens, seconds }) => {
+  const points = React.useMemo(() => {
+    let state = (object.seed * 2654435761) % 4294967296 || 1;
+    const next = () => {
+      state = (state * 1664525 + 1013904223) % 4294967296;
+      return state / 4294967296;
+    };
+    return Array.from({ length: object.count }, () => ({
+      x: next(),
+      y: next(),
+      phase: next(),
+      drift: next() - 0.5,
+    }));
+  }, [object.seed, object.count]);
+
+  const colour = colorOf(
+    typeof object.color === 'string' ? object.color : object.color.from,
+    tokens,
+  );
+  const life = object.lifetimeSeconds;
+
+  return (
+    <div style={{ width: tokens.frame.width, height: tokens.frame.height, position: 'relative' }}>
+      {points.map((point, index) => {
+        const local = ((seconds - object.enterAt) / life + point.phase) % 1;
+        if (local < 0) return null;
+        let x = point.x;
+        let y = point.y;
+        let opacity = 1;
+
+        switch (object.behaviour) {
+          case 'drift':
+            x = (point.x + point.drift * 0.08 * local + 1) % 1;
+            y = (point.y + local * 0.04) % 1;
+            opacity = Math.sin(local * Math.PI);
+            break;
+          case 'settle':
+            y = point.y + (1 - local) * -0.2;
+            opacity = Math.min(1, local * 3);
+            break;
+          case 'burst':
+            x = 0.5 + (point.x - 0.5) * local * 2;
+            y = 0.5 + (point.y - 0.5) * local * 2;
+            opacity = 1 - local;
+            break;
+          case 'rise':
+            y = point.y - local * 0.5;
+            opacity = Math.sin(local * Math.PI);
+            break;
+        }
+
+        return (
+          <div
+            key={index}
+            style={{
+              position: 'absolute',
+              left: `${x * 100}%`,
+              top: `${y * 100}%`,
+              width: object.sizePx,
+              height: object.sizePx,
+              borderRadius: '50%',
+              backgroundColor: colour,
+              opacity: Math.max(0, Math.min(1, opacity)) * 0.5,
+            }}
+          />
+        );
+      })}
+    </div>
   );
 };
 

@@ -41,7 +41,10 @@ export type SceneFinding = {
     | 'repeated_device'
     | 'unsupported_capability'
     | 'generated_product_ui'
-    | 'excessive_blur';
+    | 'excessive_blur'
+    | 'ui_too_small'
+    | 'brand_token_violation'
+    | 'scene_similarity';
   severity: 'hard_fail' | 'soft_fail' | 'note';
   message: string;
   atSeconds: number | null;
@@ -58,6 +61,27 @@ const VELOCITY_JUMP_CEILING = 6;
 
 /** Blur past this and a payload is decoration. */
 const PAYLOAD_BLUR_CEILING_PX = 6;
+
+/**
+ * Below this fraction of the frame, a product capture is a thumbnail.
+ *
+ * A critic watching an Act One master said the interface was "too much small
+ * text presented for too short a duration to actually read" and measured the
+ * viewer's load as high for the five seconds it was up. A whole page scaled
+ * into a corner is not the product being shown; it is the product being
+ * referred to.
+ */
+const UI_MIN_FRAME_SHARE = 0.34;
+
+/**
+ * How alike two scenes may be before the film has stopped developing.
+ *
+ * Compared on shape rather than content: the same object kinds, in the same
+ * roles, at the same places, with the same camera. Two scenes can say entirely
+ * different things and still be the same picture, which is the failure this
+ * catches — a film that changes its words and never changes its image.
+ */
+const SIMILARITY_CEILING = 0.86;
 
 /** The sample rate for walking a timeline. Fine enough to catch a one-frame jump. */
 const SAMPLE_HZ = 30;
@@ -255,6 +279,46 @@ export function inspectScene(
     }
   }
 
+  // --- the product, shown too small to be shown -----------------------------
+  for (const object of scene.objects) {
+    if (object.kind !== 'capture' && object.kind !== 'ui_layer') continue;
+    const widest = Math.max(
+      valueAt(object.width, 0, curves),
+      valueAt(object.width, 0.5, curves),
+      valueAt(object.width, 1, curves),
+    );
+    const scale = Math.max(
+      valueAt(object.transform.scale, 0.5, curves),
+      valueAt(object.transform.scale, 1, curves),
+    );
+    if (widest * scale < UI_MIN_FRAME_SHARE) {
+      say({
+        objectId: object.id,
+        check: 'ui_too_small',
+        severity: 'soft_fail',
+        message:
+          `The interface never occupies more than ${(widest * scale * 100).toFixed(0)}% of the frame. ` +
+          `Below about ${UI_MIN_FRAME_SHARE * 100}% it is a thumbnail of the product rather than the product.`,
+        atSeconds: object.enterAt,
+      });
+    }
+  }
+
+  // --- colours the brand does not have --------------------------------------
+  for (const object of scene.objects) {
+    for (const literal of literalColors(object)) {
+      say({
+        objectId: object.id,
+        check: 'brand_token_violation',
+        severity: 'soft_fail',
+        message:
+          `Uses the literal colour ${literal} instead of a brand token. A film assembled from hex ` +
+          `values is a film that stops being the customer's the moment their palette changes.`,
+        atSeconds: null,
+      });
+    }
+  }
+
   // --- the same device twice ------------------------------------------------
   const previous = options.previousMacros ?? [];
   if (scene.macro && previous.length >= 2) {
@@ -285,7 +349,95 @@ export function inspectScenes(
     findings.push(...inspectScene(scene, curves, { ...options, previousMacros: [...macros] }));
     macros.push(scene.macro ?? scene.id);
   }
+
+  /*
+   * And then the question only the whole film can answer: is it developing?
+   *
+   * Every scene can pass on its own and the film still be one picture
+   * repeated, which is exactly what a template looks like from the outside.
+   * Compared pairwise rather than only against the neighbour, because a film
+   * that alternates between two compositions is as static as one that holds
+   * a single one.
+   */
+  for (let i = 0; i < scenes.length; i += 1) {
+    for (let j = i + 1; j < scenes.length; j += 1) {
+      const score = similarity(scenes[i]!, scenes[j]!, curves);
+      if (score >= SIMILARITY_CEILING) {
+        findings.push({
+          sceneId: scenes[j]!.id,
+          objectId: null,
+          check: 'scene_similarity',
+          severity: 'soft_fail',
+          message:
+            `${(score * 100).toFixed(0)}% the same picture as ${scenes[i]!.id}: same object kinds, ` +
+            `same roles, same positions, same camera. The words changed and the image did not.`,
+          atSeconds: null,
+        });
+      }
+    }
+  }
+
   return findings;
+}
+
+/** Literal hex colours on an object, which should have been brand tokens. */
+function literalColors(object: SceneObject): string[] {
+  const found: string[] = [];
+  const check = (value: unknown) => {
+    if (typeof value === 'string' && /^#[0-9a-f]{3,8}$/i.test(value.trim()))
+      found.push(value.trim());
+    else if (value && typeof value === 'object') {
+      const pair = value as { from?: unknown; to?: unknown };
+      check(pair.from);
+      check(pair.to);
+    }
+  };
+  const record = object as unknown as Record<string, unknown>;
+  for (const key of ['color', 'fill', 'stroke', 'from', 'to']) {
+    if (key in record) check(record[key]);
+  }
+  // White light is white, not a brand decision; a light's colour is exempt.
+  return object.kind === 'light' ? [] : [...new Set(found)];
+}
+
+/**
+ * How alike two scenes are, as a fraction.
+ *
+ * Shape, not content. Three signals, evenly weighted: which kinds of object
+ * are present in which roles, where the payloads sit, and what the camera
+ * does. Two scenes with the same three signals are the same picture whatever
+ * the words say.
+ */
+function similarity(a: SceneGraph, b: SceneGraph, curves: Record<CurveName, CurveFn>): number {
+  const signature = (scene: SceneGraph) =>
+    new Set(scene.objects.map((object) => `${object.kind}:${object.role}`));
+  const left = signature(a);
+  const right = signature(b);
+  const shared = [...left].filter((entry) => right.has(entry)).length;
+  const union = new Set([...left, ...right]).size;
+  const kinds = union === 0 ? 1 : shared / union;
+
+  const anchor = (scene: SceneGraph) => {
+    const payload = scene.objects.find((object) => object.role === 'payload');
+    if (!payload) return { x: 0.5, y: 0.5 };
+    return {
+      x: valueAt(payload.transform.x, 0.5, curves),
+      y: valueAt(payload.transform.y, 0.5, curves),
+    };
+  };
+  const pa = anchor(a);
+  const pb = anchor(b);
+  const placement = 1 - Math.min(1, Math.hypot(pa.x - pb.x, pa.y - pb.y) * 2);
+
+  const move = (scene: SceneGraph) => ({
+    scale: valueAt(scene.camera.scale, 1, curves) - valueAt(scene.camera.scale, 0, curves),
+    x: valueAt(scene.camera.x, 1, curves) - valueAt(scene.camera.x, 0, curves),
+  });
+  const ma = move(a);
+  const mb = move(b);
+  const camera = 1 - Math.min(1, (Math.abs(ma.scale - mb.scale) + Math.abs(ma.x - mb.x)) * 4);
+
+  return (kinds + placement + camera) / 3;
 }
 
 // ---------------------------------------------------------------------------
