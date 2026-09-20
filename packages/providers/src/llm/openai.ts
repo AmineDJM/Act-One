@@ -114,6 +114,18 @@ export function unpricedModels(): string[] {
 const FIXED_TEMPERATURE = new Set<string>();
 
 /**
+ * Models whose full deliberation cannot get a byte past this host.
+ *
+ * Learned the same way and for the same reason as the temperature above: the
+ * limit belongs to whatever sits between this process and the model, it is
+ * not written anywhere, and it differs between a laptop, this sandbox, Render
+ * and a customer's corporate egress. Discovering it costs one cut request;
+ * rediscovering it on every deep call of every stage costs two minutes each
+ * time, on a pipeline that makes several per film.
+ */
+const SLOW_TO_START = new Map<string, 'low' | 'medium'>();
+
+/**
  * A chat completion, reassembled from its stream.
  *
  * `usage` arrives in a final chunk of its own when `stream_options` asks for
@@ -384,6 +396,12 @@ export class OpenAiLlmProvider implements LlmProvider {
      * model per worker, and nothing to keep up to date.
      */
     if (!FIXED_TEMPERATURE.has(model)) body['temperature'] = options.temperature ?? 0.7;
+    /*
+     * Already known to be too slow off the mark on this host, so it is asked
+     * for less deliberation from the start rather than after another cut.
+     */
+    const remembered = SLOW_TO_START.get(model);
+    if (remembered) body['reasoning_effort'] = remembered;
     if (mode?.strict) {
       body['response_format'] = {
         type: 'json_schema',
@@ -431,7 +449,7 @@ export class OpenAiLlmProvider implements LlmProvider {
     };
 
     let streamed: StreamedCompletion;
-    let reducedEffort: 'low' | 'medium' | undefined;
+    let reducedEffort: 'low' | 'medium' | undefined = remembered;
     try {
       streamed = await send();
     } catch (error) {
@@ -473,19 +491,23 @@ export class OpenAiLlmProvider implements LlmProvider {
        */
       if (isGatewayCut(error)) {
         let answered: StreamedCompletion | null = null;
-        for (const effort of ['medium', 'low'] as const) {
+        for (const effort of effortLadder(remembered)) {
           body['reasoning_effort'] = effort;
           try {
             answered = await send();
             reducedEffort = effort;
+            SLOW_TO_START.set(model, effort);
             console.warn(
-              `[openai] ${model} could not get a byte past the gateway at full deliberation; ` +
-                `answered at reasoning_effort=${effort}. The answer is less considered than the tier asks for.`,
+              `[openai] ${model} could not get a byte past the gateway at ` +
+                `${remembered ? `reasoning_effort=${remembered}` : 'full deliberation'}; answered at ` +
+                `reasoning_effort=${effort}. The answer is less considered than the tier asks for.`,
             );
             break;
           } catch (retryError) {
-            delete body['reasoning_effort'];
-            if (!isGatewayCut(retryError)) throw retryError;
+            if (!isGatewayCut(retryError)) {
+              delete body['reasoning_effort'];
+              throw retryError;
+            }
           }
         }
         if (answered === null) throw error;
@@ -646,6 +668,20 @@ function formatIssues(error: z.ZodError): string {
     .slice(0, 12)
     .map((issue) => `- ${issue.path.join('.') || '(root)'}: ${issue.message}`)
     .join('\n');
+}
+
+/**
+ * What to try next, given what was already asked for.
+ *
+ * Only downward, and never repeating a setting that has just been cut: a
+ * remembered `medium` that fails leaves only `low`, and a remembered `low`
+ * that fails leaves nothing at all, which is the honest answer \u2014 this host
+ * cannot carry this model, and saying so beats another minute of trying.
+ */
+export function effortLadder(remembered: 'low' | 'medium' | undefined): readonly ('low' | 'medium')[] {
+  if (remembered === 'low') return [];
+  if (remembered === 'medium') return ['low'];
+  return ['medium', 'low'];
 }
 
 /**

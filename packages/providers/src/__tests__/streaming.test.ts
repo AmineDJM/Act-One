@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { backoffMs } from '../http.ts';
-import { consumeSse, finishCollector, isGatewayCut, newCollector } from '../llm/openai.ts';
+import { consumeSse, effortLadder, finishCollector, isGatewayCut, newCollector } from '../llm/openai.ts';
 
 /**
  * Reassembling a completion from its stream.
@@ -120,5 +120,18 @@ describe('a gateway that kills a call before the model speaks', () => {
     }
     expect(isGatewayCut(new Error('a plain failure'))).toBe(false);
     expect(isGatewayCut(null)).toBe(false);
+  });
+});
+
+describe('asking for less thinking, in order', () => {
+  it('steps down from whatever was last asked for', () => {
+    expect(effortLadder(undefined)).toEqual(['medium', 'low']);
+    expect(effortLadder('medium')).toEqual(['low']);
+  });
+
+  it('gives up rather than ask the same question a third time', () => {
+    // A host that cannot carry the lowest setting cannot carry this model, and
+    // saying so beats another minute of trying.
+    expect(effortLadder('low')).toEqual([]);
   });
 });
