@@ -31,7 +31,7 @@
  * script dies at "identifying target audience" with an HTTP 502, that is what
  * happened, and it is the host rather than the pipeline.
  */
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -59,19 +59,60 @@ const WEBSITE = process.argv[2] ?? 'https://www.ashbyhq.com/';
 
 const store = new MemoryStore();
 const now = new Date().toISOString();
-const organizationId = newId('org');
 
-await store.organizations.create({
-  id: organizationId, name: 'Act One proof', slug: `proof-${organizationId.slice(-6)}`,
-  planId: 'pro', stripeCustomerId: null, creditBalance: 20_000, maxProjectCostUsd: 60,
-  isSuspended: false, createdAt: now,
-});
-const user = await store.users.create({
-  id: newId('usr'), email: 'lead@actone.example', name: 'Lead', avatarUrl: null,
-  isSuperAdmin: false, createdAt: now,
-});
+/*
+ * Checkpoints, so a run that dies in its ninth minute does not re-buy the
+ * first eight.
+ *
+ * Research crawls a dozen pages through a real browser and the direction stage
+ * runs nine critics and a deep arbitration; between them that is most of the
+ * cost and nearly all of the wall clock. When the storyboard call dies on a
+ * gateway \u2014 which it did, four attempts, twice \u2014 throwing all of that away to
+ * try again is how an afternoon disappears.
+ *
+ * Point ACT_ONE_PROVE_CHECKPOINT at a file and every finished stage is written
+ * there; run again with the same path and those stages are read back instead
+ * of re-run. Delete the file for a clean run. Nothing in the product does
+ * this: it is a development affordance over the in-memory store.
+ */
+type Checkpoint = { results: Record<string, unknown>; store: string };
+const checkpointPath = process.env['ACT_ONE_PROVE_CHECKPOINT'] ?? '';
+let checkpoint: Checkpoint | null = null;
+if (checkpointPath) {
+  try {
+    checkpoint = JSON.parse(await readFile(checkpointPath, 'utf8')) as Checkpoint;
+    store.restore(checkpoint.store);
+    console.log(`  (resuming: ${Object.keys(checkpoint.results).join(', ')} already done)`);
+  } catch {
+    checkpoint = null;
+  }
+}
 
-const project: Project = await store.projects.create({
+/*
+ * The workspace the checkpoint already holds, or a new one.
+ *
+ * Every id in this script is generated, so a resume that made a fresh project
+ * would be looking for rows under an id the restored store has never heard
+ * of, and would report an empty run rather than a resumed one.
+ */
+const held = checkpoint?.results['workspace'] as { organizationId: string; projectId: string } | undefined;
+const organizationId = held?.organizationId ?? newId('org');
+const resumed = held ? await store.projects.get(organizationId, held.projectId) : null;
+
+if (!resumed) {
+  await store.organizations.create({
+    id: organizationId, name: 'Act One proof', slug: `proof-${organizationId.slice(-6)}`,
+    planId: 'pro', stripeCustomerId: null, creditBalance: 20_000, maxProjectCostUsd: 60,
+    isSuspended: false, createdAt: now,
+  });
+  await store.users.create({
+    id: newId('usr'), email: 'lead@actone.example', name: 'Lead', avatarUrl: null,
+    isSuperAdmin: false, createdAt: now,
+  });
+}
+const user = (await store.users.getByEmail('lead@actone.example'))!;
+
+const project: Project = resumed ?? (await store.projects.create({
   id: newId('prj'), organizationId, createdByUserId: user.id,
   name: new URL(WEBSITE).hostname.replace(/^www\./, ''),
   websiteUrl: WEBSITE, supplementalUrls: [],
@@ -86,7 +127,7 @@ const project: Project = await store.projects.create({
   },
   productCredentialId: null, costUsd: 0, creditsSpent: 0, archivedAt: null,
   createdAt: now, updatedAt: now,
-});
+}));
 
 const root = process.env['ACT_ONE_STORAGE_DIR'] ?? (await mkdtemp(path.join(tmpdir(), 'act-one-director-')));
 const registry = new ProviderRegistry({ overrides: { storage: new LocalFsStorageProvider({ root }) } });
@@ -109,9 +150,39 @@ function section(title: string): void {
   console.log(`\n${'='.repeat(72)}\n${title}\n${'='.repeat(72)}`);
 }
 
+/**
+ * Runs a stage, or hands back the result already recorded under this name.
+ *
+ * The store and the stage's own return value both, because some of what a
+ * stage produces lives in neither the database nor the storyboard \u2014 the
+ * spread of the territories it explored, for one \u2014 and a resume that quietly
+ * lost it would report a search that never happened.
+ */
+async function stage<T>(name: string, run: () => Promise<T>): Promise<T> {
+  if (checkpoint && name in checkpoint.results) {
+    console.log(`  (${name}: from the checkpoint)`);
+    return checkpoint.results[name] as T;
+  }
+  const value = await run();
+  if (checkpointPath) {
+    checkpoint = {
+      results: {
+        ...(checkpoint?.results ?? {}),
+        // The ids too: every id here is generated, so a resume that made a
+        // fresh project would look for rows the restored store never held.
+        workspace: { organizationId, projectId: project.id },
+        [name]: value,
+      },
+      store: store.snapshot(),
+    };
+    await writeFile(checkpointPath, JSON.stringify(checkpoint));
+  }
+  return value;
+}
+
 // --- Research ---------------------------------------------------------------
 section(`RESEARCH — ${WEBSITE}`);
-await runResearch(context);
+await stage('research', () => runResearch(context));
 const researched = (await store.projects.get(organizationId, project.id))!;
 Object.assign(context, { project: researched });
 const understanding = researched.productUnderstandingId
@@ -126,7 +197,7 @@ console.log(`  moments we can film: ${understanding.productMoments.length} (${un
 
 // --- Direction and concepts -------------------------------------------------
 section('DIRECTION — understand, explore, arbitrate');
-const concepts = await runConcepts(context);
+const concepts = await stage('direction', () => runConcepts(context));
 const direction = concepts.direction;
 if (!direction) {
   console.error('\nFAILED: the Director Brain did not run.');
@@ -194,7 +265,7 @@ if (!chosen) {
 }
 await store.projects.update(organizationId, project.id, { selectedConceptId: chosen.id });
 Object.assign(context, { project: (await store.projects.get(organizationId, project.id))! });
-const board = await runStoryboard(context, { conceptId: chosen.id });
+const board = await stage('storyboard', () => runStoryboard(context, { conceptId: chosen.id }));
 const storyboard = (await store.storyboards.get(organizationId, board.storyboardId))!;
 console.log(`\n  ${storyboard.scenes.length} shots, ${storyboardDuration(storyboard).toFixed(1)}s`);
 for (const scene of storyboard.scenes) {
@@ -203,9 +274,11 @@ for (const scene of storyboard.scenes) {
 
 // --- The animatic, watched --------------------------------------------------
 section('PRE-PRODUCTION — the director watches before we pay');
-const pre = await runPreProduction(context, {
-  storyboardId: board.storyboardId, brief, audience, genome, maxRounds: 1,
-});
+const pre = await stage('pre-production', () =>
+  runPreProduction(context, {
+    storyboardId: board.storyboardId, brief, audience, genome, maxRounds: 1,
+  }),
+);
 console.log(`\n  ${pre.rounds} viewing(s) · ${pre.verdict} · ${pre.approved ? 'approved for production' : 'held'}`);
 for (const [index, seen] of pre.watched.entries()) {
   console.log(`  animatic v${index + 1}: ${seen.grade} — ${seen.summary}`);

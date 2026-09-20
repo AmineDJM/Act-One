@@ -434,6 +434,19 @@ export class OpenAiLlmProvider implements LlmProvider {
     try {
       streamed = await send();
     } catch (error) {
+      /*
+       * What was actually sent, when asked for it.
+       *
+       * A provider error names a status and a sentence of the body, and for a
+       * gateway failure that sentence is "upstream request failed", which
+       * says nothing about which of a dozen calls a stage makes is the one
+       * that cannot get through. Set ACT_ONE_LLM_DUMP_DIR and the request
+       * that failed is written out whole, so the next question is answerable
+       * from evidence rather than from a second ten-minute run.
+       *
+       * Off unless asked for: the body is the customer's own material.
+       */
+      await dumpFailedRequest(body, error);
       if (!refusedTemperature(error) || FIXED_TEMPERATURE.has(model)) throw error;
       FIXED_TEMPERATURE.add(model);
       delete body['temperature'];
@@ -582,4 +595,34 @@ function formatIssues(error: z.ZodError): string {
     .slice(0, 12)
     .map((issue) => `- ${issue.path.join('.') || '(root)'}: ${issue.message}`)
     .join('\n');
+}
+
+/** Writes a failed request out, when ACT_ONE_LLM_DUMP_DIR says to. */
+async function dumpFailedRequest(body: Record<string, unknown>, error: unknown): Promise<void> {
+  const dir = process.env['ACT_ONE_LLM_DUMP_DIR'];
+  if (!dir) return;
+  try {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    await mkdir(dir, { recursive: true });
+    const serialized = JSON.stringify(body);
+    const name = `llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+    await writeFile(
+      `${dir}/${name}`,
+      JSON.stringify(
+        {
+          error: (error as Error).message.slice(0, 2000),
+          model: body['model'],
+          bytes: serialized.length,
+          schemaName:
+            (body['response_format'] as { json_schema?: { name?: string } } | undefined)?.json_schema?.name ?? null,
+          body: JSON.parse(serialized) as unknown,
+        },
+        null,
+        2,
+      ),
+    );
+    console.error(`[openai] the failed request was written to ${dir}/${name} (${serialized.length} bytes).`);
+  } catch {
+    // Diagnostics never fail the call they are diagnosing.
+  }
 }

@@ -417,6 +417,39 @@ export class MemoryStore implements Store {
 
   // --- repositories -------------------------------------------------------
 
+  /**
+   * The whole store as JSON, and back from it.
+   *
+   * For proof runs and local work only \u2014 production state lives in Postgres,
+   * and nothing in the product calls these. They exist because a pipeline that
+   * costs ten minutes of real crawling and real model calls should not have to
+   * buy the first eight minutes again to debug the ninth, and because a run
+   * killed by a gateway on its last stage is a run whose work is still good.
+   *
+   * Deliberately dumb: every table, every row, as it is. No migration, no
+   * versioning, no compatibility promise across a schema change. A snapshot
+   * taken before a field existed and restored after it does is a snapshot that
+   * fails validation the first time something reads it, which is the correct
+   * outcome and a cheap one to recover from.
+   */
+  snapshot(): string {
+    const out: Record<string, [string, unknown][]> = {};
+    for (const [name, table] of Object.entries(this.tables)) {
+      out[name] = [...(table as Map<string, unknown>).entries()];
+    }
+    return JSON.stringify(out);
+  }
+
+  restore(json: string): void {
+    const data = JSON.parse(json) as Record<string, [string, unknown][]>;
+    for (const [name, entries] of Object.entries(data)) {
+      const table = (this.tables as unknown as Record<string, Map<string, unknown>>)[name];
+      if (!table) continue;
+      table.clear();
+      for (const [key, value] of entries) table.set(key, value);
+    }
+  }
+
   readonly organizations = {
     create: async (org: NewOrganization) => {
       if ([...this.tables.organizations.values()].some((o) => o.slug === org.slug)) {
