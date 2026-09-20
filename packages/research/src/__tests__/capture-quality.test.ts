@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { assessCapture, cropToFold, measure } from '../capture-quality.ts';
+import { assessCapture, cropToFold, fitForRender, measure } from '../capture-quality.ts';
 
 /** A PNG painted from a per-pixel function, so each test states its image. */
 async function png(
@@ -93,5 +93,44 @@ describe('cropToFold', () => {
     const fold = await cropToFold(wide, 1.6);
     expect(fold.bytes).toBe(wide);
     expect(fold.height).toBe(400);
+  });
+});
+
+describe('a picture a renderer can actually decode', () => {
+  async function png(width: number, height: number): Promise<Uint8Array> {
+    const sharp = (await import('sharp')).default;
+    return new Uint8Array(
+      await sharp({ create: { width, height, channels: 3, background: { r: 30, g: 40, b: 60 } } })
+        .png()
+        .toBuffer(),
+    );
+  }
+
+  it('leaves a picture that is already small enough alone', async () => {
+    const bytes = await png(1920, 1080);
+    const fit = await fitForRender(bytes);
+    expect(fit.resized).toBe(false);
+    expect(fit.bytes).toBe(bytes);
+  });
+
+  it('brings a full-page capture down to something Chromium will decode', async () => {
+    /*
+     * The real one: a long marketing page captured at device scale came back
+     * 3200 by 11632 — thirty-seven megapixels, a hundred and fifty megabytes
+     * decoded. The renderer refused it and the shot that was meant to show
+     * the product came out empty.
+     */
+    const fit = await fitForRender(await png(3200, 11632));
+    expect(fit.resized).toBe(true);
+    expect(Math.max(fit.width, fit.height)).toBeLessThanOrEqual(4096);
+    expect(fit.width * fit.height).toBeLessThanOrEqual(12_000_000);
+    // And it is still the same picture, not a crop.
+    expect(fit.width / fit.height).toBeCloseTo(3200 / 11632, 2);
+  });
+
+  it('brings down a picture that is wide rather than long', async () => {
+    const fit = await fitForRender(await png(9000, 3000));
+    expect(fit.resized).toBe(true);
+    expect(fit.width).toBeLessThanOrEqual(4096);
   });
 });

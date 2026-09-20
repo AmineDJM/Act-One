@@ -213,11 +213,22 @@ export async function runPreProduction(
     }
 
     /*
-     * A block is the end of the road for the automatic path. Something the
-     * panel found is disqualifying and no amount of re-cutting the same
-     * material will change it.
+     * A block that names what to change earns one attempt at changing it.
+     *
+     * This used to end the production outright, on the reasoning that a block
+     * is disqualifying and no amount of re-cutting the same material fixes
+     * it. Sometimes true. But a block here is the strictest verdict on the
+     * panel, not the director's own: one critic finding one dimension
+     * unacceptable makes the gate say block even when the director's written
+     * reason is "clear enough to continue, but not strong enough to ship" —
+     * which is a revise in every sense except the word.
+     *
+     * So the two are told apart by what the gate produced rather than by its
+     * label. A block with changes to make is worth one replan; a block with
+     * nothing to change is a dead end and says so. Either way the verdict
+     * stands: nothing below rounds it up to approved.
      */
-    if (gate.verdict === 'block') {
+    if (gate.verdict === 'block' && gate.changes.length === 0) {
       holdReason = gate.decision.reason;
       break;
     }

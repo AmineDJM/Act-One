@@ -115,6 +115,45 @@ export function measure(
  * A small JPEG for a vision call. The model reads composition, not pixels, and
  * a request carrying a 4K PNG is slow for nothing.
  */
+/**
+ * The largest picture a renderer will actually decode.
+ *
+ * A full-page capture of a long marketing site, taken at device scale on a
+ * retina viewport, comes back 3200 by 11632 \u2014 thirty-seven megapixels, a
+ * hundred and fifty megabytes once decoded. Chromium refuses it, the shot
+ * that was meant to show the product renders empty, and the only trace is
+ * one line in a browser console that nothing reads:
+ *
+ *   EncodingError: The source image cannot be decoded.
+ *
+ * Which is how a film with five shots of real material comes out looking
+ * like a film with none. Nothing downstream needs more than a 4K frame, so
+ * anything larger is brought down to fit before it is stored.
+ */
+const MAX_RENDERABLE_EDGE = 4096;
+const MAX_RENDERABLE_PIXELS = 12_000_000;
+
+export async function fitForRender(
+  bytes: Uint8Array,
+): Promise<{ bytes: Uint8Array; resized: boolean; width: number; height: number }> {
+  const image = sharp(Buffer.from(bytes));
+  const meta = await image.metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (width === 0 || height === 0) return { bytes, resized: false, width, height };
+
+  const edge = Math.max(width, height);
+  const scale = Math.min(
+    edge > MAX_RENDERABLE_EDGE ? MAX_RENDERABLE_EDGE / edge : 1,
+    width * height > MAX_RENDERABLE_PIXELS ? Math.sqrt(MAX_RENDERABLE_PIXELS / (width * height)) : 1,
+  );
+  if (scale >= 1) return { bytes, resized: false, width, height };
+
+  const target = { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+  const out = await image.resize(target).png({ compressionLevel: 9 }).toBuffer();
+  return { bytes: new Uint8Array(out), resized: true, ...target };
+}
+
 export async function previewForModel(bytes: Uint8Array, maxWidth = 1024): Promise<string> {
   const jpeg = await sharp(Buffer.from(bytes))
     .resize({ width: maxWidth, withoutEnlargement: true })

@@ -16,6 +16,7 @@ import {
 } from '@act-one/core';
 import type { Store } from '@act-one/db';
 import type { ProviderRegistry } from '@act-one/providers';
+import { fitForRender } from '@act-one/research';
 
 /**
  * What every pipeline stage is given.
@@ -81,8 +82,32 @@ export async function storeAsset(
     extension: params.extension,
   });
 
+  /*
+   * Brought down to a size a renderer will decode, before it is stored.
+   *
+   * The one boundary every generated and captured byte passes through, which
+   * is where a rule like this belongs: a thirty-seven megapixel full-page
+   * capture is refused by Chromium, the shot that was meant to show the
+   * product renders empty, and the only evidence is a console line nothing
+   * reads. Pictures only, and only when they are over.
+   */
+  let data = params.data;
+  let fitted: { width: number; height: number } | null = null;
+  if (params.contentType.startsWith('image/') && !params.contentType.includes('svg')) {
+    try {
+      const fit = await fitForRender(params.data);
+      if (fit.resized) {
+        data = fit.bytes;
+        fitted = { width: fit.width, height: fit.height };
+      }
+    } catch (error) {
+      // An image we cannot measure is stored as it arrived rather than lost.
+      console.error('[assets] could not size an image for the renderer:', (error as Error).message.slice(0, 160));
+    }
+  }
+
   const storage = context.registry.storage();
-  const stored = await storage.put(storageKey, params.data, {
+  const stored = await storage.put(storageKey, data, {
     contentType: params.contentType,
     visibility: 'private',
   });
@@ -98,9 +123,9 @@ export async function storeAsset(
     rights: params.rights,
     storageKey,
     contentType: params.contentType,
-    bytes: params.data.byteLength,
-    width: params.width ?? null,
-    height: params.height ?? null,
+    bytes: data.byteLength,
+    width: fitted?.width ?? params.width ?? null,
+    height: fitted?.height ?? params.height ?? null,
     durationSeconds: params.durationSeconds ?? null,
     checksum: stored.checksum,
     provider: params.provider ?? null,

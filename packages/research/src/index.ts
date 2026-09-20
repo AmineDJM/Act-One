@@ -7,5 +7,5 @@ export * from './understanding.ts';
 export * from './product-explorer.ts';
 export * from './research-agent.ts';
 export * from './public-captures.ts';
-export { assessCapture, type CaptureAssessment } from './capture-quality.ts';
+export { assessCapture, fitForRender, type CaptureAssessment } from './capture-quality.ts';
 export { normalizeUrl, registrableDomainOf, pathOf, absolutize } from './url.ts';
