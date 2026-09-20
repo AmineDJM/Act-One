@@ -559,6 +559,27 @@ export const QaReport = z.object({
   /** The shots this film was made of, so a defect can be traced to a kind of shot. */
   shots: z.array(z.object({ sceneId: z.string(), archetype: z.string() })).default([]),
   framesInspected: z.number().int().min(0).default(0),
+  /**
+   * What the film was actually made of, counted rather than inferred.
+   *
+   * The manifest, kept with the report, so the question "did this film have
+   * any pictures in it" can be answered afterwards from the database instead
+   * of by finding the master and looking at it. A report with every number
+   * here at zero and a full runtime is the signature of the failure this was
+   * added for: a plan full of product shots delivered as title cards.
+   */
+  coverage: z
+    .object({
+      shots: z.number().int().min(0),
+      shotsRequiringMaterial: z.number().int().min(0),
+      shotsWithMaterial: z.number().int().min(0),
+      typographicByIntent: z.number().int().min(0),
+      unresolved: z.number().int().min(0),
+      plannedPictureShare: z.number().min(0).max(1),
+      pictureShare: z.number().min(0).max(1),
+    })
+    .nullable()
+    .default(null),
   createdAt: z.string(),
 });
 export type QaReport = z.infer<typeof QaReport>;

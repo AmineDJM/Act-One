@@ -100,6 +100,19 @@ export const DeliveryFacts = z.object({
   globalQaPassed: z.boolean(),
   /** False while a `creative_replan_required` is outstanding. */
   creativeEscalationResolved: z.boolean(),
+  /**
+   * Every shot the plan built around a picture has one.
+   *
+   * Its own fact rather than something to infer from the findings, because it
+   * is the one that was silently false: a film whose every capture was missing
+   * rendered each of those shots as its line of copy on a black frame, and
+   * there was nothing anywhere in this decision that knew the difference
+   * between that and a film a director had written to be typographic.
+   *
+   * Defaulted true so a caller that predates the question is not accidentally
+   * told its film is incomplete; the render stage always passes it.
+   */
+  materialComplete: z.boolean().default(true),
 });
 export type DeliveryFacts = z.infer<typeof DeliveryFacts>;
 
@@ -114,6 +127,9 @@ export type DeliveryFacts = z.infer<typeof DeliveryFacts>;
  */
 export function deliveryState(facts: DeliveryFacts): 'ready' | 'needs_attention' | 'failed' {
   if (!facts.renderSucceeded) return 'failed';
+  // Before the quality of the film, the question of whether it is the film:
+  // a master missing the pictures it was written around is not a near miss.
+  if (!facts.materialComplete) return 'needs_attention';
   if (!facts.globalQaPassed) return 'needs_attention';
   if (!facts.repairTransactionSucceeded) return 'needs_attention';
   if (!facts.creativeEscalationResolved) return 'needs_attention';

@@ -118,12 +118,30 @@ describe('deterministic QA', () => {
         ),
       );
 
-    it('does not ship', () => {
-      const issues = runDeterministicChecks({ storyboard: typeOnly(8), brand, aspect: '16:9' });
-      const issue = issues.find((i) => i.check === 'composition' && i.message.includes('Nothing in this film is a picture'));
+    it('does not ship as a product tour', () => {
+      const issues = runDeterministicChecks({
+        storyboard: typeOnly(8), brand, aspect: '16:9', format: 'product_tour',
+      });
+      const issue = issues.find((i) => i.message.includes('is a picture'));
       expect(issue?.severity).toBe('hard_fail');
       // No timeline edit puts a picture in it, so it goes to a person.
       expect(issue?.repair).toBe('manual_review');
+    });
+
+    /*
+     * And is a note rather than a blocker as a pitch. A pitch carried in type
+     * is a real film and sometimes the best one; a product tour that never
+     * shows the product has not been made. The severity follows the format,
+     * not the pixel count — a rule like "mostly black means failure" would
+     * ban a whole legitimate register of film-making.
+     */
+    it('is a note when a director chose type for a pitch', () => {
+      const issues = runDeterministicChecks({
+        storyboard: typeOnly(8), brand, aspect: '16:9', format: 'pitch',
+      });
+      const issue = issues.find((i) => i.message.includes('is a picture'));
+      expect(issue?.severity).toBe('soft_fail');
+      expect(issue?.message).toContain('Intended, if the director chose it');
     });
 
     it('is a note, not a blocker, when the picture is merely thin', () => {

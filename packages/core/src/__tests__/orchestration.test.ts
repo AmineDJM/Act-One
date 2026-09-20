@@ -61,6 +61,7 @@ describe('what READY actually means', () => {
     repairTransactionSucceeded: true,
     globalQaPassed: true,
     creativeEscalationResolved: true,
+    materialComplete: true,
   };
 
   it('is ready only when every one of them is true', () => {
@@ -80,6 +81,16 @@ describe('what READY actually means', () => {
   it('separates a film that is not good enough from a render that threw', () => {
     expect(deliveryState({ ...whole, globalQaPassed: false })).toBe('needs_attention');
     expect(deliveryState({ ...whole, renderSucceeded: false })).toBe('failed');
+  });
+
+  /*
+   * The film that started all of this: every check it had said yes, because
+   * every check it had was about the quality of a film nobody had confirmed
+   * was there. A shot planned around a picture and rendered as its line of
+   * copy is not a film that fell slightly short.
+   */
+  it('is never ready when a shot lost the picture it was written around', () => {
+    expect(deliveryState({ ...whole, materialComplete: false })).toBe('needs_attention');
   });
 });
 

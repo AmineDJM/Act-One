@@ -59,6 +59,21 @@ export function FilmDelivery({
   const master = render.masterAssetId;
   if (!master) return null;
 
+  /*
+   * A file that exists is not a film that is finished.
+   *
+   * This panel used to offer "Download the master" for any render that had
+   * produced bytes, including one the quality gate had held back — so a cut
+   * the system itself had marked `needs_attention` was presented as the
+   * finished deliverable, with a download button and nothing to say otherwise.
+   * A customer opened one, found thirty seconds of type on black, and had no
+   * way of knowing Act One agreed with them.
+   *
+   * The bytes stay on the page: the customer should see what was made. What
+   * changes is that it is called what it is until it passes.
+   */
+  const finished = render.status === 'completed';
+
   const ready = variants.filter((variant) => variant.assetId);
 
   return (
@@ -67,8 +82,11 @@ export function FilmDelivery({
         <h3>{projectName}</h3>
         <span className={styles.panelLinks}>
           {/* What the piece is, in the words the credit will carry. */}
-          <span className="mono muted">{render.watermarked ? pieceLabel('workprint') : pieceLabel('master', 1)}</span>
-          {render.watermarked ? <span className="badge badge--warn">Watermarked preview</span> : null}
+          <span className="mono muted">
+            {!finished || render.watermarked ? pieceLabel('workprint') : pieceLabel('master', 1)}
+          </span>
+          {!finished ? <span className="badge badge--warn">Being finished</span> : null}
+          {finished && render.watermarked ? <span className="badge badge--warn">Watermarked</span> : null}
         </span>
       </div>
 
@@ -98,9 +116,20 @@ export function FilmDelivery({
         ) : null}
       </video>
 
+      {!finished ? (
+        <p className="hint">
+          {/*
+            * The reason, in the words the render stage wrote for the customer.
+            * Never the checker's words, and never nothing: a cut held back
+            * with no explanation is worse than one that says what is wrong.
+            */}
+          {render.error || 'This cut has not passed its quality checks yet. We are still working on it.'}
+        </p>
+      ) : null}
+
       <div className="row" style={{ gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-        <a className="btn" href={`/api/assets/${master}?download`} download>
-          Download the master
+        <a className={finished ? 'btn' : 'btn btn--secondary'} href={`/api/assets/${master}?download`} download>
+          {finished ? 'Download the master' : 'Download this cut'}
         </a>
         {render.captionsAssetId ? (
           <a className="btn btn--secondary" href={`/api/assets/${render.captionsAssetId}?download`} download>

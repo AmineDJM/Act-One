@@ -196,7 +196,7 @@ async function generateShot(
   // instead of the model's default look, which is the single biggest reason
   // generated shots read as bolted on.
   const referenceUrls = need.referenceAssetIds.length
-    ? Object.values(await resolveAssetUrls(context, need.referenceAssetIds))
+    ? Object.values((await resolveAssetUrls(context, need.referenceAssetIds)).urls)
     : [];
 
   const job = await media.generateVideo(
@@ -263,7 +263,7 @@ async function renderThreeD(
     return 'skipped';
   }
 
-  const screenUrls = Object.values(await resolveAssetUrls(context, scene.assetRefs));
+  const screenUrls = Object.values((await resolveAssetUrls(context, scene.assetRefs)).urls);
   /*
    * A `product_ui_3d` shot is a capture staged as an object, so with no
    * capture there is nothing to stage and the scene is skipped. A

@@ -219,7 +219,6 @@ export async function ingestAsset(
   return { asset, url: stored.url ?? (await storage.signedUrl(storageKey)) };
 }
 
-/** Resolves asset ids to URLs the renderer can read. */
 /**
  * Which of these assets move.
  *
@@ -233,16 +232,58 @@ export async function footageAmong(context: StageContext, assetIds: string[]): P
   return assets.filter((asset) => asset.contentType.startsWith('video/')).map((asset) => asset.id);
 }
 
+/** An asset that was asked for and cannot be put on the screen, and why. */
+export type UnresolvedAsset = {
+  id: string;
+  reason: 'no_such_asset' | 'object_missing';
+  /** Where the bytes were supposed to be. Empty when there is no row at all. */
+  storageKey: string;
+};
+
+/**
+ * Asset ids to URLs the renderer can actually read.
+ *
+ * The important word is *actually*. This used to sign a URL for every asset
+ * row it found and hand the lot to the renderer, which is a check of the
+ * database and not of the film. A production ran with the web service and the
+ * worker each holding their own local disk: every capture was ingested by one
+ * of them, every row was written to the database both of them share, and the
+ * bytes existed on exactly one machine. The worker then signed a URL for every
+ * one of those rows, the renderer fetched them, every fetch was an ENOENT, and
+ * each shot quietly drew its line of copy on a black frame instead. Thirty
+ * seconds of title cards went out as a finished master, and nothing anywhere
+ * in the system had asked the only question that mattered: is the picture
+ * there.
+ *
+ * So existence is checked, once, here — the one place that holds both the id
+ * and the storage it is supposed to be in. Everything downstream can then
+ * treat a url in this map as a promise that something is behind it, and read
+ * `missing` for the shots that have nothing.
+ */
 export async function resolveAssetUrls(
   context: StageContext,
   assetIds: string[],
-): Promise<Record<string, string>> {
-  if (assetIds.length === 0) return {};
-  const assets = await context.store.assets.getMany(context.organizationId, [...new Set(assetIds)]);
+): Promise<{ urls: Record<string, string>; missing: UnresolvedAsset[] }> {
+  const wanted = [...new Set(assetIds)];
+  if (wanted.length === 0) return { urls: {}, missing: [] };
+  const assets = await context.store.assets.getMany(context.organizationId, wanted);
   const storage = context.registry.storage();
+  const byId = new Map(assets.map((asset) => [asset.id, asset] as const));
+
+  const missing: UnresolvedAsset[] = wanted
+    .filter((id) => !byId.has(id))
+    .map((id) => ({ id, reason: 'no_such_asset' as const, storageKey: '' }));
 
   const entries = await Promise.all(
     assets.map(async (asset) => {
+      /*
+       * A storage provider that cannot answer is treated as not holding the
+       * object. The alternative is to assume it does, which is precisely the
+       * assumption that produced the silent film: when this check is wrong it
+       * should be wrong in the direction of stopping.
+       */
+      const held = await storage.exists(asset.storageKey).catch(() => false);
+      if (!held) return null;
       // Signed and short-lived. The renderer reads them within seconds, and a
       // long-lived URL for a customer's private product capture is a leak
       // waiting to be pasted into a bug report.
@@ -251,5 +292,14 @@ export async function resolveAssetUrls(
     }),
   );
 
-  return Object.fromEntries(entries);
+  for (const [index, entry] of entries.entries()) {
+    if (entry) continue;
+    const asset = assets[index]!;
+    missing.push({ id: asset.id, reason: 'object_missing', storageKey: asset.storageKey });
+  }
+
+  return {
+    urls: Object.fromEntries(entries.filter((entry): entry is [string, string] => entry !== null)),
+    missing,
+  };
 }

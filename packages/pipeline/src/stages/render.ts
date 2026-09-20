@@ -17,7 +17,6 @@ import {
   newId,
   posterMoment,
   REAL_PRODUCT_VISUAL_TYPES,
-  degradedShots,
   storyboardDuration,
   type AspectRatio,
   type BrandSystem,
@@ -101,6 +100,14 @@ import {
   type RepairIntent,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
+import { runSceneAssets } from './assets.ts';
+import {
+  renderModeFor,
+  summariseCoverage,
+  visualReadiness,
+  type MasterReadiness,
+  type RenderMode,
+} from '../master-readiness.ts';
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
 import { narrate } from '../narration.ts';
 import { captionFilm, NO_CAPTIONS, type FilmCaptions } from './captions.ts';
@@ -197,6 +204,15 @@ export async function runRender(
    * Cuts inherit the film's terms. An animatic is neither: it is a preview at
    * preview resolution whatever anybody is paying.
    */
+  /*
+   * Preview or master, decided once and carried.
+   *
+   * The kind has always been recorded and never enforced: an animatic and a
+   * film went through the same composition with the same behaviour, and that
+   * behaviour was to draw type whenever a picture was missing. Only one of
+   * the two is allowed to do that.
+   */
+  const mode = renderModeFor(kind);
   const plan = await planFor(store, organizationId);
   const terms = masterTermsFor(plan);
   const quality = options.quality ?? (kind === 'animatic' ? 'preview' : terms.quality);
@@ -318,6 +334,8 @@ export async function runRender(
     let escalation: CreativeEscalation | null = null;
     let qaLayers: QaLayer[] = [];
     let starvedCheck: QaCheck = 'still_frame_hold';
+    /** The manifest the delivered cut was rendered from. Null until the first pass. */
+    let lastReadiness: MasterReadiness | null = null;
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
       const rendered = await renderOnce(context, {
@@ -334,9 +352,11 @@ export async function runRender(
         understanding,
         voice,
         burnCaptions,
+        mode,
       });
       masterPath = rendered.path;
       captions = rendered.captions;
+      lastReadiness = rendered.readiness;
 
       const inspected = await inspect(context, {
         storyboard: current,
@@ -438,6 +458,8 @@ export async function runRender(
           durationSeconds: storyboardDuration(current),
           shots: current.scenes.map((scene) => ({ sceneId: scene.id, archetype: scene.visualType })),
           framesInspected: findings.length,
+          // What this pass was rendered from, kept with its verdict.
+          coverage: rendered.readiness.coverage,
           createdAt: new Date().toISOString(),
         },
         organizationId,
@@ -663,6 +685,42 @@ export async function runRender(
       });
       current = applied.storyboard;
       starved = applied.starvedSceneIds;
+      /*
+       * A repair that asks for material has to be given some.
+       *
+       * `applyRepairs` clears a shot's assets and marks it `assets_pending`
+       * when a repair says to fetch the picture again — and until now nothing
+       * read the list it hands back. The next pass therefore rendered a shot
+       * with no assets at all, which is to say as type on the canvas: the
+       * repair loop turning a flawed picture into no picture, quietly, and
+       * calling it a repair. The asset stage is asked for exactly those
+       * scenes, and what it cannot produce comes back as a blocker on the
+       * next readiness pass rather than as a title card.
+       */
+      const refetch = [...new Set(applied.needsProvider.map((entry) => entry.sceneId))];
+      if (refetch.length > 0) {
+        await store.storyboards.replaceScenes(organizationId, current.id, current.scenes);
+        try {
+          const reacquired = await runSceneAssets(context, {
+            storyboardId: current.id,
+            sceneIds: refetch,
+          });
+          await context.activity({
+            step: 'captures',
+            kind: 'note',
+            label: `re-acquiring ${refetch.length} shot${refetch.length === 1 ? '' : 's'}`,
+            detail: `${reacquired.generated} produced, ${reacquired.failed} failed, ${reacquired.skipped} skipped`,
+            status: reacquired.failed > 0 ? 'failed' : 'done',
+          });
+          extraCostUsd += reacquired.costUsd;
+        } catch (error) {
+          // A provider that will not answer is a blocker, not a crash: the
+          // readiness pass below states it in terms an operator can act on.
+          console.error('[render] re-acquisition failed:', (error as Error).message.slice(0, 200));
+        }
+        const refreshed = await store.storyboards.get(organizationId, current.id);
+        if (refreshed) current = refreshed;
+      }
       if (applied.starvedSceneIds.length > 0) {
         starvedCheck =
           findings.find((issue) => applied.starvedSceneIds.includes(issue.sceneId ?? ''))?.check ??
@@ -835,6 +893,8 @@ export async function runRender(
       repairTransactionSucceeded: lastScore === null || lastScore.accepted,
       globalQaPassed: gate.state === 'ready' && releaseState !== 'needs_attention',
       creativeEscalationResolved: escalation === null,
+      // A preview is allowed to be incomplete. This is the master gate.
+      materialComplete: lastReadiness === null || lastReadiness.ready,
     };
     const passed = deliveryState(facts) === 'ready';
     const heldForAPerson = !passed;
@@ -1145,6 +1205,8 @@ async function renderOnce(
     voice: VoiceTerms;
     /** Whether this cut wears its captions in the picture. */
     burnCaptions: boolean;
+    /** Preview or master. A preview may be incomplete; a master may not. */
+    mode: RenderMode;
     /** Film-level repairs this pass must carry out. Empty on the first pass. */
     filmRepairs?: readonly RepairAction[];
   },
@@ -1167,6 +1229,8 @@ async function renderOnce(
   soundKeys: number;
   /** Shots that rendered as type because their material did not resolve. */
   degradedIssues: QaFinding[];
+  /** The manifest this pass was rendered from: what resolved, what did not. */
+  readiness: MasterReadiness;
 }> {
   const { storyboard, brand, system } = params;
 
@@ -1261,7 +1325,7 @@ async function renderOnce(
   });
 
   const referenced = storyboard.scenes.flatMap((scene) => scene.assetRefs);
-  const assetUrls = await resolveAssetUrls(context, referenced);
+  const { urls: assetUrls, missing: missingAssets } = await resolveAssetUrls(context, referenced);
   /*
    * Which of them play. A generated shot and a 3D render are clips; everything
    * else the film draws is a still, and handing one to the other is how a
@@ -1270,49 +1334,56 @@ async function renderOnce(
   const footageAssetIds = await footageAmong(context, referenced);
 
   /*
-   * What the renderer is about to be handed, against what the plan asked for.
+   * Master readiness, before a frame is rendered.
    *
    * The composition degrades rather than fails: a shot whose capture is gone
-   * draws the scene's line of copy on the canvas instead, which is the right
-   * call for the frame and was, until now, completely silent. A production
-   * whose storage was misconfigured lost every asset it had, rendered thirty
-   * seconds of title cards on black, and passed QA — because QA read the
-   * storyboard, and the storyboard still said every one of those shots was
-   * the product.
+   * draws the scene's line of copy on the canvas instead. For a preview that
+   * is exactly right — a preview is allowed to be incomplete. For a master it
+   * is how thirty seconds of title cards on black went out as a finished film,
+   * because nothing between the plan and the encoder ever compared what the
+   * director asked for against what the renderer was actually handed.
    *
-   * Measured here rather than inferred later: this is the one place that
-   * holds both the plan and the urls it actually resolved.
+   * Measured here because this is the one place that holds both.
    */
-  const degraded = degradedShots(storyboard, new Set(Object.keys(assetUrls)));
-  const degradedIssues: QaFinding[] = degraded.map(({ scene, wanted }) => ({
-    id: newId('evt'),
-    sceneId: scene.id,
-    timecodeStart: scene.startTime,
-    detectedBy: 'deterministic',
-    evidenceAssetId: null,
-    check: 'composition',
-    severity: 'hard_fail',
-    message:
-      `Scene ${scene.index + 1} was planned as ${scene.visualType.replace(/_/g, ' ')} and none of ` +
-      `its ${wanted === 0 ? 'material' : `${wanted} asset(s)`} resolved, so it renders as ` +
-      `${scene.duration.toFixed(1)}s of type on the canvas.`,
-    confidence: 1,
-    // The material is missing rather than wrong, so the repair is to fetch it
-    // again — and when that cannot be done the loop escalates, which is the
-    // outcome this finding exists to reach.
-    repair: scene.visualType === 'generated_broll' ? 'regenerate_shot' : 'recapture_product',
-  }));
-  if (degraded.length > 0) {
-    await context.activity({
-      step: 'motion',
-      kind: 'note',
-      label: `${degraded.length} shot${degraded.length === 1 ? '' : 's'} without material`,
-      detail: degraded
-        .map(({ scene }) => `scene ${scene.index + 1} (${scene.visualType})`)
-        .join(', '),
-      status: 'done',
-    });
-  }
+  const readiness = visualReadiness({
+    storyboard,
+    mode: params.mode,
+    resolved: new Set(Object.keys(assetUrls)),
+    missing: missingAssets,
+  });
+  await context.activity({
+    step: 'motion',
+    kind: 'note',
+    label: `material ${readiness.coverage.shotsWithMaterial}/${readiness.coverage.shotsRequiringMaterial}`,
+    detail: summariseCoverage(readiness.coverage),
+    status: readiness.ready ? 'done' : 'failed',
+  });
+  const degradedIssues: QaFinding[] = readiness.blockers.map((blocker) => {
+    const scene = storyboard.scenes.find((candidate) => candidate.id === blocker.sceneId);
+    return {
+      id: newId('evt'),
+      sceneId: blocker.sceneId,
+      timecodeStart: scene?.startTime ?? null,
+      detectedBy: 'deterministic',
+      evidenceAssetId: null,
+      check: 'composition',
+      severity: 'hard_fail',
+      message: blocker.message,
+      confidence: 1,
+      /*
+       * A generated shot that was never produced can be asked for again. A
+       * capture whose bytes are not in the storage this worker can reach
+       * cannot be — no amount of re-rendering puts them there — so it goes to
+       * a person rather than around the loop a second time.
+       */
+      repair:
+        blocker.code !== 'asset_missing'
+          ? 'manual_review'
+          : scene && scene.generativeNeeds.length > 0
+            ? 'regenerate_shot'
+            : 'manual_review',
+    } satisfies QaFinding;
+  });
 
   const silentPath = path.join(params.workDir, `film-${params.attempt}.mp4`);
   await renderFilm({
@@ -1327,7 +1398,21 @@ async function renderOnce(
         lineHeight: system.typeScale.display.lineHeight,
       },
       theme: system.palette.canvas === 'light' ? 'light' : system.palette.canvas === 'dark' ? 'dark' : 'auto',
-      watermarkLabel: params.watermarked ? 'Preview' : null,
+      /*
+       * The mark a plan pays to remove, and what it says.
+       *
+       * It used to say "PREVIEW", burned into the bottom right of a file the
+       * customer downloads as their master. That is not what the file is: the
+       * render is a real master of a real film, and the watermark is there
+       * because the plan does not carry `render.clean`. A customer who opened
+       * their film and read PREVIEW on every frame reasonably concluded that
+       * the system had handed them the wrong artifact.
+       *
+       * So it carries the studio's name instead, which is true of the file
+       * whatever the plan is, and the interface says the rest: this delivery
+       * is labelled a workprint until the mark comes off.
+       */
+      watermarkLabel: params.watermarked ? 'Act One' : null,
       /*
        * The end card is the company's own address and the company's own line
        * about itself. It used to say "Start free" on every film ever rendered —
@@ -1529,7 +1614,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, readiness };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -1559,10 +1644,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, readiness };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, readiness };
 }
 
 /**
@@ -1804,6 +1889,7 @@ async function inspect(
       brand: params.brand,
       aspect: params.aspect,
       cut: params.cut,
+      format: project.brief.filmFormat,
       cta: displayHost(project.websiteUrl),
       ...(understanding
         ? { knownEvidenceIds: new Set(understanding.evidence.map((evidence) => evidence.id)) }

@@ -35,6 +35,7 @@ import {
   MAX_TYPE_ONLY_RUN_SECONDS,
   PICTURE_STANDARDS,
   type FilmCut,
+  type FilmFormat,
   weaselPhrasesIn,
   type BrandSystem,
   type QaFinding,
@@ -74,6 +75,14 @@ export type DeterministicInput = {
   knownEvidenceIds?: Set<string>;
   /** Which shape of film this is. A short holds less of everything, including picture. */
   cut?: FilmCut;
+  /**
+   * Product tour or pitch.
+   *
+   * Decides whether a film that shows nothing is a failure or a decision. A
+   * product tour that never shows the product has not been made; a pitch that
+   * carries its argument in type is a real and sometimes excellent film.
+   */
+  format?: FilmFormat;
   /** Minimum on-screen asset resolution, in pixels, for the target frame. */
   minAssetWidth?: number;
   assetResolutions?: Record<string, { width: number; height: number }>;
@@ -87,7 +96,7 @@ export function runDeterministicChecks(input: DeterministicInput): QaFinding[] {
     issues.push(...checkScene(scene, tokens, input));
   }
 
-  issues.push(...checkFilm(input.storyboard, tokens, input.cut ?? 'feature'));
+  issues.push(...checkFilm(input.storyboard, tokens, input.cut ?? 'feature', input.format ?? 'product_tour'));
 
   if (input.cta !== undefined && ctaIsVague(input.cta)) {
     issues.push({
@@ -372,7 +381,12 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   return issues;
 }
 
-function checkFilm(storyboard: Storyboard, tokens: DesignTokens, cut: FilmCut): QaFinding[] {
+function checkFilm(
+  storyboard: Storyboard,
+  tokens: DesignTokens,
+  cut: FilmCut,
+  format: FilmFormat,
+): QaFinding[] {
   const issues: QaFinding[] = [];
   const add = (
     issue: Omit<QaFinding, 'id' | 'sceneId' | 'timecodeStart' | 'detectedBy' | 'evidenceAssetId'>,
@@ -617,11 +631,26 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens, cut: FilmCut): 
   if (picture <= 0) {
     add({
       check: 'composition',
-      severity: 'hard_fail',
+      /*
+       * A product tour that never shows the product has not been made. A
+       * pitch made of type has been directed that way, and might be the best
+       * film in the catalogue — so the severity follows the format rather
+       * than the pixel count.
+       *
+       * Note what this check is *not*. It reads the plan, so it can only say
+       * whether a director asked for any picture. Whether the pictures a
+       * director did ask for actually arrived is a different question with a
+       * different answer, and it is answered by master readiness against the
+       * material that resolved, not here.
+       */
+      severity: format === 'pitch' ? 'soft_fail' : 'hard_fail',
       message:
-        `Nothing in this film is a picture: all ${storyboardDuration(storyboard).toFixed(1)}s of it ` +
-        `is typography on the canvas (${cite(PICTURE_STANDARDS.substance)}). ` +
-        'Either the captures and shots never arrived, or the plan never asked for any.',
+        `Nothing in this ${format.replace(/_/g, ' ')} is a picture: all ` +
+        `${storyboardDuration(storyboard).toFixed(1)}s of it is typography on the canvas ` +
+        `(${cite(PICTURE_STANDARDS.substance)}). ` +
+        (format === 'pitch'
+          ? 'Intended, if the director chose it.'
+          : 'Either the captures and shots never arrived, or the plan never asked for any.'),
       confidence: 1,
       /*
        * Not an automatic repair, and deliberately so. No edit to this
