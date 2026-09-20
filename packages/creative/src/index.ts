@@ -20,3 +20,4 @@ export * from './director/signatures.ts';
 export * from './director/territories.ts';
 export * from './director/understanding.ts';
 export * from './director/hero.ts';
+export * from './reference/grammar.ts';
