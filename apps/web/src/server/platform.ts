@@ -161,6 +161,8 @@ export function getVault(): SecretVault {
 export type ProviderCredentialState = {
   id: ProviderSlotId;
   configured: boolean;
+  /** A credential is on file, whether or not it is switched on. */
+  stored: boolean;
   /** Non-reversible, safe to display. */
   fingerprint: string | null;
   source: 'console' | 'environment' | 'none';
@@ -257,13 +259,28 @@ export async function listProviderState(): Promise<ProviderCredentialState[]> {
   return PROVIDER_SLOTS.map((slot) => {
     const row = byProvider.get(slot.id);
     const fromEnv = Object.keys(credentialsFromEnv(slot.id)).length > 0;
+    /*
+     * Configured means the pipeline will use it, not that a row exists.
+     *
+     * These two came apart: a stored credential with `enabled` false showed as
+     * configured in the console — a green tick, a sentence saying research runs
+     * on isolated cloud browsers — while the worker, which requires `enabled`,
+     * read nothing and quietly fell back to the local browser. The operator was
+     * told a security property their films did not have.
+     *
+     * Anything the console shows as ready has to be something a job will pick
+     * up. `enabled` is kept beside it so the card can say "stored, switched
+     * off" rather than "missing", which is a different thing to go and fix.
+     */
+    const enabled = row?.enabled ?? fromEnv;
     return {
       id: slot.id,
-      configured: Boolean(row) || fromEnv,
+      configured: (Boolean(row) && enabled) || fromEnv,
+      stored: Boolean(row),
       fingerprint: row?.fingerprint ?? null,
       source: row ? ('console' as const) : fromEnv ? ('environment' as const) : ('none' as const),
       updatedAt: row?.updatedAt ?? null,
-      enabled: row?.enabled ?? fromEnv,
+      enabled,
     };
   });
 }

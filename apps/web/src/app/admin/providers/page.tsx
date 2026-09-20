@@ -46,7 +46,10 @@ export default async function ProvidersPage() {
         ready: Boolean(state('browserbase')?.configured),
         note: state('browserbase')?.configured
           ? 'Research runs on isolated cloud browsers.'
-          : 'Research runs on the local Chromium instead, which is fine on one machine.',
+          : state('browserbase')?.stored
+            ? 'A key is on file and switched off, so research runs on the local Chromium instead. ' +
+              'Switch it on below to use isolated cloud browsers.'
+            : 'Research runs on the local Chromium instead, which is fine on one machine.',
       },
       {
         label: 'Higgsfield',
