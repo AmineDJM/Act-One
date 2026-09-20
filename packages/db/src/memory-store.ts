@@ -1050,6 +1050,11 @@ export class MemoryStore implements Store {
       [...this.tables.renders.values()]
         .filter((r) => !['completed', 'failed', 'canceled'].includes(r.status))
         .slice(0, limit),
+
+    listRecent: async (limit = 200) =>
+      [...this.tables.renders.values()]
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, limit),
   };
 
   readonly variants = {

@@ -1533,6 +1533,12 @@ export class PgStore implements Store {
         );
         return r.rows.map(toRender);
       }),
+
+    listRecent: async (limit = 200) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT * FROM renders ORDER BY created_at DESC LIMIT $1', [limit]);
+        return r.rows.map(toRender);
+      }),
   };
 
   readonly variants = {

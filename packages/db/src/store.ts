@@ -375,6 +375,13 @@ export interface RenderRepo {
   /** Films only. Cuts and animatics are not what a plan's allowance counts. */
   countForProject(organizationId: string, projectId: string): Promise<number>;
   listActive(limit?: number): Promise<Render[]>;
+  /**
+   * The most recent renders across every workspace, for the operator's
+   * quality console. Platform-scoped on purpose and never reachable from a
+   * customer session: what it exists to answer — is the creative gate
+   * holding films back, and which — is a question about the platform.
+   */
+  listRecent(limit?: number): Promise<Render[]>;
 }
 
 export interface VariantRepo {

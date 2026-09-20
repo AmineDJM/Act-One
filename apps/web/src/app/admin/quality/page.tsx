@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SEVERITY_ORDER, categoryOf, type QaCheck, type QaSeverity } from '@act-one/core';
+import { SEVERITY_ORDER, categoryOf, releasable as canRelease, type QaCheck, type QaSeverity } from '@act-one/core';
 import {
   REGENERATING,
   archetypesByScene,
@@ -38,10 +38,11 @@ export const dynamic = 'force-dynamic';
 export default async function QualityPage() {
   const store = getStore();
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [reports, organizations, costs] = await Promise.all([
+  const [reports, organizations, costs, renders] = await Promise.all([
     store.qaReports.list(600),
     store.organizations.list(500),
     store.costs.listSince(since, 'media.'),
+    store.renders.listRecent(400),
   ]);
   const names = new Map(organizations.map((organization) => [organization.id, organization.name]));
 
@@ -121,6 +122,26 @@ export default async function QualityPage() {
       report.issues.filter((issue) => issue.check === 'direction').map((issue) => ({ report, issue })),
     )
     .slice(0, 10);
+
+  /*
+   * The second gate, counted apart from the first.
+   *
+   * Production QA asks whether the film is technically complete; creative QA
+   * watches the finished file and asks whether it is any good. A platform that
+   * ships everything its checks allow and is held back by nothing it watched
+   * has a creative gate that is not doing anything, and that is visible here
+   * and nowhere else.
+   */
+  const deliverables = renders.filter((render) => render.kind !== 'animatic');
+  const judged = deliverables.filter((render) => render.creativeVerdict !== null);
+  const sentBack = judged.filter(
+    (render) => render.creativeVerdict === 'revise' || render.creativeVerdict === 'block',
+  );
+  const withConcerns = judged.filter((render) => render.creativeVerdict === 'pass_with_concerns');
+  const releasable = deliverables.filter((render) => canRelease(render));
+  const heldByCreative = deliverables.filter(
+    (render) => render.productionVerdict === 'pass' && !canRelease(render),
+  );
 
   return (
     <>
@@ -317,6 +338,50 @@ export default async function QualityPage() {
         />
         <Breakdown title="By kind of shot" rows={byArchetype} />
       </div>
+
+      <div className={styles.metrics}>
+        <Metric
+          label="Watched after mastering"
+          value={rate(judged.length, deliverables.length)}
+          note={`${plain(judged.length)} of ${plain(deliverables.length)} deliverables`}
+        />
+        <Metric
+          label="Sent back on taste"
+          value={rate(sentBack.length, judged.length)}
+          note={`${plain(withConcerns.length)} passed with concerns`}
+        />
+        <Metric
+          label="Held by the creative gate alone"
+          value={plain(heldByCreative.length)}
+          note="Technically complete, not good enough"
+        />
+        <Metric
+          label="Free to hand over"
+          value={rate(releasable.length, deliverables.length)}
+          note="Both gates passed"
+        />
+      </div>
+
+      {sentBack.length > 0 ? (
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <h2>Films the creative gate sent back</h2>
+          </div>
+          <p className="hint" style={{ marginBottom: 'var(--space-3)' }}>
+            Each of these exists, plays, and passed every technical check. What stopped it is the
+            only judgement on this page made by watching the finished file.
+          </p>
+          <ul className={styles.plainList}>
+            {sentBack.slice(0, 12).map((render) => (
+              <li key={render.id}>
+                <strong>{names.get(render.organizationId) ?? 'A workspace'}</strong>{' '}
+                <span className="mono">{render.creativeVerdict}</span> —{' '}
+                {render.creativeReason || 'No reason was recorded.'}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {verdicts.length > 0 ? (
         <section className={styles.section}>
