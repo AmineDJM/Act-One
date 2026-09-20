@@ -16,6 +16,7 @@ import {
 import { resolveTokens, watermark as watermarkSvg, type DesignTokens } from '@act-one/design';
 import { WordReveal, KineticHeadline, EditorialHeadline, MetricReveal, QuoteScene } from './components/Type.tsx';
 import { ProductWindow, ProductZoom, SpatialCards, CursorSequence, PhotoHold } from './components/Product.tsx';
+import { UiCinema } from './components/UiCinema.tsx';
 import { Footage } from './components/Footage.tsx';
 import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './components/Brand.tsx';
 
@@ -314,6 +315,24 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
         // coherent, so reaching `typeFallback` here means a broken asset
         // reference, and four seconds of brand-coloured nothing is a worse
         // answer than the line of copy the scene was written around.
+        //
+        // When production filmed this capture — found the panels in it and
+        // planned a set of framings — the sequence is the shot, for every one
+        // of these recipes. The flat staging below is not an alternative style
+        // to choose between; it is what is left when nobody looked at the
+        // picture, and it is why a film made of real product captures could
+        // still come out looking like a deck.
+        if (scene.uiSequence && scene.uiSequence.framings.length > 0 && assets[0]) {
+          return (
+            <UiCinema
+              src={assets[0]}
+              sequence={scene.uiSequence}
+              tokens={tokens}
+              words={text}
+              easing={easing}
+            />
+          );
+        }
         return assets[0] ? (
           <ProductWindow
             src={assets[0]}
@@ -333,6 +352,17 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
         );
 
       case 'product_zoom':
+        if (scene.uiSequence && scene.uiSequence.framings.length > 0 && assets[0]) {
+          return (
+            <UiCinema
+              src={assets[0]}
+              sequence={scene.uiSequence}
+              tokens={tokens}
+              words={text}
+              easing={easing}
+            />
+          );
+        }
         return assets[0] ? (
           <ProductZoom
             src={assets[0]}

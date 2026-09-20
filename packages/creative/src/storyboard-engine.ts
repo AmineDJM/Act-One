@@ -276,6 +276,7 @@ export class StoryboardEngine {
         depthOfField: 0,
         easing: 'in_out_quart',
       },
+      uiSequence: null,
       soundCues: ending.soundCues.map((type) => ({
         time: 0,
         type,
@@ -565,6 +566,7 @@ export class StoryboardEngine {
         momentIds: moment ? [moment.id] : [],
         motionRecipe,
         cameraRecipe,
+        uiSequence: null,
         soundCues: [],
         voiceOver: narration.length > 0,
         generativeNeeds:
@@ -712,6 +714,7 @@ export class StoryboardEngine {
 
     const scored = sequenced.scenes.map((scene, index) => ({
       ...scene,
+      uiSequence: null,
       soundCues: soundCuesFor(
         scene,
         /*

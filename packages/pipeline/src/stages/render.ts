@@ -100,6 +100,7 @@ import {
   type RepairIntent,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
+import { filmTheProduct } from './product-cinematography.ts';
 import { runSceneAssets } from './assets.ts';
 import { runCreativeMasterGate } from './creative-gate.ts';
 import {
@@ -1345,7 +1346,13 @@ async function renderOnce(
   /** The manifest this pass was rendered from: what resolved, what did not. */
   readiness: MasterReadiness;
 }> {
-  const { storyboard, brand, system } = params;
+  const { brand, system } = params;
+  /*
+   * Rebound rather than destructured: production adds to the storyboard on
+   * the way through — the framings each product capture is filmed with are
+   * decided below, against the real bytes and the real frame.
+   */
+  let storyboard = params.storyboard;
 
   /*
    * The voice, before the picture.
@@ -1445,6 +1452,41 @@ async function renderOnce(
    * commissioned shot ends up as an empty frame.
    */
   const footageAssetIds = await footageAmong(context, referenced);
+
+  /*
+   * Filming the product.
+   *
+   * The step between having a capture and having a shot. Until this existed
+   * the renderer was handed an image and a duration, and the only thing it
+   * could do with them was show the whole image for the whole beat — which is
+   * a slide of an interface, not a scene, however good the capture and
+   * however carefully the director wrote the beat.
+   *
+   * It runs here because this is the first place that holds both the real
+   * bytes and the real frame: what can be cropped out of a capture without
+   * showing the customer a soft picture depends on how many pixels it has and
+   * how many the deliverable has. A preview is planned at the delivered size
+   * rather than its own, so the animatic a customer approves is the framing
+   * of the film they get, not a tighter one that only holds up at half
+   * resolution.
+   */
+  const filming = await filmTheProduct(context, storyboard, {
+    aspect: params.aspect,
+    renderWidth: dimensionsFor(params.aspect, params.quality === 'preview' ? 'hd' : params.quality).width,
+  });
+  storyboard = filming.storyboard;
+  if (filming.result.filmed > 0 || filming.result.unfilmed > 0) {
+    await context.activity({
+      step: 'motion',
+      kind: 'note',
+      label: `filmed ${filming.result.filmed} product shot${filming.result.filmed === 1 ? '' : 's'}`,
+      detail:
+        filming.result.notes.length > 0
+          ? filming.result.notes.slice(0, 3).join(' · ')
+          : 'each capture read for its panels and cut into framings',
+      status: filming.result.unfilmed > 0 ? 'failed' : 'done',
+    });
+  }
 
   /*
    * Master readiness, before a frame is rendered.

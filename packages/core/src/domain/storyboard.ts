@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { nonEmpty, score01 } from '../zod-helpers.ts';
 import { VoiceStrategy } from './creative.ts';
+import { UiSequence } from './ui-cinema.ts';
 
 export const VisualType = z.enum([
   'kinetic_typography',
@@ -424,6 +425,18 @@ export const Scene = z.object({
   momentIds: z.array(z.string()).default([]),
   motionRecipe: MotionRecipe,
   cameraRecipe: CameraRecipe,
+  /*
+   * How this scene's capture is filmed.
+   *
+   * Written by production, not by the director: the framings depend on what
+   * is actually in the pixels and on how many of them there are, neither of
+   * which anyone writing a storyboard can know. Null means the scene has not
+   * been filmed — either it shows no product capture, or production has not
+   * reached it yet. It never means the scene chose to be a flat screenshot,
+   * and the notes on the sequence say where the plan fell short so that an
+   * absence is never read back as a decision.
+   */
+  uiSequence: UiSequence.nullable().default(null),
   soundCues: z.array(SoundCue).default([]),
   voiceOver: z.boolean().default(false),
   generativeNeeds: z.array(GenerativeNeed).default([]),

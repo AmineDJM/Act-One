@@ -21,7 +21,7 @@ export type TypeProps = {
   tokens: DesignTokens;
   maxWidth: number;
   maxLines?: number;
-  align?: 'left' | 'center';
+  align?: 'left' | 'center' | 'right';
   easing?: EasingName;
   delaySeconds?: number;
   staggerSeconds?: number;
@@ -189,7 +189,7 @@ export const MetricReveal: React.FC<{
   durationSeconds: number;
   easing?: EasingName;
   delaySeconds?: number;
-  align?: 'left' | 'center';
+  align?: 'left' | 'center' | 'right';
 }> = ({ value, caption, tokens, durationSeconds, easing, delaySeconds, align }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();

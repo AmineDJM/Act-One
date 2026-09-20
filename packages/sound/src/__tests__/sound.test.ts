@@ -9,6 +9,7 @@ function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualTyp
     assetRefs: [], momentIds: [],
     motionRecipe: { name: 'hold', easing: 'out_quint', delay: 0, stagger: 0.06, intensity: 0.6, params: {} },
     cameraRecipe: { move: 'static', fromScale: 1, toScale: 1, fromX: 0, toX: 0, fromY: 0, toY: 0, motionBlur: 0.1, depthOfField: 0, easing: 'in_out_quart' },
+    uiSequence: null,
     soundCues: [], voiceOver: false, generativeNeeds: [], threeDSceneId: null, status: 'draft',
     claimEvidenceIds: [], notes: '', estimatedCostUsd: 0,
     ...over,
@@ -99,6 +100,7 @@ describe('directSound', () => {
     const noisy = board([
       scene({
         id: 's1', duration: 10, visualType: 'product_ui',
+        uiSequence: null,
         soundCues: Array.from({ length: 9 }, (_, i) => ({
           time: i * 0.8, type: 'ui_click' as const, assetId: null, intensity: 0.4, durationSeconds: null,
         })),

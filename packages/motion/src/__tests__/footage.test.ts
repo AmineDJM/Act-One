@@ -47,6 +47,7 @@ function scene(over: Partial<Scene> & Pick<Scene, 'id'>): Scene {
     visualType: 'generated_broll', narration: '', onScreenText: [], assetRefs: [], momentIds: [],
     motionRecipe: { name: 'footage', easing: 'out_quint', delay: 0, stagger: 0.04, intensity: 0.6, params: {} },
     cameraRecipe: { move: 'static', fromScale: 1, toScale: 1, fromX: 0, toX: 0, fromY: 0, toY: 0, motionBlur: 0, depthOfField: 0, easing: 'in_out_quart' },
+    uiSequence: null,
     soundCues: [], voiceOver: false, generativeNeeds: [], threeDSceneId: null, status: 'ready',
     claimEvidenceIds: [], notes: '', estimatedCostUsd: 0, ...over,
   };

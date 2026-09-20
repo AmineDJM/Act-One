@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import type { UiRegion, UiStructure } from '@act-one/core';
 
 /**
  * What is actually in a product screenshot.
@@ -20,26 +21,7 @@ import sharp from 'sharp';
  * invents, redraws or approximates any part of a customer's interface; the
  * only thing being decided is where to point the camera.
  */
-export type UiRegion = {
-  /** Normalised to the capture: 0..1 of its width and height. */
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** How much of the capture's ink this region holds, 0..1. */
-  weight: number;
-  /** Ink per unit area: a dense control panel scores higher than a sparse hero. */
-  density: number;
-};
-
-export type UiStructure = {
-  width: number;
-  height: number;
-  /** The colour the interface sits on, as the capture actually shows it. */
-  background: { r: number; g: number; b: number };
-  /** Regions, strongest first. */
-  regions: UiRegion[];
-};
+export type { UiRegion, UiStructure } from '@act-one/core';
 
 /** Below this share of the capture, a region is a button rather than a panel. */
 const MIN_REGION_AREA = 0.012;
@@ -51,6 +33,17 @@ export async function readUiStructure(
   options: { analysisWidth?: number } = {},
 ): Promise<UiStructure> {
   const width = options.analysisWidth ?? 260;
+  /*
+   * The size that is reported is the capture's, not the analysis raster's.
+   *
+   * Everything below works on a 260px reduction, because gutters and ink are
+   * cheaper and cleaner to find at that size and the regions come back
+   * normalised anyway. But the framing budget downstream asks how many real
+   * pixels a crop of this thing would have, and answering 260 made every
+   * capture look far too small to crop — a fidelity check computed against a
+   * picture nobody is going to show.
+   */
+  const source = await sharp(Buffer.from(bytes)).metadata();
   const { data, info } = await sharp(Buffer.from(bytes))
     .resize({ width, withoutEnlargement: true })
     .removeAlpha()
@@ -109,7 +102,7 @@ export async function readUiStructure(
     .filter((region) => region.width * region.height >= MIN_REGION_AREA)
     .sort((left, right) => right.weight - left.weight);
 
-  return { width: info.width, height: info.height, background, regions };
+  return { width: source.width ?? info.width, height: source.height ?? info.height, background, regions };
 }
 
 type Box = { ink: Uint8Array; w: number; h: number; x0: number; y0: number; x1: number; y1: number };

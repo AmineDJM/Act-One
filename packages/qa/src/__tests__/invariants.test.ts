@@ -34,6 +34,7 @@ function shot(over: Partial<Scene> & Pick<Scene, 'id' | 'duration'>): Scene {
       move: 'static', fromScale: 1, toScale: 1, fromX: 0, toX: 0, fromY: 0, toY: 0,
       motionBlur: 0.1, depthOfField: 0, easing: 'in_out_quart',
     },
+    uiSequence: null,
     soundCues: [], voiceOver: false, generativeNeeds: [], threeDSceneId: null, status: 'draft',
     claimEvidenceIds: [], notes: '', estimatedCostUsd: 0,
     ...over,

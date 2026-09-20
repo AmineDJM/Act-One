@@ -52,6 +52,7 @@ function scene(over: Partial<Scene> & Pick<Scene, 'id'>): Scene {
     momentIds: [],
     motionRecipe: { name: 'kinetic_headline', easing: 'out_quint', delay: 0, stagger: 0, intensity: 0.6, params: {} },
     cameraRecipe: { move: 'static', fromScale: 1, toScale: 1, fromX: 0, toX: 0, fromY: 0, toY: 0, motionBlur: 0, depthOfField: 0, easing: 'in_out_quart' },
+    uiSequence: null,
     soundCues: [], voiceOver: false, generativeNeeds: [], threeDSceneId: null, status: 'ready',
     claimEvidenceIds: [], notes: '', estimatedCostUsd: 0, ...over,
   };
@@ -144,6 +145,7 @@ describe('the attention reset', () => {
       duration: ATTENTION_RESET_SECONDS + 1,
       visualType: 'quote',
       motionRecipe: { ...scene({ id: 'x' }).motionRecipe, name: 'quote_hold', stagger: 0 },
+      uiSequence: null,
       soundCues: [],
       ...over,
     });
@@ -163,6 +165,7 @@ describe('the attention reset', () => {
       ['type', inert({ id: 'type', onScreenText: ['One'], motionRecipe: { ...base.motionRecipe, stagger: 0.06 } })],
       ['sound', inert({
         id: 'sound',
+        uiSequence: null,
         soundCues: [{ time: 0.4, type: 'impact', assetId: null, intensity: 0.6, durationSeconds: null }],
       })],
     ];
@@ -304,6 +307,7 @@ describe('stillness and quiet, which are tools rather than faults', () => {
       duration: 4,
       visualType: 'quote',
       motionRecipe: { ...scene({ id: 'x' }).motionRecipe, name: 'quote_hold', stagger: 0 },
+      uiSequence: null,
       soundCues: [{ time: 0.3, type: 'impact', assetId: null, intensity: 0.7, durationSeconds: null }],
     });
     expect(needsAttention(still)).toBe(false);

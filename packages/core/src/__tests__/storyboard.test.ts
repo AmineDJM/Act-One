@@ -36,6 +36,7 @@ function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualTyp
       depthOfField: 0,
       easing: 'in_out_quart',
     },
+    uiSequence: null,
     soundCues: [],
     voiceOver: false,
     generativeNeeds: [],
