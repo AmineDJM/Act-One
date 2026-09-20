@@ -779,3 +779,54 @@
   margin-bottom: var(--space-3);
 }
 .panelHead h3 { font-size: 0.95rem; letter-spacing: -0.01em; }
+
+/* --- Director Lab --------------------------------------------------------- */
+/*
+ * Reading, not scanning.
+ *
+ * Every other page in this console is a table: the operator arrives knowing
+ * what they are looking for and wants it in a row. This one is the opposite —
+ * somebody comes here to find out whether the system actually thought, and
+ * that question is answered by reading a rejected direction and the reason it
+ * died, not by a count of them. So it is set as prose at a comfortable
+ * measure, with the structure carried by rules rather than by boxes.
+ */
+.page { display: block; }
+.pageHead { margin-bottom: var(--space-5); }
+.pageHead h1 { font-size: 1.35rem; letter-spacing: -0.02em; }
+.pageHead p { margin-top: var(--space-1); }
+
+.definitions { display: grid; gap: var(--space-3); margin: 0; }
+.definitions dt {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.definitions dd { margin: var(--space-1) 0 0; max-width: 70ch; }
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-3); }
+.list p { max-width: 74ch; margin: var(--space-1) 0 0; }
+.listItem, .listItemOn {
+  border-left: 2px solid var(--line);
+  padding-left: var(--space-3);
+}
+/* The one that was chosen. A rule rather than a fill: the rejected ones are
+   the point of the list and must not read as disabled. */
+.listItemOn { border-left-color: var(--accent, var(--text-primary)); }
+
+.bars { display: grid; gap: var(--space-2); margin: var(--space-3) 0; max-width: 520px; }
+.bar { display: grid; grid-template-columns: 140px 1fr 44px; gap: var(--space-2); align-items: center; }
+.barLabel { font-size: 0.8rem; color: var(--text-secondary); }
+.barTrack { height: 6px; border-radius: 3px; background: var(--surface-hover, var(--line)); overflow: hidden; }
+.barFill { display: block; height: 100%; background: var(--text-secondary); }
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.chipOn { border-color: var(--line-strong); background: var(--surface-hover); }

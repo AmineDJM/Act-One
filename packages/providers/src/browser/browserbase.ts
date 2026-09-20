@@ -106,7 +106,17 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
 
   async createSession(options: SessionOptions, context: CallContext): Promise<BrowserSession> {
     if (!this.isConfigured()) {
-      throw new ProviderError(this.name, 'Browserbase is not configured.', { retryable: false });
+      /*
+       * Retryable, because a fallback is exactly what this case is for.
+       *
+       * It was marked non-retryable — "a bad key will fail identically on a
+       * second vendor and only cost more" — which is true of a bad key and
+       * false of no key at all. A deployment with no Browserbase credentials
+       * and a perfectly good Playwright fallback configured behind it got the
+       * throw instead of the fallback, so research died at "Opening a browser"
+       * rather than crawling the public site it was always able to crawl.
+       */
+      throw new ProviderError(this.name, 'Browserbase is not configured.', { retryable: true });
     }
     const project = await this.project();
 

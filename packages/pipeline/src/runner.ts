@@ -1,5 +1,9 @@
 import {
   CreativeEscalation,
+  AppError,
+  AudienceModel,
+  BrandGenome,
+  CreativeBrief,
   DEFAULT_PRODUCTION_BUDGET,
   ProductionBudget,
   budgetAllowsReplan,
@@ -21,6 +25,7 @@ import { runResearch } from './stages/research.ts';
 import { runConcepts } from './stages/concepts.ts';
 import { runStoryboard } from './stages/storyboard.ts';
 import { runRender } from './stages/render.ts';
+import { runPreProduction } from './stages/pre-production.ts';
 import { runCampaign } from './stages/campaign.ts';
 import { runLocalisation } from './stages/localize.ts';
 import { runCopy } from './stages/copy.ts';
@@ -209,10 +214,41 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
       const budget = ProductionBudget.parse(
         (payload['budget'] as Record<string, unknown>) ?? DEFAULT_PRODUCTION_BUDGET,
       );
+
+      /*
+       * The cut is watched before it is paid for.
+       *
+       * An animatic costs a preview render; the film costs generated shots, a
+       * read voice and a mastered mix. Watching the cheap one first and
+       * revising there is both the better film and the cheaper production, and
+       * it is the order every studio works in. Skipped when the Director Brain
+       * never ran for this project — the models it needs would not exist, and
+       * a production that predates the direction stage must still render.
+       */
+      let storyboardId = String(payload['storyboardId'] ?? context.project.activeStoryboardId ?? '');
+      const understood = await loadDirection(context);
+      if (understood && payload['skipPreProduction'] !== true) {
+        const pre = await runPreProduction(context, { ...understood, storyboardId });
+        storyboardId = pre.storyboardId;
+        if (!pre.approved && pre.verdict === 'block') {
+          /*
+           * The panel found something disqualifying in the cut itself. No
+           * amount of re-rendering the same material changes it, so the
+           * production stops here rather than spending on a film its own
+           * director has refused.
+           */
+          throw new AppError('conflict', pre.holdReason, {
+            publicMessage:
+              'We are not happy with this cut and would rather not make it as it stands. ' +
+              'Your storyboard is saved; tell us what you want changed, or ask for new directions.',
+          });
+        }
+      }
+
       // No watermark flag in the payload: the plan decides, in the worker,
       // at the moment the film is made.
       const outcome = await runRender(context, {
-        storyboardId: String(payload['storyboardId'] ?? context.project.activeStoryboardId ?? ''),
+        storyboardId,
         maxRepairAttempts: budget.deterministicPasses,
       });
 
@@ -339,6 +375,39 @@ async function dispatch(context: StageContext, job: Job, deps: RunnerDeps): Prom
     default:
       throw new Error(`No handler for job kind: ${job.kind as string}`);
   }
+}
+
+/**
+ * The three models the Director Brain built, when it built them.
+ *
+ * Read back rather than passed on the job, because a render can be re-queued
+ * hours later by a retry, a replan or an operator, and a payload carrying a
+ * whole brief would go stale the moment anybody revised one. Null when this
+ * project predates the direction stage, which is a real state and not an
+ * error: those films still render, they are simply not watched first.
+ */
+async function loadDirection(
+  context: StageContext,
+): Promise<{ brief: CreativeBrief; audience: AudienceModel; genome: BrandGenome } | null> {
+  const [brief, audience, genome] = await Promise.all([
+    context.store.creative.latestModel(context.organizationId, context.project.id, 'brief'),
+    context.store.creative.latestModel(context.organizationId, context.project.id, 'audience'),
+    context.store.creative.latestModel(context.organizationId, context.project.id, 'genome'),
+  ]);
+  if (!brief || !audience || !genome) return null;
+
+  const parsed = {
+    brief: CreativeBrief.safeParse(brief),
+    audience: AudienceModel.safeParse(audience),
+    genome: BrandGenome.safeParse(genome),
+  };
+  if (!parsed.brief.success || !parsed.audience.success || !parsed.genome.success) {
+    // A stored model written by an older shape of the code. Better to render
+    // the film unwatched than to fail a production over a schema change.
+    console.error('[runner] stored direction could not be read back; rendering without it.');
+    return null;
+  }
+  return { brief: parsed.brief.data, audience: parsed.audience.data, genome: parsed.genome.data };
 }
 
 async function enqueueNext(
