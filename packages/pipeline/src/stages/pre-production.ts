@@ -4,9 +4,12 @@ import {
   AppError,
   ProductionBudget,
   budgetAllowsReplan,
+  comprehension,
   describeSequence,
   filmShape,
   newId,
+  shotDemand,
+  viewerTimeline,
   spendReplan,
   storyboardDuration,
   strictestVerdict,
@@ -61,6 +64,17 @@ const ANIMATIC_PANEL: readonly CriticId[] = [
   'copy',
   'sound',
   'originality',
+  /*
+   * And the one who was told nothing.
+   *
+   * The animatic is the right place for it, because this is the last gate
+   * before the film is paid for and comprehension is the most expensive
+   * thing to discover afterwards. Every other critic here has read the
+   * brief and therefore cannot tell you whether the film explains itself —
+   * they already know what it is about, so a film that communicates nothing
+   * reads to them as perfectly clear.
+   */
+  'first_time_viewer',
 ];
 
 export type PreProductionResult = {
@@ -367,12 +381,14 @@ function describeCut(
        * the same shot. A panel shown only the first judges the intention.
        */
       scene.uiSequence ? `   filmed: ${describeSequence(scene.uiSequence)}` : '',
+      demandLine(scene),
     ]
       .filter(Boolean)
       .join('\n'),
   );
 
   const shape = filmShape(storyboard);
+  const minds = comprehension(storyboard);
   return [
     `A ${storyboardDuration(storyboard).toFixed(0)}-second cut, at preview quality.`,
     `The director graded it ${seen.grade}: ${seen.summary}`,
@@ -385,6 +401,24 @@ function describeCut(
       `(${shape.cinematicShots} of ${shape.shots} shots; ${shape.operatedShots} show a control being used, ` +
       `${shape.spatialShots} open into a built space).`,
     ...weakestDimensions(seen).map((note) => `Weakest — ${note.dimension} (${note.grade}): ${note.note}`),
+    ``,
+    /*
+     * What a first-time viewer has been given, by the second.
+     *
+     * A panel told the plan judges whether the plan was sensible, and it can
+     * always answer yes. Told that at five seconds the audience has seen
+     * four category labels and no product, it is being asked the question
+     * that actually decides whether this film works on a stranger.
+     */
+    `WHAT A FIRST-TIME VIEWER HAS BEEN GIVEN:`,
+    ...viewerTimeline(storyboard).map((line) => `  ${line}`),
+    ...(minds.notes.length > 0
+      ? [
+          ``,
+          `WHERE THE FILM ASKS MORE THAN IT GIVES TIME FOR:`,
+          ...minds.notes.map((note) => `  ${note.timecodeStart.toFixed(1)}s — ${note.message}`),
+        ]
+      : []),
     ``,
     `THE SHOTS:`,
     ...shots,
@@ -409,6 +443,23 @@ function describeCut(
         ]
       : []),
   ].join('\n');
+}
+
+/**
+ * What this shot asks of a viewer, in seconds.
+ *
+ * Printed per shot rather than only as a film-level note, because a panel
+ * deciding whether a beat is too fast should be able to see the arithmetic
+ * next to the beat instead of being asked to estimate it from a duration.
+ */
+function demandLine(scene: Storyboard['scenes'][number]): string {
+  const demand = shotDemand(scene);
+  if (demand.readingSeconds === 0 && demand.lookingSeconds <= 0.4) return '';
+  const parts = [
+    demand.readingSeconds > 0 ? `${demand.readingSeconds.toFixed(1)}s to read` : '',
+    demand.lookingSeconds > 0.4 ? `${demand.lookingSeconds.toFixed(1)}s to take in` : '',
+  ].filter(Boolean);
+  return `   asks for ${parts.join(' + ')} in ${demand.duration.toFixed(1)}s (primary: ${demand.primary})`;
 }
 
 /**

@@ -56,6 +56,15 @@ export const QaCheck = z.enum([
   'anatomy',
   'composition',
   'visual_hierarchy',
+  /*
+   * Whether a person who has never seen this product could follow it.
+   *
+   * Separate from `visual_hierarchy`, which is about a frame. This is about
+   * time: a line that is gone before it has been read, a screen held too
+   * briefly for anything in it to be found, words and an interface asking for
+   * the same seconds.
+   */
+  'comprehension',
   'brand_consistency',
   'transition_quality',
   'safe_area',
@@ -345,6 +354,9 @@ const CHECK_CATEGORY: Record<QaCheck, QaCategory> = {
 
   unsupported_claim: 'editorial', fake_product_ui: 'editorial', direction: 'editorial',
   composition: 'editorial', brand_consistency: 'editorial',
+  // Editorial, not text: what is wrong is how long the cut gives the viewer,
+  // and the fix is in the writing and the edit rather than in a layout.
+  comprehension: 'editorial',
 
   distorted_ui: 'continuity', logo_integrity: 'continuity', image_artifact: 'continuity',
   anatomy: 'continuity', flicker: 'continuity', duplicate_frames: 'continuity',

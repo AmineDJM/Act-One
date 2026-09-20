@@ -40,6 +40,14 @@ const CriticResponse = z.object({
   findings: z.array(CriticFinding).max(8).default([]),
   /** The one thing this critic would change first. Empty when nothing. */
   headline: z.string().max(300).default(''),
+  /**
+   * What the work said, for the critic that was told nothing else.
+   *
+   * Asked for as a report rather than a judgement: what company is this,
+   * what does it appear to do, who is it for, what was the value, which
+   * moment is remembered. An empty string from any other critic.
+   */
+  readback: z.string().max(1400).default(''),
 });
 
 /** What each critic is for, in the words it is asked to think in. */
@@ -121,6 +129,31 @@ const BRIEFS: Record<CriticId, { title: string; question: string; lens: string[]
       'particles, glowing gradients, stock people pleased at laptops, every word bouncing in.',
       'Also look for OUR repetitions — the devices listed as recently used are a warning, not a ban.',
       'Novelty under constraint is the target. Random strangeness is not originality.',
+    ],
+  },
+  first_time_viewer: {
+    title: 'a person who has never heard of this company',
+    question: 'Watching this once, what did you understand?',
+    lens: [
+      'You know nothing about this company, this product or this interface. You have not read a brief.',
+      'You are watching once, the way anyone watches anything: reading whatever is on screen, looking',
+      'at whatever the picture shows you, at the speed the film goes.',
+      '',
+      'Report, in `readback`, and in this order: what company or product this is; what it appears to do;',
+      'who might use it; what the main value seemed to be; and which single product moment you would',
+      'still be able to describe tomorrow. Where you could not tell, say you could not tell — that is',
+      'the most useful thing you can report and the reason you exist.',
+      '',
+      'Then raise a finding for each of these that happened, with its timecode:',
+      '- a line of text that was gone before you finished reading it',
+      '- an interface on screen too briefly, or too small, for anything in it to be read',
+      '- a screen where you did not know where to look',
+      '- a moment where the words and the picture were both asking for your attention at once',
+      '- a point where you lost the thread of what was being shown',
+      '',
+      'Judge ONLY what the film communicated. If you find yourself inferring what the company probably',
+      'does, that inference is the finding: the film did not say it.',
+      'A film you enjoyed but could not describe afterwards is a revise.',
     ],
   },
   production: {
@@ -243,6 +276,7 @@ export class CriticPanel {
         critic,
         verdict,
         findings: value.findings,
+        readback: value.readback,
         criticVersion: CRITIC_VERSION,
         model: usage.model,
         costUsd: usage.costUsd,
@@ -259,6 +293,17 @@ function strictest(a: CreativeVerdict, b: CreativeVerdict): CreativeVerdict {
 
 function systemPrompt(critic: CriticId): string {
   const spec = BRIEFS[critic];
+  if (critic === 'first_time_viewer') {
+    return [
+      `You are ${spec.title}. You have been shown a short film and nothing else.`,
+      '',
+      spec.question,
+      '',
+      ...spec.lens,
+      '',
+      'Every finding cites a timecode. Return JSON only.',
+    ].join('\n');
+  }
   return [
     `You are ${spec.title}, reviewing work for a studio that makes launch films for software companies.`,
     '',
@@ -285,6 +330,28 @@ function systemPrompt(critic: CriticId): string {
 }
 
 function userPrompt(input: CriticInput, critic: CriticId): string {
+  /*
+   * Blind, and it has to be blind in the prompt rather than by instruction.
+   *
+   * Telling a model "do not use the brief" and then handing it the brief
+   * tests the model's discipline rather than the film's clarity, and it will
+   * fail that test in the direction that makes the film look good: it will
+   * read the assignment, understand the product, and report that the film
+   * communicated it. The only way to find out what a film says is to show
+   * somebody the film.
+   */
+  if (critic === 'first_time_viewer') {
+    return [
+      `THE FILM, and nothing else:`,
+      input.artifact,
+      input.images && input.images.length > 0
+        ? `\nFrames from it are attached, in order, with their timecodes.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
   const { brief, audience, genome } = input;
   return [
     `THE ASSIGNMENT`,
@@ -326,6 +393,12 @@ export const FULL_PANEL: readonly CriticId[] = [
   'sound',
   'originality',
   'production',
+  /*
+   * Last, because it is the one whose answer none of the others can give.
+   * Everything above judges the work against what it was meant to be; this
+   * one reports what it turned out to be, to somebody with no idea.
+   */
+  'first_time_viewer',
 ];
 
 /**

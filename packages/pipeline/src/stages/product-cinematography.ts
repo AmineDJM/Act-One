@@ -2,6 +2,7 @@ import {
   REAL_PRODUCT_VISUAL_TYPES,
   cuesFor,
   planUiSequence,
+  readingSeconds,
   type AspectRatio,
   type RepairAction,
   type Scene,
@@ -152,6 +153,9 @@ export async function filmTheProduct(
       frameAspect,
       renderWidth: options.renderWidth,
       hasWords: scene.onScreenText.some((line) => line.trim().length > 0),
+      // What the words cost a viewer who has never read them, so the beat
+      // that carries them is long enough to finish.
+      wordSeconds: readingSeconds(scene.onScreenText),
       ambition: ambitionFor(scene),
     });
     filmed.set(scene.id, sequence);
@@ -203,7 +207,15 @@ export async function filmTheProduct(
       return { ...scene, uiSequence: sequence, soundCues };
     }),
   };
-  await context.store.storyboards.update(context.organizationId, storyboard.id, { scenes: next.scenes });
+  /*
+   * `replaceScenes`, not `update`. `update` patches the storyboard's own
+   * columns and ignores the scene list — in both stores — so every framing
+   * planned here went into a write that dropped it. The renderer downstream
+   * still had them in memory and made the right picture, which is what made
+   * it invisible: the film was filmed and nothing that read the storyboard
+   * afterwards could tell.
+   */
+  await context.store.storyboards.replaceScenes(context.organizationId, storyboard.id, next.scenes);
   return { storyboard: next, result };
 }
 

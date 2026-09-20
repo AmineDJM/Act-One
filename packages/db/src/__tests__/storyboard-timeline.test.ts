@@ -148,6 +148,74 @@ describe.each(storeCases())('a storyboard is read back on the clock ($name)', ({
     }
   });
 
+  it('keeps what production made of a shot, across a read', async () => {
+    const store = await open();
+    try {
+      const { organizationId, storyboardId } = await boarded(store, 'Filmed', [3, 4, 2]);
+      const before = await store.storyboards.get(organizationId, storyboardId);
+      const filmed = before!.scenes.map((scene, index) =>
+        index === 1
+          ? {
+              ...scene,
+              uiSequence: {
+                sourceWidth: 2324,
+                sourceHeight: 1224,
+                background: { r: 240, g: 240, b: 242 },
+                framings: [
+                  {
+                    role: 'subject' as const,
+                    move: 'hold' as const,
+                    from: { x: 0, y: 0, width: 0.5, height: 0.28 },
+                    to: { x: 0, y: 0, width: 0.5, height: 0.28 },
+                    seconds: 4,
+                    cut: true,
+                    lift: null,
+                    words: 'none' as const,
+                    around: null,
+                    layers: [
+                      {
+                        role: 'shell' as const,
+                        motion: 'recede' as const,
+                        rect: { x: 0, y: 0, width: 1, height: 1 },
+                        depth: -0.5,
+                        delaySeconds: 0.1,
+                        durationSeconds: 1.3,
+                        from: 'below' as const,
+                        assetId: null,
+                        sourceWidth: null,
+                        sourceHeight: null,
+                        knockout: false,
+                      },
+                    ],
+                    space: 'flat' as const,
+                    wordsBehind: false,
+                  },
+                ],
+                notes: [],
+              },
+            }
+          : scene,
+      );
+      await store.storyboards.replaceScenes(organizationId, storyboardId, filmed);
+
+      /*
+       * The bug this pins down cost a whole production run. The stage that
+       * decides how each capture is filmed wrote its framings through
+       * `storyboards.update`, which patches the storyboard's own fields and
+       * ignores the scene list. The renderer still had them in memory and
+       * made the right picture, so nothing looked broken — but the
+       * director's description of the cut, the shape metrics, QA and the
+       * next attempt all read a storyboard that had never been filmed.
+       */
+      const reread = await store.storyboards.get(organizationId, storyboardId);
+      expect(reread!.scenes[1]!.uiSequence?.framings).toHaveLength(1);
+      expect(reread!.scenes[1]!.uiSequence?.framings[0]!.layers[0]!.motion).toBe('recede');
+      expect(reread!.scenes[1]!.uiSequence?.sourceWidth).toBe(2324);
+    } finally {
+      await close(store);
+    }
+  });
+
   it('gives every board of a project the same clock as a single read', async () => {
     const store = await open();
     try {

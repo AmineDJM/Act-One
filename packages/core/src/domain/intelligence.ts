@@ -550,6 +550,17 @@ export const CriticId = z.enum([
   'sound',
   'originality',
   'production',
+  /*
+   * The one critic that is shown nothing but the film.
+   *
+   * Every other critic is given the brief, the audience and the brand
+   * genome, and that is right: they are being asked whether the work serves
+   * an assignment they have to know. It also means not one of them can tell
+   * you whether the film is comprehensible, because they all already know
+   * what it is about. A panel that has read the brief will read a film that
+   * communicates nothing and understand it perfectly.
+   */
+  'first_time_viewer',
 ]);
 export type CriticId = z.infer<typeof CriticId>;
 
@@ -590,6 +601,15 @@ export const CriticReview = z.object({
   findings: z.array(CriticFinding).max(12).default([]),
   /** Which evaluator produced this, so a change of critic is visible later. */
   criticVersion: z.string().max(40).default('v1'),
+  /**
+   * What this critic understood from the work alone.
+   *
+   * Only the first-time viewer fills it, and it is the most useful sentence
+   * the panel produces: not an opinion about the film but a report of what
+   * the film managed to say to somebody who knew nothing. When it does not
+   * match what the company does, no amount of craft elsewhere matters.
+   */
+  readback: z.string().max(1400).default(''),
   model: z.string().max(80).default(''),
   costUsd: z.number().min(0).default(0),
   createdAt: z.string(),

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AppError,
+  comprehension,
   cutAspect,
   FILM_CUTS,
   pitchDrift,
@@ -1519,10 +1520,11 @@ async function renderOnce(
     });
     if (hero.record) {
       storyboard = withHeroShot(storyboard, hero.record);
-      await context.store.storyboards.update(context.organizationId, storyboard.id, {
-        scenes: storyboard.scenes,
-        heroShot: hero.record,
-      });
+      // Scenes and storyboard fields are two different writes: `update`
+      // ignores a scene list, which is how the hero shot came to be recorded
+      // on a storyboard whose shots did not have it.
+      await context.store.storyboards.replaceScenes(context.organizationId, storyboard.id, storyboard.scenes);
+      await context.store.storyboards.update(context.organizationId, storyboard.id, { heroShot: hero.record });
     } else if (hero.notes.length > 0) {
       await context.activity({
         step: 'motion',
@@ -1546,6 +1548,30 @@ async function renderOnce(
    * be written where the people and the loops that can act on it will look,
    * which is the findings, not the activity feed.
    */
+  /*
+   * What the cut asks of somebody who has never seen this product.
+   *
+   * Findings rather than notes, because they are arithmetic: a line needs
+   * more seconds to read than it is on screen for, or an interface is held
+   * too briefly for anything in it to be found. Soft — a film that asks too
+   * much of a viewer is still a film, and the fix is authorial rather than
+   * mechanical — but recorded, because the alternative is a master that is
+   * beautiful and says nothing, which is the failure nobody downstream can
+   * see without being told.
+   */
+  const comprehensionIssues: QaFinding[] = comprehension(storyboard).notes.map((note) => ({
+    id: newId('evt'),
+    sceneId: note.sceneId,
+    timecodeStart: note.timecodeStart,
+    detectedBy: 'deterministic',
+    evidenceAssetId: null,
+    check: 'comprehension',
+    severity: 'soft_fail',
+    message: note.message,
+    confidence: 1,
+    repair: note.problem === 'unreadable_text' || note.problem === 'too_brief_for_ui' ? 'retime_scene' : 'manual_review',
+  }));
+
   const cinematographyIssues: QaFinding[] = filming.result.shortfalls.map((shortfall) => {
     const scene = storyboard.scenes.find((candidate) => candidate.id === shortfall.sceneId);
     return {
@@ -1590,7 +1616,7 @@ async function renderOnce(
     detail: summariseCoverage(readiness.coverage),
     status: readiness.ready ? 'done' : 'failed',
   });
-  const degradedIssues: QaFinding[] = [...cinematographyIssues, ...readiness.blockers.map((blocker) => {
+  const degradedIssues: QaFinding[] = [...comprehensionIssues, ...cinematographyIssues, ...readiness.blockers.map((blocker) => {
     const scene = storyboard.scenes.find((candidate) => candidate.id === blocker.sceneId);
     return {
       id: newId('evt'),

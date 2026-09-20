@@ -310,6 +310,14 @@ export type PlanUiOptions = {
   renderWidth: number;
   /** True when the scene carries on-screen words that have to live in the picture. */
   hasWords?: boolean;
+  /**
+   * How long those words take a first-time viewer to read.
+   *
+   * The beat that carries them gets at least this much, taken out of the
+   * establishing frame. A line that is gone before it has been finished was
+   * not communicated, and the film paid for it in running time anyway.
+   */
+  wordSeconds?: number;
   ambition?: ShotAmbition;
 };
 
@@ -454,10 +462,29 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
   const shares = beats.map((beat) => (beat.role === 'establish' ? 0.8 : 1.15));
   const total = shares.reduce((sum, share) => sum + share, 0);
 
+  /*
+   * The beat carrying the words is the one that has to be readable.
+   *
+   * Everything else here divides the shot by rhythm, which is right until
+   * there is something on screen a person has to finish reading. Then the
+   * rhythm gives way: the beat gets the reading time it needs and the
+   * establishing frame, which communicates the least, pays for it.
+   */
+  const wordsOn = options.hasWords ? Math.min(1, beats.length - 1) : -1;
+  const needed = options.wordSeconds ?? 0;
+  const seconds_ = beats.map((_, index) => Math.max(0.6, (options.seconds * shares[index]!) / total));
+  if (wordsOn > 0 && needed > seconds_[wordsOn]!) {
+    const owed = Math.min(needed, options.seconds * 0.7) - seconds_[wordsOn]!;
+    const payable = Math.max(0, seconds_[0]! - 0.9);
+    const paid = Math.min(owed, payable);
+    seconds_[wordsOn] = seconds_[wordsOn]! + paid;
+    seconds_[0] = seconds_[0]! - paid;
+  }
+
   const framings: UiFraming[] = [];
   let previous: FramingRect | null = null;
   beats.forEach((beat, index) => {
-    const seconds = Math.max(0.6, (options.seconds * shares[index]!) / total);
+    const seconds = seconds_[index]!;
     if (!beat.region) {
       /*
        * The establishing frame is locked.

@@ -316,7 +316,17 @@ export interface StoryboardRepo {
   replaceScenes(organizationId: string, storyboardId: string, scenes: Scene[]): Promise<Storyboard>;
   updateScene(organizationId: string, sceneId: string, patch: Partial<Scene>): Promise<Scene>;
   getScene(organizationId: string, sceneId: string): Promise<Scene | null>;
-  update(organizationId: string, id: string, patch: Partial<Storyboard>): Promise<Storyboard>;
+  /**
+   * Patches the storyboard's own fields. NOT its scenes.
+   *
+   * `scenes` in the patch is ignored, by both stores, and that silence cost a
+   * whole production run: the stage that plans how each capture is filmed
+   * wrote its framings here, the renderer used them because it still had them
+   * in memory, and every reader afterwards — the director's description of
+   * the cut, the shape metrics, QA, the next attempt — saw a storyboard that
+   * had never been filmed. Scene changes go through `replaceScenes`.
+   */
+  update(organizationId: string, id: string, patch: Omit<Partial<Storyboard>, 'scenes'>): Promise<Storyboard>;
   nextVersion(organizationId: string, projectId: string): Promise<number>;
 }
 

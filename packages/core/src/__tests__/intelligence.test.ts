@@ -131,7 +131,7 @@ describe('scores are evidence, not the decision', () => {
 describe('the panel is allowed to disagree', () => {
   const review = (critic: CriticReview['critic'], verdict: CriticReview['verdict']): CriticReview => ({
     id: `crv_${critic}`, projectId: 'prj_1', artifactKind: 'animatic', artifactId: 'rnd_1',
-    critic, verdict, findings: [], criticVersion: 'v1', model: '', costUsd: 0,
+    critic, verdict, findings: [], criticVersion: 'v1', readback: '', model: '', costUsd: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
   });
 

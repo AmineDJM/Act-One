@@ -370,6 +370,16 @@ export class DirectorBrain {
       ...input.reviews.map(
         (review) =>
           `- ${review.critic.replace(/_/g, ' ')} — ${review.verdict.replace(/_/g, ' ')}` +
+          /*
+           * The readback first, where there is one.
+           *
+           * It is not an opinion and it does not belong in the findings: it
+           * is a report of what the film said to somebody who was shown
+           * nothing else. Read before the critiques, because if it does not
+           * describe the company, everything below it is a note about the
+           * craft of a film that failed at the only job it had.
+           */
+          (review.readback ? `\n    WATCHED COLD, THEY UNDERSTOOD: ${review.readback}` : '') +
           (review.findings.length > 0
             ? `\n${review.findings
                 .map((finding) => `    [${finding.severity}] ${finding.observation}${finding.evidence.length > 0 ? ` (${finding.evidence.join(', ')})` : ''}${finding.recommendation ? ` → ${finding.recommendation}` : ''}`)
