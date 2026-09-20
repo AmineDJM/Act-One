@@ -42,7 +42,7 @@ import {
   storyboardDuration,
   type Project,
 } from '@act-one/core';
-import { MemoryStore } from '@act-one/db';
+import { DbCostSink, MemoryStore } from '@act-one/db';
 import { LocalFsStorageProvider, ProviderRegistry } from '@act-one/providers';
 import {
   runConcepts,
@@ -130,7 +130,18 @@ const project: Project = resumed ?? (await store.projects.create({
 }));
 
 const root = process.env['ACT_ONE_STORAGE_DIR'] ?? (await mkdtemp(path.join(tmpdir(), 'act-one-director-')));
-const registry = new ProviderRegistry({ overrides: { storage: new LocalFsStorageProvider({ root }) } });
+/*
+ * The ledger, on a proof run.
+ *
+ * Without a sink every provider call is free as far as this script can tell,
+ * and "what does a film cost" is the question a proof of the pipeline is
+ * uniquely placed to answer. The same sink the worker uses, so what it
+ * records here is what a customer would be charged for.
+ */
+const registry = new ProviderRegistry({
+  overrides: { storage: new LocalFsStorageProvider({ root }) },
+  costSink: new DbCostSink(store, { organizationId, projectId: project.id }),
+});
 
 let lastStep = '';
 const context: StageContext = {
@@ -353,4 +364,30 @@ console.log(`\nPASS in ${minutes} minutes.`);
 console.log(`  ${territories.length} directions explored, ${territories.filter((row) => !row.selected).length} rejected`);
 console.log(`  ${reviews.length} critic reviews, ${decisions.length} director decisions`);
 console.log(`  ${pre.watched.length} animatic viewing(s) before production`);
+
+/*
+ * What it cost, by family of work rather than by provider call: an operator
+ * deciding whether a film is worth making needs to know that reasoning was
+ * four fifths of it, not that there were ninety-one requests.
+ */
+const spent = await store.costs.listForProject(organizationId, project.id);
+if (spent.length > 0) {
+  const families = new Map<string, { usd: number; calls: number; guessed: number }>();
+  for (const cost of spent) {
+    const family = cost.operation.split('.')[0] ?? cost.operation;
+    const row = families.get(family) ?? { usd: 0, calls: 0, guessed: 0 };
+    row.usd += cost.actualCostUsd || cost.estimatedCostUsd;
+    row.calls += 1;
+    if (cost.costBasis === 'unknown_price') row.guessed += 1;
+    families.set(family, row);
+  }
+  const total = [...families.values()].reduce((sum, row) => sum + row.usd, 0);
+  console.log(`\n  COST  $${total.toFixed(4)} across ${spent.length} calls`);
+  for (const [family, row] of [...families].sort((a, b) => b[1].usd - a[1].usd)) {
+    console.log(
+      `    ${family.padEnd(14)} $${row.usd.toFixed(4)}  ${String(row.calls).padStart(3)} calls` +
+        (row.guessed > 0 ? `  (${row.guessed} at a guessed rate)` : ''),
+    );
+  }
+}
 process.exit(0);
