@@ -100,20 +100,48 @@ const ReplanResponse = z.object({
   diagnosis: z.string().trim().min(1).max(400),
 });
 
-const SYSTEM_PROMPT = `You are the creative director of a film that has already been approved, and one beat of it is not working.
+/**
+ * What kind of trouble this beat is in.
+ *
+ * `starved` is the case this machinery was built for: a beat holds more room
+ * than its content can fill, so it sits on screen with nothing happening, and
+ * the answer is more to say across more shots.
+ *
+ * `creative` is the opposite and arrives by the same door. The director
+ * watched the cut and said it reads like a deck; the beat is already the
+ * right length and its copy already fits. Told the problem is always
+ * emptiness, a director dutifully writes more \u2014 and on a real run every
+ * option it produced needed between 8.7 and 14.75 seconds for a beat holding
+ * 7.01, was refused by the arithmetic, and the film was held with nothing
+ * changed. The prompt was answering a question nobody had asked.
+ */
+export type BeatTrouble = 'starved' | 'creative';
+
+function systemPrompt(trouble: BeatTrouble): string {
+  const diagnosis =
+    trouble === 'starved'
+      ? `The problem is that a beat has been given more room than its content can hold, so it sits on screen with nothing happening. The wrong answer is to shorten it \u2014 that has already been tried and it takes the film under the runtime the customer approved. The right answer is the one a director gives in the room: there is not enough here, so split the idea, put something real in the middle of it, and move the payoff to the end.
+
+So to fill a long beat with type you need MORE WORDS or MORE SHOTS, never longer shots. Roughly: every 2.6 words buys one second. Count them. A four-word line earns about two seconds; to fill eight seconds you need about twenty words across three or four shots.`
+      : `The problem is NOT that this beat is empty. It is the right length, its copy already fits, and the arithmetic is fine. Somebody watched the finished cut and said it reads like a deck \u2014 legible, correct, and forgettable.
+
+So do not add words to fill time. The time is already filled. The word counts below are a ceiling you must not exceed, not a target to reach; an option that needs more seconds than the beat has will be refused before anybody reads it, and refusing it changes nothing about the film.
+
+Change what is on screen and how it moves, at the same length. A different visual mechanism. One real image instead of two labels. A turn the viewer does not see coming. Fewer words held with more confidence is almost always the stronger answer here, and it is available to you \u2014 the floor on copy is a floor for an empty beat, not for this one.`;
+
+  return `You are the creative director of a film that has already been approved, and one beat of it is not working.
 
 You are repairing this film, not making a different one. The customer approved a runtime, a format, a message, a narrative and a brand, and every one of those survives whatever you decide. Treat the rest of the film as finished work by a colleague you respect: you are changing one beat.
 
-The problem is always the same shape. A beat has been given more room than its content can hold, so it sits on screen with nothing happening. The wrong answer is to shorten it — that has already been tried and it takes the film under the runtime the customer approved. The right answer is the one a director gives in the room: there is not enough here, so split the idea, put something real in the middle of it, and move the payoff to the end.
+${diagnosis}
 
 Your options must fill EXACTLY the seconds you are given. Not approximately.
 
 Every shot you propose must be one that can actually be made:
 - A shot with words on it needs enough time to read them: 0.45s to arrive, then one second per 2.6 words. Do not write a shot whose copy cannot be read in its duration.
-- And it must not sit there afterwards. A still shot earns exactly the time its own words take to read — 0.45s plus one second per 2.6 words — or 1.2s, whichever is more. NOT A FRAME LONGER. Past that the viewer has finished and is waiting, which is the exact defect you are repairing.
-- So to fill a long beat with type you need MORE WORDS or MORE SHOTS, never longer shots. Roughly: every 2.6 words buys one second. Count them. A four-word line earns about two seconds; to fill eight seconds you need about twenty words across three or four shots.
+- And it must not sit there afterwards. A still shot earns exactly the time its own words take to read \u2014 0.45s plus one second per 2.6 words \u2014 or 1.2s, whichever is more. NOT A FRAME LONGER. Past that the viewer has finished and is waiting.
 - Two lines of on-screen copy is the maximum. One is usually stronger.
-- A shot showing the product needs product material we already hold. If we do not hold it, do not propose it — say so in your reasoning and propose something we can make.
+- A shot showing the product needs product material we already hold. If we do not hold it, do not propose it \u2014 say so in your reasoning and propose something we can make.
 - Never invent a product interface, a metric, a customer name or a claim. If a figure is not in the material you were given, it does not exist.
 
 Give two or three genuinely different options, and mark honestly whether each is better than, comparable to, or weaker than the beat it replaces. We will take the cheapest option that is not weaker. An option you mark "comparable" that is cheap will beat an option you mark "better" that is expensive only if the difference is small, so do not inflate.
@@ -121,6 +149,7 @@ Give two or three genuinely different options, and mark honestly whether each is
 ${standardsBrief('direction')}
 
 Return JSON only.`;
+}
 
 export type BeatReplanInput = {
   projectId: string;
@@ -151,13 +180,17 @@ export type BeatReplanInput = {
  * `2.6 * (room - 0.9n)` words between them. Stated as a target rather than as
  * a rule, because it is a floor the director should clear comfortably.
  */
-export function wordBudgetLines(room: number): string[] {
+export function wordBudgetLines(room: number, trouble: BeatTrouble = 'starved'): string[] {
   const forShots = (n: number) => Math.max(0, Math.ceil(2.6 * (room - 0.9 * n)));
   return [
     `Type earns time at about 2.6 words a second, and each shot costs about 0.9s of arrival.`,
-    `So this beat needs roughly: ${forShots(2)} words across 2 shots, ` +
+    `So this beat holds roughly: ${forShots(2)} words across 2 shots, ` +
       `${forShots(3)} across 3, or ${forShots(4)} across 4.`,
-    `Count the words you write. Copy that is too thin for the room is the defect you are repairing.`,
+    trouble === 'starved'
+      ? `Count the words you write. Copy that is too thin for the room is the defect you are repairing.`
+      : `Count the words you write and stay under those numbers. They are what the beat can hold, ` +
+        `not what it needs: this beat is already full, and going over means the option is refused ` +
+        `without anybody reading it.`,
   ];
 }
 
@@ -176,6 +209,14 @@ export class BeatDirector {
 
   async replan(input: BeatReplanInput, context: CallContext): Promise<BeatReplan> {
     const room = round3(input.affected.reduce((sum, scene) => sum + scene.duration, 0));
+    /*
+     * Which question this director is actually being asked.
+     *
+     * `direction` is a note from somebody who watched the cut, and it arrives
+     * about a beat that is already the right length. Every other check here
+     * is about a beat with time it cannot fill.
+     */
+    const trouble: BeatTrouble = input.escalation.check === 'direction' ? 'creative' : 'starved';
     const first = input.affected[0];
     const index = first ? input.storyboard.scenes.findIndex((scene) => scene.id === first.id) : -1;
     const before = index > 0 ? input.storyboard.scenes[index - 1] : null;
@@ -186,7 +227,7 @@ export class BeatDirector {
 
     const { value, usage } = await this.llm.completeJson(
       [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt(trouble) },
         {
           role: 'user',
           content: [
@@ -205,7 +246,7 @@ export class BeatDirector {
              * seconds of an eight-second beat, twice. Told the number of
              * words that beat costs, it has something it can count.
              */
-            ...wordBudgetLines(room),
+            ...wordBudgetLines(room, trouble),
             ``,
             `# The beat(s) to replace`,
             ...input.affected.map((scene) => describeShot(scene)),

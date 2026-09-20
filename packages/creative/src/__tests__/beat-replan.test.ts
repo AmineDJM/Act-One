@@ -5,6 +5,7 @@ import {
   estimateOptionCostUsd,
   normalizeOption,
   rejectOption,
+  wordBudgetLines,
   type ReplanOption,
 } from '../beat-replan.ts';
 
@@ -164,5 +165,32 @@ describe('what an option would cost before anything is spent', () => {
       ],
     });
     expect(estimateOptionCostUsd(generating, 0.4)).toBeCloseTo(0.8);
+  });
+});
+
+describe('which question the director is being asked', () => {
+  it('tells a starved beat to find more to say', () => {
+    const lines = wordBudgetLines(8, 'starved').join(' ');
+    expect(lines).toMatch(/too thin for the room is the defect/);
+  });
+
+  it('tells a beat that already fits to stay under the count, not reach it', () => {
+    /*
+     * The real failure: told the problem is always emptiness, the director
+     * answered a creative note — "it reads like a deck" — by writing more,
+     * and every option it produced needed 8.7 to 14.75 seconds for a beat
+     * holding 7.01. All were refused by the arithmetic and the film was held
+     * with nothing changed.
+     */
+    const lines = wordBudgetLines(7.01, 'creative').join(' ');
+    expect(lines).toMatch(/stay under those numbers/);
+    expect(lines).toMatch(/already full/);
+    expect(lines).not.toMatch(/too thin/);
+  });
+
+  it('quotes the same arithmetic to both, because the beat is the same length', () => {
+    const starved = wordBudgetLines(7.01, 'starved')[1];
+    const creative = wordBudgetLines(7.01, 'creative')[1];
+    expect(creative).toBe(starved);
   });
 });
