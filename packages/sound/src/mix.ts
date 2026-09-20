@@ -264,8 +264,22 @@ export function mixArgs(plan: MixPlan, outputPath: string): string[] {
   if (plan.inputs.length === 0) {
     args.push('-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo:d=${plan.durationSeconds}`);
   }
-  args.push('-filter_complex', plan.filterGraph);
-  args.push('-map', `[${plan.outputLabel}]`);
+  /*
+   * Padded to the film's length, because `-t` can only ever shorten.
+   *
+   * The mix is as long as its longest sound, not as long as the film. A cut
+   * whose music ends at 10.4s over 12.2s of picture produced a 10.4s audio
+   * track, and the mux — which uses `-shortest`, correctly, so a stray long
+   * tail cannot extend a film — then trimmed 1.8 SECONDS OF PICTURE off the
+   * end. The film lost its closing mark and the only evidence was a duration
+   * that nobody reads twice.
+   *
+   * `apad` runs the tail out in silence and the `-t` below cuts it to the
+   * exact length asked for, so the audio is always precisely as long as the
+   * picture and `-shortest` has nothing to choose between.
+   */
+  args.push('-filter_complex', `${plan.filterGraph};[${plan.outputLabel}]apad[padded]`);
+  args.push('-map', '[padded]');
   /*
    * Lossless out of the mix.
    *

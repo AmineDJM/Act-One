@@ -493,13 +493,43 @@ export class HiggsfieldProvider implements GenerativeMediaProvider {
     }
 
     let response: unknown;
-    try {
-      response = await this.sdk().subscribe(plan.endpoint, {
-        input: plan.input,
-        withPolling: false,
+    if (!this.credentials && credentialIsManaged('higgsfield')) {
+      /*
+       * The vendor's SDK will not make a call it cannot sign itself.
+       *
+       * It checks for a key id and secret in the process before it will do
+       * anything, and throws `CredentialsMissedError` when it finds none —
+       * which is correct everywhere except behind a gateway that holds the
+       * credential and writes the header on the way out. There the secret is
+       * deliberately unreachable from here, and the SDK refuses a call it
+       * would have completed. Health checks and pricing already went through
+       * our own client and worked; only submission went through the SDK, so
+       * only submission failed, and it failed with a message about missing
+       * environment variables on a deployment that has no business holding
+       * that secret.
+       *
+       * This is the same wire call the SDK makes: POST the endpoint with the
+       * input as the body. Not a second code path for its own sake — the SDK
+       * stays the route wherever a key is actually held, because it is the
+       * vendor's own and will track their API.
+       */
+      const path = plan.endpoint.startsWith('/') ? plan.endpoint : `/${plan.endpoint}`;
+      response = await this.api(z.unknown(), 'POST', path, plan.input, {
+        timeoutMs: 120_000,
+        // No idempotency key exists on this API, so a retried submission may
+        // buy the shot twice. Matches the SDK's own `maxRetries: 0`.
+        attempts: 1,
+        ...(context.signal ? { signal: context.signal } : {}),
       });
-    } catch (error) {
-      throw this.fromSdk(error);
+    } else {
+      try {
+        response = await this.sdk().subscribe(plan.endpoint, {
+          input: plan.input,
+          withPolling: false,
+        });
+      } catch (error) {
+        throw this.fromSdk(error);
+      }
     }
 
     const parsed = RequestStatus.safeParse(response);

@@ -267,7 +267,15 @@ export function briefToPrompt(brief: ShotBrief): { prompt: string; negative: str
 
   return {
     prompt,
-    negative: [...ALWAYS_FORBIDDEN, ...brief.forbids].join(', '),
+    /*
+     * De-duplicated, because a sealed brief already carries these.
+     *
+     * `sealBrief` merges the standing refusals into `forbids`, so concatenating
+     * both lists printed every refusal twice — which is not merely untidy. A
+     * negative prompt is weighted, and saying "no readable text" twice tells
+     * the model that mattered twice as much as everything else in the list.
+     */
+    negative: [...new Set([...ALWAYS_FORBIDDEN, ...brief.forbids])].join(', '),
   };
 }
 
