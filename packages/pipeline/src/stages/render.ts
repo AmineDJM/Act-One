@@ -1487,6 +1487,36 @@ async function renderOnce(
       status: filming.result.unfilmed > 0 ? 'failed' : 'done',
     });
   }
+  /*
+   * A shot that could not be filmed is a finding, not a log line.
+   *
+   * This is the invariant the whole production side is built on: what the
+   * director planned and what production managed are separate facts, and one
+   * is never read off the other. A film whose product shots all stayed wide
+   * because every capture was a thousand pixels across looks, in the finished
+   * master, exactly like a film that chose wide shots. The difference only
+   * exists if it was written down at the moment it happened — and it has to
+   * be written where the people and the loops that can act on it will look,
+   * which is the findings, not the activity feed.
+   */
+  const cinematographyIssues: QaFinding[] = filming.result.shortfalls.map((shortfall) => {
+    const scene = storyboard.scenes.find((candidate) => candidate.id === shortfall.sceneId);
+    return {
+      id: newId('evt'),
+      sceneId: shortfall.sceneId,
+      timecodeStart: scene?.startTime ?? null,
+      detectedBy: 'deterministic',
+      evidenceAssetId: null,
+      check: 'asset_resolution',
+      // The film is watchable and the product is on screen; what is missing is
+      // the close look. That is a real defect and not a reason to refuse a
+      // master, which is what soft_fail means here.
+      severity: 'soft_fail',
+      message: shortfall.message,
+      confidence: 1,
+      repair: shortfall.repair,
+    } satisfies QaFinding;
+  });
 
   /*
    * Master readiness, before a frame is rendered.
@@ -1513,7 +1543,7 @@ async function renderOnce(
     detail: summariseCoverage(readiness.coverage),
     status: readiness.ready ? 'done' : 'failed',
   });
-  const degradedIssues: QaFinding[] = readiness.blockers.map((blocker) => {
+  const degradedIssues: QaFinding[] = [...cinematographyIssues, ...readiness.blockers.map((blocker) => {
     const scene = storyboard.scenes.find((candidate) => candidate.id === blocker.sceneId);
     return {
       id: newId('evt'),
@@ -1538,7 +1568,7 @@ async function renderOnce(
             ? 'regenerate_shot'
             : 'manual_review',
     } satisfies QaFinding;
-  });
+  })];
 
   const silentPath = path.join(params.workDir, `film-${params.attempt}.mp4`);
   const drawn = await renderFilm({

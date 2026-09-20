@@ -2,6 +2,7 @@ import {
   REAL_PRODUCT_VISUAL_TYPES,
   planUiSequence,
   type AspectRatio,
+  type RepairAction,
   type Scene,
   type Storyboard,
 } from '@act-one/core';
@@ -29,11 +30,27 @@ import type { StageContext } from '../context.ts';
  * so in its notes and those notes travel with the scene. And it does not
  * touch a single pixel of the customer's interface.
  */
+export type CinematographyShortfall = {
+  sceneId: string;
+  message: string;
+  repair: RepairAction;
+};
+
 export type ProductCinematographyResult = {
   /** Scenes that came back with framings to cut between. */
   filmed: number;
   /** Scenes the director wrote as real product that could not be filmed. */
   unfilmed: number;
+  /**
+   * Where the shot the director asked for was not the shot production could
+   * make, per scene.
+   *
+   * These become findings rather than log lines. A film whose product shots
+   * all stayed wide because every capture was a thousand pixels across looks
+   * exactly like a film that chose wide shots, and the difference only exists
+   * if somebody wrote it down at the moment it happened.
+   */
+  shortfalls: CinematographyShortfall[];
   notes: string[];
 };
 
@@ -46,7 +63,7 @@ export async function filmTheProduct(
   options: { aspect: AspectRatio; renderWidth: number },
 ): Promise<{ storyboard: Storyboard; result: ProductCinematographyResult }> {
   const frameAspect = aspectRatio(options.aspect);
-  const result: ProductCinematographyResult = { filmed: 0, unfilmed: 0, notes: [] };
+  const result: ProductCinematographyResult = { filmed: 0, unfilmed: 0, shortfalls: [], notes: [] };
 
   const candidates = storyboard.scenes.filter(
     (scene) => REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType) && scene.assetRefs.length > 0,
@@ -77,6 +94,13 @@ export async function filmTheProduct(
     if (!assetId) {
       result.unfilmed += 1;
       result.notes.push(`${label(scene)}: no still capture among its material, so it was not filmed`);
+      result.shortfalls.push({
+        sceneId: scene.id,
+        message:
+          `This shot was written as the real product, and none of its material is a still capture that ` +
+          `could be filmed. It plays as the whole asset held for the beat.`,
+        repair: 'recapture_product',
+      });
       continue;
     }
 
@@ -89,6 +113,13 @@ export async function filmTheProduct(
     if (!structure) {
       result.unfilmed += 1;
       result.notes.push(`${label(scene)}: its capture could not be read, so it was not filmed`);
+      result.shortfalls.push({
+        sceneId: scene.id,
+        message:
+          `The capture for this shot could not be read, so no framings were planned for it and it plays ` +
+          `as the whole image held for the beat.`,
+        repair: 'recapture_product',
+      });
       continue;
     }
 
@@ -101,6 +132,26 @@ export async function filmTheProduct(
     filmed.set(scene.id, sequence);
     result.filmed += 1;
     for (const note of sequence.notes) result.notes.push(`${label(scene)}: ${note}`);
+    /*
+     * A plan whose framings are all nearly the whole capture is a plan that
+     * could not be carried out. The cuts are still there and the shot still
+     * moves, but nothing in it is a closer look at anything, which is the
+     * entire reason the step exists.
+     */
+    const asset = byId.get(assetId)!;
+    const tightest = Math.min(...sequence.framings.map((framing) => framing.to.width));
+    if (sequence.framings.length > 1 && tightest > 0.85) {
+      result.shortfalls.push({
+        sceneId: scene.id,
+        message:
+          `The product could not be framed in this shot: its capture is ${structure.width}px across, and at ` +
+          `${options.renderWidth}px wide the tightest crop it can carry is ${Math.round(tightest * 100)}% of ` +
+          `the screen. Every framing shows almost the whole interface, so nothing in it is legible. ` +
+          `A capture of at least ${Math.ceil((options.renderWidth * 2) / 100) * 100}px would let this shot ` +
+          `hold one panel.` + (asset.sourceUrl ? ` Taken from ${asset.sourceUrl}.` : ''),
+        repair: 'recapture_product',
+      });
+    }
   }
 
   if (filmed.size === 0) return { storyboard, result };
