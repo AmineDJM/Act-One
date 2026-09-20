@@ -71,6 +71,27 @@ export type FilmShape = {
   distinctVisualTypes: number;
   /** The longest run of consecutive shots that look like the same idea. */
   longestRepeat: number;
+  /**
+   * Share of the running time in which the product itself is moving.
+   *
+   * The measure that separates a film from a deck with better pictures. A
+   * capture held for four seconds with a camera drifting across it is a
+   * picture of software; the interface coming apart, a control being pressed,
+   * panels hung in a space — those are software being filmed. Both look
+   * identical to `productShare`, which is exactly why that number kept saying
+   * a film was fine while it played as a slide show.
+   *
+   * Counted from what production planned, not from what the storyboard hoped:
+   * a shot whose framings hold no layers is not moving, whatever it was
+   * written as.
+   */
+  cinematicShare: number;
+  /** Shots in which the interface is taken apart or placed in space. */
+  cinematicShots: number;
+  /** Shots showing a real control being used and a real result. */
+  operatedShots: number;
+  /** Shots that open into a constructed space. */
+  spatialShots: number;
 };
 
 /** Whether a shot has the material it needs to show anything but type. */
@@ -92,6 +113,10 @@ export function filmShape(storyboard: Storyboard): FilmShape {
   let productSeconds = 0;
   let unresolved = 0;
   let firstProduct = Number.POSITIVE_INFINITY;
+  let cinematicSeconds = 0;
+  let cinematicShots = 0;
+  let operatedShots = 0;
+  let spatialShots = 0;
 
   for (const scene of scenes) {
     const material = hasMaterial(scene);
@@ -103,6 +128,22 @@ export function filmShape(storyboard: Storyboard): FilmShape {
       productSeconds += scene.duration;
       firstProduct = Math.min(firstProduct, scene.startTime);
     }
+
+    const framings = scene.uiSequence?.framings ?? [];
+    const moving = framings.filter(
+      (framing) => framing.layers.length > 0 || framing.space === 'volume',
+    );
+    if (moving.length > 0) {
+      cinematicShots += 1;
+      // The seconds in which something other than the camera is moving, not
+      // the whole shot: an establishing frame inside a layered shot is still
+      // an establishing frame.
+      cinematicSeconds += moving.reduce((sum, framing) => sum + framing.seconds, 0);
+    }
+    if (framings.some((framing) => framing.layers.some((layer) => layer.role === 'control'))) {
+      operatedShots += 1;
+    }
+    if (framings.some((framing) => framing.space === 'volume')) spatialShots += 1;
   }
 
   /*
@@ -127,6 +168,10 @@ export function filmShape(storyboard: Storyboard): FilmShape {
     pictureShare: share(pictureSeconds),
     typographyShare: share(typographySeconds),
     productShare: share(productSeconds),
+    cinematicShare: share(Math.min(cinematicSeconds, runtime)),
+    cinematicShots,
+    operatedShots,
+    spatialShots,
     unresolved,
     distinctVisualTypes: new Set(scenes.map((scene) => scene.visualType)).size,
     longestRepeat,
@@ -147,7 +192,14 @@ const WATCHED: Partial<
   insufficient_product: { of: 'productShare', worseIs: 'lower', says: 'there is even less product on screen' },
   bad_visual_language: { of: 'pictureShare', worseIs: 'lower', says: 'there is even less picture and even more type' },
   too_repetitive: { of: 'longestRepeat', worseIs: 'higher', says: 'the film repeats itself for even longer' },
-  too_static: { of: 'pictureShare', worseIs: 'lower', says: 'there is even less picture and even more type' },
+  /*
+   * "Too static" is about whether anything moves, and picture share cannot
+   * answer that — a film of held screenshots has a high one. The share of the
+   * running time in which the interface itself is moving can, and a repair
+   * that takes it down has made the film more of a slide show than it was.
+   */
+  too_static: { of: 'cinematicShare', worseIs: 'lower', says: 'even less of the product actually moves' },
+  bad_pacing: { of: 'longestRepeat', worseIs: 'higher', says: 'the film repeats itself for even longer' },
 };
 
 /** How much a metric may move the wrong way before it counts as a regression. */

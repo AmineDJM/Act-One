@@ -1076,3 +1076,33 @@ export function cuesFor(sequence: UiSequence, startTime: number): SoundCue[] {
 function round(value: number): number {
   return Number(Math.max(0, value).toFixed(3));
 }
+
+
+/**
+ * What a shot actually does, in a line a director can read.
+ *
+ * The other half of the invariant. A panel told only what a scene was written
+ * as judges the intention; told what production made of it, it judges the
+ * film. "Screenshot motion" and "the shell falls back while the schedule
+ * panel comes forward, then the control is pressed and the confirmation
+ * lifts" are the same visual type and are not the same shot, and the
+ * difference is precisely what everyone watching has been complaining about.
+ */
+export function describeSequence(sequence: UiSequence): string {
+  if (sequence.framings.length === 0) return 'not filmed';
+  const parts = sequence.framings.map((framing) => {
+    if (framing.space === 'volume') {
+      return `${framing.layers.length} real panels held in a built space, camera through them`;
+    }
+    if (framing.layers.length === 0) {
+      return framing.move === 'hold'
+        ? `held at ${Math.round(framing.to.width * 100)}%`
+        : `${framing.move} to ${Math.round(framing.to.width * 100)}% of the capture`;
+    }
+    const moves = framing.layers
+      .filter((layer) => layer.motion !== 'hold')
+      .map((layer) => `${layer.role} ${layer.motion}s`);
+    return moves.length > 0 ? moves.join(', ') : `held at ${Math.round(framing.to.width * 100)}%`;
+  });
+  return parts.join(' → ');
+}

@@ -4,6 +4,8 @@ import {
   AppError,
   ProductionBudget,
   budgetAllowsReplan,
+  describeSequence,
+  filmShape,
   newId,
   spendReplan,
   storyboardDuration,
@@ -356,14 +358,32 @@ function describeCut(
       `   ${scene.visualType.replace(/_/g, ' ')} · ${scene.purpose}`,
       scene.onScreenText.length > 0 ? `   on screen: ${scene.onScreenText.join(' / ')}` : '',
       scene.narration ? `   said: ${scene.narration}` : '',
+      /*
+       * What production made of it, not only what it was written as.
+       *
+       * "Screenshot motion" and "the shell falls back while the schedule
+       * panel comes forward, then the control is pressed and the
+       * confirmation lifts" are the same visual type and are not remotely
+       * the same shot. A panel shown only the first judges the intention.
+       */
+      scene.uiSequence ? `   filmed: ${describeSequence(scene.uiSequence)}` : '',
     ]
       .filter(Boolean)
       .join('\n'),
   );
 
+  const shape = filmShape(storyboard);
   return [
     `A ${storyboardDuration(storyboard).toFixed(0)}-second cut, at preview quality.`,
     `The director graded it ${seen.grade}: ${seen.summary}`,
+    /*
+     * The measure that tells a held screenshot from a filmed one. Picture
+     * share cannot: a film of stills has a high one, which is how a slide
+     * show kept passing a check meant to catch slide shows.
+     */
+    `${Math.round(shape.cinematicShare * 100)}% of the running time has the interface itself moving ` +
+      `(${shape.cinematicShots} of ${shape.shots} shots; ${shape.operatedShots} show a control being used, ` +
+      `${shape.spatialShots} open into a built space).`,
     ...weakestDimensions(seen).map((note) => `Weakest — ${note.dimension} (${note.grade}): ${note.note}`),
     ``,
     `THE SHOTS:`,
