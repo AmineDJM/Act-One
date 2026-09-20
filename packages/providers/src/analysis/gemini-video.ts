@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { httpRequest, sleep } from '../http.ts';
+import { httpRequest, httpStream, sleep } from '../http.ts';
 import { canAuthenticate, credentialIsManaged } from '../managed-credentials.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import {
@@ -239,13 +239,7 @@ export class GeminiVideoAnalyst implements VideoAnalyst {
       },
     };
 
-    const answer = await this.api(
-      GenerateResponse,
-      'POST',
-      `/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      body,
-      { timeoutMs: depth === 'deep' ? 600_000 : 300_000, signal: context.signal },
-    );
+    const answer = await this.generate(model, body, depth, context);
 
     const candidate = answer.candidates[0];
     const text = (candidate?.content?.parts ?? []).map((p) => p.text ?? '').join('');
@@ -271,6 +265,93 @@ export class GeminiVideoAnalyst implements VideoAnalyst {
     });
 
     return this.parse(text, { request, depth, model, finishReason: candidate?.finishReason });
+  }
+
+  /**
+   * Asks the model, streamed.
+   *
+   * A deep pass over a minute of film takes minutes to answer, and a request
+   * that sends nothing for minutes is a request every intermediary between
+   * here and the model treats as dead. This deployment's egress proxy cuts at
+   * about ninety seconds, measured — and it does not answer with a timeout, it
+   * answers 502 Bad Gateway, which reads like the vendor being down. The first
+   * deep pass written here died exactly that way.
+   *
+   * Streamed, bytes arrive continuously and nothing in the path has a reason
+   * to intervene. So the limit that matters stops being "how long may this
+   * take", which for a close reading is legitimately several minutes, and
+   * becomes "how long may nothing at all happen".
+   */
+  private async generate(
+    model: string,
+    body: Record<string, unknown>,
+    depth: AnalysisDepth,
+    context: CallContext,
+  ): Promise<z.infer<typeof GenerateResponse>> {
+    const parts: string[] = [];
+    let finishReason: string | undefined;
+    let usage: z.infer<typeof GenerateResponse>['usageMetadata'];
+    let buffer = '';
+
+    await httpStream(
+      this.name,
+      `${this.baseUrl}/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+      {
+        method: 'POST',
+        body,
+        headers: { ...this.authHeaders(), accept: 'text/event-stream' },
+        // A close reading thinks for a long time before it writes; the gap
+        // between chunks once it starts is short.
+        idleTimeoutMs: depth === 'deep' ? 180_000 : 90_000,
+        // Retried only before the first byte, which `httpStream` enforces:
+        // after that a retry would discard a partial answer we are paying for.
+        attempts: 2,
+        ...(context.signal ? { signal: context.signal } : {}),
+        onChunk: (chunk) => {
+          buffer += chunk;
+          /*
+           * SSE frames are separated by a blank line, and this service ends its
+           * lines with CRLF. Splitting on "\n\n" therefore never matches, the
+           * whole answer accumulates in the buffer and the stream completes
+           * having emitted nothing — which surfaces as "the analyst returned
+           * nothing" and looks exactly like a model that refused.
+           */
+          const frames = buffer.split(/\r?\n\r?\n/);
+          buffer = frames.pop() ?? '';
+          for (const frame of frames) {
+            for (const line of frame.split(/\r?\n/)) {
+              if (!line.startsWith('data:')) continue;
+              const payload = line.slice(5).trim();
+              if (!payload || payload === '[DONE]') continue;
+              let parsed: unknown;
+              try {
+                parsed = JSON.parse(payload);
+              } catch {
+                continue;
+              }
+              const piece = GenerateResponse.safeParse(parsed);
+              if (!piece.success) continue;
+              const candidate = piece.data.candidates[0];
+              for (const part of candidate?.content?.parts ?? []) {
+                if (part.text) parts.push(part.text);
+              }
+              if (candidate?.finishReason) finishReason = candidate.finishReason;
+              if (piece.data.usageMetadata) usage = piece.data.usageMetadata;
+            }
+          }
+        },
+      },
+    );
+
+    return {
+      candidates: [
+        {
+          content: { parts: [{ text: parts.join('') }] },
+          ...(finishReason ? { finishReason } : {}),
+        },
+      ],
+      ...(usage ? { usageMetadata: usage } : {}),
+    };
   }
 
   // -------------------------------------------------------------------------
