@@ -32,7 +32,8 @@
     "blender": "node --experimental-strip-types scripts/install-blender.ts",
     "higgsfield:example": "node --experimental-strip-types scripts/higgsfield-example.ts",
     "db:app-role": "node --experimental-strip-types packages/db/src/cli/app-role.ts",
-    "prove:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-director.ts"
+    "prove:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-director.ts",
+    "bench:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/bench-director.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

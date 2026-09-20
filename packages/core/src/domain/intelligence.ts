@@ -246,6 +246,64 @@ export const BRAND_DIMENSIONS = [
 ] as const;
 export type BrandDimension = (typeof BRAND_DIMENSIONS)[number];
 
+/**
+ * What 0 and 1 mean on each dimension.
+ *
+ * Added because the first benchmark run failed: asked to read four companies
+ * that share no register — a reconciliation tool, a rude consumer app, a
+ * luxury atelier and a developer-infrastructure product — the genome placed
+ * three of them within 0.07 of each other. Everything that was not playful
+ * collapsed into one "serious B2B" cluster at rationality 0.9, humour 0.03.
+ *
+ * The cause was not the model. It was that a bare number between 0 and 1 with
+ * no stated poles is an invitation to return the prior, and the prior for a
+ * software company is "professional". Naming both ends makes the scale mean
+ * something, and a luxury atelier and a database company stop being the same
+ * brand because neither of them is funny.
+ */
+export const BRAND_DIMENSION_POLES: Record<BrandDimension, { low: string; high: string }> = {
+  rationality: {
+    low: 'argues by feeling, image and association; shows rather than explains',
+    high: 'argues by evidence, mechanism and number; explains before it asserts',
+  },
+  expressiveness: {
+    low: 'flat, even, deliberately undramatic; nothing is emphasised',
+    high: 'vivid and emphatic; reaches for images, contrast and surprise',
+  },
+  visualDensity: {
+    low: 'one thing on a page, acres of space around it',
+    high: 'packed; many elements, small type, a lot to read at once',
+  },
+  motionEnergy: {
+    low: 'still, or one slow move; nothing hurries',
+    high: 'fast, kinetic, many things moving at once',
+  },
+  humour: {
+    low: 'entirely straight; an exclamation mark would be a mistake',
+    high: 'genuinely funny; jokes at its own expense',
+  },
+  sophistication: {
+    low: 'plain, direct, no airs; talks like a tool',
+    high: 'refined and allusive; assumes taste and does not explain itself',
+  },
+  warmth: {
+    low: 'cool and impersonal; the product, not the people',
+    high: 'personal and human; names, faces, the second person',
+  },
+  confidence: {
+    low: 'hedged and careful; "helps you", "can", "may"',
+    high: 'declarative; states things as fact and does not qualify',
+  },
+  minimalism: {
+    low: 'maximal; ornament, texture, colour, many voices',
+    high: 'reduced to the fewest possible elements, by conviction',
+  },
+  technicality: {
+    low: 'no jargon at all; a stranger to the category understands every word',
+    high: 'speaks to practitioners in their own terms and assumes the background',
+  },
+};
+
 export const BrandArchetype = z.enum([
   'the_engineer',
   'the_craftsman',
@@ -279,23 +337,54 @@ export const BrandGenome = z.object({
 });
 export type BrandGenome = z.infer<typeof BrandGenome>;
 
+/** Per-dimension gaps between two genomes, largest first. */
+function gaps(a: BrandGenome, b: BrandGenome): { dimension: BrandDimension; gap: number }[] {
+  return BRAND_DIMENSIONS.filter(
+    (dimension) => a.dimensions[dimension] !== undefined && b.dimensions[dimension] !== undefined,
+  )
+    .map((dimension) => ({
+      dimension,
+      gap: Math.abs((a.dimensions[dimension] ?? 0) - (b.dimensions[dimension] ?? 0)),
+    }))
+    .sort((left, right) => right.gap - left.gap);
+}
+
 /**
- * How far apart two brands are, on the dimensions they both state.
+ * How far apart two brands are overall: the mean gap across the dimensions
+ * they both state.
  *
- * Used by the benchmark: a genome that comes back nearly identical for a
- * developer-infrastructure company and a playful consumer app is a genome that
- * is reading nothing.
+ * Honest and, on its own, misleading — which is why `genomeContrast` exists
+ * beside it. Two serious, reduced, unfunny companies agree on most of these
+ * dimensions because they really are both serious, reduced and unfunny, so
+ * the mean is small however sharply they differ where it counts.
  */
 export function genomeDistance(a: BrandGenome, b: BrandGenome): number {
-  const shared = BRAND_DIMENSIONS.filter(
-    (dimension) => a.dimensions[dimension] !== undefined && b.dimensions[dimension] !== undefined,
-  );
-  if (shared.length === 0) return 0;
-  const sum = shared.reduce(
-    (total, dimension) => total + Math.abs((a.dimensions[dimension] ?? 0) - (b.dimensions[dimension] ?? 0)),
-    0,
-  );
-  return sum / shared.length;
+  const measured = gaps(a, b);
+  if (measured.length === 0) return 0;
+  return measured.reduce((total, entry) => total + entry.gap, 0) / measured.length;
+}
+
+/**
+ * How sharply two brands differ where they differ at all.
+ *
+ * The mean of the three largest gaps, and the right instrument for the
+ * question the benchmark actually asks: is there any dimension on which these
+ * two are clearly not the same brand? A reconciliation tool and a luxury
+ * atelier agree on seven dimensions and separate hard on rationality,
+ * sophistication and technicality — averaged over all ten that reads as 0.09
+ * and looks like a genome that read nothing, which is the opposite of true.
+ *
+ * Character lives in the dimensions where a brand is distinctive. This
+ * measures those and ignores the agreement, which is also how anybody
+ * describes a brand out loud.
+ */
+export function genomeContrast(a: BrandGenome, b: BrandGenome): { score: number; on: BrandDimension[] } {
+  const measured = gaps(a, b).slice(0, 3);
+  if (measured.length === 0) return { score: 0, on: [] };
+  return {
+    score: measured.reduce((total, entry) => total + entry.gap, 0) / measured.length,
+    on: measured.map((entry) => entry.dimension),
+  };
 }
 
 // ---------------------------------------------------------------------------

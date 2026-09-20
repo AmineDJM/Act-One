@@ -70,9 +70,26 @@ for (const kase of storeCases()) {
     it('lists what is published and hands over what is due', async () => {
       const store: Store = await kase.open();
       try {
-        const published = await store.articles.create(article({ status: 'published', publishedAt: '2026-02-01T00:00:00.000Z' }));
+        /*
+         * Published now, and due further back than anything else, because the
+         * Postgres case runs against a database that outlives the process.
+         *
+         * What is published is listed newest first and what is due is listed
+         * oldest first, so after a few hundred rows accumulate a fixture dated
+         * in the middle falls outside the limit and the assertion fails for a
+         * reason that has nothing to do with what it is testing.
+         */
+        const published = await store.articles.create(
+          article({ status: 'published', publishedAt: new Date().toISOString() }),
+        );
         const draft = await store.articles.create(article({ status: 'draft' }));
-        const due = await store.articles.create(article({ status: 'scheduled', scheduledFor: '2026-01-01T00:00:00.000Z' }));
+        /*
+         * Due further back than anything else in the table, for the same
+         * reason: what is due is listed oldest first, and a hundred rows left
+         * behind by earlier runs all scheduled for the same instant means ours
+         * ties with them and may fall outside the limit.
+         */
+        const due = await store.articles.create(article({ status: 'scheduled', scheduledFor: '2020-01-01T00:00:00.000Z' }));
         const later = await store.articles.create(article({ status: 'scheduled', scheduledFor: '2030-01-01T00:00:00.000Z' }));
 
         const mine = new Set([published.id, draft.id, due.id, later.id]);

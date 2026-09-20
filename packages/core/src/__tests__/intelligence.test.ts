@@ -5,6 +5,7 @@ import {
   REPETITION_WARNING_THRESHOLD,
   collapsedTerritories,
   disagreements,
+  genomeContrast,
   genomeDistance,
   paretoFront,
   repetitionAgainst,
@@ -216,5 +217,37 @@ describe('a brand genome that reads nothing is visible', () => {
 
   it('compares only the dimensions both of them state', () => {
     expect(genomeDistance(genome({ humour: 0.9 }), genome({ rationality: 0.9 }))).toBe(0);
+  });
+
+  /*
+   * The mean across every dimension is honest and, on its own, misleading.
+   * A reconciliation tool and a luxury atelier agree on most of these
+   * dimensions because they really are both serious, reduced and unfunny —
+   * and separate hard on the three that carry their character. Averaged over
+   * ten that reads as a genome that saw nothing, which is the opposite of
+   * what happened.
+   */
+  it('separates two serious brands on the dimensions where they are not alike', () => {
+    const exact = genome({
+      rationality: 0.92, sophistication: 0.72, technicality: 0.86,
+      humour: 0.02, confidence: 0.84, minimalism: 0.82, warmth: 0.2,
+    });
+    const atelier = genome({
+      rationality: 0.72, sophistication: 0.89, technicality: 0.58,
+      humour: 0.03, confidence: 0.84, minimalism: 0.81, warmth: 0.22,
+    });
+
+    // Overall they look almost identical, and that reading is not wrong.
+    expect(genomeDistance(exact, atelier)).toBeLessThan(0.12);
+    // Where they differ, they differ clearly, and the contrast says where.
+    const contrast = genomeContrast(exact, atelier);
+    expect(contrast.score).toBeGreaterThan(0.2);
+    expect(contrast.on).toContain('technicality');
+    expect(contrast.on).toContain('rationality');
+  });
+
+  it('still reports nothing for two identical genomes', () => {
+    const same = genome({ rationality: 0.5, humour: 0.5, warmth: 0.5 });
+    expect(genomeContrast(same, same)).toEqual({ score: 0, on: ['rationality', 'humour', 'warmth'] });
   });
 });

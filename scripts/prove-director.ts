@@ -14,6 +14,22 @@
  * It needs OpenAI, Chromium and FFmpeg, and takes ten to fifteen minutes.
  *
  *   npm run prove:director -- https://some-product.example
+ *
+ * Two things it needs from the host, both learned the hard way.
+ *
+ * Chromium has to be reachable and has to trust whatever terminates TLS in
+ * front of it. Behind a corporate or agent egress proxy that means both of:
+ *
+ *   ACT_ONE_CHROMIUM_PATH=/path/to/chrome
+ *   ACT_ONE_BROWSER_PROXY=$HTTPS_PROXY
+ *   ACT_ONE_BROWSER_TRUSTED_CA_SPKI=<sha256/base64 SPKI of the proxy CA>
+ *
+ * And the model calls have to be allowed to take their time. The research
+ * synthesis runs on the deep tier and can take well over a minute on a large
+ * site; a gateway that cuts requests at ninety seconds turns that into a 502
+ * that no amount of retrying fixes, because it is not transient. If this
+ * script dies at "identifying target audience" with an HTTP 502, that is what
+ * happened, and it is the host rather than the pipeline.
  */
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
