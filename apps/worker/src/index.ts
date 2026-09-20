@@ -2,9 +2,10 @@ import { PLATFORM_ORGANIZATION_ID } from '@act-one/core';
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
 import { installProxyFromEnvironment , proxyConfigured, proxyMisconfiguration } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
-import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { DEFAULT_LIBRARY, resolveFfmpeg, validateLibrary } from '@act-one/sound';
+import { DEFAULT_LIBRARY, buildSoundLibrary, resolveFfmpeg } from '@act-one/sound';
 import { auditCredentials, buildRegistry, loadConfig, type WorkerConfig } from './config.ts';
 
 /**
@@ -172,7 +173,7 @@ async function preflight(config: WorkerConfig): Promise<void> {
   checkEgress();
   await checkCredentials(config);
   await checkStorage(config);
-  await checkSoundLibrary();
+  await checkSoundLibrary(config);
 }
 
 /**
@@ -253,24 +254,63 @@ async function checkStorage(config: WorkerConfig): Promise<void> {
   else log(`storage: ${registry.storage().name}`);
 }
 
-async function checkSoundLibrary(): Promise<void> {
-  const storage = process.env['ACT_ONE_STORAGE_DIR'];
-  if (!storage) {
-    log('sound library: storage is not local, skipping the check');
-    return;
-  }
+async function checkSoundLibrary(config: WorkerConfig): Promise<void> {
+  const registry = await buildRegistry(config, { organizationId: 'platform' });
+  const storage = registry.storage();
+  const keys = [
+    ...DEFAULT_LIBRARY.music.map((track) => track.storageKey),
+    ...DEFAULT_LIBRARY.sfx.map((sample) => sample.storageKey),
+  ];
 
-  const result = validateLibrary(DEFAULT_LIBRARY, (key) => existsSync(path.join(storage, key)));
-  if (result.ok) {
-    const count = DEFAULT_LIBRARY.music.length + DEFAULT_LIBRARY.sfx.length;
-    log(`sound library: ${count} files present`);
-    return;
-  }
-
-  log(
-    `sound library: ${result.missing.length} file(s) missing — films will render SILENT. ` +
-      `Run \`npm run sound-library\`. First missing: ${result.missing[0]}`,
+  const present = await Promise.all(
+    keys.map(async (key) => ((await storage.exists(key).catch(() => false)) ? key : null)),
   );
+  const missing = keys.filter((_, index) => present[index] === null);
+  if (missing.length === 0) {
+    log(`sound library: ${keys.length} files present in ${storage.name}`);
+    return;
+  }
+
+  /*
+   * Build it rather than complain about it.
+   *
+   * The library is the same nineteen files for every deployment; it is not
+   * configuration, it is part of the product. Leaving it as a command an
+   * operator has to know about means the first film of every new deployment
+   * comes out silent — and the check that was supposed to warn about that
+   * skipped itself entirely the moment storage stopped being a local
+   * directory, which is to say on every real deployment there has ever been.
+   *
+   * Four minutes, once, before this worker takes its first job. Two workers
+   * booting together will both build it, which wastes a few minutes of one of
+   * them and is harmless: the files are identical and the keys are the same.
+   */
+  log(`sound library: ${missing.length} of ${keys.length} files missing from ${storage.name}; building them now`);
+  const workDir = await mkdtemp(path.join(tmpdir(), 'act-one-sound-'));
+  try {
+    const built = await buildSoundLibrary({
+      storageDir: workDir,
+      onProgress: (message, done, total) => log(`sound library: ${done + 1}/${total} ${message}`),
+    });
+    let uploaded = 0;
+    for (const key of built.written) {
+      await storage.put(key, new Uint8Array(await readFile(path.join(workDir, key))), {
+        contentType: 'audio/wav',
+      });
+      uploaded += 1;
+    }
+    log(`sound library: ${uploaded} file(s) written to ${storage.name}`);
+  } catch (error) {
+    // Not fatal: a silent film is still a film, and a worker that refuses to
+    // start does none of the other work either. Loud, because the failure is
+    // otherwise invisible until somebody plays a master.
+    log(
+      `sound library: could not build it — films will render SILENT until it is there. ` +
+        `${(error as Error).message}`,
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
 }
 
 /**
