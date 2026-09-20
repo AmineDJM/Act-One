@@ -94,8 +94,22 @@ export type ResearchResult = {
 };
 
 /** How many product images to look for, per page and per crawl. */
-const PRODUCT_IMAGES_PER_PAGE = 2;
-const PRODUCT_IMAGES_PER_CRAWL = 8;
+/*
+ * How much product imagery to take, per page and per crawl.
+ *
+ * Both were raised on evidence. Asked for two, the crawl of one customer's
+ * product page took the two highest on the page \u2014 a drawn phone mockup and a
+ * marked-up record \u2014 and left the third, which was the plain capture of the
+ * running application and the best shot on the site. Preferring plain
+ * captures is worthless if the plain capture is never taken.
+ *
+ * Each extra image is a scroll, an element screenshot, a local measurement
+ * and one small vision call, so the ceiling is per crawl rather than per
+ * page: a site with one very rich product page should be allowed to fill the
+ * budget there.
+ */
+const PRODUCT_IMAGES_PER_PAGE = 4;
+const PRODUCT_IMAGES_PER_CRAWL = 12;
 /** Pages whose imagery is likely to be the product rather than the company. */
 const IMAGERY_INTENTS: readonly PageIntent[] = ['home', 'product', 'use_case', 'pricing', 'launch_profile'];
 
