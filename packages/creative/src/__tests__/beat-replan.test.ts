@@ -170,7 +170,7 @@ describe('what an option would cost before anything is spent', () => {
 
 describe('which question the director is being asked', () => {
   it('tells a starved beat to find more to say', () => {
-    const lines = wordBudgetLines(8, 'starved').join(' ');
+    const lines = wordBudgetLines(8, 'too_empty').join(' ');
     expect(lines).toMatch(/too thin for the room is the defect/);
   });
 
@@ -182,15 +182,31 @@ describe('which question the director is being asked', () => {
      * holding 7.01. All were refused by the arithmetic and the film was held
      * with nothing changed.
      */
-    const lines = wordBudgetLines(7.01, 'creative').join(' ');
+    const lines = wordBudgetLines(7.01, 'bad_visual_language').join(' ');
     expect(lines).toMatch(/stay under those numbers/);
     expect(lines).toMatch(/already full/);
     expect(lines).not.toMatch(/too thin/);
   });
 
   it('quotes the same arithmetic to both, because the beat is the same length', () => {
-    const starved = wordBudgetLines(7.01, 'starved')[1];
-    const creative = wordBudgetLines(7.01, 'creative')[1];
+    const starved = wordBudgetLines(7.01, 'too_empty')[1];
+    const creative = wordBudgetLines(7.01, 'bad_visual_language')[1];
     expect(creative).toBe(starved);
+  });
+});
+
+describe('a brief per problem, not one brief for every problem', () => {
+  it('asks only the empty beat for more words', () => {
+    // Every other class is capped, because the beat is already full and an
+    // option needing more seconds than it has is refused unread.
+    for (const problem of ['bad_visual_language', 'too_dense', 'too_static', 'too_generic', 'too_repetitive']) {
+      expect(wordBudgetLines(7, problem).join(' ')).toMatch(/stay under those numbers/);
+    }
+  });
+
+  it('falls back to the empty-beat brief for a class it does not know', () => {
+    // A deterministic escalation names a check, not a taste problem, and the
+    // beat it raises is always one that cannot fill its room.
+    expect(wordBudgetLines(7, 'something_new').join(' ')).toMatch(/too thin for the room/);
   });
 });

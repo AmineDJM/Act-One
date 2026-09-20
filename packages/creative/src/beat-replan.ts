@@ -101,33 +101,71 @@ const ReplanResponse = z.object({
 });
 
 /**
- * What kind of trouble this beat is in.
+ * What kind of trouble this beat is in, and what that asks of a director.
  *
- * `starved` is the case this machinery was built for: a beat holds more room
- * than its content can fill, so it sits on screen with nothing happening, and
- * the answer is more to say across more shots.
+ * One prompt for every escalation was answering a question nobody had asked.
+ * It opened "the problem is always the same shape: a beat has been given more
+ * room than its content can hold" and told the director to write MORE WORDS
+ * or MORE SHOTS \u2014 true for a starved beat, and the exact opposite of a note
+ * saying the cut reads like a deck. Handed that note, the director dutifully
+ * wrote more: every option it produced needed between 8.7 and 14.75 seconds
+ * for a beat holding 7.01, all were refused by the arithmetic, and the film
+ * was held with nothing changed.
  *
- * `creative` is the opposite and arrives by the same door. The director
- * watched the cut and said it reads like a deck; the beat is already the
- * right length and its copy already fits. Told the problem is always
- * emptiness, a director dutifully writes more \u2014 and on a real run every
- * option it produced needed between 8.7 and 14.75 seconds for a beat holding
- * 7.01, was refused by the arithmetic, and the film was held with nothing
- * changed. The prompt was answering a question nobody had asked.
+ * So the diagnosis is chosen from what the director who watched it named, and
+ * each class gets the brief it actually needs.
  */
-export type BeatTrouble = 'starved' | 'creative';
+const TROUBLE_BRIEFS: Record<string, string> = {
+  too_empty: `The problem is that this beat has been given more room than its content can hold, so it sits on screen with nothing happening. The wrong answer is to shorten it \u2014 that has already been tried and it takes the film under the runtime the customer approved. The right answer is the one a director gives in the room: there is not enough here, so split the idea, put something real in the middle of it, and move the payoff to the end.
+
+To fill a long beat with type you need MORE WORDS or MORE SHOTS, never longer shots. Every 2.6 words buys about one second. Count them.`,
+
+  too_dense: `The problem is that this beat asks more of the viewer than its seconds allow. Words go past before they can be read, or too much happens at once. Cut what is not load-bearing. One idea, said once, held long enough to land. Fewer words is the repair, not more.`,
+
+  bad_visual_language: `The problem is NOT that this beat is empty. It is the right length, its copy already fits, and the arithmetic is fine. Somebody watched the finished cut and said it reads like a deck \u2014 legible, correct, and forgettable: a coloured field with white type on it, then another one.
+
+Do not add words to fill time; the time is already filled, and an option needing more seconds than the beat has is refused before anybody reads it. The word counts below are a CEILING, not a target.
+
+Change what is on screen. If we hold real product material, this beat should show the product doing something rather than a label describing it. If it must stay typographic, the type has to live in a composition rather than in the middle of a card. Fewer words held with more confidence is almost always the stronger answer here.`,
+
+  too_static: `The problem is that nothing moves. The beat is the right length and says the right thing, and it sits there. Give it a reason to change across its own duration \u2014 something arriving, something resolving, something the viewer watches happen \u2014 rather than a held frame with a caption. Do not solve it by adding words.`,
+
+  too_generic: `The problem is that this beat is true of this company and of forty others like it. Nothing in it could only be them. Reach for the specific: their own words, their own numbers, their own interface, the particular thing their product does that a competitor's does not. Same length, same message, no more words \u2014 a sharper one.`,
+
+  too_late_product: `The problem is that the product arrives too late to matter. This beat should be where it arrives. If we hold product material, use it here; if this beat cannot carry it, say so in your reasoning and propose what can. Do not answer this with a better label.`,
+
+  insufficient_product: `The problem is that there is not enough of the customer's own product on screen. This beat is a candidate for carrying some. Use the material we hold rather than describing what it would show. Do not answer this with more copy.`,
+
+  too_repetitive: `The problem is that this beat looks like the ones around it \u2014 same composition, same move, same shape. Break the pattern: a different kind of shot, a different framing, a different way in. Same length, same message.`,
+
+  weak_hero: `The problem is that nothing in this film is worth remembering. This beat is the best candidate for the moment that is. Propose something a viewer would describe to somebody else afterwards \u2014 one image, one turn, one piece of proof \u2014 built from what this company actually is. Not spectacle for its own sake.`,
+
+  bad_pacing: `The problem is the film's energy is flat. This beat needs to be where it changes: a held breath before something, or the acceleration after it. Use duration and density deliberately rather than evenly.`,
+
+  weak_transition: `The problem is that this beat drops into the next one rather than turning into it. Find the relationship between them \u2014 cause and effect, question and answer, before and after \u2014 and let the shot end in a way that earns what follows.`,
+
+  poor_composition: `The problem is the frame itself. What is on screen is correct and badly arranged. Rebuild the composition: where things sit, what dominates, what is allowed to be quiet. Same content, same length.`,
+};
+
+export type BeatTrouble = string;
+
+/**
+ * A class we have a brief for, or the one this machinery was built for.
+ *
+ * Normalised in one place so the brief and the word budget can never
+ * disagree: an unknown class that got the "find more to say" brief alongside
+ * a "stay under these numbers" budget would be the same contradiction this
+ * whole change exists to remove, in miniature.
+ */
+function known(trouble: BeatTrouble): string {
+  return trouble in TROUBLE_BRIEFS ? trouble : 'too_empty';
+}
+
+/** Whether this brief wants more copy or is explicitly capped. */
+const ADDS_COPY = new Set(['too_empty']);
 
 function systemPrompt(trouble: BeatTrouble): string {
-  const diagnosis =
-    trouble === 'starved'
-      ? `The problem is that a beat has been given more room than its content can hold, so it sits on screen with nothing happening. The wrong answer is to shorten it \u2014 that has already been tried and it takes the film under the runtime the customer approved. The right answer is the one a director gives in the room: there is not enough here, so split the idea, put something real in the middle of it, and move the payoff to the end.
-
-So to fill a long beat with type you need MORE WORDS or MORE SHOTS, never longer shots. Roughly: every 2.6 words buys one second. Count them. A four-word line earns about two seconds; to fill eight seconds you need about twenty words across three or four shots.`
-      : `The problem is NOT that this beat is empty. It is the right length, its copy already fits, and the arithmetic is fine. Somebody watched the finished cut and said it reads like a deck \u2014 legible, correct, and forgettable.
-
-So do not add words to fill time. The time is already filled. The word counts below are a ceiling you must not exceed, not a target to reach; an option that needs more seconds than the beat has will be refused before anybody reads it, and refusing it changes nothing about the film.
-
-Change what is on screen and how it moves, at the same length. A different visual mechanism. One real image instead of two labels. A turn the viewer does not see coming. Fewer words held with more confidence is almost always the stronger answer here, and it is available to you \u2014 the floor on copy is a floor for an empty beat, not for this one.`;
+  const diagnosis = TROUBLE_BRIEFS[known(trouble)]!;
 
   return `You are the creative director of a film that has already been approved, and one beat of it is not working.
 
@@ -180,13 +218,13 @@ export type BeatReplanInput = {
  * `2.6 * (room - 0.9n)` words between them. Stated as a target rather than as
  * a rule, because it is a floor the director should clear comfortably.
  */
-export function wordBudgetLines(room: number, trouble: BeatTrouble = 'starved'): string[] {
+export function wordBudgetLines(room: number, trouble: BeatTrouble = 'too_empty'): string[] {
   const forShots = (n: number) => Math.max(0, Math.ceil(2.6 * (room - 0.9 * n)));
   return [
     `Type earns time at about 2.6 words a second, and each shot costs about 0.9s of arrival.`,
     `So this beat holds roughly: ${forShots(2)} words across 2 shots, ` +
       `${forShots(3)} across 3, or ${forShots(4)} across 4.`,
-    trouble === 'starved'
+    ADDS_COPY.has(known(trouble))
       ? `Count the words you write. Copy that is too thin for the room is the defect you are repairing.`
       : `Count the words you write and stay under those numbers. They are what the beat can hold, ` +
         `not what it needs: this beat is already full, and going over means the option is refused ` +
@@ -216,7 +254,12 @@ export class BeatDirector {
      * about a beat that is already the right length. Every other check here
      * is about a beat with time it cannot fill.
      */
-    const trouble: BeatTrouble = input.escalation.check === 'direction' ? 'creative' : 'starved';
+    /*
+     * What the director who watched it named, or \u2014 for an escalation from the
+     * deterministic layer, which has no opinion about taste \u2014 the empty beat
+     * this machinery was built for.
+     */
+    const trouble: BeatTrouble = input.escalation.problems[0] ?? 'too_empty';
     const first = input.affected[0];
     const index = first ? input.storyboard.scenes.findIndex((scene) => scene.id === first.id) : -1;
     const before = index > 0 ? input.storyboard.scenes[index - 1] : null;

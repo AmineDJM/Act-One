@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  CreativeProblem,
   CriticId,
   DirectorDecision,
   RejectionReason,
@@ -73,6 +74,16 @@ const SelectionResponse = z.object({
 const GateResponse = z.object({
   verdict: z.enum(['pass', 'pass_with_concerns', 'revise', 'block']),
   reason: z.string().trim().min(1).max(600),
+  /**
+   * What is wrong, named from a closed list.
+   *
+   * The prose says it to a person; these say it to the machinery. One picks
+   * which repair runs, the other picks the number that decides whether the
+   * repair helped \u2014 and without them a note saying "the product arrives too
+   * late" was answered by a change that made it arrive later still, with
+   * every layer reporting success.
+   */
+  problems: z.array(CreativeProblem).max(3).default([]),
   /** What specifically to change, when the verdict is revise. */
   changes: z.array(z.string().trim().min(1).max(300)).max(8).default([]),
   arbitrations: z.array(Arbitration).max(6).default([]),
@@ -97,6 +108,13 @@ const SYSTEM_PROMPT = [
   'you exist.',
   '',
   'Name the weakest part of what you chose. Every time. A director who cannot is not looking.',
+  '',
+  'When you send something back, also name what is wrong from this list, at most three, most',
+  'important first: too_empty, too_dense, too_static, too_generic, too_late_product, weak_hero,',
+  'too_repetitive, bad_visual_language, weak_sound, bad_pacing, insufficient_product,',
+  'weak_transition, poor_composition. Your sentences are read by a person; these are read by the',
+  'machinery that decides which repair runs and then measures whether it helped. Choose them as',
+  'carefully as the sentence \u2014 "bad_visual_language" and "too_empty" ask for opposite repairs.',
   '',
   'Return JSON only.',
 ].join('\n');
@@ -224,7 +242,13 @@ export class DirectorBrain {
       reviews: readonly CriticReview[];
     },
     context: CallContext,
-  ): Promise<{ verdict: CreativeVerdict; changes: string[]; decision: DirectorDecision; costUsd: number }> {
+  ): Promise<{
+    verdict: CreativeVerdict;
+    changes: string[];
+    problems: CreativeProblem[];
+    decision: DirectorDecision;
+    costUsd: number;
+  }> {
     const { value, usage } = await this.llm.completeJson(
       [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -253,6 +277,7 @@ export class DirectorBrain {
     return {
       verdict,
       changes: value.changes,
+      problems: value.problems,
       costUsd: usage.costUsd,
       decision: {
         id: newId('ddn'),

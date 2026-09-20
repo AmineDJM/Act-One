@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CreativeProblem } from './film-shape.ts';
 import { QaCheck, RepairAction } from './qa.ts';
 
 /**
@@ -25,6 +26,14 @@ export const CreativeEscalation = z.object({
   check: QaCheck,
   /** Plain words, aimed at somebody who can change what the beat says. */
   diagnosis: z.string().max(600),
+  /**
+   * What is wrong, named rather than described.
+   *
+   * The prose chooses the repair that runs; these choose the measurement that
+   * decides whether the repair helped. Empty on escalations raised by the
+   * deterministic layer, where the check itself already says.
+   */
+  problems: z.array(CreativeProblem).max(3).default([]),
   /** What the film is contracted to run for. */
   requiredSeconds: z.number().min(0),
   /** What the affected beats can currently justify. */

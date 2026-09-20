@@ -11,6 +11,8 @@ import {
   storyboardDuration,
   type CreativeReplan,
   type ProductionBudget,
+  filmShape,
+  repairRegression,
 } from '@act-one/core';
 import {
   BeatDirector,
@@ -295,6 +297,30 @@ export async function runCreativeReplan(
       kind: 'refine',
       label: 'creative escalation',
       detail: `the director's cut broke the contract: ${violations[0]!.message}`,
+      status: 'failed',
+    });
+    return { storyboardId: null, strategy: chosen.option.strategy, replan: null };
+  }
+
+  /*
+   * And held to the note it was answering.
+   *
+   * `checkStructure` asks whether the new cut is a legal film. This asks the
+   * other question, which nothing was asking: does it do the thing it was
+   * sent to do. Told "product arrives too late, insufficient product
+   * imagery", the director's accepted option took picture coverage from 31%
+   * to 24% and left a shot holding nothing \u2014 and every layer reported
+   * success, because every layer was checking something else.
+   *
+   * Measured on the candidate before a frame of it is rendered or stored.
+   */
+  const regression = repairRegression(escalation.problems, filmShape(storyboard), filmShape(candidate));
+  if (regression) {
+    await context.activity({
+      step: 'storyboard',
+      kind: 'refine',
+      label: 'creative escalation',
+      detail: `the cut would undo its own note: ${regression}`,
       status: 'failed',
     });
     return { storyboardId: null, strategy: chosen.option.strategy, replan: null };

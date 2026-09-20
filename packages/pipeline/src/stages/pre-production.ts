@@ -258,6 +258,9 @@ export async function runPreProduction(
       sceneIds: targets,
       check: 'direction',
       diagnosis: [gate.decision.reason, ...gate.changes].filter(Boolean).join(' '),
+      // What the director named, so the replan can pick the right repair and
+      // the regression check can pick the right number to watch.
+      problems: gate.problems,
       requiredSeconds: storyboardDuration(storyboard),
       usableSeconds: storyboardDuration(storyboard),
       preservedConstraints: [

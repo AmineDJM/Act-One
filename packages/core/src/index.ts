@@ -34,6 +34,7 @@ export * from './domain/operations.ts';
 export * from './domain/copy.ts';
 export * from './domain/qa.ts';
 export * from './domain/escalation.ts';
+export * from './domain/film-shape.ts';
 export * from './domain/replan.ts';
 export * from './domain/project.ts';
 export * from './domain/job.ts';
