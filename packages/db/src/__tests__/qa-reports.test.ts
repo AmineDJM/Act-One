@@ -66,7 +66,8 @@ function render(organizationId: string, projectId: string, storyboardId: string)
     id: newId('rnd'), projectId, storyboardId, organizationId, kind: 'film', version: 1,
     aspect: '16:9', quality: 'hd', fps: 30, status: 'completed', masterAssetId: null,
     posterAssetId: null, captionsAssetId: null, watermarked: false, durationSeconds: 30,
-    costUsd: 0, qaReportId: null, error: null, startedAt: now, completedAt: now, createdAt: now,
+    costUsd: 0, qaReportId: null, productionVerdict: null, creativeVerdict: null, creativeReason: '',
+    error: null, startedAt: now, completedAt: now, createdAt: now,
   };
 }
 

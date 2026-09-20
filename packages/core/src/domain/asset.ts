@@ -122,6 +122,28 @@ export const ASSET_SOURCE_LABELS: Record<AssetSource, string> = {
   pipeline: 'Pipeline',
 };
 
+/** How long the library's own two free-text fields may be. */
+export const ASSET_NAME_LIMIT = 200;
+export const ASSET_DESCRIPTION_LIMIT = 2000;
+
+/**
+ * A label cut to the length the record allows.
+ *
+ * What an asset is called comes from outside: a page title, a capture label,
+ * a heading read off a customer's site. None of those are written to our
+ * limits, and a two-hundred-and-one character title is not a reason to throw
+ * away a crawl that has already been paid for. Cut at a word where there is
+ * one late enough to still read as a name, and say that it was cut.
+ */
+export function fitLabel(text: string, limit: number): string {
+  const clean = text.trim().replace(/\s+/g, ' ');
+  if (clean.length <= limit) return clean;
+  const cut = clean.slice(0, limit - 1);
+  const space = cut.lastIndexOf(' ');
+  const kept = space > limit * 0.6 ? cut.slice(0, space) : cut;
+  return `${kept.trimEnd()}\u2026`;
+}
+
 export const Asset = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -154,11 +176,11 @@ export const Asset = z.object({
    */
   library: z.boolean().default(false),
   /** What a person calls it. The filename until they rename it. */
-  name: z.string().max(200).default(''),
+  name: z.string().max(ASSET_NAME_LIMIT).default(''),
   category: LibraryCategory.default('other'),
   categorySource: CategorySource.default('none'),
   /** What is in the picture, in a sentence, so the library can be searched by content. */
-  description: z.string().max(2000).default(''),
+  description: z.string().max(ASSET_DESCRIPTION_LIMIT).default(''),
   tags: z.array(z.string().max(60)).max(40).default([]),
   favorite: z.boolean().default(false),
   /** Approved for use: the creative system prefers these over anything else in the library. */

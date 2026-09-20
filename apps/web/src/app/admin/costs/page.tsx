@@ -37,6 +37,21 @@ export default async function CostsPage() {
 
   const thirtyDays = windows[windows.length - 1]!;
 
+  /*
+   * What of this is a price, and what is the ledger's own guess.
+   *
+   * A model missing from the price table is billed at the dearest rate on
+   * record — the safe direction — and used to enter the ledger looking exactly
+   * like a measured cost. Totals built on it read as fact. The guessed portion
+   * is separated here rather than folded in, because a number somebody acts on
+   * has to say how much of itself it invented.
+   */
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const recent = await store.costs.listSince(since);
+  const guessed = recent.filter((cost) => cost.costBasis === 'unknown_price');
+  const guessedUsd = guessed.reduce((sum, cost) => sum + cost.actualCostUsd, 0);
+  const unpriced = [...new Set(guessed.map((cost) => `${cost.provider}/${cost.model ?? 'unnamed'}`))].sort();
+
   return (
     <>
       <header className={styles.head}>
@@ -46,6 +61,29 @@ export default async function CostsPage() {
           customer ever sees; this is the reconciliation behind them.
         </p>
       </header>
+
+      {unpriced.length > 0 ? (
+        <section className={styles.panel} style={{ marginBottom: 'var(--space-5)' }}>
+          <div className={styles.panelHead}>
+            <h3>UNKNOWN_PRICE</h3>
+            <span className="badge badge--warn">${guessedUsd.toFixed(2)} of the last 30 days</span>
+          </div>
+          <p className="muted">
+            {guessed.length} call{guessed.length === 1 ? '' : 's'} on{' '}
+            {unpriced.length} model{unpriced.length === 1 ? '' : 's'} with no rate on record. They
+            were charged at the dearest rate we know, which is a guess in the safe direction and
+            still a guess — every total on this page includes it. Set the real rates in{' '}
+            <a href="/admin/providers">Integrations</a> and this disappears.
+          </p>
+          <ul className={styles.list}>
+            {unpriced.map((model) => (
+              <li key={model} className="mono">
+                {model}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className={styles.metrics}>
         {windows.map((window) => (

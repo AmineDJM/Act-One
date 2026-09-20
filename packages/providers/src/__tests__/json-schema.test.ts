@@ -74,3 +74,48 @@ describe('toStrictJsonSchema', () => {
     expect(supportsStrictMode(z.object({ a: z.string() }))).toBe(true);
   });
 });
+
+/**
+ * A constraint the model cannot see is a trap, not a division of labour.
+ *
+ * Strict mode rejects `maxLength`, so it is stripped — and then zod judged the
+ * answer against it anyway. A research pass that had already crawled a whole
+ * site was discarded because the model wrote 214 characters into a field
+ * limited to 200, a limit deleted from the schema before it ever saw it.
+ */
+describe('stripped constraints are still said out loud', () => {
+  it('tells the model a length limit it is not allowed to be told in keywords', () => {
+    const strict = toStrictJsonSchema(
+      z.object({ tone: z.string().min(1).max(200) }),
+      'x',
+    );
+    const tone = (strict!.schema['properties'] as Record<string, { description?: string; maxLength?: number }>)['tone']!;
+    // The keyword is gone, because strict mode refuses it...
+    expect(tone.maxLength).toBeUndefined();
+    // ...and the rule survives in the one annotation strict mode keeps.
+    expect(tone.description).toContain('at most 200 characters');
+  });
+
+  it('keeps the field’s own description and adds to it', () => {
+    const strict = toStrictJsonSchema(
+      z.object({ hook: z.string().max(80).describe('The first three seconds.') }),
+      'x',
+    );
+    const hook = (strict!.schema['properties'] as Record<string, { description?: string }>)['hook']!;
+    expect(hook.description).toBe('The first three seconds. (at most 80 characters)');
+  });
+
+  it('says how many items an array may hold', () => {
+    const strict = toStrictJsonSchema(z.object({ beats: z.array(z.string()).min(3).max(5) }), 'x');
+    const beats = (strict!.schema['properties'] as Record<string, { description?: string }>)['beats']!;
+    expect(beats.description).toContain('at least 3 items');
+    expect(beats.description).toContain('at most 5 items');
+  });
+
+  it('stays quiet about constraints a model never breaks', () => {
+    // A minimum of one character is what "a string" already means.
+    const strict = toStrictJsonSchema(z.object({ name: z.string().min(1) }), 'x');
+    const name = (strict!.schema['properties'] as Record<string, { description?: string }>)['name']!;
+    expect(name.description).toBeUndefined();
+  });
+});

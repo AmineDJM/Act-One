@@ -22,6 +22,8 @@ export type CostRecord = {
   unit?: string;
   succeeded?: boolean;
   isRetry?: boolean;
+  /** Whether `actualCostUsd` is a rate somebody set or the ledger's own guess. */
+  costBasis?: 'listed' | 'unknown_price';
   metadata?: Record<string, unknown>;
 };
 

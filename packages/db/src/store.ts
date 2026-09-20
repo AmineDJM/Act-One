@@ -52,6 +52,7 @@ import type {
   DirectorDecision,
   QaReport,
   Render,
+  RenderInput,
   RevisionRequest,
   Scene,
   Storyboard,
@@ -367,7 +368,7 @@ export interface AssetRepo {
 }
 
 export interface RenderRepo {
-  create(render: Render): Promise<Render>;
+  create(render: RenderInput): Promise<Render>;
   get(organizationId: string, id: string): Promise<Render | null>;
   listForProject(organizationId: string, projectId: string): Promise<Render[]>;
   update(organizationId: string, id: string, patch: Partial<Render>): Promise<Render>;

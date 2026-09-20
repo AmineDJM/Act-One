@@ -22,6 +22,15 @@ import { z } from 'zod';
  *     guarantees SHAPE, and zod still validates CONTENT after parsing — which
  *     is the division of labour we want anyway, since only zod can express
  *     "this is a hex colour" or "clamp this to 0..1".
+ *
+ *     But a stripped constraint is a rule the model cannot see and is then
+ *     judged against, which is not a division of labour, it is a trap. A
+ *     research pass that had already crawled a whole site was thrown away
+ *     because the model wrote 214 characters into a field limited to 200 —
+ *     a limit that had been deleted from the schema before it ever saw it.
+ *     So the constraints are not discarded: they are folded into the field's
+ *     `description`, which strict mode does allow, and the model is told in
+ *     words what it is not allowed to be told in keywords.
  */
 const UNSUPPORTED_KEYWORDS = new Set([
   'minLength', 'maxLength', 'pattern', 'format',
@@ -67,10 +76,28 @@ function harden(node: unknown): Record<string, unknown> {
   const source = node as Record<string, unknown>;
   const out: Record<string, unknown> = {};
 
+  const stripped: string[] = [];
   for (const [key, value] of Object.entries(source)) {
-    if (UNSUPPORTED_KEYWORDS.has(key)) continue;
+    if (UNSUPPORTED_KEYWORDS.has(key)) {
+      const said = describeConstraint(key, value);
+      if (said) stripped.push(said);
+      continue;
+    }
     out[key] =
       value !== null && typeof value === 'object' ? harden(value) : value;
+  }
+
+  /*
+   * What was taken out, said in words.
+   *
+   * `description` is one of the few annotations strict mode keeps, so a limit
+   * the schema may not carry can still reach the model. Appended rather than
+   * replacing, because the field's own description is usually the more useful
+   * half of the sentence.
+   */
+  if (stripped.length > 0) {
+    const existing = typeof out['description'] === 'string' ? `${out['description']} ` : '';
+    out['description'] = `${existing}(${stripped.join('; ')})`;
   }
 
   if (out['type'] === 'object' || out['properties']) {
@@ -81,6 +108,36 @@ function harden(node: unknown): Record<string, unknown> {
   }
 
   return out;
+}
+
+/**
+ * One stripped keyword, as an instruction a model can act on.
+ *
+ * Only the ones worth the tokens: a length limit is broken constantly and a
+ * `multipleOf` never is. Anything not listed here is dropped silently, as it
+ * always was.
+ */
+function describeConstraint(key: string, value: unknown): string | null {
+  if (typeof value === 'number') {
+    switch (key) {
+      case 'maxLength':
+        return `at most ${value} characters`;
+      case 'minLength':
+        return value > 1 ? `at least ${value} characters` : null;
+      case 'maxItems':
+        return `at most ${value} items`;
+      case 'minItems':
+        return value > 0 ? `at least ${value} items` : null;
+      case 'maximum':
+        return `no greater than ${value}`;
+      case 'minimum':
+        return `no less than ${value}`;
+      default:
+        return null;
+    }
+  }
+  if (key === 'pattern' && typeof value === 'string') return `matching ${value}`;
+  return null;
 }
 
 /**

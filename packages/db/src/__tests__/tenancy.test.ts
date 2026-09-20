@@ -275,6 +275,7 @@ describe.each(storeCases())('Store tenant isolation ($name)', ({ open, close }) 
       unit: 'call',
       succeeded: true,
       isRetry: false,
+      costBasis: 'listed' as const,
       metadata: {},
       createdAt: new Date().toISOString(),
     });

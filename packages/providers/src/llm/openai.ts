@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { httpRequest } from '../http.ts';
+import { httpRequest, httpStream } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import { toStrictJsonSchema } from './json-schema.ts';
 import type {
@@ -112,6 +112,105 @@ export function unpricedModels(): string[] {
  * its first call and never pays for it again.
  */
 const FIXED_TEMPERATURE = new Set<string>();
+
+/**
+ * A chat completion, reassembled from its stream.
+ *
+ * `usage` arrives in a final chunk of its own when `stream_options` asks for
+ * it, and does not arrive at all from every gateway — so both token counts are
+ * optional and the caller estimates when they are missing, exactly as it did
+ * when the response came back whole.
+ */
+export type StreamedCompletion = {
+  content: string;
+  model: string | undefined;
+  inputTokens: number | undefined;
+  outputTokens: number | undefined;
+};
+
+export type Collector = {
+  /** Text not yet ending in a newline: an SSE event split across two chunks. */
+  pending: string;
+  parts: string[];
+  model: string | undefined;
+  inputTokens: number | undefined;
+  outputTokens: number | undefined;
+  /** Set when the model stopped for a reason the caller should know about. */
+  finish: string | null;
+};
+
+export function newCollector(): Collector {
+  return { pending: '', parts: [], model: undefined, inputTokens: undefined, outputTokens: undefined, finish: null };
+}
+
+/**
+ * Server-sent events, one chunk at a time.
+ *
+ * Chunks do not respect event boundaries — a `data:` line routinely arrives in
+ * two pieces — so whatever follows the last newline is held back until the
+ * next chunk completes it. Getting this wrong produces a JSON parse error on
+ * perfectly good output, occasionally, under load, which is the worst kind of
+ * bug to own.
+ */
+export function consumeSse(text: string, into: Collector): void {
+  const buffered = into.pending + text;
+  const lines = buffered.split('\n');
+  into.pending = lines.pop() ?? '';
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line.startsWith('data:')) continue;
+    const payload = line.slice(5).trim();
+    if (payload === '' || payload === '[DONE]') continue;
+
+    let event: unknown;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      // A malformed event is dropped rather than failing the generation: the
+      // content that did arrive is still the model's answer.
+      continue;
+    }
+    const parsed = StreamEvent.safeParse(event);
+    if (!parsed.success) continue;
+
+    if (parsed.data.model) into.model = parsed.data.model;
+    if (parsed.data.usage) {
+      into.inputTokens = parsed.data.usage.prompt_tokens ?? into.inputTokens;
+      into.outputTokens = parsed.data.usage.completion_tokens ?? into.outputTokens;
+    }
+    for (const choice of parsed.data.choices ?? []) {
+      const delta = choice.delta?.content;
+      if (typeof delta === 'string' && delta.length > 0) into.parts.push(delta);
+      if (choice.finish_reason) into.finish = choice.finish_reason;
+    }
+  }
+}
+
+export function finishCollector(collector: Collector): StreamedCompletion {
+  return {
+    content: collector.parts.join(''),
+    model: collector.model,
+    inputTokens: collector.inputTokens,
+    outputTokens: collector.outputTokens,
+  };
+}
+
+const StreamEvent = z.object({
+  model: z.string().optional(),
+  choices: z
+    .array(
+      z.object({
+        delta: z.object({ content: z.string().nullable().optional() }).optional(),
+        finish_reason: z.string().nullable().optional(),
+      }),
+    )
+    .optional(),
+  usage: z
+    .object({ prompt_tokens: z.number().optional(), completion_tokens: z.number().optional() })
+    .nullable()
+    .optional(),
+});
 
 function refusedTemperature(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -294,37 +393,55 @@ export class OpenAiLlmProvider implements LlmProvider {
       body['response_format'] = { type: 'json_object' };
     }
 
-    const send = () =>
-      httpRequest<unknown>(this.name, `${this.baseUrl}/chat/completions`, {
+    /*
+     * Streamed, always.
+     *
+     * Not for the user interface — nothing here shows a model typing. For
+     * survival: a deep-tier answer takes ninety seconds or more, and a silent
+     * ninety-second request is killed by every intermediary between this
+     * process and the model. Measured at 92.2s in one sandbox; Render's
+     * router, Cloudflare and any corporate egress each have their own number
+     * and none of them is written anywhere the person debugging it will look.
+     * The symptom is an HTTP 502 that survives all three retries, because a
+     * deterministic timeout is not a transient failure.
+     *
+     * With bytes arriving continuously there is nothing for an intermediary
+     * to act on, and the timeout becomes what it should always have been:
+     * how long nothing at all may happen, rather than how long a good answer
+     * is allowed to take.
+     */
+    body['stream'] = true;
+    body['stream_options'] = { include_usage: true };
+
+    const send = async (): Promise<StreamedCompletion> => {
+      const collector = newCollector();
+      await httpStream(this.name, `${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: this.headers(),
         body,
-        timeoutMs: 180_000,
         attempts: 3,
+        idleTimeoutMs: 60_000,
         signal: context.signal,
+        onChunk: (text) => consumeSse(text, collector),
       });
+      return finishCollector(collector);
+    };
 
-    let response: unknown;
+    let streamed: StreamedCompletion;
     try {
-      response = await send();
+      streamed = await send();
     } catch (error) {
       if (!refusedTemperature(error) || FIXED_TEMPERATURE.has(model)) throw error;
       FIXED_TEMPERATURE.add(model);
       delete body['temperature'];
-      response = await send();
+      streamed = await send();
     }
 
-    const parsed = ChatResponse.safeParse(response);
-    if (!parsed.success) {
-      throw new ProviderError(this.name, 'Unexpected chat completion payload.', {
-        retryable: true,
-      });
-    }
-
-    const content = parsed.data.choices[0]?.message?.content ?? '';
-    const inputTokens = parsed.data.usage?.prompt_tokens ?? estimateTokens(messages);
-    const outputTokens = parsed.data.usage?.completion_tokens ?? Math.ceil(content.length / 4);
-    const costUsd = priceFor(model, inputTokens, outputTokens);
+    const content = streamed.content;
+    const inputTokens = streamed.inputTokens ?? estimateTokens(messages);
+    const outputTokens = streamed.outputTokens ?? Math.ceil(content.length / 4);
+    const priced = priceCall(model, inputTokens, outputTokens);
+    const costUsd = priced.costUsd;
 
     await this.costSink?.record({
       provider: this.name,
@@ -334,12 +451,15 @@ export class OpenAiLlmProvider implements LlmProvider {
       actualCostUsd: costUsd,
       quantity: inputTokens + outputTokens,
       unit: 'token',
+      // Carried so the console can separate what was measured from what was
+      // guessed, rather than presenting one total that is partly fiction.
+      costBasis: priced.basis,
       metadata: { tier, projectId: context.projectId, sceneId: context.sceneId },
     });
 
     return {
       value: content,
-      usage: { inputTokens, outputTokens, costUsd, model: parsed.data.model ?? model },
+      usage: { inputTokens, outputTokens, costUsd, model: streamed.model ?? model },
     };
   }
 
@@ -377,14 +497,41 @@ function lastUserIndex(messages: LlmMessage[]): number {
   return messages.length - 1;
 }
 
-export function priceFor(model: string, inputTokens: number, outputTokens: number): number {
+/**
+ * What a call cost, and whether that number is a price or a guess.
+ *
+ * Both are returned because only one of them used to be, and the missing one
+ * is the one that matters: a model absent from the table was billed at the
+ * dearest rate on record and entered the ledger looking exactly like a
+ * measured cost. Every report built on it was confidently wrong and nobody
+ * reading it could tell.
+ *
+ * Still the dearest rate — guessing high is the safe direction, and a film
+ * must not stop because a price list is out of date — but it arrives labelled.
+ */
+export function priceCall(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): { costUsd: number; basis: 'listed' | 'unknown_price' } {
   const known = PRICING[model];
   if (!known && !warned.has(model)) {
     warned.add(model);
-    console.warn(`[openai] no price on record for ${model}; the ledger is charging it at the dearest rate we know.`);
+    console.warn(
+      `[openai] no price on record for ${model}; the ledger is charging it at the dearest rate ` +
+        'we know and marking it UNKNOWN_PRICE. Set the real rate in the Super Admin console.',
+    );
   }
   const pricing = known ?? unpriced();
-  return (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
+  return {
+    costUsd: (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output,
+    basis: known ? 'listed' : 'unknown_price',
+  };
+}
+
+/** The cost alone, for callers that only need the number. */
+export function priceFor(model: string, inputTokens: number, outputTokens: number): number {
+  return priceCall(model, inputTokens, outputTokens).costUsd;
 }
 
 /** What the table holds, for a test and for the console. */

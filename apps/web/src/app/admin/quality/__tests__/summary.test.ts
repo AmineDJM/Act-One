@@ -199,7 +199,8 @@ function cost(sceneId: string, provider: string, model: string | null): Generati
   return {
     id: newId('cst'), organizationId: 'org_1', projectId: 'prj_1', sceneId, renderId: 'rnd_1',
     provider, model, operation: 'media.image', estimatedCostUsd: 0.1, actualCostUsd: 0.1,
-    creditsCharged: 5, quantity: 1, unit: 'call', succeeded: true, isRetry: false, metadata: {},
+    creditsCharged: 5, quantity: 1, unit: 'call', succeeded: true, isRetry: false,
+    costBasis: 'listed', metadata: {},
     createdAt: '2026-01-01T00:00:00.000Z',
   };
 }

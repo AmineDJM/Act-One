@@ -11,6 +11,8 @@ export type CostRecordInput = {
   unit?: string;
   succeeded?: boolean;
   isRetry?: boolean;
+  /** Whether `actualCostUsd` is a rate somebody set or the ledger's own guess. */
+  costBasis?: 'listed' | 'unknown_price';
   metadata?: Record<string, unknown>;
 };
 
@@ -65,6 +67,7 @@ export class DbCostSink {
       unit: cost.unit ?? 'call',
       succeeded: cost.succeeded ?? true,
       isRetry: cost.isRetry ?? false,
+      costBasis: cost.costBasis ?? 'listed',
       metadata: cost.metadata ?? {},
       createdAt: new Date().toISOString(),
     });

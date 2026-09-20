@@ -1,4 +1,7 @@
 import {
+  ASSET_DESCRIPTION_LIMIT,
+  ASSET_NAME_LIMIT,
+  fitLabel,
   newId,
   storageKeyFor,
   type Asset,
@@ -138,10 +141,10 @@ export type LibraryParams = {
 function libraryFields(params: LibraryParams): Partial<Asset> {
   return {
     library: params.library ?? false,
-    name: params.name ?? '',
+    name: fitLabel(params.name ?? '', ASSET_NAME_LIMIT),
     category: params.category ?? 'other',
     categorySource: params.categorySource ?? (params.category ? 'inferred' : 'none'),
-    description: params.description ?? '',
+    description: fitLabel(params.description ?? '', ASSET_DESCRIPTION_LIMIT),
     source: params.source ?? 'pipeline',
     parentAssetId: params.parentAssetId ?? null,
   };

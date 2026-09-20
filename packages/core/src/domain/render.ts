@@ -92,12 +92,71 @@ export const Render = z.object({
   durationSeconds: z.number().min(0).default(0),
   costUsd: z.number().min(0).default(0),
   qaReportId: z.string().nullable().default(null),
+  /**
+   * Two gates, recorded separately, because they ask different questions.
+   *
+   * Production QA asks whether the film is technically complete: the pictures
+   * arrived, the track can be heard, the container plays. Creative QA asks
+   * whether it is any good, by watching the finished file. A film can pass
+   * either and fail the other, and collapsing them into one `status` meant
+   * "completed" was said of a film nobody had judged.
+   *
+   * `null` means the gate has not run — which is not the same as passing, and
+   * is what every render made before this existed will honestly say.
+   */
+  productionVerdict: z.enum(['pass', 'needs_attention', 'failed']).nullable().default(null),
+  creativeVerdict: z.enum(['pass', 'pass_with_concerns', 'revise', 'block']).nullable().default(null),
+  /** What the creative gate said, in the director's words. */
+  creativeReason: z.string().max(800).default(''),
   error: z.string().nullable().default(null),
   startedAt: z.string().nullable().default(null),
   completedAt: z.string().nullable().default(null),
   createdAt: z.string(),
 });
 export type Render = z.infer<typeof Render>;
+/**
+ * What a caller hands the store. Every field the schema gives a default may
+ * be left out, so a column added to a render is not a change to every place
+ * that has ever made one.
+ */
+export type RenderInput = z.input<typeof Render>;
+
+/**
+ * Whether this render may be handed over as the finished film.
+ *
+ * The one place that answers it, so the page, the download route, Collections
+ * and the campaign stage cannot each decide differently — which they did: the
+ * project page offered "Download the master" for anything that had produced
+ * bytes, including cuts the quality gate had held back.
+ *
+ * A master artifact may exist and be watched long before this is true. What it
+ * may not do is call itself finished.
+ */
+export function releasable(render: {
+  kind: string;
+  status: RenderStatus;
+  masterAssetId: string | null;
+  productionVerdict?: 'pass' | 'needs_attention' | 'failed' | null;
+  creativeVerdict?: 'pass' | 'pass_with_concerns' | 'revise' | 'block' | null;
+}): boolean {
+  if (!render.masterAssetId) return false;
+  if (render.status !== 'completed') return false;
+  // An animatic is a preview by definition and is never the deliverable.
+  if (render.kind === 'animatic') return false;
+  /*
+   * A verdict that never ran is not a pass. Renders made before the gates
+   * existed carry null and are trusted on their status alone, which is the
+   * only honest reading: nothing judged them, and rewriting history to say
+   * something did would be worse than either answer.
+   */
+  if (render.productionVerdict !== null && render.productionVerdict !== undefined) {
+    if (render.productionVerdict !== 'pass') return false;
+  }
+  if (render.creativeVerdict !== null && render.creativeVerdict !== undefined) {
+    if (render.creativeVerdict !== 'pass' && render.creativeVerdict !== 'pass_with_concerns') return false;
+  }
+  return true;
+}
 
 export const VariantPurpose = z.enum([
   'hero_60',

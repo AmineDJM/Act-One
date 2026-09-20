@@ -36,6 +36,16 @@ export const GenerationCost = z.object({
   unit: z.string().default('call'),
   succeeded: z.boolean().default(true),
   isRetry: z.boolean().default(false),
+  /**
+   * Whether the number above is a price or a guess.
+   *
+   * `listed` means a rate somebody set. `unknown_price` means the model is not
+   * in the table and the ledger substituted the dearest rate it knows — which
+   * is the safe direction to guess and is still a guess, and used to be
+   * invisible. A dashboard that sums both into one figure and calls it spend
+   * is confidently wrong, and the person reading it has no way to tell.
+   */
+  costBasis: z.enum(['listed', 'unknown_price']).default('listed'),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string(),
 });

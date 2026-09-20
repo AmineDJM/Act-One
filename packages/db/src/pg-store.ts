@@ -5,7 +5,7 @@ import {
   CriticReview,
   DirectorDecision,
 } from '@act-one/core';
-import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Referral as ReferralSchema } from '@act-one/core';
+import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
   AppError,
@@ -65,6 +65,7 @@ import type {
   QaReport,
   ProjectStage,
   Render,
+  RenderInput,
   ResearchSource,
   RevisionRequest,
   Scene,
@@ -1441,8 +1442,9 @@ export class PgStore implements Store {
   };
 
   readonly renders = {
-    create: async (render: Render) =>
-      this.tenant(render.organizationId, async (c) => {
+    create: async (input: RenderInput) => {
+      const render = RenderSchema.parse(input);
+      return this.tenant(render.organizationId, async (c) => {
         await c.query(
           `INSERT INTO renders
              (id, organization_id, project_id, storyboard_id, kind, version, aspect, quality, fps,
@@ -1455,7 +1457,8 @@ export class PgStore implements Store {
           ],
         );
         return render;
-      }),
+      });
+    },
 
     get: async (organizationId: string, id: string) =>
       this.tenant(organizationId, async (c) => {
@@ -1488,14 +1491,18 @@ export class PgStore implements Store {
              qa_report_id = COALESCE($9, qa_report_id),
              error = COALESCE($10, error),
              started_at = COALESCE($11, started_at),
-             completed_at = COALESCE($12, completed_at)
+             completed_at = COALESCE($12, completed_at),
+             production_verdict = COALESCE($13, production_verdict),
+             creative_verdict = COALESCE($14, creative_verdict),
+             creative_reason = COALESCE($15, creative_reason)
            WHERE id = $1 AND organization_id = $2 RETURNING *`,
           [
             id, organizationId, patch.status ?? null, patch.masterAssetId ?? null,
             patch.posterAssetId ?? null, patch.captionsAssetId ?? null,
             patch.durationSeconds ?? null, patch.costUsd ?? null,
             patch.qaReportId ?? null, patch.error ?? null, patch.startedAt ?? null,
-            patch.completedAt ?? null,
+            patch.completedAt ?? null, patch.productionVerdict ?? null,
+            patch.creativeVerdict ?? null, patch.creativeReason ?? null,
           ],
         );
         if (!r.rows[0]) throw notFound('Render');
@@ -2068,13 +2075,13 @@ export class PgStore implements Store {
           `INSERT INTO generation_costs
              (id, organization_id, project_id, scene_id, render_id, provider, model, operation,
               estimated_cost_usd, actual_cost_usd, credits_charged, quantity, unit, succeeded,
-              is_retry, metadata, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+              is_retry, cost_basis, metadata, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
           [
             cost.id, cost.organizationId, cost.projectId, cost.sceneId, cost.renderId,
             cost.provider, cost.model, cost.operation, cost.estimatedCostUsd, cost.actualCostUsd,
             cost.creditsCharged, cost.quantity, cost.unit, cost.succeeded, cost.isRetry,
-            cost.metadata, cost.createdAt,
+            cost.costBasis, cost.metadata, cost.createdAt,
           ],
         );
         return cost;
@@ -3696,6 +3703,9 @@ function toRender(row: Row): Render {
     durationSeconds: num(row['duration_seconds']),
     costUsd: num(row['cost_usd']),
     qaReportId: (row['qa_report_id'] as string) ?? null,
+    productionVerdict: (row['production_verdict'] as Render['productionVerdict']) ?? null,
+    creativeVerdict: (row['creative_verdict'] as Render['creativeVerdict']) ?? null,
+    creativeReason: (row['creative_reason'] as string) ?? '',
     error: (row['error'] as string) ?? null,
     startedAt: isoOrNull(row['started_at']),
     completedAt: isoOrNull(row['completed_at']),
@@ -3762,6 +3772,7 @@ function toCost(row: Row): GenerationCost {
     unit: row['unit'] as string,
     succeeded: Boolean(row['succeeded']),
     isRetry: Boolean(row['is_retry']),
+    costBasis: (row['cost_basis'] as GenerationCost['costBasis']) ?? 'listed',
     metadata: (row['metadata'] as Record<string, unknown>) ?? {},
     createdAt: iso(row['created_at']),
   };

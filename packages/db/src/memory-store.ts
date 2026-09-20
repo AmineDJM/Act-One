@@ -1,4 +1,4 @@
-import { Asset as AssetSchema } from '@act-one/core';
+import { Asset as AssetSchema, Render as RenderSchema } from '@act-one/core';
 import {
   AppError,
   levelSeverity,
@@ -63,6 +63,7 @@ import type {
   ProjectStage,
   QaReport,
   Render,
+  RenderInput,
   ResearchSource,
   RevisionRequest,
   VoiceConsentRecord,
@@ -992,7 +993,8 @@ export class MemoryStore implements Store {
   };
 
   readonly renders = {
-    create: async (render: Render) => {
+    create: async (input: RenderInput) => {
+      const render = RenderSchema.parse(input);
       this.tables.renders.set(render.id, render);
       return render;
     },

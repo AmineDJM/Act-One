@@ -149,6 +149,121 @@ export async function httpRequest<T = unknown>(
   });
 }
 
+/**
+ * The same request, streamed, with an idle timeout instead of a total one.
+ *
+ * A long generation sent without streaming is one silent request that takes a
+ * minute and a half, and every intermediary between here and the model treats
+ * silence as death. This sandbox's egress proxy cuts at 92.2s, measured;
+ * Render's router, Cloudflare and any corporate proxy have their own numbers,
+ * and none of them is documented where the person debugging it will look. The
+ * research synthesis died at exactly that wall on every single attempt,
+ * including all three retries, because a deterministic timeout is not a
+ * transient failure however retryable the status code says it is.
+ *
+ * Streamed, bytes arrive continuously and no intermediary has a reason to
+ * intervene. So the timeout that matters is not "how long may this take" — a
+ * good answer is allowed to take four minutes — but "how long may nothing at
+ * all happen", which is what a hung connection actually looks like.
+ *
+ * Retried only before the first byte. After that a retry would mean discarding
+ * a partial answer we are paying for and asking for another, and the failure
+ * modes that happen mid-stream are not the ones a retry fixes.
+ */
+export async function httpStream(
+  provider: string,
+  url: string,
+  options: HttpOptions & {
+    /** Longest gap between chunks before the connection is treated as dead. */
+    idleTimeoutMs?: number;
+    /** Called with each decoded chunk as it arrives. */
+    onChunk: (text: string) => void;
+  },
+): Promise<void> {
+  const attempts = Math.max(1, options.attempts ?? 3);
+  const idleTimeoutMs = options.idleTimeoutMs ?? 45_000;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+
+    let idle: ReturnType<typeof setTimeout> | null = null;
+    const resetIdle = () => {
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(() => controller.abort(), idleTimeoutMs);
+    };
+
+    try {
+      resetIdle();
+      const response = await fetch(url, {
+        method: options.method ?? 'POST',
+        headers: {
+          ...(options.body !== undefined &&
+          !(options.body instanceof Uint8Array) &&
+          !(options.body instanceof FormData)
+            ? { 'content-type': 'application/json' }
+            : {}),
+          accept: 'text/event-stream',
+          ...options.headers,
+        },
+        body: serializeBody(options.body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const detail = redact(await safeText(response));
+        const retryable = RETRYABLE_STATUS.has(response.status);
+        const error = new ProviderError(
+          provider,
+          `HTTP ${response.status} ${response.statusText}: ${detail.slice(0, 600)}`,
+          { retryable, status: response.status },
+        );
+        if (retryable && attempt < attempts) {
+          lastError = error;
+          await sleep(backoffMs(attempt, response.headers.get('retry-after')));
+          continue;
+        }
+        throw error;
+      }
+      if (!response.body) {
+        throw new ProviderError(provider, 'The response carried no body to stream.', { retryable: true });
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let received = false;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        resetIdle();
+        received = true;
+        options.onChunk(decoder.decode(value, { stream: true }));
+      }
+      options.onChunk(decoder.decode());
+      if (!received) {
+        throw new ProviderError(provider, 'The stream closed without sending anything.', { retryable: true });
+      }
+      return;
+    } catch (error) {
+      if (options.signal?.aborted === true) {
+        throw new ProviderError(provider, 'Request cancelled', { retryable: false });
+      }
+      if (error instanceof ProviderError && !error.retryable) throw error;
+      lastError = error;
+      if (attempt >= attempts) break;
+      await sleep(backoffMs(attempt, null));
+    } finally {
+      if (idle) clearTimeout(idle);
+      options.signal?.removeEventListener('abort', onAbort);
+    }
+  }
+
+  if (lastError instanceof ProviderError) throw lastError;
+  throw new ProviderError(provider, redact(String(lastError)), { retryable: true, cause: lastError });
+}
+
 function serializeBody(body: unknown): BodyInit | undefined {
   if (body === undefined || body === null) return undefined;
   if (typeof body === 'string') return body;
