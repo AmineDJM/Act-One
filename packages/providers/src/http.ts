@@ -106,10 +106,14 @@ export async function httpRequest<T = unknown>(
 
       if (!response.ok) {
         const detail = redact(await safeText(response));
-        const retryable = RETRYABLE_STATUS.has(response.status);
+        const broke = outOfCredit(response.status, detail);
+        const retryable = RETRYABLE_STATUS.has(response.status) && !broke;
         const error = new ProviderError(
           provider,
-          `HTTP ${response.status} ${response.statusText}: ${detail.slice(0, 600)}`,
+          broke
+            ? `The ${provider} account has no credit left, so nothing can be generated until it is topped up. ` +
+              `(HTTP ${response.status}: ${detail.slice(0, 300)})`
+            : `HTTP ${response.status} ${response.statusText}: ${detail.slice(0, 600)}`,
           { retryable, status: response.status },
         );
         if (retryable && attempt < attempts) {
@@ -214,10 +218,14 @@ export async function httpStream(
 
       if (!response.ok) {
         const detail = redact(await safeText(response));
-        const retryable = RETRYABLE_STATUS.has(response.status);
+        const broke = outOfCredit(response.status, detail);
+        const retryable = RETRYABLE_STATUS.has(response.status) && !broke;
         const error = new ProviderError(
           provider,
-          `HTTP ${response.status} ${response.statusText}: ${detail.slice(0, 600)}`,
+          broke
+            ? `The ${provider} account has no credit left, so nothing can be generated until it is topped up. ` +
+              `(HTTP ${response.status}: ${detail.slice(0, 300)})`
+            : `HTTP ${response.status} ${response.statusText}: ${detail.slice(0, 600)}`,
           { retryable, status: response.status },
         );
         if (retryable && attempt < attempts) {
@@ -278,6 +286,21 @@ async function safeText(response: Response): Promise<string> {
   } catch {
     return '<unreadable body>';
   }
+}
+
+/**
+ * A 429 that will never clear on its own.
+ *
+ * Rate limiting and an empty wallet arrive as the same status, and they are
+ * opposite situations: the first says "in a moment", the second says "not
+ * until somebody pays". Retried as if it were the first, an exhausted
+ * account burns four attempts and a minute of backoff and then reports
+ * "Too Many Requests", which sends whoever reads it looking for a traffic
+ * problem that does not exist.
+ */
+export function outOfCredit(status: number, body: string): boolean {
+  if (status !== 429 && status !== 402) return false;
+  return /insufficient_quota|credit_balance_exhausted|billing_hard_limit|exceeded your current quota/i.test(body);
 }
 
 export function backoffMs(attempt: number, retryAfter: string | null, status?: number): number {

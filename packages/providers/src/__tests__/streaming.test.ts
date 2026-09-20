@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { backoffMs } from '../http.ts';
+import { backoffMs, outOfCredit } from '../http.ts';
 import { consumeSse, effortLadder, finishCollector, isGatewayCut, newCollector } from '../llm/openai.ts';
 
 /**
@@ -133,5 +133,21 @@ describe('asking for less thinking, in order', () => {
     // A host that cannot carry the lowest setting cannot carry this model, and
     // saying so beats another minute of trying.
     expect(effortLadder('low')).toEqual([]);
+  });
+});
+
+describe('an empty wallet is not a rate limit', () => {
+  it('recognises what a provider says when the credit has run out', () => {
+    expect(outOfCredit(429, '{"error":{"code":"credit_balance_exhausted"}}')).toBe(true);
+    expect(outOfCredit(429, '{"error":{"type":"insufficient_quota"}}')).toBe(true);
+    expect(outOfCredit(429, 'You have exceeded your current quota')).toBe(true);
+    expect(outOfCredit(402, 'billing_hard_limit_reached')).toBe(true);
+  });
+
+  it('leaves an ordinary rate limit alone', () => {
+    // This one really does clear on its own, and backing off is the answer.
+    expect(outOfCredit(429, '{"error":{"code":"rate_limit_exceeded"}}')).toBe(false);
+    expect(outOfCredit(503, 'insufficient_quota')).toBe(false);
+    expect(outOfCredit(500, 'anything')).toBe(false);
   });
 });

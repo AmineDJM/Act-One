@@ -140,6 +140,39 @@ describe('attachPublicCaptures', () => {
     expect(moments[0]?.wowScore).toBe(0.55);
     expect(moments[1]?.wowScore).toBe(0.45);
   });
+
+  it('takes the plain capture of the application over the one dressed for marketing', () => {
+    /*
+     * A page usually publishes both: a screenshot of the running product, and
+     * the same product set in a phone mockup beside a logo and some callout
+     * arrows. Both are the company's own and both are usable; the plain one
+     * is the better shot, and the research agent says so by giving a dressed
+     * capture a worse rank rather than refusing it.
+     */
+    const dressed = candidate({ key: 'dressed', kind: 'product_image', pageUrl: PRODUCT, rank: 50 });
+    const plain = candidate({ key: 'plain', kind: 'product_image', pageUrl: PRODUCT, rank: 2 });
+    const { attachments } = attachPublicCaptures(
+      [moment({ id: 'm1', evidenceIds: ['e1'] })],
+      [evidence('e1', PRODUCT)],
+      [dressed, plain],
+      { homepageUrl: HOME },
+    );
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]!.candidate.key).toBe('plain');
+  });
+
+  it('still uses the dressed capture when it is all the page has', () => {
+    const dressed = candidate({ key: 'dressed', kind: 'product_image', pageUrl: PRODUCT, rank: 50 });
+    const page = candidate({ key: 'page', kind: 'public_page', pageUrl: PRODUCT, rank: 100 });
+    const { attachments } = attachPublicCaptures(
+      [moment({ id: 'm1', evidenceIds: ['e1'] })],
+      [evidence('e1', PRODUCT)],
+      [page, dressed],
+      { homepageUrl: HOME },
+    );
+    // A dressed screenshot of the product still beats a photograph of the page.
+    expect(attachments[0]!.candidate.key).toBe('dressed');
+  });
 });
 
 describe('pageLabel', () => {
