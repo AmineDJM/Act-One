@@ -74,6 +74,12 @@ const now = new Date().toISOString();
  * there; run again with the same path and those stages are read back instead
  * of re-run. Delete the file for a clean run. Nothing in the product does
  * this: it is a development affordance over the in-memory store.
+ *
+ * It caches what a stage *returned*, including an unhappy answer. A stage
+ * that finished by holding the film is finished as far as this is concerned,
+ * so re-running after fixing the thing that held it replays the hold and
+ * proves nothing. Delete that stage's key from the file (or the whole file)
+ * before testing a fix to a stage that already ran.
  */
 type Checkpoint = { results: Record<string, unknown>; store: string };
 const checkpointPath = process.env['ACT_ONE_PROVE_CHECKPOINT'] ?? '';
