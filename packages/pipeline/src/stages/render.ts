@@ -407,6 +407,35 @@ export async function runRender(
        * gone is a thinner mix, which is a note.
        */
       issues = [...issues, ...rendered.soundIssues, ...rendered.degradedIssues];
+      /*
+       * A picture the browser refused is a hole in a shot that promised one.
+       *
+       * Blocking for a deliverable and a note for a preview, which is the
+       * same line the rest of this loop draws: a customer's master may not go
+       * out one picture short of what it was planned to show, and a timing
+       * preview may.
+       */
+      if (rendered.undecodable.length > 0) {
+        issues = [
+          ...issues,
+          {
+            id: newId('evt'),
+            sceneId: null,
+            timecodeStart: null,
+            detectedBy: 'deterministic',
+            evidenceAssetId: null,
+            check: 'asset_resolution',
+            severity: kind === 'animatic' ? 'soft_fail' : 'hard_fail',
+            message:
+              `${rendered.undecodable.length} picture(s) the film asked for could not be decoded by the ` +
+              `renderer, so the shots that needed them drew without them. ` +
+              `First: ${rendered.undecodable[0]}`,
+            confidence: 1,
+            repair: 'swap_asset',
+          },
+        ];
+      }
+
       if (rendered.missingAudio.length > 0) {
         /*
          * Every file the score asked for, gone, and no voice to carry the
@@ -1311,6 +1340,8 @@ async function renderOnce(
   soundKeys: number;
   /** Shots that rendered as type because their material did not resolve. */
   degradedIssues: QaFinding[];
+  /** Pictures the browser refused to decode, by the url it was asked for. */
+  undecodable: string[];
   /** The manifest this pass was rendered from: what resolved, what did not. */
   readiness: MasterReadiness;
 }> {
@@ -1468,7 +1499,7 @@ async function renderOnce(
   });
 
   const silentPath = path.join(params.workDir, `film-${params.attempt}.mp4`);
-  await renderFilm({
+  const drawn = await renderFilm({
     props: {
       storyboard,
       brand,
@@ -1538,6 +1569,28 @@ async function renderOnce(
     detail: `${params.aspect} · ${params.quality}`,
     status: 'done',
   });
+
+  /*
+   * Pictures the browser would not take.
+   *
+   * A shot whose material fails to decode draws without it and the encode
+   * carries on: the render succeeds, the film is short one picture, and the
+   * evidence is one line in a tab log that nothing reads. So it is said here,
+   * and \u2014 for a master, where every required shot has to show what it
+   * promised \u2014 it is a blocker rather than a note. A preview may go out with
+   * a hole in it; a deliverable may not.
+   */
+  const undecodable = drawn.undecodable;
+  if (undecodable.length > 0) {
+    await context.activity({
+      step: 'motion',
+      kind: 'note',
+      label: `${undecodable.length} picture(s) would not load`,
+      detail: undecodable.slice(0, 3).join(' · '),
+      status: 'failed',
+    });
+  }
+
   await context.progress(0.62, 'Designing the sound');
 
   const directed = directSound({
@@ -1713,7 +1766,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, readiness };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -1743,10 +1796,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, readiness };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, readiness };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
 }
 
 /**

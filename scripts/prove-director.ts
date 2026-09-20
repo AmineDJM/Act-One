@@ -31,7 +31,9 @@
  * script dies at "identifying target audience" with an HTTP 502, that is what
  * happened, and it is the host rather than the pipeline.
  */
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import type { Dirent } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -81,7 +83,58 @@ const now = new Date().toISOString();
  * proves nothing. Delete that stage's key from the file (or the whole file)
  * before testing a fix to a stage that already ran.
  */
-type Checkpoint = { results: Record<string, unknown>; store: string };
+/**
+ * Which code a stage's answer depends on.
+ *
+ * A checkpoint that replays an answer produced by code that has since changed
+ * is worse than no checkpoint: it looks like a result. A blocked
+ * pre-production verdict was replayed after the logic that blocked it had
+ * been fixed, and the run reported the same hold, having tested nothing.
+ *
+ * So each stage is fingerprinted from the packages it actually runs, and an
+ * answer is only reused when that fingerprint still matches. Listing the
+ * dependencies by hand is the point rather than an inconvenience: it says out
+ * loud which code can change a stage's mind.
+ */
+const STAGE_CODE: Record<string, string[]> = {
+  research: ['packages/research', 'packages/providers'],
+  direction: ['packages/creative', 'packages/providers', 'packages/core'],
+  storyboard: ['packages/creative', 'packages/core'],
+  'pre-production': [
+    'packages/creative',
+    'packages/pipeline',
+    'packages/qa',
+    'packages/motion',
+    'packages/sound',
+    'packages/core',
+  ],
+};
+
+/** A hash of every source file under these directories. */
+async function fingerprint(roots: readonly string[]): Promise<string> {
+  const hash = createHash('sha256');
+  const walk = async (dir: string): Promise<void> => {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of [...entries].sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+        hash.update(full);
+        hash.update(await readFile(full));
+      }
+    }
+  };
+  for (const root of [...roots].sort()) await walk(path.join(process.cwd(), root, 'src'));
+  return hash.digest('hex').slice(0, 16);
+}
+
+type Checkpoint = { results: Record<string, unknown>; codes?: Record<string, string>; store: string };
 const checkpointPath = process.env['ACT_ONE_PROVE_CHECKPOINT'] ?? '';
 let checkpoint: Checkpoint | null = null;
 if (checkpointPath) {
@@ -176,13 +229,18 @@ function section(title: string): void {
  * lost it would report a search that never happened.
  */
 async function stage<T>(name: string, run: () => Promise<T>): Promise<T> {
+  const code = await fingerprint(STAGE_CODE[name] ?? []);
   if (checkpoint && name in checkpoint.results) {
-    console.log(`  (${name}: from the checkpoint)`);
-    return checkpoint.results[name] as T;
+    if ((checkpoint.codes?.[name] ?? '') === code) {
+      console.log(`  (${name}: from the checkpoint)`);
+      return checkpoint.results[name] as T;
+    }
+    console.log(`  (${name}: the code changed since it ran, so it runs again)`);
   }
   const value = await run();
   if (checkpointPath) {
     checkpoint = {
+      codes: { ...(checkpoint?.codes ?? {}), [name]: code },
       results: {
         ...(checkpoint?.results ?? {}),
         // The ids too: every id here is generated, so a resume that made a
