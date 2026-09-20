@@ -34,7 +34,7 @@ export type SceneFinding = {
   objectId: string | null;
   check:
     | 'unreadable_duration'
-    | 'text_outside_frame'
+    | 'object_outside_frame'
     | 'outside_safe_area'
     | 'competing_payloads'
     | 'excessive_simultaneous_motion'
@@ -207,14 +207,16 @@ export function inspectScene(
    * structural check that cannot see the most visible defect in the output is
    * the check that needed writing.
    *
-   * Horizontal only, and deliberately. The box width is known exactly; its
-   * height depends on how the text wraps, which depends on the font, which
-   * this package cannot see without a browser. A guessed vertical bound would
-   * produce false failures on every correct scene, and a check people learn to
-   * ignore protects nothing.
+   * Widened from text to every object that states a width, because two
+   * independent reviewers of the rendered previews — a video model and a
+   * vision model from another vendor — both named a clipped product plate
+   * before either named anything else, and the check as first written only
+   * looked at type. `horizontalExtent` below says which kinds can be measured
+   * and why the vertical axis cannot.
    */
   for (const object of scene.objects) {
-    if (object.kind !== 'text') continue;
+    const extent = horizontalExtent(object);
+    if (!extent) continue;
     for (const t of [0, 0.5, 1]) {
       /*
        * Measured through the camera, not off the authored transform.
@@ -234,23 +236,41 @@ export function inspectScene(
       // and displaces each layer by its own depth, then the camera scales and
       // translates the whole frame around its centre.
       const scale = valueAt(object.transform.scale, t, curves) * depth * camScale;
-      const width = object.maxWidth * scale;
+      const width = valueAt(extent.width, t, curves) * scale;
       const parallaxed = 0.5 + (valueAt(object.transform.x, t, curves) - 0.5) * depth;
       const x = 0.5 + (parallaxed - 0.5) * camScale + camX;
       const left = x - object.transform.anchor.x * width;
       const right = left + width;
       if (left >= -TEXT_BLEED && right <= 1 + TEXT_BLEED) continue;
 
+      /*
+       * A full bleed is a decision; a plate hanging off one side is a mistake.
+       *
+       * Both look identical to an edge test, which is why the first version of
+       * this flagged every deliberately full-frame capture in all three
+       * directions. What separates them is coverage: an object that reaches
+       * past BOTH edges covers the frame, which is what somebody asking for a
+       * full bleed wanted. An object that reaches past one edge and stops
+       * short of the other is cropped, and that is the thing two reviewers
+       * called out as looking accidental rather than art-directed.
+       *
+       * Type is exempt from the exemption. A headline wider than the frame is
+       * never a bleed, whatever it covers — the words are simply gone.
+       */
+      const bleedsBothEdges = left <= TEXT_BLEED && right >= 1 - TEXT_BLEED;
+      if (bleedsBothEdges && object.kind !== 'text') continue;
+
       const edge = left < -TEXT_BLEED ? 'left' : 'right';
       const over = edge === 'left' ? -left : right - 1;
       say({
         objectId: object.id,
-        check: 'text_outside_frame',
-        severity: object.role === 'payload' ? 'hard_fail' : 'soft_fail',
+        check: 'object_outside_frame',
+        severity:
+          object.kind === 'shape' ? 'note' : object.role === 'payload' ? 'hard_fail' : 'soft_fail',
         message:
-          `"${object.content.slice(0, 40)}" is laid out in a box ${(width * 100).toFixed(0)}% of the ` +
-          `frame wide, which puts its ${edge} edge ${(over * 100).toFixed(0)}% past the frame. ` +
-          `The words are cut off. Narrow maxWidth, move x, or change the anchor.`,
+          `${extent.what} is ${(width * 100).toFixed(0)}% of the frame wide, which puts its ` +
+          `${edge} edge ${(over * 100).toFixed(0)}% past the frame. ${extent.consequence} ` +
+          `Narrow it, move x, or change the anchor.`,
         atSeconds: null,
       });
       break;
@@ -418,6 +438,56 @@ export function inspectScene(
 }
 
 /** A whole film's worth, with the device history threaded through. */
+
+/**
+ * How wide an object is in frame units, when that is knowable without a browser.
+ *
+ * Horizontal only, and the asymmetry is real rather than laziness. Every kind
+ * below states its width as a fraction of the frame, so the left and right
+ * edges are arithmetic. Height is not: a capture's is its width times the
+ * aspect of an image this package has never seen, and a text block's is
+ * however many lines the font happened to wrap to. A guessed vertical bound
+ * would fail correct scenes, and a check people learn to ignore protects
+ * nothing — so vertical clipping is left to a measurement taken on the
+ * rendered frames, where it is a fact rather than an estimate.
+ *
+ * `field`, `gradient`, `light` and `particles` are absent on purpose: they are
+ * atmosphere, they are meant to run past the edges, and a bleed is the point.
+ */
+function horizontalExtent(
+  object: SceneObject,
+): { width: Animatable; what: string; consequence: string } | null {
+  switch (object.kind) {
+    case 'text':
+      return {
+        width: object.maxWidth,
+        what: `"${object.content.slice(0, 40)}" is laid out in a box that`,
+        consequence: 'The words are cut off.',
+      };
+    case 'capture':
+      return {
+        width: object.width,
+        what: 'This capture of the product',
+        consequence: 'Part of the interface is cropped by the frame, which reads as a mistake.',
+      };
+    case 'ui_layer':
+      return { width: object.width, what: 'This interface layer', consequence: 'Part of it is cut off.' };
+    case 'image':
+      return { width: object.width, what: 'This image', consequence: 'Part of it is cut off.' };
+    case 'clip':
+      return { width: object.width, what: 'This clip', consequence: 'Part of the shot is cropped away.' };
+    case 'shape':
+      /*
+       * A rule drawn to the edge is a decision; a rule that overshoots by a
+       * third of a frame is a mistake, and nothing distinguishes them from the
+       * numbers alone. So a shape is only ever a note, never a hard failure.
+       */
+      return { width: object.width, what: 'This shape', consequence: 'It runs past the frame.' };
+    default:
+      return null;
+  }
+}
+
 export function inspectScenes(
   scenes: readonly SceneGraph[],
   curves: Record<CurveName, CurveFn>,

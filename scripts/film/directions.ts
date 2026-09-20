@@ -154,8 +154,8 @@ const paper: Graph[] = [
         { x: 0.60, y: 0.44, scale: { from: 0.94, to: 1, curve: 'out_quint' }, opacity: { from: 0, to: 1, curve: 'out_cubic' } },
         { width: 0.58, enterAt: 0.12, reason: 'The stages of the process, set as the main figure.' }),
       plate('a2_p2', 'ast_work_films', { x: 0, y: 0, width: 1, height: 0.6 },
-        { x: 0.80, y: 0.80, scale: { from: 0.94, to: 1, curve: 'out_quint' }, opacity: { from: 0, to: 1, curve: 'out_cubic' } },
-        { width: 0.46, enterAt: 0.40, reason: 'The work, overlapping and running off the page edge.' }),
+        { x: 0.74, y: 0.80, scale: { from: 0.94, to: 1, curve: 'out_quint' }, opacity: { from: 0, to: 1, curve: 'out_cubic' } },
+        { width: 0.46, enterAt: 0.40, reason: 'The work, overlapping the first figure.' }),
       rule('a2_rule', { x: 0.07, y: 0.3, anchor: { x: 0, y: 0.5 } }, { width: 0.32, fill: ACCENT, height: 0.004, reason: 'The rule carried from the previous page.' }),
     ],
     audio: [{ at: 0.2, kind: 'ui_click', intensity: 0.4, causedBy: 'a2_p1', reason: 'Each plate sets.' }],
@@ -231,7 +231,7 @@ const depth: Graph[] = [
     camera: { scale: { from: 1.5, to: 1.12, curve: 'out_expo' }, focalLengthMm: 120, depthOfField: { from: 0.7, to: 0.2, curve: 'out_expo' }, focusZ: 0 },
     objects: [
       plate('b1_detail', 'ast_home_hero', { x: 0.1, y: 0.2, width: 0.35, height: 0.3 },
-        { x: 0.44, y: 0.52, z: 0, scale: { from: 1.4, to: 1.0, curve: 'out_expo' } },
+        { x: 0.5, y: 0.52, z: 0, scale: { from: 1.4, to: 1.0, curve: 'out_expo' } },
         { width: 0.8, role: 'payload', reason: 'A detail of the real interface, before the whole of it.' }),
     ],
     audio: [{ at: 0.05, kind: 'riser', intensity: 0.5, causedBy: 'b1_detail', reason: 'Something is about to open.' }],
@@ -342,7 +342,7 @@ const field: Graph[] = [
     objects: [
       plate('c4_wide', 'ast_home_hero', { x: 0, y: 0, width: 1, height: 1 },
         { x: 0.5, y: 0.52, scale: { from: 1.04, to: 1.0, curve: 'out_quint' }, opacity: { from: 0, to: 1, curve: 'out_cubic' } },
-        { width: 0.96, role: 'payload', cornerRadiusPx: 0, shadow: false, reason: 'The real product, full-bleed, after three fields of nothing but words.' }),
+        { width: 1.1, role: 'payload', cornerRadiusPx: 0, shadow: false, reason: 'The real product, full-bleed, after three fields of nothing but words. Wider than the frame so the camera drift never uncovers an edge.' }),
       text('c4_tag', 'the real thing', { token: 'statement', maxWidth: 0.4, maxLines: 1, color: INK },
         { x: 0.06, y: 0.9, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],

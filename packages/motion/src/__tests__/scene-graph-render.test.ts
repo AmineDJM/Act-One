@@ -158,13 +158,13 @@ describe('the scene language', () => {
       });
 
     const clipped = inspectScenes([headline(1.6)], EASINGS).filter(
-      (f) => f.check === 'text_outside_frame',
+      (f) => f.check === 'object_outside_frame',
     );
     expect(clipped).toHaveLength(1);
     expect(clipped[0]?.severity).toBe('hard_fail');
 
     expect(
-      inspectScenes([headline(1)], EASINGS).filter((f) => f.check === 'text_outside_frame'),
+      inspectScenes([headline(1)], EASINGS).filter((f) => f.check === 'object_outside_frame'),
     ).toEqual([]);
   });
 });
