@@ -10,6 +10,7 @@ import {
   type Storyboard,
 } from '@act-one/core';
 import { DEFAULT_LIBRARY, findMusic, findSfx, type MusicCharacter, type MusicTrack, type SfxKind, type SoundLibrary } from './library.ts';
+import { planEnding, type EndingPlan } from './ending.ts';
 
 /**
  * The Sound Director.
@@ -38,9 +39,20 @@ export type SoundDesign = {
     enterAtSeconds: number;
     fadeInSeconds: number;
     fadeOutSeconds: number;
+    /**
+     * Film time at which the music is gone.
+     *
+     * It used to be the end of the film by construction, which meant every
+     * ending was "music fades under the last frame" no matter what the last
+     * frame was. A film that ends on its own product sound, or on a held
+     * silence, needs the bed out of the way before it gets there.
+     */
+    exitAtSeconds: number;
     baseGainDb: number;
   } | null;
   cues: PlacedCue[];
+  /** How this film stops, and why. Chosen from the cut, not applied to it. */
+  ending: EndingPlan;
   /** Seconds of deliberate silence in the film. Reported for QA. */
   silenceSeconds: number;
   /** Target integrated loudness for the master. */
@@ -131,6 +143,25 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
     notes.push(`Thinned UI sounds from ${uiCues.length} to ${uiBudget}.`);
   }
 
+  /*
+   * How the film stops.
+   *
+   * This runs after the cues are placed because the decision is read out of
+   * the film — how much of it was spent operating the product, how dense the
+   * sound got, what the last frame holds — and then it is enforced back onto
+   * them. `endWithSting` is a preference the creative system expresses; an
+   * ending that belongs to no film in particular is not a preference worth
+   * honouring, so the plan wins and says why in the notes.
+   */
+  const dense = total > 0 && cues.filter((cue) => cue.storageKey !== null).length / total > 0.45;
+  const ending = planEnding(storyboard, { loud: dense, hasVoiceOver: input.hasVoiceOver ?? false });
+  const removed = applyEnding(cues, ending, total);
+  if (removed.length > 0) {
+    notes.push(`${ending.strategy.replace(/_/g, ' ')}: dropped ${removed.join(', ')} from the last seconds. ${ending.reason}`);
+  } else {
+    notes.push(`Ending — ${ending.strategy.replace(/_/g, ' ')}. ${ending.reason}`);
+  }
+
   const silence = computeSilence(cues, enterAt, total);
   if (silence < 0.6 && total > 20) {
     notes.push('No deliberate silence in this film — the mix has no dynamics to play against.');
@@ -146,7 +177,15 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
           startOffsetSeconds: chooseStartOffset(track, storyboard, enterAt),
           enterAtSeconds: Number(enterAt.toFixed(3)),
           fadeInSeconds: input.behaviour.openOnMusic ? 0.8 : 1.6,
-          fadeOutSeconds: track.hasOutro ? 2.2 : 1.2,
+          /*
+           * A hard stop is a cut, not a fade: 120 ms so the tail does not
+           * click, and nothing that reads as a resolution.
+           */
+          fadeOutSeconds:
+            ending.strategy === 'hard_stop' ? 0.12 : track.hasOutro ? 2.2 : 1.2,
+          exitAtSeconds: Number(
+            Math.max(enterAt + 0.5, total - ending.musicOutSeconds).toFixed(3),
+          ),
           /*
            * One bed level, whether or not anybody is speaking.
            *
@@ -160,10 +199,63 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
         }
       : null,
     cues: cues.sort((a, b) => a.atSeconds - b.atSeconds),
+    ending,
     silenceSeconds: Number(silence.toFixed(2)),
     targetLufs: LOUDNESS_TARGETS[channel],
     notes,
   };
+}
+
+/**
+ * How much of the tail counts as "the ending".
+ *
+ * A fixed three and a half seconds is the whole ending of a five-second film,
+ * and clearing it took out an impact that was doing structural work in the
+ * middle of the cut. The ending is the last quarter, and on a long film that
+ * is still only the last few seconds.
+ */
+const LAST_SHARE = 0.25;
+const LAST_SECONDS_MAX = 3.5;
+
+/**
+ * The ending, enforced on the cues that were already placed.
+ *
+ * Every strategy but one removes rather than adds, which is the point: the
+ * generic ending is what you get by adding a gesture, and the way out of it is
+ * not a different gesture. Returns what it took away, so the notes can say so
+ * instead of the film quietly losing a sound somebody asked for.
+ */
+function applyEnding(cues: PlacedCue[], ending: EndingPlan, total: number): string[] {
+  const from = total - Math.min(LAST_SECONDS_MAX, total * LAST_SHARE);
+  const doomed = new Set<string>();
+  for (const cue of cues) {
+    if (cue.atSeconds <= from) continue;
+    switch (ending.strategy) {
+      case 'product_sound_last':
+        // Everything that is not the product's own sound clears out of its way.
+        if (cue.type !== 'ui_click') doomed.add(cue.id);
+        break;
+      case 'let_it_go_quiet':
+      case 'hard_stop':
+        if (cue.type === 'logo_sting' || cue.type === 'impact' || cue.type === 'riser') doomed.add(cue.id);
+        break;
+      case 'subtract_to_one':
+        if (cue.type === 'logo_sting' || cue.type === 'riser') doomed.add(cue.id);
+        break;
+      case 'small_impact':
+        // One mark. A sting under it is the ending this exists to avoid.
+        if (cue.type === 'logo_sting' || cue.type === 'riser') doomed.add(cue.id);
+        break;
+    }
+  }
+  const dropped: string[] = [];
+  for (let i = cues.length - 1; i >= 0; i -= 1) {
+    const cue = cues[i]!;
+    if (!doomed.has(cue.id)) continue;
+    dropped.push(cue.type);
+    cues.splice(i, 1);
+  }
+  return [...new Set(dropped)];
 }
 
 function placeCue(

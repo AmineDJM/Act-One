@@ -29,8 +29,9 @@ function design(baseGainDb: number): SoundDesign {
   return {
     id: 'snd_1',
     storyboardId: 'sbd_1',
-    music: { trackId: 'trk_1', storageKey: 'bed', startOffsetSeconds: 0, enterAtSeconds: 0, fadeInSeconds: 0, fadeOutSeconds: 0, baseGainDb },
+    music: { trackId: 'trk_1', storageKey: 'bed', startOffsetSeconds: 0, enterAtSeconds: 0, fadeInSeconds: 0, fadeOutSeconds: 0, exitAtSeconds: 6, baseGainDb },
     cues: [],
+    ending: { strategy: 'hard_stop', reason: 'fixture', musicOutSeconds: 0, sting: false },
     silenceSeconds: 0,
     targetLufs: -16,
     notes: [],

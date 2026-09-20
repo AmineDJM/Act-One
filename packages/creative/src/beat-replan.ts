@@ -132,6 +132,12 @@ Change what is on screen. If we hold real product material, this beat should sho
 
   too_generic: `The problem is that this beat is true of this company and of forty others like it. Nothing in it could only be them. Reach for the specific: their own words, their own numbers, their own interface, the particular thing their product does that a competitor's does not. Same length, same message, no more words \u2014 a sharper one.`,
 
+  polished_deck: `The problem is that the film is a presentation. Not a bad one — that is why it survived every other check. Isolated cards, held screenshots, the same composition every time, one feature after the next, and nothing actually happening in any of it.
+
+Do not answer this with more words, another screenshot, or one more card. Those are the disease. The answer is a different visual idea for this beat: something occurring rather than something displayed. The product doing the thing instead of a picture of the thing. One image nobody else could use. A moment that leads into the next one instead of ending so the next can start.
+
+If this beat genuinely cannot be anything other than a card, say so in your reasoning and name the beat that can.`,
+
   too_late_product: `The problem is that the product arrives too late to matter. This beat should be where it arrives. If we hold product material, use it here; if this beat cannot carry it, say so in your reasoning and propose what can. Do not answer this with a better label.`,
 
   insufficient_product: `The problem is that there is not enough of the customer's own product on screen. This beat is a candidate for carrying some. Use the material we hold rather than describing what it would show. Do not answer this with more copy.`,

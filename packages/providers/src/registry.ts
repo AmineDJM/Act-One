@@ -238,6 +238,22 @@ export class ProviderRegistry {
   }
 
   /**
+   * The media provider, only when it can actually be called.
+   *
+   * `mediaOrNull` answers a question about configuration — has an operator
+   * switched generative media off — and it was being read as an answer to a
+   * different question, which is whether a shot written as moving footage can
+   * be produced. On a deployment with the feature on and no key the two
+   * answers differ, and the film silently came out as stills with nothing
+   * anywhere saying why.
+   */
+  mediaReady(): GenerativeMediaProvider | null {
+    const provider = this.mediaOrNull();
+    if (provider === null) return null;
+    return provider.isConfigured?.() === false ? null : provider;
+  }
+
+  /**
    * The voice for a quality tier. Finals go to the primary engine; previews
    * to the preview engine when one is set apart, otherwise to the same engine,
    * which picks its cheaper model from the request's quality.

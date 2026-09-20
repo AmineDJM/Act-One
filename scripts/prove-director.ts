@@ -36,6 +36,7 @@ import { createHash } from 'node:crypto';
 import type { Dirent } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   AudienceModel,
   BrandGenome,
@@ -45,7 +46,7 @@ import {
   type Project,
 } from '@act-one/core';
 import { DbCostSink, MemoryStore } from '@act-one/db';
-import { LocalFsStorageProvider, ProviderRegistry } from '@act-one/providers';
+import { LocalFsStorageProvider, ProviderRegistry, loadLocalEnv } from '@act-one/providers';
 import {
   runConcepts,
   runPreProduction,
@@ -58,6 +59,16 @@ import {
 import { measureFilm, readContainer } from '@act-one/qa';
 
 const WEBSITE = process.argv[2] ?? 'https://www.ashbyhq.com/';
+
+/*
+ * A key that exists somewhere the process cannot see is a key that does not
+ * exist. Deployed, every secret is an environment variable; on a machine or in
+ * a sandbox it is usually a file the repository ignores, and Act One spent a
+ * long time reporting "no video provider configured" to a person who had
+ * configured one. Names only — the values are never printed.
+ */
+const fromFile = loadLocalEnv(path.resolve(fileURLToPath(new URL('..', import.meta.url))));
+if (fromFile.length > 0) console.log(`  .env.local → ${fromFile.join(', ')}`);
 
 const store = new MemoryStore();
 const now = new Date().toISOString();

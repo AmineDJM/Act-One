@@ -5,6 +5,8 @@ import {
   AppError,
   comprehension,
   cutAspect,
+  deckSymptoms,
+  mediumMix,
   FILM_CUTS,
   pitchDrift,
   AUDIO_STANDARDS,
@@ -101,6 +103,7 @@ import {
   type RepairIntent,
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
+import { isBlenderAvailable } from '@act-one/three-d';
 import { filmTheProduct } from './product-cinematography.ts';
 import { runHeroShot, withHeroShot } from './hero-shot.ts';
 import { runSceneAssets } from './assets.ts';
@@ -1572,6 +1575,59 @@ async function renderOnce(
     repair: note.problem === 'unreadable_text' || note.problem === 'too_brief_for_ui' ? 'retime_scene' : 'manual_review',
   }));
 
+  /*
+   * Is it a deck?
+   *
+   * Asked of the whole cut rather than of any shot, because every shot in a
+   * presentation passes: the type is legible, the capture is real, the pacing
+   * is fine. What makes it a deck is the shape they add up to, and nothing in
+   * this system was looking at the shape.
+   */
+  const deck = deckSymptoms(storyboard);
+  const deckIssues: QaFinding[] = deck.isDeck
+    ? [
+        {
+          id: newId('evt'),
+          sceneId: null,
+          timecodeStart: 0,
+          detectedBy: 'deterministic',
+          evidenceAssetId: null,
+          check: 'direction',
+          severity: 'soft_fail',
+          message: deck.message,
+          confidence: 1,
+          // Not `rewrite_copy`, and deliberately so: answering this with
+          // words is how the film got here.
+          repair: 'manual_review',
+        } satisfies QaFinding,
+      ]
+    : [];
+
+  /*
+   * What each shot is made of, and what it could not be made of.
+   *
+   * A beat written for moving footage on a worker with no video provider
+   * becomes a card, and in the finished film a card that was always meant to
+   * be a card and a card that is a missing generated shot are the same
+   * picture. This is the sentence that tells them apart.
+   */
+  const media = mediumMix(storyboard, {
+    video: context.registry.mediaReady() !== null,
+    threeD: await isBlenderAvailable().catch(() => false),
+  });
+  const mediumIssues: QaFinding[] = media.shortfalls.map((shortfall) => ({
+    id: newId('evt'),
+    sceneId: shortfall.sceneId,
+    timecodeStart: shortfall.startTime,
+    detectedBy: 'deterministic',
+    evidenceAssetId: null,
+    check: 'direction',
+    severity: 'soft_fail',
+    message: shortfall.message,
+    confidence: 1,
+    repair: 'regenerate_shot',
+  }));
+
   const cinematographyIssues: QaFinding[] = filming.result.shortfalls.map((shortfall) => {
     const scene = storyboard.scenes.find((candidate) => candidate.id === shortfall.sceneId);
     return {
@@ -1616,7 +1672,7 @@ async function renderOnce(
     detail: summariseCoverage(readiness.coverage),
     status: readiness.ready ? 'done' : 'failed',
   });
-  const degradedIssues: QaFinding[] = [...comprehensionIssues, ...cinematographyIssues, ...readiness.blockers.map((blocker) => {
+  const degradedIssues: QaFinding[] = [...deckIssues, ...mediumIssues, ...comprehensionIssues, ...cinematographyIssues, ...readiness.blockers.map((blocker) => {
     const scene = storyboard.scenes.find((candidate) => candidate.id === blocker.sceneId);
     return {
       id: newId('evt'),

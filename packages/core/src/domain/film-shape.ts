@@ -17,6 +17,19 @@ import { REAL_PRODUCT_VISUAL_TYPES } from './storyboard.ts';
  * both the same prompt and fixes neither.
  */
 export const CreativeProblem = z.enum([
+  /*
+   * The one failure this whole project keeps producing.
+   *
+   * Not "the film is bad" — the film is usually fine. It is that the film is
+   * a deck: isolated cards, held screenshots, the same composition over and
+   * over, one feature after another, nothing happening. Every individual shot
+   * passes, and the thing they add up to is a presentation with music on it.
+   *
+   * It is named as a problem in its own right because the repairs that a
+   * general complaint produces — more words, another screenshot, one more
+   * card — are the disease.
+   */
+  'polished_deck',
   /** The beat holds more room than its content can fill. */
   'too_empty',
   /** More is asked of the viewer than the seconds allow. */
@@ -200,6 +213,14 @@ const WATCHED: Partial<
    */
   too_static: { of: 'cinematicShare', worseIs: 'lower', says: 'even less of the product actually moves' },
   bad_pacing: { of: 'longestRepeat', worseIs: 'higher', says: 'the film repeats itself for even longer' },
+  /*
+   * A repair for "this is a deck" that raises the share of the film which is
+   * a typographic card has answered the complaint with the disease. This is
+   * the one watch where the metric is the most direct restatement of the
+   * problem, and it is the one that needed it most: every general note about
+   * a film being flat has, historically, come back as another card.
+   */
+  polished_deck: { of: 'typographyShare', worseIs: 'higher', says: 'there is even more of the film on a title card' },
 };
 
 /** How much a metric may move the wrong way before it counts as a regression. */
@@ -256,4 +277,86 @@ function format(of: keyof FilmShape, value: number): string {
   if (of === 'firstProductSeconds') return `${value.toFixed(1)}s`;
   if (of === 'longestRepeat') return String(value);
   return `${Math.round(value * 100)}%`;
+}
+
+/**
+ * Whether the film is a deck.
+ *
+ * Every individual check can pass on a film that is a presentation, because
+ * nothing is wrong with any single shot: the type is legible, the capture is
+ * real, the pacing is fine. What makes it a deck is the shape of the whole —
+ * cards in isolation, screens held rather than operated, the same composition
+ * returning, one feature after the next, nothing happening.
+ *
+ * So it is counted rather than judged. Each symptom is a fact about the cut;
+ * three of them together is the thing everybody keeps recognising and nobody
+ * could name.
+ */
+export type DeckSymptom =
+  | 'cards_carry_the_film'
+  | 'screens_held_not_operated'
+  | 'one_composition_repeated'
+  | 'feature_by_feature'
+  | 'nothing_happens';
+
+export const DECK_SAYS: Record<DeckSymptom, string> = {
+  cards_carry_the_film: 'more than a third of the running time is a typographic card',
+  screens_held_not_operated: 'the product is shown but never filmed: whole screens, held',
+  one_composition_repeated: 'the same kind of shot returns three or more times in a row',
+  feature_by_feature: 'three or more consecutive beats are single-label feature names',
+  nothing_happens: 'nothing in the film is operated and almost nothing moves but the camera',
+};
+
+/** Three symptoms is the line. Two is a film with a habit; three is a presentation. */
+export const DECK_THRESHOLD = 3;
+
+export function deckSymptoms(storyboard: Storyboard): {
+  symptoms: DeckSymptom[];
+  isDeck: boolean;
+  message: string;
+} {
+  const shape = filmShape(storyboard);
+  const scenes = [...storyboard.scenes].sort((a, b) => a.index - b.index);
+  const symptoms: DeckSymptom[] = [];
+
+  if (shape.typographyShare > 0.35) symptoms.push('cards_carry_the_film');
+
+  const shown = scenes.filter(
+    (scene) => REAL_PRODUCT_VISUAL_TYPES.includes(scene.visualType) && scene.assetRefs.length > 0,
+  );
+  const filmed = shown.filter((scene) => (scene.uiSequence?.framings.length ?? 0) > 0);
+  if (shown.length > 0 && filmed.length < shown.length / 2) symptoms.push('screens_held_not_operated');
+
+  if (shape.longestRepeat >= 3) symptoms.push('one_composition_repeated');
+
+  /*
+   * A run of beats whose whole content is a category name. "ATS", "CRM",
+   * "Scheduling" is the shape of a feature list read aloud, and it is what a
+   * film does instead of an argument when nobody decided what the argument
+   * was.
+   */
+  let labels = 0;
+  let longestLabels = 0;
+  for (const scene of scenes) {
+    const words = scene.onScreenText.join(' ').trim().split(/\s+/).filter(Boolean);
+    const isLabel = scene.assetRefs.length === 0 && words.length > 0 && words.length <= 2;
+    labels = isLabel ? labels + 1 : 0;
+    longestLabels = Math.max(longestLabels, labels);
+  }
+  if (longestLabels >= 3) symptoms.push('feature_by_feature');
+
+  if (shape.operatedShots === 0 && shape.cinematicShare < 0.15) symptoms.push('nothing_happens');
+
+  const isDeck = symptoms.length >= DECK_THRESHOLD;
+  return {
+    symptoms,
+    isDeck,
+    message: isDeck
+      ? `This is a presentation rather than a film: ${symptoms.map((symptom) => DECK_SAYS[symptom]).join('; ')}. ` +
+        `The answer is a different visual idea, not more words, another screenshot or one more card.`
+      : symptoms.length > 0
+        ? `${symptoms.length} of the ${DECK_THRESHOLD} habits of a deck are present: ` +
+          `${symptoms.map((symptom) => DECK_SAYS[symptom]).join('; ')}.`
+        : 'None of the shapes a presentation takes are present in this cut.',
+  };
 }

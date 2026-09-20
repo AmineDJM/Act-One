@@ -65,7 +65,14 @@ export function buildMix(options: BuildMixOptions): MixPlan {
         atSeconds: design.music.enterAtSeconds,
         gainDb: design.music.baseGainDb,
         trimStartSeconds: design.music.startOffsetSeconds,
-        durationSeconds: options.durationSeconds - design.music.enterAtSeconds,
+        /*
+         * The bed runs from where it enters to where the ending says it is
+         * gone — not to the last frame. On a film that ends on its own product
+         * sound or on a held silence, music under the final frame is the thing
+         * being avoided, and the fade below now lands on that exit point.
+         */
+        durationSeconds:
+          Math.min(design.music.exitAtSeconds, options.durationSeconds) - design.music.enterAtSeconds,
         fadeInSeconds: design.music.fadeInSeconds,
         fadeOutSeconds: design.music.fadeOutSeconds,
       });

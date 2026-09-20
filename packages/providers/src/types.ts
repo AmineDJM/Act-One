@@ -52,6 +52,17 @@ export interface Provider {
   readonly name: string;
   readonly kind: ProviderKind;
   health(): Promise<ProviderHealth>;
+  /**
+   * Whether this provider has what it needs to make a real call.
+   *
+   * Constructing a vendor client costs nothing and needs no key, so a registry
+   * will happily hand back a provider for a vendor nobody has given credentials
+   * to; it fails at the call, minutes later, somewhere else. That let "is video
+   * available?" be answered yes on a deployment that had no video — the same
+   * mistake as reading an absence as a decision. A provider that can tell the
+   * difference says so here, and the registry asks before promising anything.
+   */
+  isConfigured?(): boolean;
 }
 
 /** Context threaded into every provider call so costs attribute correctly. */

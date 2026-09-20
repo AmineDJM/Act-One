@@ -38,6 +38,7 @@ export * from './domain/film-shape.ts';
 export * from './domain/ui-cinema.ts';
 export * from './domain/hero-shot.ts';
 export * from './domain/comprehension.ts';
+export * from './domain/medium.ts';
 export * from './domain/replan.ts';
 export * from './domain/project.ts';
 export * from './domain/job.ts';

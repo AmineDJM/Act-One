@@ -106,13 +106,21 @@ export async function runSceneAssets(
         continue;
       }
 
-      const media = registry.mediaOrNull();
+      const media = registry.mediaReady();
       if (!media) {
-        // Generative media is off for this deployment. The storyboard engine
-        // routes around it, so this is a configuration state rather than a
-        // failure — the scene falls back to typography at render time.
+        // Generative media is unavailable to this deployment — switched off,
+        // or switched on with no credentials, which from here is the same
+        // thing and used to be worse: the provider object existed, so the
+        // stage went on to call it and died on the first request. The
+        // storyboard engine routes around an absent provider, so this is a
+        // configuration state rather than a failure, and the note says which
+        // of the two it is so somebody can fix the fixable one.
         result.skipped += 1;
-        result.notes.push(`Scene ${scene.index + 1}: generative media is disabled.`);
+        result.notes.push(
+          registry.mediaOrNull() === null
+            ? `Scene ${scene.index + 1}: generative media is disabled.`
+            : `Scene ${scene.index + 1}: generative media is enabled but has no credentials.`,
+        );
         continue;
       }
 

@@ -18,6 +18,8 @@ export { BrowserbaseProvider, type BrowserbaseConfig } from './browser/browserba
 export { LocalChromiumProvider, type LocalBrowserConfig } from './browser/local.ts';
 export { KernelProvider, type KernelConfig } from './browser/kernel.ts';
 
+export { loadLocalEnv } from './local-env.ts';
+
 export * from './media/types.ts';
 export {
   HiggsfieldProvider,
