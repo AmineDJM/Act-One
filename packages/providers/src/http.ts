@@ -114,7 +114,7 @@ export async function httpRequest<T = unknown>(
         );
         if (retryable && attempt < attempts) {
           lastError = error;
-          await sleep(backoffMs(attempt, response.headers.get('retry-after')));
+          await sleep(backoffMs(attempt, response.headers.get('retry-after'), response.status));
           continue;
         }
         throw error;
@@ -222,7 +222,7 @@ export async function httpStream(
         );
         if (retryable && attempt < attempts) {
           lastError = error;
-          await sleep(backoffMs(attempt, response.headers.get('retry-after')));
+          await sleep(backoffMs(attempt, response.headers.get('retry-after'), response.status));
           continue;
         }
         throw error;
@@ -280,12 +280,22 @@ async function safeText(response: Response): Promise<string> {
   }
 }
 
-export function backoffMs(attempt: number, retryAfter: string | null): number {
+export function backoffMs(attempt: number, retryAfter: string | null, status?: number): number {
   if (retryAfter) {
     const seconds = Number(retryAfter);
     if (Number.isFinite(seconds) && seconds >= 0) return Math.min(30_000, seconds * 1000);
   }
-  const base = Math.min(20_000, 500 * 2 ** (attempt - 1));
+  /*
+   * A gateway status is waited out, not hammered.
+   *
+   * 502, 503 and 504 mean the hop in front of the provider failed, and half a
+   * second is not long enough for one to come back. Three attempts a second
+   * and a half apart is not patience \u2014 it is asking the same broken hop the
+   * same question three times \u2014 and it threw away a twelve-page crawl and a
+   * director's arbitration that had both already been paid for.
+   */
+  const gateway = status === 502 || status === 503 || status === 504;
+  const base = Math.min(20_000, (gateway ? 2_000 : 500) * 2 ** (attempt - 1));
   return Math.round(base * (0.75 + Math.random() * 0.5));
 }
 

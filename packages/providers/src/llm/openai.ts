@@ -419,7 +419,10 @@ export class OpenAiLlmProvider implements LlmProvider {
         method: 'POST',
         headers: this.headers(),
         body,
-        attempts: 3,
+        // Four, because the gateway in front of the model is the thing that
+        // fails, and a stage that has already paid for a crawl is not thrown
+        // away over a hop that would have come back in ten seconds.
+        attempts: 4,
         idleTimeoutMs: 60_000,
         signal: context.signal,
         onChunk: (text) => consumeSse(text, collector),

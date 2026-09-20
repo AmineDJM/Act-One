@@ -3,6 +3,7 @@ import { getStore } from '@/server/store.ts';
 import { getStorage } from '@/server/assets.ts';
 import { reportError } from '@/server/report.ts';
 import { parseByteRange } from '@/server/range.ts';
+import { releaseCheck } from '@/server/release.ts';
 
 /**
  * Serves one asset to the organisation that owns it.
@@ -31,6 +32,26 @@ export async function GET(
     const storage = await getStorage();
     const query = new URL(request.url).searchParams;
     const download = query.get('download') !== null;
+
+    /*
+     * A master leaves as a file only once both gates have passed.
+     *
+     * Enforced here rather than by hiding a button, because a button is not a
+     * rule: the page, Collections and a copied link all reach these same bytes
+     * and each used to decide for itself whether the film was finished. It is
+     * still streamed for playback \u2014 the customer must be able to watch what
+     * was made, and the page says plainly that it is a workprint \u2014 but it
+     * does not arrive on anybody's disk called a master.
+     */
+    if (download) {
+      const release = await releaseCheck(getStore(), session.organizationId, asset);
+      if (!release.allowed) {
+        return new Response(release.reason, {
+          status: 409,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+        });
+      }
+    }
 
     // The library's cards ask for the small version the upload made; an asset
     // without one (an SVG, an older capture) is served as it is.

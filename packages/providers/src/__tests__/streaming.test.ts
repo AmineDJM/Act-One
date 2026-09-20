@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { backoffMs } from '../http.ts';
 import { consumeSse, finishCollector, newCollector } from '../llm/openai.ts';
 
 /**
@@ -78,5 +79,26 @@ describe('a completion, reassembled from its stream', () => {
   it('is unbothered by a null content delta', () => {
     const result = stream([event({ choices: [{ delta: { content: null } }] }), delta('text')]);
     expect(result.content).toBe('text');
+  });
+});
+
+describe('how long to wait before asking again', () => {
+  it('waits longer for a gateway than for the provider', () => {
+    // 502/503/504 is the hop in front of the model, not the model. Half a
+    // second three times over is how a paid-for research crawl was lost.
+    const provider = backoffMs(1, null, 429);
+    const gateway = backoffMs(1, null, 502);
+    expect(gateway).toBeGreaterThan(provider * 2);
+  });
+
+  it('honours what the server actually asked for', () => {
+    expect(backoffMs(1, '7', 502)).toBe(7000);
+    expect(backoffMs(3, '120', 429)).toBe(30_000);
+  });
+
+  it('never waits more than twenty seconds on its own reckoning', () => {
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      expect(backoffMs(attempt, null, 502)).toBeLessThanOrEqual(20_000 * 1.25);
+    }
   });
 });

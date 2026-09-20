@@ -12,6 +12,7 @@ import {
   newId,
   orderForPublic,
   rememberAddress,
+  releasable,
   submissionNext,
   type Asset,
   type CollectionStatus,
@@ -58,8 +59,8 @@ export type SubmissionView = {
 export async function deliverableFor(organizationId: string, project: Project): Promise<Render | null> {
   const renders = (await getStore().renders.listForProject(organizationId, project.id)).filter((render) => render.kind === 'film');
   return (
-    renders.find((render) => render.id === project.latestRenderId && render.masterAssetId && render.status === 'completed') ??
-    renders.find((render) => render.status === 'completed' && Boolean(render.masterAssetId)) ??
+    renders.find((render) => render.id === project.latestRenderId && releasable(render)) ??
+    renders.find((render) => releasable(render)) ??
     null
   );
 }
@@ -80,6 +81,11 @@ export async function loadSubmission(session: Session, project: Project): Promis
 }
 
 function eligibilityOf(render: Render | null): string | null {
+  /*
+   * `deliverableFor` only returns a releasable film, so a project whose film
+   * was held reaches here as null and is told to finish it \u2014 rather than
+   * being offered a gallery place for a cut Act One's own review sent back.
+   */
   if (!render || !render.masterAssetId) return 'Collections shows finished films. Render the master first.';
   if (render.watermarked) return 'A watermarked preview cannot be selected. Render the clean master first.';
   return null;

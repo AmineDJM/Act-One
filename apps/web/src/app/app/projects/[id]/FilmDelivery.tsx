@@ -1,4 +1,4 @@
-import { ATTRIBUTION, pieceLabel, type Render, type Variant } from '@act-one/core';
+import { ATTRIBUTION, pieceLabel, releasable, type Render, type Variant } from '@act-one/core';
 import styles from '../../app.module.css';
 
 /** What a viewer calls the track in the player's own menu. */
@@ -72,7 +72,14 @@ export function FilmDelivery({
    * The bytes stay on the page: the customer should see what was made. What
    * changes is that it is called what it is until it passes.
    */
-  const finished = render.status === 'completed';
+  /*
+   * Both gates, not one. `releasable` is the single answer in this codebase
+   * to "may this be handed over", and the download route enforces the same
+   * one \u2014 so a film the creative review sent back reads as a workprint here
+   * and refuses to download there, rather than the page saying one thing and
+   * the server another.
+   */
+  const finished = releasable(render);
 
   const ready = variants.filter((variant) => variant.assetId);
 

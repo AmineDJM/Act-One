@@ -8,6 +8,7 @@ export { runCreativeReplan } from './stages/replan.ts';
 export { runDirection, type DirectionResult } from './stages/direction.ts';
 export { runPreProduction, type PreProductionResult } from './stages/pre-production.ts';
 export { runAnimatic } from './stages/animatic.ts';
+export { runCreativeMasterGate, type CreativeGateResult } from './stages/creative-gate.ts';
 export {
   needsMaterial,
   renderModeFor,

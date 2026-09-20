@@ -101,6 +101,7 @@ import {
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { runSceneAssets } from './assets.ts';
+import { runCreativeMasterGate } from './creative-gate.ts';
 import {
   renderModeFor,
   summariseCoverage,
@@ -336,6 +337,8 @@ export async function runRender(
     let heldBy: string[] = [];
     let escalation: CreativeEscalation | null = null;
     let qaLayers: QaLayer[] = [];
+    /** What the director said watching the last cut back, for the creative gate. */
+    let directorsVerdict: DirectorsVerdict | null = null;
     let starvedCheck: QaCheck = 'still_frame_hold';
     /** The manifest the delivered cut was rendered from. Null until the first pass. */
     let lastReadiness: MasterReadiness | null = null;
@@ -379,6 +382,9 @@ export async function runRender(
       });
       issues = inspected.issues;
       qaLayers = inspected.layers;
+      // Carried out of the loop so the creative gate can read what the
+      // director already said rather than pay to have it watched twice.
+      directorsVerdict = inspected.watched;
 
       /*
        * A film that was scored and came out silent.
@@ -899,9 +905,52 @@ export async function runRender(
       // A preview is allowed to be incomplete. This is the master gate.
       materialComplete: lastReadiness === null || lastReadiness.ready,
     };
-    const passed = deliveryState(facts) === 'ready';
+    const productionPassed = deliveryState(facts) === 'ready';
+
+    /*
+     * The second gate, on the file that is about to be handed over.
+     *
+     * Everything above this line asked whether anything is wrong. A film can
+     * answer no to all of it and still be thirty seconds of type on a flat
+     * field in silence \u2014 which is what a customer received while every
+     * check in this system reported success, because every check was reading
+     * the plan. So the creative gate opens the master, measures what is
+     * actually on the screen and in the track, shows the cut to the panel and
+     * asks the director to decide.
+     *
+     * Not on an animatic: a preview is the customer looking at their own cut
+     * while they are still changing it, and it is not delivered.
+     */
+    const creative =
+      kind === 'animatic' || options.skipVisionQa
+        ? null
+        : await runCreativeMasterGate(context, {
+            renderId: render.id,
+            storyboard: current,
+            masterPath,
+            workDir,
+            watched: directorsVerdict,
+          }).catch((error: unknown) => {
+            /*
+             * A gate that could not run has not passed. It is recorded as
+             * having not run \u2014 `creativeVerdict` stays null \u2014 and the
+             * film is not held for it, because withholding a customer's film
+             * over an outage is a different failure from withholding it over
+             * quality.
+             */
+            console.error('[render] the creative gate could not run:', (error as Error).message.slice(0, 200));
+            return null;
+          });
+
+    const creativeOk =
+      creative === null || creative.verdict === 'pass' || creative.verdict === 'pass_with_concerns';
+    const passed = productionPassed && creativeOk;
     const heldForAPerson = !passed;
-    const holdReason = heldForAPerson ? replanMessage(lastScore, starved, current, heldBy) : '';
+    const holdReason = !productionPassed
+      ? replanMessage(lastScore, starved, current, heldBy)
+      : creativeOk
+        ? ''
+        : creative!.reason;
     await store.renders.update(organizationId, render.id, {
       /*
        * `needs_attention`, not `failed`.
@@ -915,6 +964,14 @@ export async function runRender(
       posterAssetId: posterAsset?.asset.id ?? null,
       captionsAssetId: captionAsset?.asset.id ?? null,
       durationSeconds: storyboardDuration(current),
+      /*
+       * Two verdicts, recorded apart, because they answer different questions
+       * and a film can pass one and fail the other. `releasable()` reads both;
+       * a gate that never ran stays null rather than being written down as a
+       * pass nobody gave.
+       */
+      productionVerdict: productionPassed ? 'pass' : 'needs_attention',
+      ...(creative ? { creativeVerdict: creative.verdict, creativeReason: creative.reason } : {}),
       completedAt: new Date().toISOString(),
       ...(passed ? {} : { error: holdReason || gate.reason || 'Quality checks did not pass.' }),
     });
@@ -1884,7 +1941,7 @@ async function inspect(
     /** Whether the film was scored at all, for the check that it can be heard. */
     hasSound: boolean;
   },
-): Promise<{ issues: QaFinding[]; layers: QaLayer[] }> {
+): Promise<{ issues: QaFinding[]; layers: QaLayer[]; watched: DirectorsVerdict | null }> {
   const { registry, project, organizationId } = context;
   await context.progress(0.78, 'Checking the film');
   await context.activity({ step: 'composition', kind: 'step', label: 'checking the film frame by frame', status: 'active' });
@@ -1945,7 +2002,7 @@ async function inspect(
    */
   const layers: QaLayer[] = ['spec', 'structural', 'visual', 'audio', 'cross_modal'];
 
-  if (params.skipVision) return { issues, layers };
+  if (params.skipVision) return { issues, layers, watched: null };
 
   // Vision QA reads actual frames, extracted from the finished film so it sees
   // exactly what the customer will.
@@ -2011,7 +2068,7 @@ async function inspect(
     }
   }
 
-  return { issues, layers };
+  return { issues, layers, watched: verdict };
 }
 
 /**
