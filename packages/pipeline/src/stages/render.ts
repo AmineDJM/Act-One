@@ -1646,11 +1646,28 @@ async function renderOnce(
   });
   const soundIssues: QaFinding[] = [...narration.issues, ...captions.issues];
   /*
-   * What the film was scored to carry, before anything was resolved or mixed.
-   * Read off the design rather than off the mix, because the whole question
-   * downstream is whether a film that asked for sound came back without it.
+   * Whether this film was meant to be heard \u2014 read off the plan, not off the
+   * mix and not off the design.
+   *
+   * This used to ask whether the design had ended up holding music, cues or
+   * voice, which is a question about the sound library rather than about the
+   * film. On a real run the storyboard asked for "mid-tempo percussion with
+   * dry interface ticks, window snaps, cursor taps, and one heavier cut" and
+   * carried sixteen sound cues; the library those cues point at was not
+   * present, so the design came back empty, so the film "was never meant to
+   * have a track", so the silent master check stood down and a film nobody
+   * can hear was mastered and shown to the director to be judged.
+   *
+   * An absence is not a decision. The storyboard's own music direction and
+   * its own cues are what the creative system asked for, before anything went
+   * looking for a file, and that is what makes the silence a failure rather
+   * than a choice.
    */
-  const hasSound = Boolean(design.music) || design.cues.length > 0 || voiceTracks.length > 0;
+  const soundIntended =
+    storyboard.musicDirection.trim().length > 0 ||
+    storyboard.scenes.some((scene) => scene.soundCues.length > 0 || scene.voiceOver) ||
+    voiceTracks.length > 0;
+  const hasSound = soundIntended;
   const soundKeys = new Set(
     [design.music?.storageKey, ...design.cues.map((cue) => cue.storageKey)].filter(
       (key): key is string => typeof key === 'string',

@@ -21,7 +21,7 @@ import { runRender } from './render.ts';
 export async function runAnimatic(
   context: StageContext,
   options: { storyboardId?: string } = {},
-): Promise<{ renderId: string; assetId: string; issues: number }> {
+): Promise<{ renderId: string; assetId: string; issues: number; silent: boolean }> {
   const storyboardId = options.storyboardId ?? context.project.activeStoryboardId;
   if (!storyboardId) throw new AppError('conflict', 'There is no storyboard to preview yet.');
 
@@ -38,5 +38,16 @@ export async function runAnimatic(
   // The issue count travels with the result so the operational log records a
   // preview of a storyboard that still has problems in it, rather than a clean
   // line that says a preview was made.
-  return { renderId: result.renderId, assetId: result.assetId, issues: result.issues.length };
+  /*
+   * Whether this preview came back with nothing on its track.
+   *
+   * Carried out rather than left in the report, because the next thing that
+   * happens to this file is that a panel of critics watches it \u2014 including
+   * one whose whole job is the sound \u2014 and silence it has not been warned
+   * about reads as a creative decision.
+   */
+  const silent = result.issues.some(
+    (issue) => issue.check === 'missing_audio' && issue.severity === 'hard_fail',
+  );
+  return { renderId: result.renderId, assetId: result.assetId, issues: result.issues.length, silent };
 }

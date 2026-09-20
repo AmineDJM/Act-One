@@ -348,9 +348,13 @@ export function deadAirIssues(params: {
  * their launch film and hearing nothing, with no warning anywhere. A film that
  * was scored and came back silent has not been made yet.
  *
- * `scored` is what makes this safe to state so strongly: a film with no music,
- * no effects and no voice was never meant to have a track, and silence is what
- * it is supposed to be.
+ * `scored` is what makes this safe to state so strongly \u2014 and it has to mean
+ * what the film ASKED FOR, not what the sound library happened to yield.
+ * Passed the latter, this check stood down on a film whose storyboard called
+ * for mid-tempo percussion and carried sixteen cues, because the samples were
+ * not on disk: the design came back empty, the film was read as one that
+ * "never meant to have a track", and a master nobody could hear went to the
+ * director to be judged. An absence is not a decision.
  */
 export function silentMasterIssue(params: {
   peakDb: number;

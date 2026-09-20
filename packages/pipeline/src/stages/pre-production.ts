@@ -173,7 +173,7 @@ export async function runPreProduction(
         brief: input.brief,
         audience: input.audience,
         genome: input.genome,
-        artifact: describeCut(storyboard, seen),
+        artifact: describeCut(storyboard, seen, { silent: animatic.silent }),
         images: [{ url: sheet.url, detail: 'high' }],
       },
       ANIMATIC_PANEL,
@@ -191,7 +191,7 @@ export async function runPreProduction(
         genome: input.genome,
         stage: 'animatic',
         artifactId: animatic.renderId,
-        artifact: describeCut(storyboard, seen),
+        artifact: describeCut(storyboard, seen, { silent: animatic.silent }),
         reviews: panelled.reviews,
       },
       call,
@@ -342,7 +342,11 @@ async function contactSheetFor(
 }
 
 /** The cut as a critic should read it: the shot list, and what the director saw. */
-function describeCut(storyboard: Storyboard, seen: DirectorsVerdict): string {
+function describeCut(
+  storyboard: Storyboard,
+  seen: DirectorsVerdict,
+  audio: { silent: boolean } = { silent: false },
+): string {
   const shots = storyboard.scenes.map((scene, index) =>
     [
       `${index + 1}. ${scene.id} @ ${scene.startTime.toFixed(1)}s for ${scene.duration.toFixed(1)}s`,
@@ -363,6 +367,24 @@ function describeCut(storyboard: Storyboard, seen: DirectorsVerdict): string {
     ...shots,
     ``,
     `Frames from the cut are attached as a contact sheet, one per shot, in order.`,
+    /*
+     * Say it, rather than let a panel hear silence and call it a choice.
+     *
+     * A sound critic shown a film with nothing on its track has no way to
+     * tell a deliberate hush from a library that was never provisioned, and
+     * it will write one of them down as taste. It is a production fault, the
+     * picture is what is being judged here, and saying so costs one line.
+     */
+    ...(audio.silent
+      ? [
+          ``,
+          `THE PREVIEW HAS NO SOUND, AND THAT IS NOT A CHOICE.`,
+          `This film's plan asks for sound; the preview could not obtain it, which is a`,
+          `production fault being handled separately. Judge the picture, the cut and the`,
+          `writing. Do not read the silence as an intention, and do not mark the film`,
+          `down for a mix nobody has heard.`,
+        ]
+      : []),
   ].join('\n');
 }
 

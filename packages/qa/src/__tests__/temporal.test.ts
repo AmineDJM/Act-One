@@ -430,3 +430,20 @@ describe('a real file with real defects', () => {
     for (const finding of findings) expect(finding.repair).not.toBeNull();
   }, 180_000);
 });
+
+describe('silence that was never chosen', () => {
+  it('fails a film that asked for sound and came back with none', () => {
+    const issues = silentMasterIssue({ peakDb: Number.NEGATIVE_INFINITY, scored: true, durationSeconds: 26.4 });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('hard_fail');
+    expect(issues[0]!.message).toMatch(/nothing on it to hear/);
+  });
+
+  it('leaves a film that genuinely asked for nothing alone', () => {
+    expect(silentMasterIssue({ peakDb: Number.NEGATIVE_INFINITY, scored: false, durationSeconds: 26.4 })).toEqual([]);
+  });
+
+  it('says nothing about a film that can be heard', () => {
+    expect(silentMasterIssue({ peakDb: -12, scored: true, durationSeconds: 26.4 })).toEqual([]);
+  });
+});
