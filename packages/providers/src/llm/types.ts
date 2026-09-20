@@ -42,6 +42,18 @@ export type LlmUsage = {
   outputTokens: number;
   costUsd: number;
   model: string;
+  /**
+   * How hard the model was allowed to think, when it was asked for less than
+   * the tier's own setting.
+   *
+   * Set only when a hop between here and the model killed the request before
+   * a single byte arrived and we asked again for something that would start
+   * sooner. A reasoning model emits nothing while it thinks, so streaming
+   * does not save a call from a time-to-first-byte limit \u2014 asking for less
+   * deliberation does, and it is a worse answer, so it is recorded rather
+   * than swallowed.
+   */
+  reducedEffort?: 'low' | 'medium';
 };
 
 export type LlmResult<T> = {

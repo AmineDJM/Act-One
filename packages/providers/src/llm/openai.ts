@@ -431,6 +431,7 @@ export class OpenAiLlmProvider implements LlmProvider {
     };
 
     let streamed: StreamedCompletion;
+    let reducedEffort: 'low' | 'medium' | undefined;
     try {
       streamed = await send();
     } catch (error) {
@@ -447,10 +448,54 @@ export class OpenAiLlmProvider implements LlmProvider {
        * Off unless asked for: the body is the customer's own material.
        */
       await dumpFailedRequest(body, error);
-      if (!refusedTemperature(error) || FIXED_TEMPERATURE.has(model)) throw error;
-      FIXED_TEMPERATURE.add(model);
-      delete body['temperature'];
-      streamed = await send();
+
+      /*
+       * Killed before the model said anything.
+       *
+       * Streaming was supposed to end this: bytes arriving continuously give
+       * no intermediary a reason to intervene. It does not help when there
+       * are no bytes to send \u2014 a reasoning model emits nothing at all while
+       * it thinks, and on a long prompt that silence can run past whatever
+       * time-to-first-byte limit the hop in front of it enforces. Measured
+       * here: the same storyboard request, same bytes, answered by the
+       * balanced model in 9.2s and cut at exactly 30.09s on the deep one,
+       * four attempts running, twice.
+       *
+       * Retrying is useless \u2014 it is deterministic, not transient \u2014 and the
+       * stage has already paid for a crawl and a director's arbitration. So
+       * the model is asked for less deliberation, which is what actually
+       * moves the first byte: 7.9s at `low` on the request that could not get
+       * a byte out in thirty seconds at the default.
+       *
+       * It is a worse answer, and it is recorded as one. A silent downgrade
+       * presented as a success is the failure this whole codebase keeps
+       * finding in itself.
+       */
+      if (isGatewayCut(error)) {
+        let answered: StreamedCompletion | null = null;
+        for (const effort of ['medium', 'low'] as const) {
+          body['reasoning_effort'] = effort;
+          try {
+            answered = await send();
+            reducedEffort = effort;
+            console.warn(
+              `[openai] ${model} could not get a byte past the gateway at full deliberation; ` +
+                `answered at reasoning_effort=${effort}. The answer is less considered than the tier asks for.`,
+            );
+            break;
+          } catch (retryError) {
+            delete body['reasoning_effort'];
+            if (!isGatewayCut(retryError)) throw retryError;
+          }
+        }
+        if (answered === null) throw error;
+        streamed = answered;
+      } else {
+        if (!refusedTemperature(error) || FIXED_TEMPERATURE.has(model)) throw error;
+        FIXED_TEMPERATURE.add(model);
+        delete body['temperature'];
+        streamed = await send();
+      }
     }
 
     const content = streamed.content;
@@ -475,7 +520,13 @@ export class OpenAiLlmProvider implements LlmProvider {
 
     return {
       value: content,
-      usage: { inputTokens, outputTokens, costUsd, model: streamed.model ?? model },
+      usage: {
+        inputTokens,
+        outputTokens,
+        costUsd,
+        model: streamed.model ?? model,
+        ...(reducedEffort ? { reducedEffort } : {}),
+      },
     };
   }
 
@@ -595,6 +646,18 @@ function formatIssues(error: z.ZodError): string {
     .slice(0, 12)
     .map((issue) => `- ${issue.path.join('.') || '(root)'}: ${issue.message}`)
     .join('\n');
+}
+
+/**
+ * A hop in front of the model killed the request before a byte arrived.
+ *
+ * `httpStream` only retries before the first byte, so any provider error
+ * carrying a gateway status is one of these by construction: once the stream
+ * has started, a failure surfaces as an abort rather than a status.
+ */
+export function isGatewayCut(error: unknown): boolean {
+  const status = (error as { status?: number } | null)?.status;
+  return status === 502 || status === 503 || status === 504;
 }
 
 /** Writes a failed request out, when ACT_ONE_LLM_DUMP_DIR says to. */

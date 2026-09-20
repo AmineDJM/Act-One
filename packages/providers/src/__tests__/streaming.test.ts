@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { backoffMs } from '../http.ts';
-import { consumeSse, finishCollector, newCollector } from '../llm/openai.ts';
+import { consumeSse, finishCollector, isGatewayCut, newCollector } from '../llm/openai.ts';
 
 /**
  * Reassembling a completion from its stream.
@@ -100,5 +100,25 @@ describe('how long to wait before asking again', () => {
     for (let attempt = 1; attempt <= 10; attempt += 1) {
       expect(backoffMs(attempt, null, 502)).toBeLessThanOrEqual(20_000 * 1.25);
     }
+  });
+});
+
+describe('a gateway that kills a call before the model speaks', () => {
+  it('is recognised by its status, whatever the body says', () => {
+    // `httpStream` only retries before the first byte, so a provider error
+    // carrying a gateway status is one of these by construction.
+    for (const status of [502, 503, 504]) {
+      expect(isGatewayCut(Object.assign(new Error('upstream request failed'), { status }))).toBe(true);
+    }
+  });
+
+  it('is not confused with the model refusing the request', () => {
+    // A 400 is an answer. A 429 is a queue. Neither is a hop that died with
+    // nothing to say, and neither is fixed by asking for less thinking.
+    for (const status of [400, 401, 404, 429, 500]) {
+      expect(isGatewayCut(Object.assign(new Error('nope'), { status }))).toBe(false);
+    }
+    expect(isGatewayCut(new Error('a plain failure'))).toBe(false);
+    expect(isGatewayCut(null)).toBe(false);
   });
 });
