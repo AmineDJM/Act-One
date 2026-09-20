@@ -76,7 +76,30 @@ describe('directSound', () => {
     const sample = findSfx(DEFAULT_LIBRARY, impact.sfxKind!)!;
     // The cue was authored at 4.0s; the sample must start earlier by its pre-roll.
     expect(impact.atSeconds).toBeCloseTo(4 - sample.preRoll, 3);
-    expect(sample.preRoll).toBeGreaterThan(0);
+  });
+
+  /**
+   * The compensation itself, on a sample that definitely has air in front.
+   *
+   * This used to be asserted by requiring the shipped library's impacts to
+   * have a non-zero pre-roll — which made a statement about the SAMPLES into a
+   * test of the DIRECTOR. When the library's pre-roll claims were measured
+   * against the actual audio, the impacts turned out to begin at their
+   * transient and the honest value became zero, and a correct measurement
+   * broke a passing test. The mechanism is what matters and it is tested here
+   * on a sample whose pre-roll is a fact of the fixture rather than a hope
+   * about the library.
+   */
+  it('pulls a sample back by exactly the air in front of it', () => {
+    const withAir = {
+      ...DEFAULT_LIBRARY,
+      sfx: DEFAULT_LIBRARY.sfx.map((sample) =>
+        sample.kind.startsWith('impact') ? { ...sample, preRoll: 0.12 } : sample,
+      ),
+    };
+    const design = directSound({ storyboard, behaviour: cinematic, library: withAir });
+    const impact = design.cues.find((c) => c.type === 'impact')!;
+    expect(impact.atSeconds).toBeCloseTo(4 - 0.12, 3);
   });
 
   it('picks a hard impact for a fast cut and a soft one for a held frame', () => {

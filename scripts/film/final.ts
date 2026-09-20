@@ -136,7 +136,21 @@ const tick = (index: number, ruleY: number): SceneObject => {
      */
     enterAt: 0.06 + index * 0.012,
     transform: Transform.parse({
-      x: { keyframes: [{ t: 0, value: spread }, { t: 0.52, value: spread }, { t: 1, value: gathered, curve: 'in_out_quart' }], curve: 'in_out_quart' },
+      /*
+       * The collapse finishes with time to spare, and that is the edit.
+       *
+       * It used to run to t = 1, landing on the same frame the line changed to
+       * "One afternoon." A model watching the film read that moment as "text
+       * changes" and recorded no transformation at all — the thirty marks
+       * gathering, which is the film's entire argument, registered as nothing,
+       * because the words moved at the same instant and words win.
+       *
+       * So the marks now finish at 0.78 and SIT there, gathered, under a line
+       * that still says six weeks. That gap is the point being made: the same
+       * scale, the same rule, the work now occupying a twentieth of it. Only
+       * then does the line change to agree with what the picture already said.
+       */
+      x: { keyframes: [{ t: 0, value: spread }, { t: 0.42, value: spread }, { t: 0.78, value: gathered, curve: 'in_out_quart' }, { t: 1, value: gathered }], curve: 'in_out_quart' },
       y: ruleY - height / 2 - 0.006,
       anchor: { x: 0.5, y: 1 },
       opacity: { from: 0, to: 1, curve: 'out_cubic' },
@@ -217,7 +231,10 @@ const scenes: Graph[] = [
     ],
     audio: [
       { at: 0.1, kind: 'ui_click', intensity: 0.35, causedBy: 'measure_rule', reason: 'The rule is drawn.' },
-      { at: 2.6, kind: 'riser', intensity: 0.55, causedBy: 'tick_29', reason: 'The measure fills; something is about to give.' },
+      { at: 1.6, kind: 'riser', intensity: 0.55, causedBy: 'tick_29', reason: 'The measure fills; something is about to give.' },
+      // On the landing, not on the cut: the marks arriving is the event, and
+      // an event nobody hears is an event that did not happen.
+      { at: 3.59, kind: 'impact', intensity: 0.7, causedBy: 'tick_0', reason: 'The thirty marks arrive together.' },
     ],
     /*
      * The ticks are named as carried, so the handover is a fact in the graph
@@ -297,8 +314,11 @@ const scenes: Graph[] = [
          * next card at the right edge, and a paragraph the crop cut through.
          * A plate is a framing decision, and framing through the middle of a
          * word is the thing that reads as a mistake rather than as a choice.
+         * So the bottom edge lands between the headline and the paragraph
+         * below it: the product's own claim, whole, rather than three lines of
+         * body copy with the last one sliced through.
          */
-        crop: { x: 0, y: 0, width: 0.86, height: 0.88 },
+        crop: { x: 0, y: 0, width: 0.86, height: 0.72 },
         /*
          * Sized so the page still shows under it.
          *
