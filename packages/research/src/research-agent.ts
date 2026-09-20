@@ -105,8 +105,28 @@ const IMAGERY_INTENTS: readonly PageIntent[] = ['home', 'product', 'use_case', '
  */
 const CaptureReading = z.object({
   kind: z.enum(['interface', 'web_page', 'photograph', 'illustration', 'other']),
-  /** A dialog, cookie wall or overlay covering the content. */
+  /**
+   * Something that is not the product is covering the shot.
+   *
+   * A cookie banner, a consent wall, a newsletter popup, a chat bubble. Not
+   * the product's own panels: an email draft open over a record, a settings
+   * sheet, a command palette are the software doing something, which is the
+   * most filmable thing a screenshot can contain. Reading those as
+   * obstructions threw away the only real interface on a customer's whole
+   * site, and the film fell back to photographing the pricing page.
+   */
   obstructed: z.boolean().default(false),
+  /**
+   * The screenshot has been dressed: a phone or laptop mockup around it,
+   * other graphics beside it, callout arrows over it.
+   *
+   * Still the company's own product and still usable \u2014 most marketing pages
+   * publish nothing else \u2014 but a plain capture of the running application is
+   * better material for a film, so it is preferred where both exist. On the
+   * page this was found on, the plain capture was a full candidate record with
+   * an email going out; the dressed one was a drawn phone next to a reply box.
+   */
+  staged: z.boolean().default(false),
   /** What is on screen, in one plain sentence. */
   shows: z.string().max(240).default(''),
 });
@@ -297,7 +317,13 @@ export class ProductResearchAgent {
           bytes: image.bytes,
           width: quality.width,
           height: quality.height,
-          rank: imageIndex,
+          /*
+           * Plain captures of the running application before dressed ones.
+           * Both are the company's own product and both are usable; a full
+           * record with an email going out is a better shot than a drawn
+           * phone beside a reply box, and the film should get the better one.
+           */
+          rank: reading?.staged ? imageIndex + 50 : imageIndex,
         });
       }
 
@@ -387,14 +413,28 @@ export class ProductResearchAgent {
           {
             role: 'system',
             content:
-              'You classify captures for a film about a software product. ' +
+              'You classify captures for a film about a software product.\n\n' +
               '"interface" means a screenshot of software: an application window, dashboard, editor, ' +
-              'console or app screen, with or without a browser or device frame around it. ' +
+              'console or app screen. A real screenshot stays "interface" when it has been placed in a ' +
+              'browser chrome, a phone or laptop mockup, or on a coloured background \u2014 companies present ' +
+              'their own product that way on almost every marketing page.\n' +
               '"web_page" means a marketing or documentation page. A photograph of people, places or ' +
-              'objects is "photograph"; drawn or abstract graphics are "illustration". ' +
-              '"obstructed" is true when a dialog, cookie banner, sign-up wall or overlay covers the content. ' +
-              '"shows" is one plain sentence naming what is on screen, in the product\'s own words where visible. ' +
-              'Return JSON only.',
+              'objects is "photograph".\n' +
+              '"illustration" is for graphics that were drawn rather than captured: a vector facsimile of ' +
+              'an interface, an abstract diagram, a cartoon. Judge the pixels, not the subject \u2014 a drawn ' +
+              'imitation of software is an illustration however convincing, and we must never put one on ' +
+              'screen as somebody\'s product.\n\n' +
+              '"staged" is true when a real screenshot has been dressed for marketing: set inside a phone ' +
+              'or laptop mockup, placed beside other graphics or logos, or marked up with callout boxes ' +
+              'and arrows. A plain capture of the running application is false.\n\n' +
+              '"obstructed" is true only when something that is NOT part of the product covers the shot: ' +
+              'a cookie banner, a consent or sign-up wall, a newsletter popup, a chat widget, a page ' +
+              'overlay. The product\'s own panels are not obstructions \u2014 an email draft open over a ' +
+              'record, a settings sheet, a side drawer, a command palette, a confirmation dialog belonging ' +
+              'to the software are the product doing something, which is the most filmable thing a ' +
+              'screenshot can contain. Say false for those.\n\n' +
+              '"shows" is one plain sentence naming what is on screen, in the product\'s own words where ' +
+              'visible. Return JSON only.',
           },
           { role: 'user', content: `This capture is expected to be a ${what}. Classify it.` },
         ],
