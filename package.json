@@ -35,7 +35,9 @@
     "prove:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-director.ts",
     "bench:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/bench-director.ts",
     "evaluate:directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/evaluate-directions.ts",
+    "commission:device": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/commission-device.ts",
     "commission:shot": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/commission-shot.ts",
+    "final": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/final.ts",
     "directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/directions.ts",
     "watch:film": "vite-node scripts/watch-film.ts"
   },

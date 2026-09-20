@@ -1,6 +1,13 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { DesignTokens } from '@act-one/design';
+import {
+  AbsoluteFill,
+  OffthreadVideo,
+  continueRender,
+  delayRender,
+  useCurrentFrame,
+  useVideoConfig,
+} from 'remotion';
+import { contrastRatio, type DesignTokens } from '@act-one/design';
 import {
   objectPresent,
   objectProgress,
@@ -119,9 +126,94 @@ function defocusPx(z: number, camera: CameraSpec, t: number): number {
   return Math.min(24, Math.abs(z - focus) * aperture * 14);
 }
 
+
+/**
+ * A region of a capture, at the shape that region actually is.
+ *
+ * THE BUG THIS REPLACES was one line: `aspectRatio: crop.width / crop.height`.
+ * Those are fractions OF THE SOURCE, so a crop covering the whole of a
+ * 1580x680 capture computed 1/1 and the browser drew a square. The image
+ * inside was then scaled to fill it, which magnified the interface by more
+ * than two and pushed most of it off the frame — the product shot came out as
+ * a band of body copy with the headline cut off above it, and the same error
+ * was quietly distorting every capture in every scene-graph film by whatever
+ * the source aspect happened to be.
+ *
+ * The region's shape is `(crop.width x sourceWidth) / (crop.height x
+ * sourceHeight)`, and the source's dimensions are the part no stylesheet
+ * knows. So the image is loaded and measured, and the frame is held open with
+ * `delayRender` while that happens. That is what `delayRender` is for: a
+ * headless render screenshots whenever the page says it is ready, and a frame
+ * that reports ready before its picture has a size is a frame with the wrong
+ * picture in it.
+ *
+ * Falls back to the crop's own ratio if the image cannot be measured, which is
+ * the old behaviour — wrong, but no worse than it was, and it renders.
+ */
+const CroppedImage: React.FC<{
+  src: string;
+  widthPx: number;
+  crop: { x: number; y: number; width: number; height: number };
+  radiusPx: number;
+  shadow: string | null;
+  chrome: { line: string; surface: string } | null;
+}> = ({ src, widthPx, crop, radiusPx, shadow, chrome }) => {
+  const [natural, setNatural] = React.useState<{ width: number; height: number } | null>(null);
+  const [handle] = React.useState(() => delayRender(`Measuring ${src}`));
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      setNatural({ width: image.naturalWidth, height: image.naturalHeight });
+      continueRender(handle);
+    };
+    image.onerror = () => {
+      // Continue rather than hang. A missing asset is a QA problem, and a
+      // render that never finishes is a worse way to report it than a frame
+      // with a gap in it.
+      if (!cancelled) continueRender(handle);
+    };
+    image.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src, handle]);
+
+  const sourceAspect = natural ? natural.width / natural.height : null;
+  const aspect = sourceAspect
+    ? (crop.width * sourceAspect) / crop.height
+    : crop.width / crop.height;
+
+  return (
+    <div
+      style={{
+        width: widthPx,
+        aspectRatio: `${aspect}`,
+        overflow: 'hidden',
+        borderRadius: radiusPx,
+        boxShadow: shadow ?? 'none',
+        ...(chrome ? { border: `1px solid ${chrome.line}`, background: chrome.surface } : {}),
+      }}
+    >
+      <img
+        src={src}
+        alt=""
+        style={{
+          width: `${100 / crop.width}%`,
+          marginLeft: `${(-crop.x * 100) / crop.width}%`,
+          marginTop: `${(-crop.y * 100) / crop.height}%`,
+          display: 'block',
+        }}
+      />
+    </div>
+  );
+};
+
 export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
   scene,
-  tokens,
+  tokens: filmTokens,
   assetUrls,
 }) => {
   const frame = useCurrentFrame();
@@ -129,8 +221,44 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
   const seconds = frame / fps;
   const sceneT = Math.min(1, seconds / Math.max(0.0001, scene.durationSeconds));
 
+  // Resolved against the film's own tokens, because the scene's set is derived
+  // from this value and cannot be used to compute it.
   const background =
-    scene.background === 'canvas' ? tokens.canvas : animColor(scene.background, sceneT, tokens);
+    scene.background === 'canvas'
+      ? filmTokens.canvas
+      : animColor(scene.background, sceneT, filmTokens);
+
+  /*
+   * A scene that inverts its background inverts what reads on it.
+   *
+   * `onCanvas.primary` is the film's reading colour, decided once from the
+   * film's theme. A scene is free to set its own background, and an editorial
+   * cut does exactly that — paper, paper, paper, then ink for the mark. What
+   * happened then was that the mark kept the light theme's reading colour and
+   * came out as near-black type on a near-black field: present in the DOM,
+   * passing every check, and invisible on screen. The film's last shot was its
+   * own name, and you could not see it.
+   *
+   * So the on-canvas set is chosen against the background this scene actually
+   * has, not against the one the film started with. Measured by contrast
+   * rather than by a theme flag, because the question is only ever "can this
+   * be read on that" and a hex the author picked has no theme.
+   */
+  const tokens = React.useMemo(() => {
+    if (contrastRatio(filmTokens.onCanvas.primary, background) >= 4.5) return filmTokens;
+    const flipped = {
+      primary: filmTokens.canvas,
+      secondary: filmTokens.canvas,
+      muted: filmTokens.onCanvas.muted,
+      accent: filmTokens.onCanvas.accent,
+    };
+    // Only swap when the swap is actually better; a mid-grey background can
+    // fail both ways, and a worse colour is not an improvement.
+    return contrastRatio(flipped.primary, background) >
+      contrastRatio(filmTokens.onCanvas.primary, background)
+      ? { ...filmTokens, onCanvas: { ...filmTokens.onCanvas, ...flipped } }
+      : filmTokens;
+  }, [filmTokens, background]);
 
   /*
    * Masks are resolved to the objects they act on before anything draws.
@@ -267,34 +395,20 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
                 height: Math.max(0.01, num(source.height, t)),
               };
               return wrapped(
-                <div
-                  style={{
-                    width,
-                    // The crop decides the aspect: a region of a page is not
-                    // the shape of the page.
-                    aspectRatio: `${crop.width} / ${crop.height}`,
-                    overflow: 'hidden',
-                    borderRadius: 'cornerRadiusPx' in object ? num(object.cornerRadiusPx, t) : 0,
-                    boxShadow:
-                      'shadow' in object && object.shadow && tokens.shadow
-                        ? tokens.shadow.soft
-                        : 'none',
-                    ...(object.kind === 'capture' && object.chrome
-                      ? { border: `1px solid ${tokens.line}`, background: tokens.surface }
-                      : {}),
-                  }}
-                >
-                  <img
-                    src={url}
-                    alt=""
-                    style={{
-                      width: `${100 / crop.width}%`,
-                      marginLeft: `${(-crop.x * 100) / crop.width}%`,
-                      marginTop: `${(-crop.y * 100) / crop.height}%`,
-                      display: 'block',
-                    }}
-                  />
-                </div>,
+                <CroppedImage
+                  src={url}
+                  widthPx={width}
+                  crop={crop}
+                  radiusPx={'cornerRadiusPx' in object ? num(object.cornerRadiusPx, t) : 0}
+                  shadow={
+                    'shadow' in object && object.shadow && tokens.shadow ? tokens.shadow.soft : null
+                  }
+                  chrome={
+                    object.kind === 'capture' && object.chrome
+                      ? { line: tokens.line, surface: tokens.surface }
+                      : null
+                  }
+                />,
               );
             }
 
@@ -330,11 +444,35 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
             case 'clip': {
               const url = assetUrls[object.assetId];
               if (!url) return null;
+              /*
+               * OffthreadVideo, because a raw <video> does not play in a render.
+               *
+               * The browser's own element gives whatever it has decoded by the
+               * time the screenshot is taken, which in a headless render is a
+               * different frame each run and very often the first one. So the
+               * scene language could declare a clip, the router would route it,
+               * QA would pass it, and the film would come out with a frozen
+               * still where the only moving footage in it was supposed to be.
+               * The older recipe path already knew this; the scene graph path
+               * was written with a plain tag and never had footage put through
+               * it to find out.
+               *
+               * `sourceInSeconds` and `playbackRate` are the clip's own, so a
+               * shot can start partway into a take and run slower than life,
+               * which is most of what makes four generated seconds usable.
+               */
               return wrapped(
-                <video
+                <OffthreadVideo
                   src={url}
                   muted
-                  style={{ width: num(object.width, t) * tokens.frame.width, display: 'block' }}
+                  pauseWhenBuffering
+                  startFrom={Math.round(object.sourceInSeconds * fps)}
+                  playbackRate={object.playbackRate}
+                  style={{
+                    width: num(object.width, t) * tokens.frame.width,
+                    display: 'block',
+                    objectFit: 'cover',
+                  }}
                 />,
               );
             }

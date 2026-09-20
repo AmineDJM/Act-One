@@ -128,14 +128,31 @@ export function inspectScene(
   }
 
   // --- the product rule -----------------------------------------------------
+  /*
+   * A denial is not a claim.
+   *
+   * This read the object's stated reason for a word like "interface" and
+   * failed the scene on finding one. A commissioned shot whose reason said
+   * "the world the product lives in, shot rather than drawn. NO INTERFACE
+   * appears in it" was therefore refused — for containing the sentence that
+   * proves the rule was obeyed. The most careful author in the system was the
+   * one the check punished, which is the worst possible incentive: the way to
+   * pass became to stop mentioning it.
+   *
+   * Still prose, and still only as good as prose. It cannot know what is in a
+   * clip; what it can do is notice when somebody has written down that they
+   * are putting the product in generated imagery. The negation window below is
+   * small on purpose — "no interface" and "never a dashboard" are denials,
+   * while a sentence with "not" thirty words earlier is not.
+   */
   for (const object of scene.objects) {
     if ((object.kind === 'image' || object.kind === 'clip') && object.generated) {
       const describes = `${object.reason} ${scene.intent}`.toLowerCase();
-      if (
-        /\b(dashboard|interface|ui|screen|app|console|editor|inbox|panel|sidebar|settings)\b/.test(
+      const claimed =
+        /(?<!\b(?:no|not|never|without|excluding|free of)\b[\s\w]{0,12})\b(dashboard|interface|ui|screen|app|console|editor|inbox|panel|sidebar|settings)\b/.test(
           describes,
-        )
-      ) {
+        );
+      if (claimed) {
         say({
           objectId: object.id,
           check: 'generated_product_ui',
@@ -289,11 +306,30 @@ export function inspectScene(
     let payloads = 0;
     let moving = 0;
 
+    /*
+     * Gestures, not objects.
+     *
+     * The ceiling exists because a frame with a dozen unrelated things moving
+     * gives the eye nowhere to rest. Thirty tick marks sliding together along
+     * one rule is not a dozen unrelated things: it is ONE move, performed by
+     * thirty marks, and the eye reads it as a single gesture because that is
+     * what it is. Counting objects failed the most deliberate shot in the film
+     * — a measure collapsing — at exactly the moment it was doing its job.
+     *
+     * So identical motion collapses to one. Two objects moving on the same
+     * curve, by the same amount, at the same moment are a group; anything that
+     * genuinely competes for attention differs in at least one of those and
+     * still counts separately.
+     */
+    const gestures = new Set<string>();
+
     for (const object of scene.objects) {
       if (!objectPresent(object, seconds, scene.durationSeconds)) continue;
       if (object.role === 'payload') payloads += 1;
-      if (isMoving(object, seconds, scene, curves)) moving += 1;
+      const signature = motionSignature(object, seconds, scene, curves);
+      if (signature) gestures.add(signature);
     }
+    moving = gestures.size;
     if (payloads > worstPayloads) {
       worstPayloads = payloads;
       worstAt = seconds;
@@ -511,8 +547,24 @@ export function inspectScenes(
    */
   for (let i = 0; i < scenes.length; i += 1) {
     for (let j = i + 1; j < scenes.length; j += 1) {
+      /*
+       * Adjacent scenes joined by an object handover are meant to match.
+       *
+       * A handover that carries objects by id across a boundary is a statement
+       * that the same things are still on screen — it is how the language says
+       * "this is a transformation, not a cut". Two such scenes SHOULD be the
+       * same picture, minus the one thing that changed, and flagging them for
+       * it punishes the only mechanism the language has for continuity. The
+       * measure that collapses in this film scored 89% against the shot it
+       * collapses out of, which is the correct number and the wrong verdict.
+       *
+       * Adjacent only, and only when objects are actually named. A film that
+       * returns to a composition five shots later is repeating itself whatever
+       * its handovers say, and an empty `carries` list claims nothing.
+       */
+      const carried = j === i + 1 && scenes[i]!.handover.carries.length > 0;
       const score = similarity(scenes[i]!, scenes[j]!, curves);
-      if (score >= SIMILARITY_CEILING) {
+      if (score >= SIMILARITY_CEILING && !carried) {
         findings.push({
           sceneId: scenes[j]!.id,
           objectId: null,
@@ -617,13 +669,23 @@ function movesAtAll(
   );
 }
 
-function isMoving(
+/**
+ * What an object is doing right now, as a string two objects can share.
+ *
+ * Null when it is doing nothing. Otherwise the per-frame delta, rounded hard
+ * enough that thirty marks travelling together produce one signature and two
+ * things genuinely moving differently produce two. The rounding is the whole
+ * design: too fine and a group of marks with slightly different distances
+ * counts as a crowd again, too coarse and a headline and a plate moving in
+ * roughly the same direction get merged into one gesture they are not.
+ */
+function motionSignature(
   object: SceneObject,
   seconds: number,
   scene: SceneGraph,
   curves: Record<CurveName, CurveFn>,
-): boolean {
-  if (!movesAtAll(object, scene, curves)) return false;
+): string | null {
+  if (!movesAtAll(object, scene, curves)) return null;
   const enter = object.enterAt;
   const exit = object.exitAt ?? scene.durationSeconds;
   const span = Math.max(0.0001, exit - enter);
@@ -633,7 +695,9 @@ function isMoving(
   const dy = valueAt(object.transform.y, t + step, curves) - valueAt(object.transform.y, t, curves);
   const ds =
     valueAt(object.transform.scale, t + step, curves) - valueAt(object.transform.scale, t, curves);
-  return Math.hypot(dx, dy) > 1e-4 || Math.abs(ds) > 1e-4;
+  if (Math.hypot(dx, dy) <= 1e-4 && Math.abs(ds) <= 1e-4) return null;
+  const q = (value: number) => (value * 1e3).toFixed(1);
+  return `${q(dx)}:${q(dy)}:${q(ds)}`;
 }
 
 function worstVelocityJump(
