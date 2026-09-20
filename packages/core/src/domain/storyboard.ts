@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HandoverPlan } from './grammar.ts';
 import { nonEmpty, score01 } from '../zod-helpers.ts';
 import { VoiceStrategy } from './creative.ts';
 import { UiSequence } from './ui-cinema.ts';
@@ -313,6 +314,18 @@ export const EasingName = z.enum([
   'spring_soft',
   'spring_tight',
   'anticipate',
+  /*
+   * How things LEAVE.
+   *
+   * There was no ease-in family here at all, and the consequence was
+   * measurable: across four reference films the ease-in curves are the single
+   * most common family — things accelerate out of frame and the next idea
+   * occupies the space they left — and an Act One film contained four such
+   * moves in total. Nothing could get out of the way, so the only way left to
+   * change the picture was to replace it. A missing curve became a grammar.
+   */
+  'in_cubic',
+  'in_quint',
 ]);
 export type EasingName = z.infer<typeof EasingName>;
 
@@ -465,6 +478,18 @@ export const Storyboard = z.object({
   treatmentId: z.string(),
   version: z.number().int().min(1).default(1),
   scenes: z.array(Scene).default([]),
+  /*
+   * How each beat hands over to the next, keyed by the id of the beat that
+   * does the leaving. Absent means a cut.
+   *
+   * A join belongs to a PAIR of scenes, not to one of them, which is why it
+   * lives here and not on Scene: an overlap that scene N claims is time scene
+   * N+1 must agree to share, and a field that changes under an anchor is a
+   * fact about the film rather than about either beat. Keeping it here also
+   * means the renderer can lay out every window in one pass instead of
+   * discovering the overlaps as it walks the list.
+   */
+  handovers: z.record(z.string(), HandoverPlan).default({}),
   voiceStrategy: VoiceStrategy.default('none'),
   /** ISO 639-1 code the copy and narration were written in; the voice follows it. */
   language: z.string().min(2).max(12).nullable().default(null),

@@ -75,6 +75,10 @@ export const EASINGS: Record<EasingName, EasingFn> = {
   // Pulls back a touch before moving. Used sparingly: on more than one element
   // at a time it reads as a cartoon.
   anticipate: cubicBezier(0.68, -0.35, 0.265, 1),
+  // Exits. Slow to commit, then gone — the mirror of out_quint, and the
+  // curve that lets a beat clear the frame instead of being replaced by one.
+  in_cubic: cubicBezier(0.55, 0.055, 0.675, 0.19),
+  in_quint: cubicBezier(0.64, 0, 0.78, 0),
 };
 
 export function ease(name: EasingName, t: number): number {

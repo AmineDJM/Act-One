@@ -71,7 +71,7 @@ describe.skipIf(browser === undefined)('every deterministic visual type', () => 
   it('puts something on screen', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'act-one-types-'));
     const storyboard: Storyboard = resequence({
-      id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+      id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
       scenes: [
         scene({ id: 'type', visualType: 'kinetic_typography', purpose: 'Open', onScreenText: ['Forty unmatched rows.'], recipe: 'kinetic_headline' }),
         scene({ id: 'stat', visualType: 'statistic', purpose: 'Proof', onScreenText: ['0', 'unmatched rows remaining'], recipe: 'metric_reveal' }),

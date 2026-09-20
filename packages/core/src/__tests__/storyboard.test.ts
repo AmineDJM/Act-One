@@ -55,6 +55,7 @@ function board(scenes: Scene[]): Storyboard {
     projectId: 'prj_1',
     conceptId: 'cpt_1',
     treatmentId: 'trt_1',
+    handovers: {},
     version: 1,
     scenes,
     voiceStrategy: 'none',

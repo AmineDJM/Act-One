@@ -1,0 +1,12 @@
+-- How each beat hands over to the next.
+--
+-- Until this column existed a scene could only be replaced by the next one:
+-- the renderer gave every scene a hard frame range with no overlap, so there
+-- was no interval in which two scenes existed and nothing could survive a
+-- boundary. Measured against four reference films, Act One made 0.23
+-- continuous transformations for every hard cut where the weakest reference
+-- made 0.93 and the strongest 13.7.
+--
+-- Keyed by the id of the scene that does the leaving. An absent key is a cut,
+-- which is what every film made before today was made of.
+ALTER TABLE storyboards ADD COLUMN handovers JSONB NOT NULL DEFAULT '{}'::jsonb;

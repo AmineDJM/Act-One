@@ -79,7 +79,7 @@ describe.skipIf(browser === undefined)('captions burned into a vertical cut', ()
   it('is on screen for its cue, gone between cues, and inside the safe area', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'act-one-captions-'));
     const storyboard: Storyboard = resequence({
-      id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+      id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
       scenes: [scene({ id: 'open', visualType: 'kinetic_typography', purpose: 'Open', onScreenText: ['Forty unmatched rows.'] })],
       voiceStrategy: 'narrator', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft',
       language: 'en',
@@ -155,7 +155,7 @@ describe.skipIf(browser === undefined)('captions burned into a vertical cut', ()
   it('draws nothing at all when a film has no captions', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'act-one-captions-none-'));
     const storyboard: Storyboard = resequence({
-      id: 'sbd_2', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+      id: 'sbd_2', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
       scenes: [scene({ id: 'open', visualType: 'kinetic_typography', purpose: 'Open', onScreenText: ['Forty unmatched rows.'] })],
       voiceStrategy: 'none', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft',
       language: 'en',

@@ -1119,8 +1119,8 @@ export class PgStore implements Store {
           `INSERT INTO storyboards
              (id, organization_id, project_id, concept_id, treatment_id, version, status,
               voice_strategy, music_direction, created_at, updated_at, language,
-              parent_storyboard_id, revision_reason, hero_shot)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+              parent_storyboard_id, revision_reason, hero_shot, handovers)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [
             storyboard.id,
             organizationId,
@@ -1137,6 +1137,7 @@ export class PgStore implements Store {
             storyboard.parentStoryboardId,
             storyboard.revisionReason,
             storyboard.heroShot,
+            storyboard.handovers,
           ],
         );
         await insertScenes(c, organizationId, storyboard.id, storyboard.scenes);
@@ -1229,12 +1230,14 @@ export class PgStore implements Store {
              music_direction = COALESCE($5, music_direction),
              language = COALESCE($6, language),
              hero_shot = COALESCE($7, hero_shot),
+             handovers = COALESCE($8, handovers),
              updated_at = now()
            WHERE id = $1 AND organization_id = $2 RETURNING *`,
           [
             id, organizationId, patch.status ?? null, patch.voiceStrategy ?? null,
             patch.musicDirection ?? null, patch.language ?? null,
             patch.heroShot === undefined ? null : patch.heroShot,
+            patch.handovers === undefined ? null : patch.handovers,
           ],
         );
         if (!r.rows[0]) throw notFound('Storyboard');
@@ -3563,6 +3566,7 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
     projectId: row['project_id'] as string,
     conceptId: row['concept_id'] as string,
     treatmentId: row['treatment_id'] as string,
+    handovers: (row['handovers'] as Storyboard['handovers']) ?? {},
     version: num(row['version']),
     scenes,
     voiceStrategy: row['voice_strategy'] as Storyboard['voiceStrategy'],

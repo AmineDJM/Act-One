@@ -38,7 +38,7 @@ function scene(over: Partial<Scene> & Pick<Scene, 'id'>): Scene {
 }
 
 const storyboard: Storyboard = resequence({
-  id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+  id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
   scenes: [
     scene({ id: 'a', narration: 'Northwind closes 40 hours of reconciliation.', onScreenText: ['40 hours a month'] }),
     scene({ id: 'b', narration: 'One run, every month.', onScreenText: ['One run'] }),

@@ -9,6 +9,7 @@ import {
   type AspectRatio,
   type BrandSystem,
   type CaptionCue,
+  sceneWindows,
   type RenderQuality,
   type Scene,
   type Storyboard,
@@ -19,6 +20,7 @@ import { ProductWindow, ProductZoom, SpatialCards, CursorSequence, PhotoHold } f
 import { UiCinema } from './components/UiCinema.tsx';
 import { Footage } from './components/Footage.tsx';
 import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './components/Brand.tsx';
+import { Joined } from './handover.tsx';
 
 /**
  * The film.
@@ -42,6 +44,7 @@ export const Film: React.FC<FilmProps> = ({
 }) => {
   const { fps, width, height } = useVideoConfig();
   const aspect = aspectFor(width, height);
+  const windows = sceneWindows(storyboard);
 
   const tokens = resolveTokens(brand, {
     aspect,
@@ -52,13 +55,32 @@ export const Film: React.FC<FilmProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: tokens.canvas }}>
-      {storyboard.scenes.map((scene) => (
+      {/*
+        * Scenes overlap where a join asks them to.
+        *
+        * A window is not the same thing as a beat: `startTime` and `duration`
+        * remain the editorial truth that the captions, the sound cues and
+        * every QA measurement key off, while the window is how long the scene
+        * is MOUNTED — early enough to arrive into the previous beat's last
+        * moments, late enough to leave into the next one's first. Before this,
+        * the two were the same number and so two scenes were never on screen
+        * together, which is why nothing could survive a boundary.
+        */}
+      {storyboard.scenes.map((scene, index) => {
+        const window = windows[index]!;
+        const previous = index > 0 ? storyboard.scenes[index - 1] : undefined;
+        return (
         <Sequence
           key={scene.id}
-          from={Math.round(scene.startTime * fps)}
-          durationInFrames={Math.max(1, Math.round(scene.duration * fps))}
+          from={Math.round(window.fromSeconds * fps)}
+          durationInFrames={Math.max(1, Math.round((window.toSeconds - window.fromSeconds) * fps))}
           name={`${scene.index + 1}. ${scene.purpose.slice(0, 40)}`}
         >
+         <Joined
+           window={window}
+           incoming={previous ? storyboard.handovers[previous.id] ?? null : null}
+           outgoing={storyboard.handovers[scene.id] ?? null}
+         >
           <SceneRenderer
             scene={scene}
             tokens={tokens}
@@ -75,8 +97,10 @@ export const Film: React.FC<FilmProps> = ({
             tagline={tagline ?? ''}
             footage={new Set(footageAssetIds ?? [])}
           />
+         </Joined>
         </Sequence>
-      ))}
+        );
+      })}
 
       {captions && captions.length > 0 ? <Captions cues={captions} tokens={tokens} aspect={aspect} /> : null}
 
@@ -562,7 +586,20 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
     }
   })();
 
-  return <AbsoluteFill style={{ backgroundColor: tokens.canvas }}>{body}</AbsoluteFill>;
+  /*
+   * No fill of its own.
+   *
+   * Every scene used to paint the canvas colour, which was redundant — the
+   * film root paints the same colour underneath — and quietly fatal to any
+   * join: an arriving scene is a full-frame opaque rectangle, so it covered
+   * the beat it was supposed to be overlapping instead of sharing the frame
+   * with it. The first real handover render came out with LESS on screen at
+   * the join than a straight cut, which is how this was found.
+   *
+   * The field belongs to the film. A scene contributes what is standing on
+   * it, and nothing else.
+   */
+  return <AbsoluteFill>{body}</AbsoluteFill>;
 };
 
 /** Positions a block on the grid so every scene shares the same margins. */

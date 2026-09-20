@@ -73,6 +73,7 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
     projectId: `prj_${id}`,
     conceptId: `cpt_${id}`,
     treatmentId: `trt_${id}`,
+    handovers: {},
     version: 1,
     scenes: specs.map((spec, index) => ({
       id: `scn_${id}_${index}`,

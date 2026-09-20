@@ -256,3 +256,34 @@ export function againstGrammar(measured: Partial<Record<BandName, number>>): Gra
   }
   return findings;
 }
+
+export const AnchorKind = z.enum([
+  /** The brand mark. Introduced, carried, shrunk, and it becomes the next idea's centre. */
+  'mark',
+  /** A line of type that continues across the join instead of being replaced. */
+  'line',
+  /** The product capture itself, at a different scale on the other side. */
+  'plate',
+]);
+export type AnchorKind = z.infer<typeof AnchorKind>;
+
+export const HandoverPlan = z.object({
+  kind: Handover,
+  /**
+   * How long both scenes are on screen.
+   *
+   * Zero for a cut. The references transform for 0.27 to 3.2 seconds with a
+   * median near half a second, and the overlap is bounded below by what the
+   * eye can read as continuity and above by the shorter of the two scenes,
+   * because an overlap longer than its own scene is a dissolve with extra
+   * steps.
+   */
+  seconds: z.number().min(0).max(3.2).default(0),
+  /** What survives, when something does. */
+  anchor: AnchorKind.nullable().default(null),
+  /** Why this join and not a cut, in the director's words. Empty for a cut. */
+  reason: z.string().max(300).default(''),
+});
+export type HandoverPlan = z.infer<typeof HandoverPlan>;
+
+export const CUT: HandoverPlan = { kind: 'cut', seconds: 0, anchor: null, reason: '' };

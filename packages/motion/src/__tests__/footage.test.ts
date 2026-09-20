@@ -122,7 +122,7 @@ describe.skipIf(browser === undefined)('a generated shot in the finished film', 
     servers.push(served.close);
 
     const storyboard: Storyboard = resequence({
-      id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+      id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
       scenes: [scene({ id: 'broll', assetRefs: ['ast_clip'], purpose: 'Atmosphere' })],
       voiceStrategy: 'none', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft', language: 'en',
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
@@ -156,7 +156,7 @@ describe.skipIf(browser === undefined)('a generated shot in the finished film', 
   it('falls back to the words when generation produced nothing', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'act-one-footage-none-'));
     const storyboard: Storyboard = resequence({
-      id: 'sbd_2', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+      id: 'sbd_2', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
       // The recipe says footage and the shot has none: the scene is its words.
       scenes: [scene({ id: 'broll', assetRefs: [], onScreenText: ['Forty unmatched rows.'] })],
       voiceStrategy: 'none', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft', language: 'en',

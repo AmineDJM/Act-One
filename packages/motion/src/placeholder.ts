@@ -69,7 +69,7 @@ const storyboard: Storyboard = resequence({
   id: 'sbd_placeholder',
   projectId: 'prj_placeholder',
   conceptId: 'cpt_placeholder',
-  treatmentId: 'trt_placeholder',
+  treatmentId: 'trt_placeholder', handovers: {},
   version: 1,
   scenes: [
     scene({

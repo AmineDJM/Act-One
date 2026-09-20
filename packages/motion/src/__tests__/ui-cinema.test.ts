@@ -72,7 +72,7 @@ async function capturePng(width: number, height: number): Promise<string> {
 
 function film(id: string, uiSequence: Scene['uiSequence']): Storyboard {
   return resequence({
-    id: `sbd_${id}`, projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
+    id: `sbd_${id}`, projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', handovers: {}, version: 1,
     scenes: [
       {
         id: `scn_${id}`, storyboardId: `sbd_${id}`, index: 0, startTime: 0, duration: SECONDS,

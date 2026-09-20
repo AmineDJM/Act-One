@@ -289,7 +289,7 @@ async function renderShortlist(
     id,
     projectId: context.project.id,
     conceptId: 'cpt_hero',
-    treatmentId: 'trt_hero',
+    treatmentId: 'trt_hero', handovers: {},
     version: 1,
     scenes: usable.map((candidate, index) => ({
       id: `scn_hero_${index}`,

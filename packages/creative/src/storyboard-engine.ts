@@ -724,7 +724,7 @@ export class StoryboardEngine {
       id: storyboardId,
       projectId: input.projectId,
       conceptId: input.concept.id,
-      treatmentId: input.treatment.id,
+      treatmentId: input.treatment.id, handovers: {},
       version: input.version,
       scenes: timed,
       voiceStrategy: input.treatment.voiceStrategy,
