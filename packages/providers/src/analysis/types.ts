@@ -25,8 +25,35 @@ import type { CallContext, Provider } from '../types.ts';
  * worse than no film grammar, because it is followed.
  */
 
-/** Seconds from the start of the film, as the source reported them. */
-export const Timecode = z.number().min(0);
+/**
+ * Seconds from the start of the film.
+ *
+ * Coerced, because a model asked for a time writes one the way a person would:
+ * `12.4`, `"12.4"`, `"12.4s"`, `"00:12.4"`, `"1:06"`. All five mean the same
+ * moment and only the first is a number. A live pass over a 67-second film was
+ * lost in its entirety — every boundary, beat and cue correct — because one
+ * field came back as a string.
+ *
+ * Only forms whose meaning is unambiguous are accepted. Anything else stays
+ * invalid rather than being guessed into a plausible timestamp, because a
+ * boundary at the wrong second is worse than a boundary that was dropped.
+ */
+export const Timecode = z.preprocess((input) => {
+  if (typeof input === 'number') return input;
+  if (typeof input !== 'string') return input;
+  const text = input.trim().toLowerCase().replace(/\s+/g, '');
+  // mm:ss(.sss) or hh:mm:ss(.sss)
+  const clock = /^(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)$/.exec(text);
+  if (clock) {
+    const hours = Number(clock[1] ?? 0);
+    return hours * 3600 + Number(clock[2]) * 60 + Number(clock[3]);
+  }
+  const plain = /^(\d+(?:\.\d+)?)(?:s|sec|secs|seconds)?$/.exec(text);
+  if (plain) return Number(plain[1]);
+  const ms = /^(\d+(?:\.\d+)?)ms$/.exec(text);
+  if (ms) return Number(ms[1]) / 1000;
+  return input;
+}, z.number().min(0));
 
 /** A closed interval on the film's clock. */
 export const Span = z.object({

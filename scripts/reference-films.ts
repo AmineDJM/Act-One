@@ -19,7 +19,7 @@ import { mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { neutralRamp } from '@act-one/design';
-import { resequence, type BrandSystem, type Scene, type Storyboard } from '@act-one/core';
+import { BrandSystem, resequence, type Scene, type Storyboard } from '@act-one/core';
 import { renderFilm, type FilmProps } from '@act-one/motion';
 import { runDeterministicChecks, verifyMaster } from '@act-one/qa';
 import { getSystem } from '@act-one/creative';
@@ -36,12 +36,34 @@ import {
 const OUT = path.resolve(process.cwd(), 'apps/web/public/work');
 const STORAGE = process.env['ACT_ONE_STORAGE_DIR'] ?? path.resolve('.act-one-demo/storage');
 
-function brand(over: Partial<BrandSystem> & Pick<BrandSystem, 'id' | 'name' | 'primaryColor'>): BrandSystem {
-  return {
+function brand(
+  over: Partial<BrandSystem> & Pick<BrandSystem, 'id' | 'name' | 'primaryColor'>,
+): BrandSystem {
+  /*
+   * Parsed rather than cast.
+   *
+   * This used to end `} as BrandSystem`, which told the compiler to stop
+   * asking about the fields the literal does not set — and `communication`,
+   * which the schema fills with a default, was therefore absent at runtime.
+   * The deterministic checks read `brand.communication.language`, so the one
+   * command that proves the real renderer works died on its first film and
+   * had not run since. Parsing applies every default the schema promises,
+   * and a field that goes missing in future is an error here rather than a
+   * crash three packages away.
+   */
+  return BrandSystem.parse({
     organizationId: 'org_reference',
     logo: null,
     logoVariants: [],
-    secondaryColor: null,
+    /*
+     * A real second colour, not an absence.
+     *
+     * The schema requires one and the literal used to pass null, which the
+     * cast hid. Taken from the brand's own neutral ramp rather than invented:
+     * a mid neutral derived from the primary is what these demonstration
+     * brands would actually have, and it keeps the films inside one palette.
+     */
+    secondaryColor: neutralRamp(over.primaryColor, 9, 0.05)[6] ?? over.primaryColor,
     accentColors: [],
     primaryCandidates: [over.primaryColor],
     neutrals: neutralRamp(over.primaryColor, 9, 0.05),
@@ -54,7 +76,6 @@ function brand(over: Partial<BrandSystem> & Pick<BrandSystem, 'id' | 'name' | 'p
     cornerStyle: 'subtle',
     cornerRadiusPx: 10,
     motionStyle: 'precise',
-    tone: '',
     allowsGlow: false,
     allowsGradient: false,
     confirmedByUser: true,
@@ -62,7 +83,7 @@ function brand(over: Partial<BrandSystem> & Pick<BrandSystem, 'id' | 'name' | 'p
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...over,
-  } as BrandSystem;
+  });
 }
 
 type SceneSpec = Partial<Scene> & Pick<Scene, 'duration' | 'visualType' | 'purpose'>;
@@ -84,19 +105,35 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
       assetRefs: [],
       momentIds: [],
       cameraRecipe: {
-        move: 'static', fromScale: 1, toScale: 1, fromX: 0, toX: 0, fromY: 0, toY: 0,
-        motionBlur: 0.1, depthOfField: 0, easing: 'in_out_quart',
+        move: 'static',
+        fromScale: 1,
+        toScale: 1,
+        fromX: 0,
+        toX: 0,
+        fromY: 0,
+        toY: 0,
+        motionBlur: 0.1,
+        depthOfField: 0,
+        easing: 'in_out_quart',
       },
       soundCues: [],
       voiceOver: false,
       generativeNeeds: [],
       threeDSceneId: null,
       status: 'draft',
-      parentStoryboardId: null, revisionReason: '',
+      parentStoryboardId: null,
+      revisionReason: '',
       claimEvidenceIds: [],
       notes: '',
       estimatedCostUsd: 0,
-      motionRecipe: { name: 'word_reveal', easing: 'out_quint', delay: 0, stagger: 0.06, intensity: 0.6, params: {} },
+      motionRecipe: {
+        name: 'word_reveal',
+        easing: 'out_quint',
+        delay: 0,
+        stagger: 0.06,
+        intensity: 0.6,
+        params: {},
+      },
       ...spec,
     })) as Scene[],
     voiceStrategy: 'none',
@@ -104,7 +141,8 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
     heroShot: null,
     musicDirection,
     status: 'draft',
-    parentStoryboardId: null, revisionReason: '',
+    parentStoryboardId: null,
+    revisionReason: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   });
@@ -133,12 +171,49 @@ const northwind: FilmProps = {
   storyboard: storyboard(
     'northwind',
     [
-      { duration: 3.4, visualType: 'kinetic_typography', purpose: 'Open on the problem', onScreenText: ['Forty unmatched rows.'], motionRecipe: recipe('kinetic_headline', 'in_out_quart', 0.45, 0.06) },
-      { duration: 2.2, visualType: 'kinetic_typography', purpose: 'Name the cost', onScreenText: ['Every Monday.'], motionRecipe: recipe('word_reveal', 'in_out_quart', 0.45, 0.08) },
-      { duration: 4.0, visualType: 'transition', purpose: 'Turn', onScreenText: ['Then stop doing it.'], motionRecipe: recipe('mask_reveal', 'in_out_quart', 0.5, 0) },
-      { duration: 1.9, visualType: 'kinetic_typography', purpose: 'State the shift', onScreenText: ['One run.'], motionRecipe: recipe('editorial_headline', 'in_out_quart', 0.5, 0) },
-      { duration: 4.4, visualType: 'statistic', purpose: 'Land the proof', onScreenText: ['0', 'unmatched rows remaining'], claimEvidenceIds: ['evd_northwind_close'], motionRecipe: recipe('metric_reveal', 'out_quint', 0.5, 0) },
-      { duration: 3.6, visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Close the books while you sleep.'], motionRecipe: recipe('cta_end_card', 'out_quint', 0.45, 0) },
+      {
+        duration: 3.4,
+        visualType: 'kinetic_typography',
+        purpose: 'Open on the problem',
+        onScreenText: ['Forty unmatched rows.'],
+        motionRecipe: recipe('kinetic_headline', 'in_out_quart', 0.45, 0.06),
+      },
+      {
+        duration: 2.2,
+        visualType: 'kinetic_typography',
+        purpose: 'Name the cost',
+        onScreenText: ['Every Monday.'],
+        motionRecipe: recipe('word_reveal', 'in_out_quart', 0.45, 0.08),
+      },
+      {
+        duration: 4.0,
+        visualType: 'transition',
+        purpose: 'Turn',
+        onScreenText: ['Then stop doing it.'],
+        motionRecipe: recipe('mask_reveal', 'in_out_quart', 0.5, 0),
+      },
+      {
+        duration: 1.9,
+        visualType: 'kinetic_typography',
+        purpose: 'State the shift',
+        onScreenText: ['One run.'],
+        motionRecipe: recipe('editorial_headline', 'in_out_quart', 0.5, 0),
+      },
+      {
+        duration: 4.4,
+        visualType: 'statistic',
+        purpose: 'Land the proof',
+        onScreenText: ['0', 'unmatched rows remaining'],
+        claimEvidenceIds: ['evd_northwind_close'],
+        motionRecipe: recipe('metric_reveal', 'out_quint', 0.5, 0),
+      },
+      {
+        duration: 3.6,
+        visualType: 'logo_reveal',
+        purpose: 'Sign off',
+        onScreenText: ['Close the books while you sleep.'],
+        motionRecipe: recipe('cta_end_card', 'out_quint', 0.45, 0),
+      },
     ],
     'Sparse, sub-heavy, one impact on the turn.',
   ),
@@ -166,13 +241,56 @@ const meridian: FilmProps = {
   storyboard: storyboard(
     'meridian',
     [
-      { duration: 2.1, visualType: 'kinetic_typography', purpose: 'Hook', onScreenText: ['You have a question.'], motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03) },
-      { duration: 2.4, visualType: 'kinetic_typography', purpose: 'Escalate', onScreenText: ['The data team has forty.'], motionRecipe: recipe('word_reveal', 'out_expo', 0.85, 0.03) },
-      { duration: 1.7, visualType: 'kinetic_typography', purpose: 'The wait', onScreenText: ['Yours is forty-one.'], motionRecipe: recipe('editorial_headline', 'out_expo', 0.8, 0) },
-      { duration: 2.1, visualType: 'transition', purpose: 'Break', onScreenText: ['Ask it here instead.'], motionRecipe: recipe('mask_reveal', 'out_expo', 0.8, 0) },
-      { duration: 2.5, visualType: 'statistic', purpose: 'Proof', onScreenText: ['1.4s', 'from question to answer'], claimEvidenceIds: ['evd_meridian_latency'], motionRecipe: recipe('metric_reveal', 'out_expo', 0.8, 0) },
-      { duration: 2.1, visualType: 'kinetic_typography', purpose: 'Reframe', onScreenText: ['No ticket. No queue.'], motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03) },
-      { duration: 3.0, visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Stop asking the data team.'], motionRecipe: recipe('cta_end_card', 'out_expo', 0.7, 0) },
+      {
+        duration: 2.1,
+        visualType: 'kinetic_typography',
+        purpose: 'Hook',
+        onScreenText: ['You have a question.'],
+        motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03),
+      },
+      {
+        duration: 2.4,
+        visualType: 'kinetic_typography',
+        purpose: 'Escalate',
+        onScreenText: ['The data team has forty.'],
+        motionRecipe: recipe('word_reveal', 'out_expo', 0.85, 0.03),
+      },
+      {
+        duration: 1.7,
+        visualType: 'kinetic_typography',
+        purpose: 'The wait',
+        onScreenText: ['Yours is forty-one.'],
+        motionRecipe: recipe('editorial_headline', 'out_expo', 0.8, 0),
+      },
+      {
+        duration: 2.1,
+        visualType: 'transition',
+        purpose: 'Break',
+        onScreenText: ['Ask it here instead.'],
+        motionRecipe: recipe('mask_reveal', 'out_expo', 0.8, 0),
+      },
+      {
+        duration: 2.5,
+        visualType: 'statistic',
+        purpose: 'Proof',
+        onScreenText: ['1.4s', 'from question to answer'],
+        claimEvidenceIds: ['evd_meridian_latency'],
+        motionRecipe: recipe('metric_reveal', 'out_expo', 0.8, 0),
+      },
+      {
+        duration: 2.1,
+        visualType: 'kinetic_typography',
+        purpose: 'Reframe',
+        onScreenText: ['No ticket. No queue.'],
+        motionRecipe: recipe('kinetic_headline', 'out_expo', 0.85, 0.03),
+      },
+      {
+        duration: 3.0,
+        visualType: 'logo_reveal',
+        purpose: 'Sign off',
+        onScreenText: ['Stop asking the data team.'],
+        motionRecipe: recipe('cta_end_card', 'out_expo', 0.7, 0),
+      },
     ],
     'Driving pulse, hard cut on every line.',
   ),
@@ -203,12 +321,53 @@ const halyard: FilmProps = {
   storyboard: storyboard(
     'halyard',
     [
-      { duration: 3.0, visualType: 'kinetic_typography', purpose: 'Open flat', onScreenText: ['Nothing happened last night.'], motionRecipe: recipe('editorial_headline', 'out_quint', 0.4, 0) },
-      { duration: 2.4, visualType: 'kinetic_typography', purpose: 'Or the night before', onScreenText: ['Or the night before that.'], motionRecipe: recipe('word_reveal', 'out_quint', 0.4, 0.05) },
-      { duration: 5.2, visualType: 'quote', purpose: 'The turn', onScreenText: ['We have not been paged in eleven months.', 'Infrastructure lead, 200-person team'], claimEvidenceIds: ['evd_halyard_pages'], motionRecipe: recipe('quote_hold', 'out_quint', 0.4, 0) },
-      { duration: 3.0, visualType: 'statistic', purpose: 'Proof', onScreenText: ['11', 'months since the last page'], claimEvidenceIds: ['evd_halyard_pages'], motionRecipe: recipe('metric_reveal', 'out_quint', 0.4, 0) },
-      { duration: 2.0, visualType: 'kinetic_typography', purpose: 'The argument', onScreenText: ['Boring on purpose.'], motionRecipe: recipe('kinetic_headline', 'out_quint', 0.45, 0.04) },
-      { duration: 3.4, visualType: 'logo_reveal', purpose: 'Sign off', onScreenText: ['Infrastructure that stays quiet.'], motionRecipe: recipe('cta_end_card', 'out_quint', 0.4, 0) },
+      {
+        duration: 3.0,
+        visualType: 'kinetic_typography',
+        purpose: 'Open flat',
+        onScreenText: ['Nothing happened last night.'],
+        motionRecipe: recipe('editorial_headline', 'out_quint', 0.4, 0),
+      },
+      {
+        duration: 2.4,
+        visualType: 'kinetic_typography',
+        purpose: 'Or the night before',
+        onScreenText: ['Or the night before that.'],
+        motionRecipe: recipe('word_reveal', 'out_quint', 0.4, 0.05),
+      },
+      {
+        duration: 5.2,
+        visualType: 'quote',
+        purpose: 'The turn',
+        onScreenText: [
+          'We have not been paged in eleven months.',
+          'Infrastructure lead, 200-person team',
+        ],
+        claimEvidenceIds: ['evd_halyard_pages'],
+        motionRecipe: recipe('quote_hold', 'out_quint', 0.4, 0),
+      },
+      {
+        duration: 3.0,
+        visualType: 'statistic',
+        purpose: 'Proof',
+        onScreenText: ['11', 'months since the last page'],
+        claimEvidenceIds: ['evd_halyard_pages'],
+        motionRecipe: recipe('metric_reveal', 'out_quint', 0.4, 0),
+      },
+      {
+        duration: 2.0,
+        visualType: 'kinetic_typography',
+        purpose: 'The argument',
+        onScreenText: ['Boring on purpose.'],
+        motionRecipe: recipe('kinetic_headline', 'out_quint', 0.45, 0.04),
+      },
+      {
+        duration: 3.4,
+        visualType: 'logo_reveal',
+        purpose: 'Sign off',
+        onScreenText: ['Infrastructure that stays quiet.'],
+        motionRecipe: recipe('cta_end_card', 'out_quint', 0.4, 0),
+      },
     ],
     'Almost none. Room tone and one soft mark.',
   ),
@@ -251,16 +410,13 @@ for (const film of FILMS) {
      * uncited would mean exempting ourselves from the rule we hold every
      * customer's film to.
      */
-    knownEvidenceIds: new Set([
-      'evd_northwind_close',
-      'evd_meridian_latency',
-      'evd_halyard_pages',
-    ]),
+    knownEvidenceIds: new Set(['evd_northwind_close', 'evd_meridian_latency', 'evd_halyard_pages']),
   }).filter((issue) => issue.severity === 'hard_fail' || issue.severity === 'soft_fail');
 
   if (issues.length > 0) {
     console.error(`\n${film.slug} would not pass our own QA:`);
-    for (const issue of issues) console.error(`  ${issue.severity} ${issue.check}: ${issue.message}`);
+    for (const issue of issues)
+      console.error(`  ${issue.severity} ${issue.check}: ${issue.message}`);
     process.exit(1);
   }
 }
@@ -307,7 +463,9 @@ for (const film of FILMS) {
     .filter((key): key is string => Boolean(key))
     .filter((key) => !resolvedPaths[key]);
   if (missing.length > 0) {
-    console.error(`\n${film.slug} has no sound library to score with. Run \`npm run sound-library\`.`);
+    console.error(
+      `\n${film.slug} has no sound library to score with. Run \`npm run sound-library\`.`,
+    );
     process.exit(1);
   }
 
@@ -329,23 +487,29 @@ for (const film of FILMS) {
     outputArgs: ['-c:a', 'pcm_s24le'],
   });
 
-  const muxed = await runFfmpeg(
-    muxArgs(silentPath, mastered, path.join(OUT, `${film.slug}.mp4`)),
-    { timeoutMs: 5 * 60_000 },
-  );
+  const muxed = await runFfmpeg(muxArgs(silentPath, mastered, path.join(OUT, `${film.slug}.mp4`)), {
+    timeoutMs: 5 * 60_000,
+  });
   if (!muxed.ok) throw new Error(`${film.slug} mux failed: ${muxed.stderr.slice(-400)}`);
 
   // The same gate every customer's master passes: the file has to say the
   // right things and decode end to end, or the shop window shows a film that
   // some visitors' browsers would refuse.
-  const playable = await verifyMaster(path.join(OUT, `${film.slug}.mp4`), { width: 1920, height: 1080 });
+  const playable = await verifyMaster(path.join(OUT, `${film.slug}.mp4`), {
+    width: 1920,
+    height: 1080,
+  });
   if (playable.issues.length > 0) {
     console.error(`\n${film.slug} would not play everywhere:`);
     for (const issue of playable.issues) console.error(`  ${issue}`);
     process.exit(1);
   }
 
-  await Promise.all([rm(silentPath, { force: true }), rm(premaster, { force: true }), rm(mastered, { force: true })]);
+  await Promise.all([
+    rm(silentPath, { force: true }),
+    rm(premaster, { force: true }),
+    rm(mastered, { force: true }),
+  ]);
 
   // A poster held a beat after the first cut, so the card shows the film
   // composed rather than the frame before anything has moved.
@@ -359,7 +523,9 @@ for (const film of FILMS) {
   });
 
   const seconds = film.props.storyboard.scenes.reduce((sum, scene) => sum + scene.duration, 0);
-  console.log(`${film.slug.padEnd(10)} ${seconds.toFixed(1)}s film + poster in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+  console.log(
+    `${film.slug.padEnd(10)} ${seconds.toFixed(1)}s film + poster in ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  );
 }
 
 console.log(`\nWritten to ${OUT}`);

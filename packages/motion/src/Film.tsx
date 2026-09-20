@@ -14,8 +14,22 @@ import {
   type Storyboard,
 } from '@act-one/core';
 import { resolveTokens, watermark as watermarkSvg, type DesignTokens } from '@act-one/design';
-import { WordReveal, KineticHeadline, EditorialHeadline, MetricReveal, QuoteScene } from './components/Type.tsx';
-import { ProductWindow, ProductZoom, SpatialCards, CursorSequence, PhotoHold } from './components/Product.tsx';
+import {
+  WordReveal,
+  KineticHeadline,
+  EditorialHeadline,
+  MetricReveal,
+  QuoteScene,
+} from './components/Type.tsx';
+import { SceneCamera } from './components/SceneCamera.tsx';
+import { ElementField, type FieldFigure } from './components/ElementField.tsx';
+import {
+  ProductWindow,
+  ProductZoom,
+  SpatialCards,
+  CursorSequence,
+  PhotoHold,
+} from './components/Product.tsx';
 import { UiCinema } from './components/UiCinema.tsx';
 import { Footage } from './components/Footage.tsx';
 import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './components/Brand.tsx';
@@ -65,12 +79,12 @@ export const Film: React.FC<FilmProps> = ({
             brand={brand}
             assetUrls={assetUrls}
             /*
-              * No invented fallback. This used to default to "Start free",
-              * which is a promise about a product nobody checked has a free
-              * tier — made on the customer's behalf, on their launch day.
-              * An end card with no line is a design problem; one with a claim
-              * we made up is somebody else's problem.
-              */
+             * No invented fallback. This used to default to "Start free",
+             * which is a promise about a product nobody checked has a free
+             * tier — made on the customer's behalf, on their launch day.
+             * An end card with no line is a design problem; one with a claim
+             * we made up is somebody else's problem.
+             */
             cta={cta ?? ''}
             tagline={tagline ?? ''}
             footage={new Set(footageAssetIds ?? [])}
@@ -78,7 +92,9 @@ export const Film: React.FC<FilmProps> = ({
         </Sequence>
       ))}
 
-      {captions && captions.length > 0 ? <Captions cues={captions} tokens={tokens} aspect={aspect} /> : null}
+      {captions && captions.length > 0 ? (
+        <Captions cues={captions} tokens={tokens} aspect={aspect} />
+      ) : null}
 
       {watermarkLabel ? (
         <AbsoluteFill
@@ -142,7 +158,14 @@ const Captions: React.FC<{ cues: CaptionCue[]; tokens: DesignTokens; aspect: str
         pointerEvents: 'none',
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: Math.round(sizePx * 0.16) }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: Math.round(sizePx * 0.16),
+        }}
+      >
         {(cue.lines.length > 0 ? cue.lines : [cue.text]).map((line, index) => (
           <span
             key={`${cue.start}-${index}`}
@@ -191,6 +214,9 @@ function marked(line: string, emphasis: string | null, accent: string): React.Re
   );
 }
 
+/** The figures a scene may ask for. Anything else is ignored rather than guessed. */
+const FIELD_FIGURES: readonly FieldFigure[] = ['converge', 'disperse', 'settle', 'stream'];
+
 type SceneRendererProps = {
   scene: Scene;
   tokens: DesignTokens;
@@ -202,13 +228,36 @@ type SceneRendererProps = {
   footage: Set<string>;
 };
 
-const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, assetUrls, cta, tagline, footage }) => {
+const SceneRenderer: React.FC<SceneRendererProps> = ({
+  scene,
+  tokens,
+  brand,
+  assetUrls,
+  cta,
+  tagline,
+  footage,
+}) => {
   const text = scene.onScreenText.join(' ');
   const easing = scene.motionRecipe.easing;
-  const assets = scene.assetRefs.map((id) => assetUrls[id]).filter((url): url is string => Boolean(url));
+  /*
+   * A field of separate objects behind the beat, when the director asked for one.
+   *
+   * Opt-in per scene rather than automatic. A film where every beat carries a
+   * field is a film with one idea in it, and the measurement this closes —
+   * elements on screen, and therefore how much of the picture is in motion —
+   * is not worth buying with a house style that repeats.
+   */
+  const field = FIELD_FIGURES.includes(String(scene.motionRecipe.params['field']) as FieldFigure)
+    ? (String(scene.motionRecipe.params['field']) as FieldFigure)
+    : null;
+  const assets = scene.assetRefs
+    .map((id) => assetUrls[id])
+    .filter((url): url is string => Boolean(url));
   /** The first clip this scene has, if any. A shot plays one thing. */
   const clip = scene.assetRefs.find((id) => footage.has(id) && assetUrls[id]);
-  const logoUrl = brand.logo?.assetId ? assetUrls[brand.logo.assetId] ?? brand.logo.url : brand.logo?.url ?? null;
+  const logoUrl = brand.logo?.assetId
+    ? (assetUrls[brand.logo.assetId] ?? brand.logo.url)
+    : (brand.logo?.url ?? null);
 
   const body = (() => {
     switch (scene.motionRecipe.name) {
@@ -274,11 +323,11 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             <MetricReveal
               value={value ?? ''}
               /*
-                * No fallback to `purpose`. That field is the storyboard's note
-                * to itself about what the beat is for — "Show scale: real
-                * customer impact" — and it was being set in type under the
-                * number, on screen, in the customer's film.
-                */
+               * No fallback to `purpose`. That field is the storyboard's note
+               * to itself about what the beat is for — "Show scale: real
+               * customer impact" — and it was being set in type under the
+               * number, on screen, in the customer's film.
+               */
               caption={rest.join(' ')}
               tokens={tokens}
               durationSeconds={scene.duration}
@@ -345,7 +394,9 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
             // A published product image is shown as published: it often
             // carries its own frame, and a browser bar around a browser bar
             // is the tell of a template.
-            chrome={scene.visualType !== 'product_ui_3d' && scene.motionRecipe.params['frame'] !== 'bare'}
+            chrome={
+              scene.visualType !== 'product_ui_3d' && scene.motionRecipe.params['frame'] !== 'bare'
+            }
             aspect={captureAspect(scene)}
           />
         ) : (
@@ -460,7 +511,12 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
       case 'spatial_cards':
       case 'image_wall':
         return assets.length > 0 ? (
-          <SpatialCards srcs={assets} tokens={tokens} durationSeconds={scene.duration} easing={easing} />
+          <SpatialCards
+            srcs={assets}
+            tokens={tokens}
+            durationSeconds={scene.duration}
+            easing={easing}
+          />
         ) : (
           typeFallback()
         );
@@ -562,7 +618,37 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
     }
   })();
 
-  return <AbsoluteFill style={{ backgroundColor: tokens.canvas }}>{body}</AbsoluteFill>;
+  /*
+   * Every scene gets the camera its storyboard asked for.
+   *
+   * It used to reach only the components that take `camera` as a prop, which
+   * meant a typographic beat rendered inside a static frame and held perfectly
+   * still once its words had arrived. `SceneCamera` skips the scenes whose own
+   * body already moves, so nothing is double-dollied.
+   */
+  return (
+    <AbsoluteFill style={{ backgroundColor: tokens.canvas }}>
+      <SceneCamera
+        camera={scene.cameraRecipe}
+        recipe={scene.motionRecipe.name}
+        durationSeconds={scene.duration}
+      >
+        {field ? (
+          <ElementField
+            figure={field}
+            count={Number(scene.motionRecipe.params['fieldCount'] ?? 14)}
+            tokens={tokens}
+            durationSeconds={scene.duration}
+            easing={easing}
+            staggerSeconds={scene.motionRecipe.stagger || undefined}
+            delaySeconds={scene.motionRecipe.delay}
+            seed={scene.index + 1}
+          />
+        ) : null}
+        {body}
+      </SceneCamera>
+    </AbsoluteFill>
+  );
 };
 
 /** Positions a block on the grid so every scene shares the same margins. */
@@ -639,7 +725,10 @@ function cursorPath(scene: Scene): { x: number; y: number }[] {
 function qualityOf(aspect: AspectRatio, width: number): RenderQuality {
   const qualities: RenderQuality[] = ['preview', 'hd', 'uhd'];
   return qualities
-    .map((quality) => ({ quality, distance: Math.abs(dimensionsFor(aspect, quality).width - width) }))
+    .map((quality) => ({
+      quality,
+      distance: Math.abs(dimensionsFor(aspect, quality).width - width),
+    }))
     .sort((left, right) => left.distance - right.distance)[0]!.quality;
 }
 
@@ -650,5 +739,3 @@ function aspectFor(width: number, height: number): '16:9' | '9:16' | '1:1' | '4:
   if (ratio < 0.95) return '4:5';
   return '16:9';
 }
-
-
