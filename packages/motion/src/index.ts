@@ -13,3 +13,8 @@ export {
 } from './composition.ts';
 export { PLACEHOLDER_FILM_PROPS } from './placeholder.ts';
 export { renderFilm, bundleFilm, type RenderFilmOptions, type RenderFilmResult } from './render.ts';
+export { SceneGraphRenderer, type SceneGraphRendererProps } from './components/SceneGraphRenderer.tsx';
+export { SceneCamera, bodyDrivesCamera } from './components/SceneCamera.tsx';
+export { ElementField, type FieldFigure, type ElementFieldProps } from './components/ElementField.tsx';
+export { renderScenes, type RenderScenesOptions } from './render.ts';
+export { sceneCompositionId, scenesDurationInFrames } from './composition.ts';

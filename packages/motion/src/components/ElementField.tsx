@@ -32,6 +32,21 @@ import { ease, clamp01 } from '../easing.ts';
  * for, and the semantics — how many, arriving from where, converging or
  * dispersing — say what the beat says. A field of drifting shapes that means
  * nothing is exactly the "AI-generated" tell this product refuses.
+ *
+ * THE FIRST CUT FAILED ON EXACTLY THAT, and the two rules below are what came
+ * back from watching it. A critic given the rendered file said the shapes
+ * "heavily obscure the text, making it difficult to read", that the motion
+ * "feels entirely disconnected from the narrative" and "reads as a generic
+ * template", and measured the viewer as competing between "reading text" and
+ * "ignoring decorative motion". Every word of that was earned: the field had
+ * been put on nine of fifteen beats to move a measurement, which is the exact
+ * mistake of optimising the instrument instead of the film.
+ *
+ * So: THE TYPE ALWAYS WINS. A field is laid out around the reading area rather
+ * than across it, and it is carried at a weight that cannot compete with a
+ * headline. And a field appears only where its figure IS the sentence — the
+ * fragments that converge are the fragments the line is naming. Where it would
+ * merely be movement, there is none, and the beat rests.
  */
 
 /**
@@ -65,6 +80,21 @@ export type ElementFieldProps = {
   seed?: number;
   /** Elements the accent colour is spent on. The rest are neutral. */
   accentCount?: number;
+  /**
+   * The part of the frame the type occupies, as fractions, which the field
+   * stays out of.
+   *
+   * Not a suggestion. A headline with a card drifting through it is a headline
+   * somebody has to work to read, and a viewer who is working to read is not
+   * watching the film.
+   */
+  clearZone?: { x: number; y: number; width: number; height: number };
+  /**
+   * How loud the field is allowed to be, 0 to 1.
+   *
+   * Low by default. This is the layer behind the argument, not the argument.
+   */
+  weight?: number;
 };
 
 /** The band the references sit in, and the reason the default is what it is. */
@@ -73,6 +103,18 @@ const DEFAULT_STAGGER_SECONDS = 0.07;
 /** Below this nothing reads as a group; above it nothing reads as one idea. */
 const MIN_COUNT = 3;
 const MAX_COUNT = 28;
+
+/**
+ * Where the type sits by default: the centre-left block `Framed` lays out.
+ *
+ * Generous on purpose. A shape that clips the descender of a headline is as
+ * bad as one across the middle of it, and the cost of keeping clear is a
+ * composition that uses its margins, which is what the references do anyway.
+ */
+const DEFAULT_CLEAR_ZONE = { x: 0.04, y: 0.3, width: 0.66, height: 0.42 };
+
+/** The field is behind the argument, never level with it. */
+const DEFAULT_WEIGHT = 0.42;
 
 /**
  * A deterministic pseudo-random sequence.
@@ -106,7 +148,44 @@ type Placed = {
   accent: boolean;
 };
 
-function place(figure: FieldFigure, count: number, seed: number, accentCount: number): Placed[] {
+/**
+ * Pushes a resting position out of the reading area, by the shortest way out.
+ *
+ * Applied to where an element COMES TO REST rather than to its whole path: a
+ * card that crosses behind a headline while travelling reads as depth, and one
+ * that parks there reads as a mistake. The shortest way out keeps the
+ * composition the figure asked for — a converge still converges, it just
+ * converges to the side of the sentence rather than on top of it.
+ */
+function clearOf(
+  x: number,
+  y: number,
+  zone: { x: number; y: number; width: number; height: number },
+): { x: number; y: number } {
+  const inside =
+    x > zone.x && x < zone.x + zone.width && y > zone.y && y < zone.y + zone.height;
+  if (!inside) return { x, y };
+
+  const left = x - zone.x;
+  const right = zone.x + zone.width - x;
+  const up = y - zone.y;
+  const down = zone.y + zone.height - y;
+  const nearest = Math.min(left, right, up, down);
+
+  const margin = 0.045;
+  if (nearest === right) return { x: zone.x + zone.width + margin, y };
+  if (nearest === left) return { x: Math.max(0.02, zone.x - margin), y };
+  if (nearest === down) return { x, y: Math.min(0.97, zone.y + zone.height + margin) };
+  return { x, y: Math.max(0.03, zone.y - margin) };
+}
+
+function place(
+  figure: FieldFigure,
+  count: number,
+  seed: number,
+  accentCount: number,
+  zone: { x: number; y: number; width: number; height: number },
+): Placed[] {
   const r = sequence(seed, count * 6);
   const placed: Placed[] = [];
 
@@ -190,9 +269,11 @@ export const ElementField: React.FC<ElementFieldProps> = (props) => {
     count,
     Math.max(0, props.accentCount ?? Math.max(1, Math.round(count * 0.15))),
   );
+  const zone = props.clearZone ?? DEFAULT_CLEAR_ZONE;
+  const weight = Math.max(0, Math.min(1, props.weight ?? DEFAULT_WEIGHT));
   const placed = React.useMemo(
-    () => place(props.figure, count, props.seed ?? 1, accentCount),
-    [props.figure, count, props.seed, accentCount],
+    () => place(props.figure, count, props.seed ?? 1, accentCount, zone),
+    [props.figure, count, props.seed, accentCount, zone],
   );
 
   const seconds = frame / fps;
@@ -231,7 +312,7 @@ export const ElementField: React.FC<ElementFieldProps> = (props) => {
         const arriving = clamp01(t / 0.25);
         const crowding = props.figure === 'converge' ? 1 - eased * 0.45 : 1;
         const leaving = props.figure === 'stream' ? 1 - Math.max(0, (t - 0.85) / 0.15) : 1;
-        const opacity = arriving * crowding * leaving * 0.9;
+        const opacity = arriving * crowding * leaving * weight;
 
         const colour = element.accent ? tokens.accent : tokens.onCanvas.muted;
         // Sized off the real frame, so a field is the same proportion of the

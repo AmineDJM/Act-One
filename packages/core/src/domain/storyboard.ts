@@ -305,9 +305,31 @@ export function movesThroughout(scene: Pick<Scene, 'motionRecipe' | 'cameraRecip
   );
 }
 
+/**
+ * The easing families a film may use.
+ *
+ * Six of these arrive. Not one of them leaves, and that absence is the reason
+ * Act One's films have the shape they have.
+ *
+ * Measured across the four reference films, ease-IN — the accelerating family,
+ * where a thing starts slowly and is moving fastest as it goes — is the single
+ * most common curve in three of the four. It is what lets an element
+ * accelerate out of frame so the next idea can occupy the space it left, which
+ * is how those films change subject twenty times while cutting three. An
+ * engine whose entire vocabulary decelerates can only ever put things down
+ * gently; to get rid of one it has to cut.
+ *
+ * So `in_cubic` and `in_out_cubic` are here, and they are not decoration on
+ * the list. `in_cubic` is the exit curve, and its absence was a structural
+ * limit on the grammar this system could express. `out_cubic` is the gentler
+ * sibling of the workhorse, for arrivals that should not snap.
+ */
 export const EasingName = z.enum([
   'linear',
   'out_quint',        // the workhorse for confident UI motion
+  'out_cubic',        // a softer arrival, where out_quint would snap
+  'in_cubic',         // THE EXIT. Accelerates away; the next idea takes the space.
+  'in_out_cubic',     // travel: leaves one place and arrives at another
   'in_out_quart',
   'out_expo',
   'spring_soft',

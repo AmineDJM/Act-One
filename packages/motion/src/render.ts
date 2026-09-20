@@ -3,8 +3,21 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
-import { DEFAULT_FPS, dimensionsFor, type AspectRatio, type RenderQuality } from '@act-one/core';
-import { compositionId, filmDurationInFrames, type FilmProps } from './composition.ts';
+import {
+  DEFAULT_FPS,
+  dimensionsFor,
+  type AspectRatio,
+  type BrandSystem,
+  type RenderQuality,
+  type SceneGraph,
+} from '@act-one/core';
+import {
+  compositionId,
+  filmDurationInFrames,
+  sceneCompositionId,
+  scenesDurationInFrames,
+  type FilmProps,
+} from './composition.ts';
 
 /**
  * Server-side rendering.
@@ -15,11 +28,12 @@ import { compositionId, filmDurationInFrames, type FilmProps } from './compositi
  */
 let bundlePromise: Promise<string> | null = null;
 
-export async function bundleFilm(options: { entryPoint?: string; outDir?: string } = {}): Promise<string> {
+export async function bundleFilm(
+  options: { entryPoint?: string; outDir?: string } = {},
+): Promise<string> {
   if (bundlePromise) return bundlePromise;
 
-  const entryPoint =
-    options.entryPoint ?? fileURLToPath(new URL('./entry.tsx', import.meta.url));
+  const entryPoint = options.entryPoint ?? fileURLToPath(new URL('./entry.tsx', import.meta.url));
 
   bundlePromise = bundle({
     entryPoint,
@@ -59,7 +73,11 @@ export type RenderFilmOptions = {
   concurrency?: number;
   /** Chromium executable, for environments with a preinstalled browser. */
   browserExecutable?: string;
-  onProgress?: (progress: { renderedFrames: number; encodedFrames: number; progress: number }) => void;
+  onProgress?: (progress: {
+    renderedFrames: number;
+    encodedFrames: number;
+    progress: number;
+  }) => void;
   signal?: AbortSignal;
   /** Frames-only mode: renders a single still for animatics and posters. */
   stillAtSeconds?: number;
@@ -126,7 +144,14 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
       imageFormat: 'png',
       ...(browserExecutable ? { browserExecutable } : {}),
     });
-    return { outputPath: options.outputPath, durationSeconds: 0, width, height, fps, undecodable: [] };
+    return {
+      outputPath: options.outputPath,
+      durationSeconds: 0,
+      width,
+      height,
+      fps,
+      undecodable: [],
+    };
   }
 
   await renderMedia({
@@ -184,7 +209,11 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
  * warning about a font.
  */
 export function undecodableFrom(text: string): string | null {
-  if (!/EncodingError|cannot be decoded|Failed to load (?:resource|image)|ERR_FILE_NOT_FOUND/i.test(text)) {
+  if (
+    !/EncodingError|cannot be decoded|Failed to load (?:resource|image)|ERR_FILE_NOT_FOUND/i.test(
+      text,
+    )
+  ) {
     return null;
   }
   const url = /(https?:\/\/[^\s"']+|file:\/\/[^\s"']+)/.exec(text);
@@ -196,4 +225,95 @@ export function undecodableFrom(text: string): string | null {
 /** Clears the cached bundle. Used when the worker reloads the motion package. */
 export function resetBundle(): void {
   bundlePromise = null;
+}
+
+// ---------------------------------------------------------------------------
+
+export type RenderScenesOptions = {
+  scenes: readonly SceneGraph[];
+  brand: BrandSystem;
+  assetUrls?: Record<string, string>;
+  aspect: AspectRatio;
+  quality?: RenderQuality;
+  fps?: number;
+  outputPath: string;
+  concurrency?: number;
+  browserExecutable?: string;
+  onProgress?: (progress: {
+    renderedFrames: number;
+    encodedFrames: number;
+    progress: number;
+  }) => void;
+};
+
+/**
+ * Renders a film composed of scene graphs.
+ *
+ * The same encoder settings and the same delivery colour as `renderFilm`,
+ * because a film is a film however it was composed — a scene-graph master that
+ * decoded differently from a storyboard master would be a second delivery
+ * format nobody asked for. What differs is only which composition is selected
+ * and what is handed to it.
+ */
+export async function renderScenes(options: RenderScenesOptions): Promise<RenderFilmResult> {
+  const fps = options.fps ?? DEFAULT_FPS;
+  const quality = options.quality ?? 'hd';
+  const { width, height } = dimensionsFor(options.aspect, quality);
+
+  const undecodable = new Set<string>();
+  const serveUrl = await bundleFilm();
+  await mkdir(path.dirname(options.outputPath), { recursive: true });
+  const browserExecutable = resolveBrowserExecutable(options.browserExecutable);
+
+  const inputProps = {
+    scenes: options.scenes,
+    brand: options.brand,
+    assetUrls: options.assetUrls ?? {},
+  } as unknown as Record<string, unknown>;
+
+  const composition = await selectComposition({
+    serveUrl,
+    id: sceneCompositionId(options.aspect),
+    inputProps,
+    ...(browserExecutable ? { browserExecutable } : {}),
+  });
+
+  const resolved = {
+    ...composition,
+    width,
+    height,
+    fps,
+    durationInFrames: scenesDurationInFrames(options.scenes, fps),
+  };
+
+  await renderMedia({
+    composition: resolved,
+    serveUrl,
+    codec: 'h264',
+    outputLocation: options.outputPath,
+    inputProps,
+    crf: quality === 'uhd' ? 16 : 18,
+    pixelFormat: 'yuv420p',
+    colorSpace: 'bt709',
+    concurrency: options.concurrency ?? null,
+    ...(browserExecutable ? { browserExecutable } : {}),
+    onProgress: options.onProgress
+      ? ({ renderedFrames, encodedFrames, progress }) =>
+          options.onProgress!({ renderedFrames, encodedFrames, progress })
+      : undefined,
+    chromiumOptions: { gl: 'swangle' },
+    onBrowserLog: ({ text }) => {
+      const url = undecodableFrom(text);
+      if (url) undecodable.add(url);
+    },
+  });
+
+  return {
+    outputPath: options.outputPath,
+    durationSeconds: resolved.durationInFrames / fps,
+    width,
+    height,
+    fps,
+    undecodable: [...undecodable],
+  };
 }

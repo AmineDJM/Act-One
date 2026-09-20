@@ -1,4 +1,12 @@
-import { dimensionsFor, storyboardDuration, type AspectRatio, type BrandSystem, type CaptionCue, type RenderQuality, type Storyboard } from '@act-one/core';
+import {
+  dimensionsFor,
+  storyboardDuration,
+  type AspectRatio,
+  type BrandSystem,
+  type CaptionCue,
+  type RenderQuality,
+  type Storyboard,
+} from '@act-one/core';
 
 /**
  * The parts of the film package that carry no JSX.
@@ -50,4 +58,23 @@ export function compositionId(aspect: AspectRatio): string {
 
 export function dimensionsForRender(aspect: AspectRatio, quality: RenderQuality) {
   return dimensionsFor(aspect, quality);
+}
+
+/**
+ * The scene-graph composition, one per aspect.
+ *
+ * Separate from the storyboard compositions rather than replacing them: a film
+ * arrives either as a storyboard of named recipes or as a list of graphs, and
+ * the renderer picks the door by which id it selects.
+ */
+export function sceneCompositionId(aspect: AspectRatio): string {
+  return `ActOneScenes-${aspect.replace(':', 'x')}`;
+}
+
+export function scenesDurationInFrames(
+  scenes: readonly { durationSeconds: number }[],
+  fps: number,
+): number {
+  const seconds = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
+  return Math.max(1, Math.round(seconds * fps));
 }

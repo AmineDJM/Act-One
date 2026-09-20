@@ -1,0 +1,369 @@
+import React from 'react';
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
+import type { DesignTokens } from '@act-one/design';
+import {
+  objectPresent,
+  objectProgress,
+  valueAt,
+  type Animatable,
+  type CameraSpec,
+  type SceneGraph,
+  type SceneObject,
+} from '@act-one/core';
+import { EASINGS } from '../easing.ts';
+import { ElementField, type FieldFigure } from './ElementField.tsx';
+
+/**
+ * The executor for the scene language.
+ *
+ * The recipe renderer next door has a branch per named shot. This has a branch
+ * per PRIMITIVE, which is a different kind of list: adding `product_zoom` to
+ * the first one is a feature, and everything it can ever draw is already in
+ * it. Adding a capture object to this one lets a director compose captures
+ * with masks and fields and depth in arrangements nobody has thought of yet.
+ *
+ * Both exist. A storyboard that names a recipe still renders through the
+ * branch that has always rendered it, and a scene that arrives as a graph
+ * renders here. The macros in `compile.ts` are the bridge, and the reason
+ * neither is going away is that the recipes carry real films today and a
+ * migration that breaks them to prove a point is a migration that costs
+ * customers their masters.
+ *
+ * DEPTH IS HONEST. `z` and `focalLengthMm` produce parallax and defocus by
+ * scaling and blurring per layer. It is 2.5D, the capability registry says so,
+ * and a director who needs real geometry gets the geometry executor instead of
+ * an approximation dressed up as a camera.
+ */
+
+export type SceneGraphRendererProps = {
+  scene: SceneGraph;
+  tokens: DesignTokens;
+  /** Asset id to resolvable URL, as the pipeline resolves them. */
+  assetUrls: Record<string, string>;
+};
+
+/** Resolves a brand token path like `onCanvas.primary`, or passes a literal through. */
+function colorOf(value: string, tokens: DesignTokens): string {
+  if (!value.includes('.')) {
+    if (value === 'accent') return tokens.accent;
+    if (value === 'canvas') return tokens.canvas;
+    if (value === 'line') return tokens.line;
+    if (value === 'surface') return tokens.surface;
+    return value;
+  }
+  const [group, key] = value.split('.');
+  if (group === 'onCanvas') {
+    const palette = tokens.onCanvas as unknown as Record<string, string>;
+    return palette[key ?? 'primary'] ?? tokens.onCanvas.primary;
+  }
+  return value;
+}
+
+function animColor(
+  value: string | { from: string; to: string; curve: keyof typeof EASINGS },
+  t: number,
+  tokens: DesignTokens,
+): string {
+  // Colour is not interpolated: a midpoint between two brand colours is a
+  // colour the brand does not have. It swaps on the curve's own midpoint,
+  // which is what a designer means by a field change.
+  if (typeof value === 'string') return colorOf(value, tokens);
+  const eased = EASINGS[value.curve]?.(t) ?? t;
+  return colorOf(eased < 0.5 ? value.from : value.to, tokens);
+}
+
+const num = (property: Animatable, t: number): number => valueAt(property, t, EASINGS);
+
+/**
+ * The camera, as one transform over everything.
+ *
+ * Objects at different `z` are scaled differently by the dolly, which is where
+ * parallax comes from; the focal length decides how strongly. A long lens
+ * flattens the separation, a wide one exaggerates it, which is the part of a
+ * real lens that reads on screen.
+ */
+function cameraTransform(camera: CameraSpec, t: number): { transform: string } {
+  const x = num(camera.x, t);
+  const y = num(camera.y, t);
+  const scale = num(camera.scale, t);
+  const rotation = num(camera.rotationZ, t);
+  return {
+    transform:
+      `translate(${(x * 100).toFixed(4)}%, ${(y * 100).toFixed(4)}%) ` +
+      `scale(${scale.toFixed(5)}) rotate(${rotation.toFixed(3)}deg)`,
+  };
+}
+
+/** How much a layer at depth `z` is moved by the camera's dolly. */
+function parallax(z: number, camera: CameraSpec, t: number): number {
+  const dolly = num(camera.dollyZ, t);
+  // 50mm is neutral. Wider separates depths faster, longer flattens them.
+  const strength = 50 / Math.max(18, camera.focalLengthMm);
+  return 1 + dolly * strength * -z;
+}
+
+/** Defocus by distance from the focal plane, when the camera asks for any. */
+function defocusPx(z: number, camera: CameraSpec, t: number): number {
+  if (camera.depthOfField <= 0) return 0;
+  const focus = num(camera.focusZ, t);
+  return Math.min(24, Math.abs(z - focus) * camera.depthOfField * 14);
+}
+
+export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
+  scene,
+  tokens,
+  assetUrls,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const seconds = frame / fps;
+  const sceneT = Math.min(1, seconds / Math.max(0.0001, scene.durationSeconds));
+
+  const background =
+    scene.background === 'canvas' ? tokens.canvas : animColor(scene.background, sceneT, tokens);
+
+  /*
+   * Masks are resolved to the objects they act on before anything draws.
+   *
+   * They are referential rather than nested, so the pass that applies them has
+   * to happen here: an object names nothing, and a mask names what it covers.
+   */
+  const maskedBy = new Map<string, SceneObject & { kind: 'mask' }>();
+  for (const object of scene.objects) {
+    if (object.kind !== 'mask') continue;
+    for (const target of object.masks) maskedBy.set(target, object);
+  }
+
+  // Painter's order: furthest first, so `z` orders the frame as well as
+  // separating it.
+  const drawable = scene.objects
+    .filter((object) => object.kind !== 'mask')
+    .filter((object) => objectPresent(object, seconds, scene.durationSeconds))
+    .sort((a, b) => num(b.transform.z, 0) - num(a.transform.z, 0));
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: background }}>
+      <AbsoluteFill style={{ ...cameraTransform(scene.camera, sceneT), willChange: 'transform' }}>
+        {drawable.map((object) => {
+          const t = objectProgress(object, seconds, scene.durationSeconds);
+          const z = num(object.transform.z, t);
+          const depthScale = parallax(z, scene.camera, sceneT);
+          const blur = num(object.transform.blurPx, t) + defocusPx(z, scene.camera, sceneT);
+
+          const style: React.CSSProperties = {
+            position: 'absolute',
+            left: `${num(object.transform.x, t) * 100}%`,
+            top: `${num(object.transform.y, t) * 100}%`,
+            opacity: Math.max(0, Math.min(1, num(object.transform.opacity, t))),
+            transform:
+              `translate(${-object.transform.anchor.x * 100}%, ${-object.transform.anchor.y * 100}%) ` +
+              `scale(${(num(object.transform.scale, t) * depthScale).toFixed(5)}) ` +
+              `rotateX(${num(object.transform.rotationX, t).toFixed(2)}deg) ` +
+              `rotateY(${num(object.transform.rotationY, t).toFixed(2)}deg) ` +
+              `rotate(${num(object.transform.rotationZ, t).toFixed(2)}deg)`,
+            ...(blur > 0.05 ? { filter: `blur(${blur.toFixed(2)}px)` } : {}),
+            willChange: 'transform, opacity',
+          };
+
+          const mask = maskedBy.get(object.id);
+          const clipPath = mask ? clipPathFor(mask, seconds, scene) : undefined;
+          const wrapped = (children: React.ReactNode) => (
+            <div key={object.id} style={{ ...style, ...(clipPath ? { clipPath } : {}) }}>
+              {children}
+            </div>
+          );
+
+          switch (object.kind) {
+            case 'text': {
+              const token = tokens.type[object.token];
+              return wrapped(
+                <div
+                  style={{
+                    fontFamily: token.family,
+                    fontWeight: token.weight,
+                    fontSize: token.sizePx,
+                    lineHeight: token.lineHeight,
+                    letterSpacing: `${num(object.tracking ?? token.tracking, t)}em`,
+                    color: animColor(object.color, t, tokens),
+                    textAlign: object.align,
+                    width: tokens.frame.width * object.maxWidth,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {object.staggerBy === 'none' || object.staggerSeconds <= 0
+                    ? object.content
+                    : staggeredText(object, seconds)}
+                </div>,
+              );
+            }
+
+            case 'shape': {
+              const width = num(object.width, t) * tokens.frame.width;
+              const height = num(object.height, t) * tokens.frame.height;
+              return wrapped(
+                <div
+                  style={{
+                    width: object.shape === 'line' ? width : width,
+                    height:
+                      object.shape === 'line' ? Math.max(1, num(object.strokeWidthPx, t)) : height,
+                    backgroundColor:
+                      object.shape === 'line'
+                        ? animColor(object.stroke, t, tokens)
+                        : animColor(object.fill, t, tokens),
+                    border:
+                      object.shape === 'line'
+                        ? 'none'
+                        : `${num(object.strokeWidthPx, t)}px solid ${animColor(object.stroke, t, tokens)}`,
+                    borderRadius:
+                      object.shape === 'ellipse' ? '50%' : num(object.cornerRadiusPx, t),
+                  }}
+                />,
+              );
+            }
+
+            case 'capture':
+            case 'ui_layer':
+            case 'image': {
+              const url = assetUrls[object.assetId];
+              if (!url) return null;
+              const width = num(object.width, t) * tokens.frame.width;
+              const crop = object.crop ?? { x: 0, y: 0, width: 1, height: 1 };
+              return wrapped(
+                <div
+                  style={{
+                    width,
+                    // The crop decides the aspect: a region of a page is not
+                    // the shape of the page.
+                    aspectRatio: `${crop.width} / ${crop.height}`,
+                    overflow: 'hidden',
+                    borderRadius: 'cornerRadiusPx' in object ? num(object.cornerRadiusPx, t) : 0,
+                    boxShadow:
+                      'shadow' in object && object.shadow && tokens.shadow
+                        ? tokens.shadow.soft
+                        : 'none',
+                    ...(object.kind === 'capture' && object.chrome
+                      ? { border: `1px solid ${tokens.line}`, background: tokens.surface }
+                      : {}),
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    style={{
+                      width: `${100 / crop.width}%`,
+                      marginLeft: `${(-crop.x * 100) / crop.width}%`,
+                      marginTop: `${(-crop.y * 100) / crop.height}%`,
+                      display: 'block',
+                    }}
+                  />
+                </div>,
+              );
+            }
+
+            case 'gradient':
+              return wrapped(
+                <div
+                  style={{
+                    width: tokens.frame.width,
+                    height: tokens.frame.height,
+                    background: `linear-gradient(${num(object.angleDeg, t)}deg, ${animColor(object.from, t, tokens)}, ${animColor(object.to, t, tokens)})`,
+                  }}
+                />,
+              );
+
+            case 'field':
+              // The field owns its own layout and clock; the graph gives it its
+              // figure, its count and the area it must keep clear.
+              return (
+                <ElementField
+                  key={object.id}
+                  figure={object.figure as FieldFigure}
+                  count={object.count}
+                  tokens={tokens}
+                  durationSeconds={scene.durationSeconds}
+                  easing="out_cubic"
+                  staggerSeconds={object.staggerSeconds}
+                  delaySeconds={object.enterAt}
+                  seed={object.seed}
+                  {...(object.clearZone ? { clearZone: object.clearZone } : {})}
+                />
+              );
+
+            case 'clip': {
+              const url = assetUrls[object.assetId];
+              if (!url) return null;
+              return wrapped(
+                <video
+                  src={url}
+                  muted
+                  style={{ width: num(object.width, t) * tokens.frame.width, display: 'block' }}
+                />,
+              );
+            }
+
+            /*
+             * Geometry is not drawn here.
+             *
+             * A 3D object arrives already rendered, as frames the geometry
+             * executor produced. Drawing a placeholder would be the renderer
+             * inventing a shot, which is the one thing it must never do — so
+             * an unrendered 3D object is nothing, and the routing said so
+             * before anybody got here.
+             */
+            case 'three_d':
+              return null;
+
+            default:
+              return null;
+          }
+        })}
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+/** Words arriving one after another, on the object's own stagger. */
+function staggeredText(object: SceneObject & { kind: 'text' }, seconds: number): React.ReactNode {
+  const units =
+    object.staggerBy === 'line' ? object.content.split('\n') : object.content.split(' ');
+  return units.map((unit, index) => {
+    const start = object.enterAt + index * object.staggerSeconds;
+    const local = Math.max(0, Math.min(1, (seconds - start) / 0.5));
+    const eased = EASINGS.out_quint(local);
+    return (
+      <span
+        key={index}
+        style={{
+          display: 'inline-block',
+          opacity: eased,
+          transform: `translateY(${((1 - eased) * 0.35).toFixed(3)}em)`,
+          marginRight: object.staggerBy === 'line' ? 0 : '0.28em',
+          ...(object.staggerBy === 'line' ? { width: '100%' } : {}),
+        }}
+      >
+        {unit}
+      </span>
+    );
+  });
+}
+
+/** A mask's shape at a moment, as a CSS clip path. */
+function clipPathFor(
+  mask: SceneObject & { kind: 'mask' },
+  seconds: number,
+  scene: SceneGraph,
+): string | undefined {
+  const t = objectProgress(mask, seconds, scene.durationSeconds);
+  const width = num(mask.width, t) * 100;
+  const height = num(mask.height, t) * 100;
+  const cx = num(mask.transform.x, t) * 100;
+  const cy = num(mask.transform.y, t) * 100;
+
+  if (mask.shape === 'ellipse') {
+    return `ellipse(${(width / 2).toFixed(2)}% ${(height / 2).toFixed(2)}% at ${cx.toFixed(2)}% ${cy.toFixed(2)}%)`;
+  }
+  if (mask.shape === 'path' && mask.d) return `path('${mask.d}')`;
+  const left = cx - width / 2;
+  const top = cy - height / 2;
+  return `inset(${top.toFixed(2)}% ${(100 - left - width).toFixed(2)}% ${(100 - top - height).toFixed(2)}% ${left.toFixed(2)}%)`;
+}

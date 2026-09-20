@@ -68,6 +68,21 @@ export const EASINGS: Record<EasingName, EasingFn> = {
   linear: (t) => t,
   // The workhorse. Fast departure, long settle — confident without being showy.
   out_quint: cubicBezier(0.22, 1, 0.36, 1),
+  // A softer arrival than the workhorse, for a thing that should settle rather
+  // than snap into place.
+  out_cubic: cubicBezier(0.215, 0.61, 0.355, 1),
+  /*
+   * The exit.
+   *
+   * Starts slowly and is moving fastest as it goes, which is what makes an
+   * element look like it LEFT rather than like it faded. Measured as the most
+   * common family in three of the four reference films, and absent from this
+   * engine entirely until now — every curve here arrived, none of them
+   * departed, so the only way to be rid of something was to cut.
+   */
+  in_cubic: cubicBezier(0.55, 0.055, 0.675, 0.19),
+  // Travel: leaves one place and arrives at another, with the speed in the middle.
+  in_out_cubic: cubicBezier(0.645, 0.045, 0.355, 1),
   in_out_quart: cubicBezier(0.77, 0, 0.175, 1),
   out_expo: cubicBezier(0.16, 1, 0.3, 1),
   spring_soft: spring(90, 17),

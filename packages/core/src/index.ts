@@ -61,3 +61,9 @@ export * from './domain/editorial.ts';
 export * from './domain/speech-usage.ts';
 export * from './domain/collaboration.ts';
 export * from './domain/credentials.ts';
+
+export * from './scene/language.ts';
+export * from './scene/capabilities.ts';
+export * from './scene/compile.ts';
+export * from './scene/inspect.ts';
+export * from './scene/experimental.ts';
