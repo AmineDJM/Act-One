@@ -107,7 +107,22 @@ export async function filmTheProduct(
     const index = order.get(scene.id) ?? 0;
     if (index === 0) return 'plain';
     if (index === expandAt) return 'expanded';
-    return 'layered';
+    /*
+     * And it alternates.
+     *
+     * The first version of this made every shot after the first take the
+     * interface apart, and the originality critic read the result back
+     * exactly: "blurred UI background, floating panels, slow push-ins" — the
+     * most familiar SaaS launch grammar there is. Which is the same mistake
+     * as the purple card, arriving from the other direction: replacing a
+     * default with a better default is still a default, and the second time
+     * an audience sees a trick it is not a trick.
+     *
+     * So the film breathes between them. A camera on a whole frame after a
+     * shot that came apart is a contrast; four decompositions in a row are a
+     * house style.
+     */
+    return index % 2 === 1 ? 'layered' : 'plain';
   };
 
   const filmed = new Map<string, Scene['uiSequence']>();

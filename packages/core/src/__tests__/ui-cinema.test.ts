@@ -284,10 +284,23 @@ describe('the interface as layers', () => {
     }
   });
 
-  it('puts the words behind the product when there is a behind', () => {
+  it('gives a spatial shot no words at all', () => {
+    /*
+     * One attention target at a time. Three real panels moving through a
+     * built space IS the thing to look at, and the blind viewer's report of
+     * the last cut said exactly what happens otherwise: visually
+     * interesting, did not know where to look.
+     */
     const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'expanded', seconds: 9 });
     const volume = plan.framings.find((framing) => framing.space === 'volume')!;
-    expect(volume.wordsBehind).toBe(true);
+    expect(volume.words).toBe('none');
+    expect(volume.wordsBehind).toBe(false);
+    expect(plan.framings.filter((framing) => framing.words !== 'none')).toHaveLength(1);
+  });
+
+  it('will not open into a space it has no time to be looked at in', () => {
+    const rushed = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'expanded', seconds: 4 });
+    expect(rushed.framings.some((framing) => framing.space === 'volume')).toBe(false);
   });
 });
 

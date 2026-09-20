@@ -430,7 +430,17 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
    * so a short scene gets two good shots rather than four unreadable ones.
    */
   const beats: { role: FramingRole; region: UiRegion | null }[] = [{ role: 'establish', region: null }];
-  const room = Math.floor(options.seconds / 1.5);
+  /*
+   * A spatial shot is one idea and needs the whole shot to be it.
+   *
+   * Cut into four beats, the volume gets two seconds — three panels arriving
+   * in sequence in the time it takes to notice the first one, which the
+   * blind viewer reported back as "visually interesting, did not know where
+   * to look". So when the film is opening out here, it opens out: one wide
+   * frame to arrive on, and then the space.
+   */
+  const expanding = (options.ambition ?? 'plain') === 'expanded' && volumePanels(usable).length >= 3;
+  const room = expanding ? 2 : Math.floor(options.seconds / 1.5);
   const candidates: { role: FramingRole; region: UiRegion | null }[] = operable
     ? [
         { role: 'subject', region: subject },
@@ -470,9 +480,21 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
    * rhythm gives way: the beat gets the reading time it needs and the
    * establishing frame, which communicates the least, pays for it.
    */
-  const wordsOn = options.hasWords ? Math.min(1, beats.length - 1) : -1;
+  /*
+   * The words go on the quietest beat, not on the second one.
+   *
+   * Reading and looking compete, and the beat that asks least of the eye is
+   * the one that can afford to carry a line. In practice that is the widest,
+   * flattest framing — the establishing frame if the shot has one that is
+   * long enough, because the viewer is orienting there rather than reading
+   * an interface. Putting the line on the beat where the interface comes
+   * apart asks for both at once, which is the note the first-time viewer
+   * keeps writing.
+   */
+  const wordsOn = options.hasWords ? quietestBeat(beats) : -1;
   const needed = options.wordSeconds ?? 0;
   const seconds_ = beats.map((_, index) => Math.max(0.6, (options.seconds * shares[index]!) / total));
+  // Nothing to buy when the words are already on the frame that would pay.
   if (wordsOn > 0 && needed > seconds_[wordsOn]!) {
     const owed = Math.min(needed, options.seconds * 0.7) - seconds_[wordsOn]!;
     const payable = Math.max(0, seconds_[0]! - 0.9);
@@ -503,9 +525,15 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
           move: 'hold',
           from: full,
           to: full,
-          seconds: Math.min(seconds, 1.4),
+          seconds: Math.min(seconds, wordsOn === 0 ? seconds : 1.4),
           cut: true,
-          words: 'none',
+          /*
+           * The establishing frame carries the line when it is the quietest
+           * place for it — which it usually is. Nothing is moving, the
+           * viewer is orienting rather than reading an interface, and the
+           * frame is wide enough that a corner of it is genuinely empty.
+           */
+          words: wordsOn === 0 ? quietCorner(structure, full) : 'none',
           around: null,
         }),
       );
@@ -521,7 +549,18 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
      * builds an environment rather than finding one, and a film that reached
      * for it twice would have made it a template the second time.
      */
-    if (ambition === 'expanded' && beat.role === 'subject' && volumePanels(usable).length >= 3) {
+    /*
+     * A volume needs room. Three panels arriving in sequence in two seconds
+     * is a flash of something interesting that nobody had time to look at,
+     * and the first-time viewer's report of the last cut said exactly that:
+     * visually interesting, did not know where to look.
+     */
+    if (
+      ambition === 'expanded' &&
+      beat.role === 'subject' &&
+      seconds >= 2.6 &&
+      volumePanels(usable).length >= 3
+    ) {
       const panels = volumePanels(usable).map((region) => ({ rect: clampRect(region) }));
       framings.push(
         UiFraming.parse({
@@ -532,8 +571,17 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
           seconds,
           cut: true,
           space: 'volume',
-          wordsBehind: options.hasWords === true,
-          words: options.hasWords ? 'bottom_left' : 'none',
+          /*
+           * And it carries no words at all.
+           *
+           * One attention target at a time. Three real panels moving through
+           * a built space IS the thing to look at; a line over it, or even
+           * behind it, is a second thing asking for the same two seconds. The
+           * words go to another beat, which is what the rest of the shot is
+           * for.
+           */
+          wordsBehind: false,
+          words: 'none',
           around: clampRect(beat.region),
           layers: volumeLayers(panels, seconds),
         }),
@@ -608,7 +656,7 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
          * moving one are two answers to the same question.
          */
         lift: layers.length === 0 && beat.role === 'result' ? clampRect(beat.region) : null,
-        words: options.hasWords && index === 1 ? quietCorner(structure, target) : 'none',
+        words: index === wordsOn ? quietCorner(structure, target) : 'none',
         around: clampRect(beat.region),
         layers,
       }),
@@ -757,6 +805,31 @@ export function pickControl(structure: UiStructure, within: UiRegion | null): Ui
     if (inside.length > 0) return inside[0]!;
   }
   return structure.controls[0]!;
+}
+
+/**
+ * The beat that asks least of the eye, and can therefore carry the words.
+ *
+ * Establishing frames first: nothing is moving and the viewer is orienting
+ * anyway. Then whichever remaining beat has the fewest things happening in
+ * it. Never the beat where a control is pressed — that one is a story on its
+ * own and a line over it is a second one.
+ */
+function quietestBeat(beats: readonly { role: FramingRole; region: UiRegion | null }[]): number {
+  const establish = beats.findIndex((beat) => beat.role === 'establish');
+  if (establish >= 0 && beats.length > 1) return establish;
+  const preference: Record<FramingRole, number> = {
+    establish: 0,
+    context: 1,
+    subject: 2,
+    result: 3,
+    action: 4,
+  };
+  let best = 0;
+  for (let index = 1; index < beats.length; index += 1) {
+    if (preference[beats[index]!.role] < preference[beats[best]!.role]) best = index;
+  }
+  return best;
 }
 
 /**

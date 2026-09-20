@@ -1126,21 +1126,20 @@ function soundCuesFor(
     });
   }
 
-  if (
-    system.sound.uiSoundDensity !== 'none' &&
-    (scene.visualType === 'product_ui' || scene.visualType === 'screenshot_motion')
-  ) {
-    const clicks = system.sound.uiSoundDensity === 'rhythmic' ? 2 : 1;
-    for (let i = 0; i < clicks; i += 1) {
-      cues.push({
-        time: round3(scene.startTime + scene.duration * (0.3 + i * 0.35)),
-        type: 'ui_click',
-        assetId: null,
-        intensity: 0.35,
-        durationSeconds: null,
-      });
-    }
-  }
+  /*
+   * No clicks here, and there used to be.
+   *
+   * Every product shot got one or two, placed at fixed fractions of its
+   * duration, because at this point in the pipeline nothing knew whether
+   * anything was being clicked — the storyboard has a visual type and a
+   * duration, and that is all. The result was a film where the interface
+   * clicked twice a shot while sitting perfectly still, which a viewer reads
+   * as a soundtrack pretending rather than a product working.
+   *
+   * Production knows. It decides which control is pressed and when, and it
+   * writes the click on that frame. A film in which nothing is operated now
+   * has no clicks in it, which is the correct and honest outcome.
+   */
 
   if (scene.voiceOver) {
     // Duck the music under narration rather than fighting it in the mix.
