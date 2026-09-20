@@ -253,9 +253,17 @@ export async function runRender(
     storyboardId: storyboard.id,
     organizationId,
     kind,
-    // Films are numbered; cuts and animatics ride the version of the film they
-    // come from, so "version 3" always means the customer's third film.
-    version: (await store.renders.countForProject(organizationId, project.id)) + (kind === 'film' ? 1 : 0),
+    /*
+     * Films are numbered; cuts and animatics ride the version of the film they
+     * come from, so "version 3" always means the customer's third film.
+     *
+     * At least one, always. An animatic is usually made before any film
+     * exists, and the arithmetic gave it version 0 \u2014 which the schema has
+     * forbidden since it was written and nothing ever checked, because the
+     * store took a whole `Render` and never parsed it. A preview of the film
+     * that does not exist yet is a preview of version 1.
+     */
+    version: versionFor(kind, await store.renders.countForProject(organizationId, project.id)),
     aspect,
     quality,
     fps: DEFAULT_FPS,
@@ -1037,6 +1045,11 @@ export async function runRender(
     // morning, and the failure that follows looks nothing like the cause.
     await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+/** What number this render carries: the next film, or the film the rest ride on. */
+export function versionFor(kind: RenderKind, filmsMade: number): number {
+  return kind === 'film' ? filmsMade + 1 : Math.max(1, filmsMade);
 }
 
 /**
