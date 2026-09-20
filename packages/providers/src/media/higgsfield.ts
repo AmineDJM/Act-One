@@ -155,6 +155,75 @@ function priceFromEstimate(answer: unknown): { usd: number; approximate: boolean
   return search(answer, 0);
 }
 
+/**
+ * The price, worked out from the vendor's own description of its pricing.
+ *
+ * Higgsfield moved to token-metered billing and its estimate endpoint stopped
+ * answering with a number: it answers with the formula, in prose, and the rate
+ * per thousand tokens inside it. Our parser looked for a figure, found none,
+ * and refused to make a single generated shot.
+ *
+ * So the rate is read out of the sentence rather than written down here. A
+ * price compiled into this file is a price that is wrong the week they change
+ * it — and wrong in the direction that spends a customer's money without
+ * anybody noticing. If the sentence changes shape enough that no rate can be
+ * read, nothing is guessed: the call fails with the sentence itself attached,
+ * which is a thing an operator can act on.
+ */
+export function priceFromDescription(
+  description: string,
+  shot: { seconds: number; width: number; height: number },
+): number | null {
+  const rate = ratePerThousandTokens(description);
+  if (rate === null) return null;
+  const fps = framesPerSecond(description) ?? 24;
+  const tokens = Math.ceil((shot.seconds * shot.width * shot.height * fps) / 1024);
+  return Math.round((tokens / 1000) * rate * 1_000_000) / 1_000_000;
+}
+
+/** Dollars per 1,000 video tokens, however the sentence happens to phrase it. */
+export function ratePerThousandTokens(description: string): number | null {
+  const text = description.replace(/,/g, '');
+  /*
+   * A number, not "digits and dots".
+   *
+   * `[\d.]+` swallows the full stop that ends the sentence — the rate came
+   * back as "0.0004." and `Number` of that is NaN, so a perfectly readable
+   * price read as unreadable.
+   */
+  const NUMBER = '(\\d+(?:\\.\\d+)?)';
+  const patterns = [
+    new RegExp(`(?:each|per)\\s*1000\\s*video\\s*tokens?\\s*(?:cost|costs|is|are)?\\s*\\$\\s*${NUMBER}`, 'i'),
+    new RegExp(`\\$\\s*${NUMBER}\\s*(?:per|\\/)\\s*1000\\s*video\\s*tokens?`, 'i'),
+    new RegExp(`\\$\\s*${NUMBER}\\s*(?:per|\\/)\\s*1000\\s*tokens?`, 'i'),
+  ];
+  for (const pattern of patterns) {
+    const found = pattern.exec(text);
+    const value = found ? Number(found[1]) : NaN;
+    if (Number.isFinite(value) && value >= 0) return value;
+  }
+  return null;
+}
+
+/** The frame rate the formula is written against, when it names one. */
+function framesPerSecond(description: string): number | null {
+  const found = /(\d+(?:\.\d+)?)\s*fps/i.exec(description);
+  const value = found ? Number(found[1]) : NaN;
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** Pixel dimensions for the resolution and aspect a request asks for. */
+export function framePixels(resolution: string, aspect: string): { width: number; height: number } {
+  const shortest = /(\d+)\s*p/i.exec(resolution);
+  const lines = shortest ? Number(shortest[1]) : 720;
+  const [left, right] = aspect.split(':').map(Number);
+  const ratio = left && right ? left / right : 16 / 9;
+  // The shorter side carries the line count, which is what "720p" means.
+  return ratio >= 1
+    ? { width: Math.round(lines * ratio), height: lines }
+    : { width: lines, height: Math.round(lines / ratio) };
+}
+
 /** `POST /files/generate-upload-url`: a presigned slot on the vendor's CDN. */
 const UploadGrant = z.object({
   upload_url: z.string(),
@@ -521,12 +590,50 @@ export class HiggsfieldProvider implements GenerativeMediaProvider {
       attempts: 2,
     });
     const price = priceFromEstimate(answer);
+
+    /*
+     * A description instead of a number.
+     *
+     * Token-metered billing: they answer with the formula and the rate rather
+     * than a figure, and the shot we are about to ask for is the one thing we
+     * already know exactly. So the rate is read out of their sentence and the
+     * tokens counted from our own request — no price written down here to go
+     * stale, and nothing guessed.
+     */
     if (!price) {
-      // The answer itself, so the console says what came back rather than
-      // that something did. An estimate carries no secret.
+      const described = typeof answer['pricing_description'] === 'string'
+        ? answer['pricing_description']
+        : typeof answer['description'] === 'string'
+          ? answer['description']
+          : '';
+      const frame = framePixels(
+        String(input['resolution'] ?? MIN_VIDEO_RESOLUTION),
+        String(input['aspect_ratio'] ?? '16:9'),
+      );
+      const seconds = Number(input['duration']);
+      const metered = described
+        ? priceFromDescription(described, {
+            seconds: Number.isFinite(seconds) && seconds > 0 ? seconds : MIN_VIDEO_SECONDS,
+            ...frame,
+          })
+        : null;
+      if (metered !== null) {
+        this.estimates.set(key, { usd: metered, at: Date.now() });
+        return metered;
+      }
+    }
+
+    if (!price) {
+      /*
+       * The whole answer, not the first three hundred characters of it.
+       *
+       * The truncation was the reason a real deployment could not be
+       * diagnosed: the sentence that named the rate was cut off two
+       * characters before the number. An estimate carries no secret.
+       */
       throw new ProviderError(
         this.name,
-        `Higgsfield answered the estimate without a price: ${JSON.stringify(answer).slice(0, 300)}`,
+        `Higgsfield answered the estimate without a price: ${JSON.stringify(answer).slice(0, 2000)}`,
         { retryable: false },
       );
     }

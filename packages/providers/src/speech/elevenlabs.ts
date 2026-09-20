@@ -69,6 +69,72 @@ const VoiceList = z.object({
   has_more: z.boolean().optional(),
 });
 
+/**
+ * One page of the voice library, read as far as it can be read.
+ *
+ * A live account answered this with something the whole-page schema refused,
+ * and the error said only that it was unexpected — so the one thing needed to
+ * fix it, what actually came back, was the one thing missing. Two changes
+ * from that: a voice is parsed on its own, so a single entry with a field we
+ * do not know does not cost the other two hundred; and when nothing can be
+ * read at all, the reason names the shape and the first mismatch rather than
+ * announcing that a mismatch occurred.
+ *
+ * Voice names and ids are not secrets. The reason carries them so an operator
+ * can see the entry that broke.
+ */
+export function readVoicePage(raw: unknown): {
+  voices: Voice[];
+  skipped: number;
+  hasMore: boolean;
+  reason?: string;
+} {
+  if (!raw || typeof raw !== 'object') {
+    return { voices: [], skipped: 0, hasMore: false, reason: `a ${typeof raw} rather than an object.` };
+  }
+  const body = raw as Record<string, unknown>;
+  if (!Array.isArray(body['voices'])) {
+    return {
+      voices: [],
+      skipped: 0,
+      hasMore: false,
+      reason: `no list of voices in it. Keys: ${Object.keys(body).join(', ') || 'none'}.`,
+    };
+  }
+
+  const voices: Voice[] = [];
+  let skipped = 0;
+  let firstProblem = '';
+  for (const entry of body['voices']) {
+    const parsed = Voice.safeParse(entry);
+    if (parsed.success) {
+      voices.push(parsed.data);
+      continue;
+    }
+    skipped += 1;
+    if (!firstProblem) {
+      const issue = parsed.error.issues[0];
+      const named = (entry as { name?: unknown })?.name;
+      firstProblem =
+        `${typeof named === 'string' ? `"${named}"` : 'a voice'}: ` +
+        `${issue?.path.join('.') || 'the entry'} ${issue?.message ?? 'did not match'}`;
+    }
+  }
+
+  if (voices.length === 0) {
+    return {
+      voices: [],
+      skipped,
+      hasMore: false,
+      reason:
+        skipped > 0
+          ? `${skipped} voice(s), none of which we could read — ${firstProblem}.`
+          : 'an empty list of voices.',
+    };
+  }
+  return { voices, skipped, hasMore: body['has_more'] === true };
+}
+
 const SharedVoice = z.object({
   public_owner_id: z.string(),
   voice_id: z.string(),
@@ -425,17 +491,23 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
       const query = new URLSearchParams({ page_size: '100' });
       if (token) query.set('next_page_token', token);
       const raw = await this.get(`/v2/voices?${query.toString()}`);
-      const parsed = VoiceList.safeParse(raw);
-      if (!parsed.success) {
-        throw new ProviderError(
-          this.name,
-          'ElevenLabs answered the voice library with something unexpected.',
-          { retryable: true },
+      const page_ = readVoicePage(raw);
+      if (page_.reason) {
+        throw new ProviderError(this.name, `ElevenLabs answered the voice library with ${page_.reason}`, {
+          retryable: true,
+        });
+      }
+      if (page_.skipped > 0) {
+        // Not fatal, and not silent. One voice with a field we do not expect
+        // is a voice we cannot rank, not a library we cannot read.
+        console.warn(
+          `[elevenlabs] ${page_.skipped} voice(s) in this page did not match the shape we read; ` +
+            `using the other ${page_.voices.length}.`,
         );
       }
-      voices.push(...parsed.data.voices);
+      voices.push(...page_.voices);
       const next = (raw as { next_page_token?: string | null }).next_page_token ?? null;
-      if (!parsed.data.has_more || !next) break;
+      if (!page_.hasMore || !next) break;
       token = next;
     }
     this.catalogue = { voices, at: Date.now() };
