@@ -101,6 +101,7 @@ import {
 } from '@act-one/qa';
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { filmTheProduct } from './product-cinematography.ts';
+import { runHeroShot, withHeroShot } from './hero-shot.ts';
 import { runSceneAssets } from './assets.ts';
 import { runCreativeMasterGate } from './creative-gate.ts';
 import {
@@ -1487,6 +1488,52 @@ async function renderOnce(
       status: filming.result.unfilmed > 0 ? 'failed' : 'done',
     });
   }
+  /*
+   * The hero shot, once per film.
+   *
+   * It runs here because it needs what only this point has: the real bytes,
+   * the real frame, and the framing plans the film already carries — a hero
+   * that repeats a shot the audience saw eight seconds ago is not a hero.
+   * Once, because the search renders its shortlist and asks a director to
+   * look at it, and doing that again on every repair attempt would charge the
+   * customer for the same decision three times. The record on the storyboard
+   * is what makes "once" checkable.
+   */
+  if (!storyboard.heroShot) {
+    const hero = await runHeroShot(context, {
+      storyboard,
+      brand,
+      understanding: params.understanding,
+      direction: params.storyboard.revisionReason || context.project.brief.keyMessage || '',
+      aspect: params.aspect,
+      renderWidth: dimensionsFor(params.aspect, params.quality === 'preview' ? 'hd' : params.quality).width,
+      workDir: params.workDir,
+    }).catch((error: unknown) => {
+      /*
+       * A hero shot is an improvement, not a requirement. A search that fails
+       * must not take the film down with it — but it says so, because a film
+       * that silently never got one is the exact thing this stage exists to
+       * stop happening.
+       */
+      return { record: null, notes: [`the hero shot search failed: ${String(error)}`], costUsd: 0 };
+    });
+    if (hero.record) {
+      storyboard = withHeroShot(storyboard, hero.record);
+      await context.store.storyboards.update(context.organizationId, storyboard.id, {
+        scenes: storyboard.scenes,
+        heroShot: hero.record,
+      });
+    } else if (hero.notes.length > 0) {
+      await context.activity({
+        step: 'motion',
+        kind: 'note',
+        label: 'no hero shot',
+        detail: hero.notes.slice(0, 2).join(' · '),
+        status: 'failed',
+      });
+    }
+  }
+
   /*
    * A shot that could not be filmed is a finding, not a log line.
    *

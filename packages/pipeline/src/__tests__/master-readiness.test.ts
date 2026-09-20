@@ -42,7 +42,7 @@ function scene(over: Partial<Scene> & Pick<Scene, 'id' | 'duration' | 'visualTyp
 function board(scenes: Scene[]): Storyboard {
   return resequence({
     id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
-    scenes, voiceStrategy: 'none', language: 'fr', musicDirection: '', parentStoryboardId: null,
+    scenes, voiceStrategy: 'none', language: 'fr', heroShot: null, musicDirection: '', parentStoryboardId: null,
     revisionReason: '', status: 'approved',
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
   });

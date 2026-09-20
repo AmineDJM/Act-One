@@ -1119,8 +1119,8 @@ export class PgStore implements Store {
           `INSERT INTO storyboards
              (id, organization_id, project_id, concept_id, treatment_id, version, status,
               voice_strategy, music_direction, created_at, updated_at, language,
-              parent_storyboard_id, revision_reason)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+              parent_storyboard_id, revision_reason, hero_shot)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [
             storyboard.id,
             organizationId,
@@ -1136,6 +1136,7 @@ export class PgStore implements Store {
             storyboard.language ?? null,
             storyboard.parentStoryboardId,
             storyboard.revisionReason,
+            storyboard.heroShot,
           ],
         );
         await insertScenes(c, organizationId, storyboard.id, storyboard.scenes);
@@ -1227,9 +1228,14 @@ export class PgStore implements Store {
              voice_strategy = COALESCE($4, voice_strategy),
              music_direction = COALESCE($5, music_direction),
              language = COALESCE($6, language),
+             hero_shot = COALESCE($7, hero_shot),
              updated_at = now()
            WHERE id = $1 AND organization_id = $2 RETURNING *`,
-          [id, organizationId, patch.status ?? null, patch.voiceStrategy ?? null, patch.musicDirection ?? null, patch.language ?? null],
+          [
+            id, organizationId, patch.status ?? null, patch.voiceStrategy ?? null,
+            patch.musicDirection ?? null, patch.language ?? null,
+            patch.heroShot === undefined ? null : patch.heroShot,
+          ],
         );
         if (!r.rows[0]) throw notFound('Storyboard');
         const scenes = patch.scenes ?? (await loadScenes(c, organizationId, id));
@@ -3562,6 +3568,7 @@ function toStoryboard(row: Row, scenes: Scene[]): Storyboard {
     voiceStrategy: row['voice_strategy'] as Storyboard['voiceStrategy'],
     language: (row['language'] as string | null) ?? null,
     musicDirection: (row['music_direction'] as string) ?? '',
+    heroShot: (row['hero_shot'] as Storyboard['heroShot']) ?? null,
     parentStoryboardId: (row['parent_storyboard_id'] as string | null) ?? null,
     revisionReason: (row['revision_reason'] as string) ?? '',
     status: row['status'] as Storyboard['status'],

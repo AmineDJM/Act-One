@@ -81,7 +81,7 @@ describe.skipIf(browser === undefined)('captions burned into a vertical cut', ()
     const storyboard: Storyboard = resequence({
       id: 'sbd_1', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
       scenes: [scene({ id: 'open', visualType: 'kinetic_typography', purpose: 'Open', onScreenText: ['Forty unmatched rows.'] })],
-      voiceStrategy: 'narrator', musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft',
+      voiceStrategy: 'narrator', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft',
       language: 'en',
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     });
@@ -157,7 +157,7 @@ describe.skipIf(browser === undefined)('captions burned into a vertical cut', ()
     const storyboard: Storyboard = resequence({
       id: 'sbd_2', projectId: 'prj_1', conceptId: 'cpt_1', treatmentId: 'trt_1', version: 1,
       scenes: [scene({ id: 'open', visualType: 'kinetic_typography', purpose: 'Open', onScreenText: ['Forty unmatched rows.'] })],
-      voiceStrategy: 'none', musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft',
+      voiceStrategy: 'none', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'draft',
       language: 'en',
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     });

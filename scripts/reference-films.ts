@@ -101,6 +101,7 @@ function storyboard(id: string, specs: SceneSpec[], musicDirection: string): Sto
     })) as Scene[],
     voiceStrategy: 'none',
     language: null,
+    heroShot: null,
     musicDirection,
     status: 'draft',
     parentStoryboardId: null, revisionReason: '',

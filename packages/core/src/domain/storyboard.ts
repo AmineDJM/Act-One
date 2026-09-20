@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { nonEmpty, score01 } from '../zod-helpers.ts';
 import { VoiceStrategy } from './creative.ts';
 import { UiSequence } from './ui-cinema.ts';
+import { HeroShotRecord } from './hero-shot.ts';
 
 export const VisualType = z.enum([
   'kinetic_typography',
@@ -468,6 +469,12 @@ export const Storyboard = z.object({
   /** ISO 639-1 code the copy and narration were written in; the voice follows it. */
   language: z.string().min(2).max(12).nullable().default(null),
   musicDirection: z.string().max(600).default(''),
+  /**
+   * The one shot this film is meant to be remembered for, and how it was
+   * found. Null until the search has run; never null because the film did
+   * not want one.
+   */
+  heroShot: HeroShotRecord.nullable().default(null),
   status: StoryboardStatus.default('draft'),
   /*
    * Lineage.

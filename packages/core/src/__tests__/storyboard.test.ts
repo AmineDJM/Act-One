@@ -59,6 +59,7 @@ function board(scenes: Scene[]): Storyboard {
     scenes,
     voiceStrategy: 'none',
     language: null,
+    heroShot: null,
     musicDirection: '', parentStoryboardId: null, revisionReason: '',
     status: 'draft',
     createdAt: '2026-01-01T00:00:00.000Z',

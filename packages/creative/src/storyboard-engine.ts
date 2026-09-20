@@ -703,6 +703,7 @@ export class StoryboardEngine {
       voiceStrategy: input.treatment.voiceStrategy,
       // The brief's word; the storyboard stage asks the copy when there is none.
       language: input.brief.language ?? null,
+      heroShot: null,
       musicDirection: input.treatment.soundStyle,
       status: 'draft',
       // Written rather than revised: a replan is what sets these.

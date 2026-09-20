@@ -107,6 +107,7 @@ const storyboard: Storyboard = resequence({
   ],
   voiceStrategy: 'none',
   language: null,
+  heroShot: null,
   musicDirection: 'Sparse, sub-heavy.', parentStoryboardId: null, revisionReason: '',
   status: 'draft',
   createdAt: '2026-01-01T00:00:00.000Z',

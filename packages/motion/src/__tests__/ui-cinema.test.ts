@@ -89,7 +89,7 @@ function film(id: string, uiSequence: Scene['uiSequence']): Storyboard {
         claimEvidenceIds: [], notes: '', estimatedCostUsd: 0,
       } satisfies Scene,
     ],
-    voiceStrategy: 'none', musicDirection: '', parentStoryboardId: null, revisionReason: '',
+    voiceStrategy: 'none', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '',
     status: 'draft', language: null,
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
   });

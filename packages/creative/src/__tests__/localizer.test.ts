@@ -43,7 +43,7 @@ const storyboard: Storyboard = resequence({
     scene({ id: 'a', narration: 'Northwind closes 40 hours of reconciliation.', onScreenText: ['40 hours a month'] }),
     scene({ id: 'b', narration: 'One run, every month.', onScreenText: ['One run'] }),
   ],
-  voiceStrategy: 'narrator', musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'approved', language: 'en',
+  voiceStrategy: 'narrator', heroShot: null, musicDirection: '', parentStoryboardId: null, revisionReason: '', status: 'approved', language: 'en',
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
 });
 
