@@ -11,7 +11,7 @@ import {
   type ModularScaleName,
   type RenderQuality,
 } from '@act-one/core';
-import { clamp, ensureContrast, isDark, mix, withAlpha } from './color.ts';
+import { clamp, ensureContrast, filmCanvas, isDark, mix, withAlpha } from './color.ts';
 import { createFrame, createGrid, type Frame, type Grid } from './layout.ts';
 import { metricsFor, opticalTracking } from './typography.ts';
 
@@ -76,7 +76,11 @@ export function resolveTokens(brand: BrandSystem, options: TokenOptions): Design
     options.theme === 'auto' || options.theme === undefined
       ? preferredTheme(brand)
       : options.theme;
-  const canvas = theme === 'dark' ? brand.canvasDark : brand.canvasLight;
+  /*
+   * Never #000, and never paper white. The creative systems have always said
+   * so; this is where it becomes true of the frame rather than of the prose.
+   */
+  const canvas = filmCanvas(theme === 'dark' ? brand.canvasDark : brand.canvasLight, brand.primaryColor);
   const darkCanvas = isDark(canvas);
 
   const neutrals = darkCanvas ? [...brand.neutrals].reverse() : brand.neutrals;

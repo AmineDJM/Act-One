@@ -114,6 +114,50 @@ export function mix(a: string, b: string, amount: number): string {
   });
 }
 
+/**
+ * The darkest a film's canvas is allowed to be, and the lightest.
+ *
+ * Every creative system in the catalogue says some version of the same thing —
+ * "a brand-tinted near-black, never #000. Pure black kills the sense of a lit
+ * space and makes the UI look pasted on" — and nothing enforced it. The canvas
+ * came straight out of brand extraction, so a site with a black background
+ * produced a film whose every frame measured 0,0,0 in every corner: not a dark
+ * film, an absence of one. The white end matters for the same reason and for
+ * one more: a deliverable is studio range, and paper white clips there.
+ */
+export const CANVAS_FLOOR_L = 0.125;
+export const CANVAS_CEILING_L = 0.965;
+
+/**
+ * The canvas a film is actually shot on.
+ *
+ * Lifts a black off the floor and pulls a white off the ceiling, and gives the
+ * lift the brand's own hue rather than a neutral grey — a near-black that
+ * carries a trace of the accent reads as a lit room, and a neutral one reads
+ * as a switched-off screen. The tint is small on purpose: at a tenth of the
+ * accent it is below the threshold anybody could name, which is exactly where
+ * it belongs.
+ *
+ * A canvas already inside the range is returned untouched. A brand that chose
+ * #101014 chose it.
+ */
+export function filmCanvas(canvas: string, accent: string): string {
+  const L = lightness(canvas);
+  if (L < CANVAS_FLOOR_L) {
+    /*
+     * Hue first, lightness second, and in that order for a reason: setting a
+     * saturated accent to a near-black lightness asks sRGB for a colour it
+     * does not have, and the clipped answer comes back both brighter and far
+     * more coloured than it was asked for — which is how a "trace of blue"
+     * became a navy canvas the first time this was written.
+     */
+    const tinted = chroma(canvas) < 0.01 ? mix(canvas, accent, 0.12) : canvas;
+    return withLightness(tinted, CANVAS_FLOOR_L);
+  }
+  if (L > CANVAS_CEILING_L) return withLightness(canvas, CANVAS_CEILING_L);
+  return canvas;
+}
+
 export function isDark(hex: string): boolean {
   return lightness(hex) < 0.55;
 }

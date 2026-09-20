@@ -86,7 +86,7 @@ export async function runLocalisation(
       to: options.language,
       // The end card carries the company's own line about itself, which is
       // copy like any other and has to cross like any other.
-      tagline: understanding ? firstClause(understanding.oneLiner) : '',
+      tagline: understanding ? firstClause(understanding.oneLiner, 72, from) : '',
       companyName: project.name,
       websiteUrl: displayHost(project.websiteUrl),
     },

@@ -99,6 +99,90 @@ describe('deterministic QA', () => {
     expect(issues.some((i) => i.check === 'legible_generated_text' && i.severity === 'hard_fail')).toBe(true);
   });
 
+  /*
+   * The film a customer opened and said "on dirait que c'est juste des
+   * écritures sur un fond noir". Thirty seconds, eight shots, not one picture
+   * in any of them — and it passed type, layout, colour, motion, pacing, sync
+   * and delivery, because every one of those checks was true of it.
+   */
+  describe('a film with no picture in it', () => {
+    const typeOnly = (count: number, each = 4) =>
+      board(
+        Array.from({ length: count }, (_, i) =>
+          scene({
+            id: `s${i}`,
+            duration: each,
+            visualType: 'kinetic_typography',
+            onScreenText: ['Code.'],
+          }),
+        ),
+      );
+
+    it('does not ship', () => {
+      const issues = runDeterministicChecks({ storyboard: typeOnly(8), brand, aspect: '16:9' });
+      const issue = issues.find((i) => i.check === 'composition' && i.message.includes('Nothing in this film is a picture'));
+      expect(issue?.severity).toBe('hard_fail');
+      // No timeline edit puts a picture in it, so it goes to a person.
+      expect(issue?.repair).toBe('manual_review');
+    });
+
+    it('is a note, not a blocker, when the picture is merely thin', () => {
+      const board_ = board([
+        scene({ id: 'a', duration: 3, visualType: 'kinetic_typography', onScreenText: ['One.'] }),
+        scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Two.'] }),
+        scene({ id: 'c', duration: 3, visualType: 'kinetic_typography', onScreenText: ['Three.'] }),
+        scene({ id: 'd', duration: 1.2, visualType: 'real_media', assetRefs: ['ast_1'] }),
+      ]);
+      const issues = runDeterministicChecks({ storyboard: board_, brand, aspect: '16:9' });
+      const issue = issues.find((i) => i.message.includes('carries a picture'));
+      expect(issue?.severity).toBe('soft_fail');
+    });
+
+    it('says nothing about a film that shows plenty', () => {
+      const board_ = board([
+        scene({ id: 'a', duration: 3, visualType: 'kinetic_typography', onScreenText: ['One.'] }),
+        scene({ id: 'b', duration: 4, visualType: 'real_media', assetRefs: ['ast_1'] }),
+        scene({ id: 'c', duration: 3, visualType: 'generated_broll' }),
+      ]);
+      const issues = runDeterministicChecks({ storyboard: board_, brand, aspect: '16:9' });
+      expect(issues.some((i) => i.message.includes('carries a picture'))).toBe(false);
+      expect(issues.some((i) => i.message.includes('Nothing in this film is a picture'))).toBe(false);
+    });
+
+    it('flags a long run of title cards even in a film that does show something', () => {
+      const board_ = board([
+        scene({ id: 'a', duration: 4, visualType: 'real_media', assetRefs: ['ast_1'] }),
+        scene({ id: 'b', duration: 3.5, visualType: 'kinetic_typography', onScreenText: ['One.'] }),
+        scene({ id: 'c', duration: 3.2, visualType: 'statistic', onScreenText: ['1700', 'questions'] }),
+        scene({ id: 'd', duration: 3.4, visualType: 'quote', onScreenText: ['Good.', 'Someone'] }),
+        scene({ id: 'e', duration: 4, visualType: 'real_media', assetRefs: ['ast_2'] }),
+      ]);
+      const issues = runDeterministicChecks({ storyboard: board_, brand, aspect: '16:9' });
+      const issue = issues.find((i) => i.message.includes('with nothing on screen'));
+      expect(issue?.severity).toBe('soft_fail');
+      // Anchored where the run begins, not at the top of the film.
+      expect(issue?.sceneId).toBe('b');
+      expect(issue?.timecodeStart).toBeCloseTo(4, 3);
+    });
+
+    it('holds a short to a tighter run than a film', () => {
+      const runOf = (cut: 'feature' | 'short') =>
+        runDeterministicChecks({
+          storyboard: board([
+            scene({ id: 'a', duration: 2, visualType: 'real_media', assetRefs: ['ast_1'] }),
+            scene({ id: 'b', duration: 3, visualType: 'kinetic_typography', onScreenText: ['One.'] }),
+            scene({ id: 'c', duration: 2.5, visualType: 'kinetic_typography', onScreenText: ['Two.'] }),
+            scene({ id: 'd', duration: 2, visualType: 'real_media', assetRefs: ['ast_2'] }),
+          ]),
+          brand,
+          aspect: '16:9',
+          cut,
+        }).some((i) => i.message.includes('with nothing on screen'));
+      expect(runOf('short')).toBe(true);
+      expect(runOf('feature')).toBe(false);
+    });
+  });
+
   it('flags an edit where every scene is the same length', () => {
     const issues = runDeterministicChecks({
       storyboard: board(

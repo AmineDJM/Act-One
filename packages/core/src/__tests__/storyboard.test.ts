@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  degradedShots,
+  longestTypeOnlyRun,
+  pictureShare,
   resequence,
   storyboardDuration,
   visualMix,
@@ -179,5 +182,79 @@ describe('the frame that represents a film', () => {
 
   it('survives a storyboard with no scenes at all', () => {
     expect(posterMoment([])).toBe(0);
+  });
+});
+
+/**
+ * The plan against what the renderer will actually be handed.
+ *
+ * A production lost every asset it had to a storage misconfiguration and
+ * rendered thirty seconds of title cards on black, reporting a clean pass —
+ * because the storyboard it was checked against still said every one of those
+ * shots was the product.
+ */
+describe('degradedShots', () => {
+  const product = (id: string, refs: string[]) =>
+    scene({
+      id,
+      duration: 4,
+      visualType: 'product_ui',
+      assetRefs: refs,
+      motionRecipe: { name: 'product_window', easing: 'out_quint', delay: 0, stagger: 0, intensity: 0.5, params: {} },
+    });
+
+  it('names a shot whose material did not resolve', () => {
+    const degraded = degradedShots(board([product('a', ['ast_1'])]), new Set());
+    expect(degraded).toHaveLength(1);
+    expect(degraded[0]!.scene.id).toBe('a');
+    expect(degraded[0]!.wanted).toBe(1);
+  });
+
+  it('is satisfied by one reference out of several, because a shot plays one thing', () => {
+    const degraded = degradedShots(board([product('a', ['ast_1', 'ast_2'])]), new Set(['ast_2']));
+    expect(degraded).toHaveLength(0);
+  });
+
+  it('catches a shot that was never given a reference at all', () => {
+    const degraded = degradedShots(board([product('a', [])]), new Set(['ast_9']));
+    expect(degraded.map((entry) => entry.scene.id)).toEqual(['a']);
+  });
+
+  it('says nothing about a typographic shot, which needs no material', () => {
+    const typographic = scene({ id: 'a', duration: 4, visualType: 'kinetic_typography', onScreenText: ['Code.'] });
+    expect(degradedShots(board([typographic]), new Set())).toHaveLength(0);
+  });
+});
+
+describe('how much of a film is picture', () => {
+  it('is zero for a film of nothing but type', () => {
+    const board_ = board([
+      scene({ id: 'a', duration: 4, visualType: 'kinetic_typography', onScreenText: ['Code.'] }),
+      scene({ id: 'b', duration: 4, visualType: 'statistic', onScreenText: ['1700'] }),
+    ]);
+    expect(pictureShare(board_)).toBe(0);
+    expect(longestTypeOnlyRun(board_).seconds).toBeCloseTo(8, 5);
+  });
+
+  it('counts a mixed shot at half, which keeps the budget honest', () => {
+    const board_ = board([
+      scene({ id: 'a', duration: 5, visualType: 'mixed_media', assetRefs: ['ast_1'] }),
+      scene({ id: 'b', duration: 5, visualType: 'kinetic_typography', onScreenText: ['Code.'] }),
+    ]);
+    expect(pictureShare(board_)).toBeCloseTo(0.25, 5);
+  });
+
+  it('measures a run of title cards across scene boundaries, and stops at a picture', () => {
+    const board_ = resequence(board([
+      scene({ id: 'a', duration: 3, visualType: 'kinetic_typography', onScreenText: ['One.'] }),
+      scene({ id: 'b', duration: 3, visualType: 'quote', onScreenText: ['Two.'] }),
+      scene({ id: 'c', duration: 4, visualType: 'real_media', assetRefs: ['ast_1'] }),
+      scene({ id: 'd', duration: 2, visualType: 'kinetic_typography', onScreenText: ['Three.'] }),
+    ]));
+    const run = longestTypeOnlyRun(board_);
+    expect(run.seconds).toBeCloseTo(6, 5);
+    expect(run.sceneIds).toEqual(['a', 'b']);
+    expect(run.start).toBeCloseTo(0, 5);
+    expect(run.end).toBeCloseTo(6, 5);
   });
 });

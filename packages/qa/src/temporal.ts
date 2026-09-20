@@ -6,6 +6,7 @@ import {
   LEVEL_JUMP_CEILING_LU,
   SPEECH_OVERRUN_TOLERANCE,
   TAIL_FADE_SECONDS,
+  SILENT_MASTER_FLOOR_DB,
   TAIL_SILENCE_FLOOR_DB,
   TEMPORAL_STANDARDS,
   captionSyncTolerance,
@@ -330,6 +331,54 @@ export function deadAirIssues(params: {
     );
 }
 
+/**
+ * Nothing on the track at all.
+ *
+ * `deadAirIssues` above cannot find this one, and not by oversight: a film
+ * that is silent end to end produces exactly one silence, starting at zero and
+ * ending at the end, and both of that check's exemptions — the head is before
+ * anything has started, the tail is the ending — were written for it. So a
+ * master whose every sample sat at −91 dB passed the audio pass, passed the
+ * container pass (AAC-LC, 48 kHz, stereo, a real track with real samples in
+ * it), and was delivered as a finished film.
+ *
+ * A hard fail, not a note. The earlier call was that the picture is finished
+ * and withholding it helps nobody; what that produced was a customer opening
+ * their launch film and hearing nothing, with no warning anywhere. A film that
+ * was scored and came back silent has not been made yet.
+ *
+ * `scored` is what makes this safe to state so strongly: a film with no music,
+ * no effects and no voice was never meant to have a track, and silence is what
+ * it is supposed to be.
+ */
+export function silentMasterIssue(params: {
+  peakDb: number;
+  scored: boolean;
+  durationSeconds: number;
+}): QaFinding[] {
+  if (!params.scored) return [];
+  if (params.peakDb > SILENT_MASTER_FLOOR_DB) return [];
+  return [
+    finding({
+      check: 'missing_audio',
+      severity: 'hard_fail',
+      layer: 'audio',
+      sceneId: null,
+      timecodeStart: 0,
+      timecodeEnd: round3(params.durationSeconds),
+      confidence: 1,
+      // No storyboard edit fixes this, so it goes to whoever provisions the
+      // library rather than around the repair loop one more time.
+      repair: 'manual_review',
+      message:
+        `The film was scored and its track peaks at ` +
+        `${params.peakDb === Number.NEGATIVE_INFINITY ? '-inf' : params.peakDb.toFixed(1)} dB ` +
+        `across all ${params.durationSeconds.toFixed(1)}s: there is nothing on it to hear.`,
+      because: cite(TEMPORAL_STANDARDS.silentMaster),
+    }),
+  ];
+}
+
 /** Somebody turning a knob, heard between two adjacent windows. */
 export function levelJumpIssues(windows: readonly LoudnessWindow[]): QaFinding[] {
   const issues: QaFinding[] = [];
@@ -478,7 +527,14 @@ function bestOverlapLine(lines: readonly SpokenLine[], cue: CaptionCue): SpokenL
 export async function measureFilm(
   masterPath: string,
   options: { signal?: AbortSignal; timeoutMs?: number; silenceFloorDb?: number; workDir?: string } = {},
-): Promise<{ freezes: Freeze[]; silences: Silence[]; windows: LoudnessWindow[]; tailPeakDb: number }> {
+): Promise<{
+  freezes: Freeze[];
+  silences: Silence[];
+  windows: LoudnessWindow[];
+  tailPeakDb: number;
+  /** The loudest sample anywhere in the film. `-Infinity` when there is no track. */
+  peakDb: number;
+}> {
   const timeoutMs = options.timeoutMs ?? 120_000;
   const signal = options.signal;
   const floor = options.silenceFloorDb ?? -50;
@@ -532,12 +588,52 @@ export async function measureFilm(
     await rm(loudnessPath, { force: true }).catch(() => undefined);
   }
 
+  const [tailPeakDb, peakDb] = await Promise.all([
+    measureTailPeak(masterPath, { ...(signal ? { signal } : {}), timeoutMs }),
+    measurePeak(masterPath, { ...(signal ? { signal } : {}), timeoutMs }),
+  ]);
+
   return {
     freezes: parseFreezes(freezeRun.stderr),
     silences: parseSilences(silenceRun.stderr),
     windows,
-    tailPeakDb: await measureTailPeak(masterPath, { ...(signal ? { signal } : {}), timeoutMs }),
+    tailPeakDb,
+    peakDb,
   };
+}
+
+/**
+ * The loudest sample anywhere in the film.
+ *
+ * One number, and the only one that answers "is there any sound on this at
+ * all". Returns `-Infinity` for a file with no audio track and for one whose
+ * every sample is zero, which are the same thing to a viewer.
+ */
+export async function measurePeak(
+  masterPath: string,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<number> {
+  const run = await runFfmpeg(
+    [
+      '-nostdin',
+      '-i',
+      masterPath,
+      '-af',
+      'astats=measure_overall=Peak_level:measure_perchannel=none',
+      '-f',
+      'null',
+      '-',
+    ],
+    options,
+  );
+  return parsePeakLevel(run.stderr);
+}
+
+/** `astats` prints the peak as a number or as `-inf`; both mean something. */
+export function parsePeakLevel(stderr: string): number {
+  const match = /Peak level dB:\s*(-?\d+(?:\.\d+)?|-inf)/i.exec(stderr);
+  if (!match) return Number.NEGATIVE_INFINITY;
+  return match[1] === '-inf' ? Number.NEGATIVE_INFINITY : Number(match[1]);
 }
 
 /** The loudest sample in the final fifth of a second. */
@@ -560,9 +656,7 @@ export async function measureTailPeak(
     ],
     options,
   );
-  const match = /Peak level dB:\s*(-?\d+(?:\.\d+)?|-inf)/i.exec(run.stderr);
-  if (!match) return Number.NEGATIVE_INFINITY;
-  return match[1] === '-inf' ? Number.NEGATIVE_INFINITY : Number(match[1]);
+  return parsePeakLevel(run.stderr);
 }
 
 /**

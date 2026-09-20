@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { BrandSystem as BrandSystemSchema, SAFE_AREAS, type AspectRatio, type BrandSystem } from '@act-one/core';
 import {
   contrastRatio, lightness, ensureContrast, readableOn, neutralRamp, dedupeColors,
-  perceptualDistance, isNeutral, mix, withLightness, hexToRgb, rgbToHex,
+  perceptualDistance, isNeutral, mix, withLightness, hexToRgb, rgbToHex, chroma,
+  filmCanvas, CANVAS_FLOOR_L, CANVAS_CEILING_L,
   measureText, breakLines, fitTextToBox, opticalTracking,
   createFrame, createGrid, place, withinSafeArea, columnSpan, stageProduct,
   resolveTokens, applyCase, textBlock, document as svgDocument, barChart, watermark,
@@ -315,6 +316,43 @@ describe('svg', () => {
         series: [{ label: 'a', value: 0 }],
       }),
     ).toBe('');
+  });
+
+  /*
+   * The defect a real master carried: every corner of every frame measured
+   * 0,0,0. Cinematic Black's own note says "a brand-tinted near-black, never
+   * #000 — pure black kills the sense of a lit space", and until now nothing
+   * in the pipeline read that note.
+   */
+  describe('the canvas a film is shot on', () => {
+    it('lifts a pure black off the floor and gives it the brand hue', () => {
+      const black = { ...brand, canvasDark: '#000000', primaryColor: '#1E6FFF' };
+      const tokens = resolveTokens(black, { aspect: '16:9', theme: 'dark' });
+      expect(tokens.canvas).not.toBe('#000000');
+      expect(lightness(tokens.canvas)).toBeGreaterThanOrEqual(CANVAS_FLOOR_L - 0.005);
+      // A trace, not a colour: still unmistakably a near-black.
+      expect(lightness(tokens.canvas)).toBeLessThan(0.2);
+      expect(chroma(tokens.canvas)).toBeGreaterThan(0);
+    });
+
+    it('leaves a near-black the brand actually chose alone', () => {
+      const tokens = resolveTokens(brand, { aspect: '16:9', theme: 'dark' });
+      expect(tokens.canvas).toBe(brand.canvasDark);
+    });
+
+    it('pulls paper white off the ceiling, because a deliverable is studio range', () => {
+      const paper = { ...brand, canvasLight: '#FFFFFF' };
+      const tokens = resolveTokens(paper, { aspect: '16:9', theme: 'light' });
+      expect(tokens.canvas).not.toBe('#FFFFFF');
+      expect(lightness(tokens.canvas)).toBeLessThanOrEqual(CANVAS_CEILING_L + 0.005);
+    });
+
+    it('still clears contrast on a lifted canvas', () => {
+      const black = { ...brand, canvasDark: '#000000' };
+      const tokens = resolveTokens(black, { aspect: '16:9', theme: 'dark' });
+      expect(contrastRatio(tokens.onCanvas.primary, tokens.canvas)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(tokens.onCanvas.secondary, tokens.canvas)).toBeGreaterThanOrEqual(4.5);
+    });
   });
 
   it('places the watermark inside the safe area', () => {

@@ -7,6 +7,7 @@ export * from './audio.ts';
 export * from './caption.ts';
 export * from './localization.ts';
 export * from './editorial.ts';
+export * from './picture.ts';
 export * from './conversion.ts';
 export * from './short-form.ts';
 export * from './temporal.ts';

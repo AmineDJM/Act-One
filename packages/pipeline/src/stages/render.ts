@@ -17,6 +17,7 @@ import {
   newId,
   posterMoment,
   REAL_PRODUCT_VISUAL_TYPES,
+  degradedShots,
   storyboardDuration,
   type AspectRatio,
   type BrandSystem,
@@ -77,6 +78,7 @@ import {
   isFullRange,
   levelJumpIssues,
   measureFilm,
+  silentMasterIssue,
   parseFrameStats,
   planRepairs,
   rangeIssues,
@@ -350,19 +352,33 @@ export async function runRender(
         cut,
         fps: DEFAULT_FPS,
         durationSeconds: storyboardDuration(current),
+        hasSound: rendered.hasSound,
       });
       issues = inspected.issues;
       qaLayers = inspected.layers;
 
       /*
-       * A film that was scored and came out silent. Reported rather than
-       * repaired, because no change to the storyboard fixes it: the library is
-       * not provisioned, and that is an operator's job. A major rather than a
-       * blocker, because the picture is finished and withholding it helps
-       * nobody — but it never ships unremarked.
+       * A film that was scored and came out silent.
+       *
+       * Not repairable by any storyboard edit: the library is not provisioned,
+       * and that is an operator's job. It used to be a major rather than a
+       * blocker, on the reasoning that the picture is finished and withholding
+       * it helps nobody. What that reasoning produced was a customer opening
+       * their launch film and hearing nothing, with the system calling it
+       * READY — so the severity now follows what is actually missing. Every
+       * file gone is a film with no sound at all and does not ship; some files
+       * gone is a thinner mix, which is a note.
        */
-      issues = [...issues, ...rendered.soundIssues];
+      issues = [...issues, ...rendered.soundIssues, ...rendered.degradedIssues];
       if (rendered.missingAudio.length > 0) {
+        /*
+         * Every file the score asked for, gone, and no voice to carry the
+         * film instead: that is not a thinner mix, it is no sound at all.
+         */
+        const everything =
+          rendered.soundKeys > 0 &&
+          rendered.missingAudio.length >= rendered.soundKeys &&
+          rendered.spoken.length === 0;
         issues = [
           ...issues,
           {
@@ -372,10 +388,10 @@ export async function runRender(
             detectedBy: 'deterministic',
             evidenceAssetId: null,
             check: 'missing_audio',
-            severity: 'soft_fail',
+            severity: everything ? 'hard_fail' : 'soft_fail',
             message:
-              `The sound library is missing ${rendered.missingAudio.length} file(s), so this film ` +
-              `is silent where it was scored. Run \`npm run sound-library\`. ` +
+              `The sound library is missing ${rendered.missingAudio.length} of ${rendered.soundKeys} ` +
+              `file(s), so this film is silent where it was scored. Run \`npm run sound-library\`. ` +
               `First missing: ${rendered.missingAudio[0]}`,
             confidence: 1,
             repair: 'manual_review',
@@ -1139,6 +1155,18 @@ async function renderOnce(
   captions: FilmCaptions;
   /** Where each line landed in the finished file, for the temporal checks. */
   spoken: SpokenLine[];
+  /**
+   * Whether this film was supposed to make a sound.
+   *
+   * A film with no bed, no cues and no voice is meant to be silent, and a
+   * silent master is the correct outcome. Everything else that comes back
+   * silent has failed, and only this flag tells the two apart.
+   */
+  hasSound: boolean;
+  /** How many library files the score asked for, so "some missing" and "all missing" differ. */
+  soundKeys: number;
+  /** Shots that rendered as type because their material did not resolve. */
+  degradedIssues: QaFinding[];
 }> {
   const { storyboard, brand, system } = params;
 
@@ -1241,6 +1269,51 @@ async function renderOnce(
    */
   const footageAssetIds = await footageAmong(context, referenced);
 
+  /*
+   * What the renderer is about to be handed, against what the plan asked for.
+   *
+   * The composition degrades rather than fails: a shot whose capture is gone
+   * draws the scene's line of copy on the canvas instead, which is the right
+   * call for the frame and was, until now, completely silent. A production
+   * whose storage was misconfigured lost every asset it had, rendered thirty
+   * seconds of title cards on black, and passed QA — because QA read the
+   * storyboard, and the storyboard still said every one of those shots was
+   * the product.
+   *
+   * Measured here rather than inferred later: this is the one place that
+   * holds both the plan and the urls it actually resolved.
+   */
+  const degraded = degradedShots(storyboard, new Set(Object.keys(assetUrls)));
+  const degradedIssues: QaFinding[] = degraded.map(({ scene, wanted }) => ({
+    id: newId('evt'),
+    sceneId: scene.id,
+    timecodeStart: scene.startTime,
+    detectedBy: 'deterministic',
+    evidenceAssetId: null,
+    check: 'composition',
+    severity: 'hard_fail',
+    message:
+      `Scene ${scene.index + 1} was planned as ${scene.visualType.replace(/_/g, ' ')} and none of ` +
+      `its ${wanted === 0 ? 'material' : `${wanted} asset(s)`} resolved, so it renders as ` +
+      `${scene.duration.toFixed(1)}s of type on the canvas.`,
+    confidence: 1,
+    // The material is missing rather than wrong, so the repair is to fetch it
+    // again — and when that cannot be done the loop escalates, which is the
+    // outcome this finding exists to reach.
+    repair: scene.visualType === 'generated_broll' ? 'regenerate_shot' : 'recapture_product',
+  }));
+  if (degraded.length > 0) {
+    await context.activity({
+      step: 'motion',
+      kind: 'note',
+      label: `${degraded.length} shot${degraded.length === 1 ? '' : 's'} without material`,
+      detail: degraded
+        .map(({ scene }) => `scene ${scene.index + 1} (${scene.visualType})`)
+        .join(', '),
+      status: 'done',
+    });
+  }
+
   const silentPath = path.join(params.workDir, `film-${params.attempt}.mp4`);
   await renderFilm({
     props: {
@@ -1263,9 +1336,16 @@ async function renderOnce(
        * that is a claim, and we had no evidence for it.
        */
       cta: displayHost(context.project.websiteUrl),
-      // One clause, not the whole one-liner: the lockup holds a single line,
-      // and handing it a paragraph is how a film ends mid-phrase.
-      tagline: params.understanding ? firstClause(params.understanding.oneLiner) : '',
+      /*
+       * One clause, not the whole one-liner: the lockup holds a single line,
+       * and handing it a paragraph is how a film ends mid-phrase. In the
+       * brand's own language, because where the clause is cut depends on which
+       * words can end a line — a French film ended on "les conducteurs à"
+       * because this call did not say what language it was cutting.
+       */
+      tagline: params.understanding
+        ? firstClause(params.understanding.oneLiner, 72, brand.communication.language)
+        : '',
       /*
        * Burned in only where the format asks for it.
        *
@@ -1398,6 +1478,17 @@ async function renderOnce(
     ...(voiceTracks.length > 0 ? { voiceTracks } : {}),
   });
   const soundIssues: QaFinding[] = [...narration.issues, ...captions.issues];
+  /*
+   * What the film was scored to carry, before anything was resolved or mixed.
+   * Read off the design rather than off the mix, because the whole question
+   * downstream is whether a film that asked for sound came back without it.
+   */
+  const hasSound = Boolean(design.music) || design.cues.length > 0 || voiceTracks.length > 0;
+  const soundKeys = new Set(
+    [design.music?.storageKey, ...design.cues.map((cue) => cue.storageKey)].filter(
+      (key): key is string => typeof key === 'string',
+    ),
+  ).size;
   if (voiceTracks.length > 0 && design.music) {
     let lead = await measureDialogueLead(plan, voiceTracks, { ...(context.signal ? { signal: context.signal } : {}) });
     const reduction = lead ? bedReductionDb(lead) : 0;
@@ -1438,7 +1529,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -1468,10 +1559,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues };
 }
 
 /**
@@ -1623,6 +1714,8 @@ async function checkTiming(
     cut: FilmCut;
     fps: number;
     durationSeconds: number;
+    /** Whether the film was scored at all. A silent film meant to be silent is not a defect. */
+    hasSound: boolean;
   },
 ): Promise<QaFinding[]> {
   const issues: QaFinding[] = [
@@ -1650,6 +1743,16 @@ async function checkTiming(
       }),
       ...levelJumpIssues(measured.windows),
       ...abruptEndIssue({ tailPeakDb: measured.tailPeakDb, durationSeconds: params.durationSeconds }),
+      /*
+       * The question none of the above can ask. Dead air is measured between
+       * the head and the tail, and a film that is silent end to end has no
+       * middle — its one silence is exempt at both ends by construction.
+       */
+      ...silentMasterIssue({
+        peakDb: measured.peakDb,
+        scored: params.hasSound,
+        durationSeconds: params.durationSeconds,
+      }),
     );
   } catch (error) {
     console.error('[render] timing measurement failed:', (error as Error).message);
@@ -1677,6 +1780,8 @@ async function inspect(
     cut: FilmCut;
     fps: number;
     durationSeconds: number;
+    /** Whether the film was scored at all, for the check that it can be heard. */
+    hasSound: boolean;
   },
 ): Promise<{ issues: QaFinding[]; layers: QaLayer[] }> {
   const { registry, project, organizationId } = context;
@@ -1698,6 +1803,7 @@ async function inspect(
       storyboard: params.storyboard,
       brand: params.brand,
       aspect: params.aspect,
+      cut: params.cut,
       cta: displayHost(project.websiteUrl),
       ...(understanding
         ? { knownEvidenceIds: new Set(understanding.evidence.map((evidence) => evidence.id)) }

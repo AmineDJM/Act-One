@@ -15,6 +15,7 @@ import {
   parseFreezes,
   parseShortTermLoudness,
   parseSilences,
+  silentMasterIssue,
   speechDriftIssues,
   type SpokenLine,
 } from '../temporal.ts';
@@ -237,6 +238,80 @@ describe('the parsers, against output FFmpeg actually wrote', () => {
   it('reads -inf as silence rather than as nothing', () => {
     expect(parseShortTermLoudness('pts_time:1\nlavfi.r128.S=-inf')).toEqual([{ at: 1, lufs: -70 }]);
   });
+});
+
+/**
+ * The film the customer actually received.
+ *
+ * Thirty seconds, 1920x1080, an AAC-LC track at 48 kHz stereo — and every one
+ * of its 2,879,488 samples at the floor. It passed the container pass, passed
+ * the audio pass, and was delivered as a finished master. Built here at three
+ * seconds because the defect does not care how long it lasts.
+ */
+describe('a master with nothing on its track', () => {
+  let workDir = '';
+  let clipPath = '';
+  let built = false;
+
+  beforeAll(async () => {
+    workDir = await mkdtemp(path.join(tmpdir(), 'act-one-silent-'));
+    clipPath = path.join(workDir, 'silent.mp4');
+    const run = await runFfmpeg(
+      [
+        '-nostdin', '-y',
+        '-f', 'lavfi', '-i', 'color=c=black:size=320x240:rate=30:duration=3',
+        '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo:duration=3',
+        '-map', '0:v', '-map', '1:a',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest',
+        clipPath,
+      ],
+      { timeoutMs: 120_000 },
+    );
+    built = run.ok;
+  }, 180_000);
+
+  afterAll(async () => {
+    if (workDir) await rm(workDir, { recursive: true, force: true });
+  });
+
+  it('measures a peak at the floor', async () => {
+    expect(built, 'the fixture clip was not built').toBe(true);
+    const measured = await measureFilm(clipPath, { workDir });
+    expect(measured.peakDb).toBeLessThanOrEqual(-60);
+  }, 180_000);
+
+  it('is invisible to the dead-air check, which is why this one exists', async () => {
+    expect(built, 'the fixture clip was not built').toBe(true);
+    const measured = await measureFilm(clipPath, { workDir });
+    const scenes = [scene({ duration: 3 })];
+    /*
+     * The one silence runs the whole film, so it starts inside the head
+     * exemption and ends inside the tail one, and dead air finds nothing at
+     * all. This is not a bug in that check — it is the reason a film with no
+     * sound whatsoever sailed through the audio pass.
+     */
+    expect(
+      deadAirIssues({ silences: measured.silences, durationSeconds: 3, cut: 'feature', scenes }),
+    ).toHaveLength(0);
+
+    const findings = silentMasterIssue({
+      peakDb: measured.peakDb,
+      scored: true,
+      durationSeconds: 3,
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.check).toBe('missing_audio');
+    expect(findings[0]!.severity).toBe('hard_fail');
+    expect(findings[0]!.layer).toBe('audio');
+  }, 180_000);
+
+  it('says nothing about a film that was never scored', async () => {
+    expect(built, 'the fixture clip was not built').toBe(true);
+    const measured = await measureFilm(clipPath, { workDir });
+    expect(
+      silentMasterIssue({ peakDb: measured.peakDb, scored: false, durationSeconds: 3 }),
+    ).toHaveLength(0);
+  }, 180_000);
 });
 
 /**

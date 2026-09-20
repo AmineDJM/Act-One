@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CAMERA_DRIVEN_RECIPES, movesThroughout, type MotionRecipeName } from '@act-one/core';
+import {
+  CAMERA_DRIVEN_RECIPES,
+  MATERIAL_BACKED_RECIPES,
+  movesThroughout,
+  type MotionRecipeName,
+} from '@act-one/core';
 
 /**
  * Which recipes the camera actually reaches.
@@ -19,8 +24,14 @@ import { CAMERA_DRIVEN_RECIPES, movesThroughout, type MotionRecipeName } from '@
  */
 const FILM = path.resolve(import.meta.dirname, '../Film.tsx');
 
-/** The recipes whose body is handed `camera={scene.cameraRecipe}`, read off the switch. */
-async function cameraDrivenInRenderer(): Promise<Set<string>> {
+/**
+ * The recipes whose body in the renderer's switch contains `needle`.
+ *
+ * One reader for both lists: which recipes the camera reaches, and which ones
+ * draw type when their material is missing. A label with an empty body falls
+ * through to the next one, so labels accumulate until a body appears.
+ */
+async function recipesInRendererWith(needle: string): Promise<Set<string>> {
   const source = await readFile(FILM, 'utf8');
   const body = source.slice(source.indexOf('const SceneRenderer'));
   const cases = [...body.matchAll(/case '([a-z_0-9]+)':/g)].map((match) => ({
@@ -29,21 +40,21 @@ async function cameraDrivenInRenderer(): Promise<Set<string>> {
     end: match.index! + match[0].length,
   }));
 
-  const driven = new Set<string>();
+  const found = new Set<string>();
   let pending: string[] = [];
   for (const [index, entry] of cases.entries()) {
     const stop = cases[index + 1]?.start ?? body.length;
     const chunk = body.slice(entry.end, stop);
     pending.push(entry.name);
-    // An empty body means this label falls through to the next one, so the
-    // labels accumulate until a body actually appears.
     if (chunk.trim().length > 0) {
-      if (chunk.includes('camera={scene.cameraRecipe}')) for (const name of pending) driven.add(name);
+      if (chunk.includes(needle)) for (const name of pending) found.add(name);
       pending = [];
     }
   }
-  return driven;
+  return found;
 }
+
+const cameraDrivenInRenderer = () => recipesInRendererWith('camera={scene.cameraRecipe}');
 
 describe('the camera reaches exactly the recipes core says it does', () => {
   it('reads the renderer and finds recipes at all', async () => {
@@ -54,6 +65,26 @@ describe('the camera reaches exactly the recipes core says it does', () => {
   it('agrees with CAMERA_DRIVEN_RECIPES, in both directions', async () => {
     const driven = await cameraDrivenInRenderer();
     expect([...driven].sort()).toEqual([...CAMERA_DRIVEN_RECIPES].sort());
+  });
+});
+
+/**
+ * The list the pipeline uses to notice a shot that lost its material.
+ *
+ * A film went out as eight title cards on black. Every one of its scenes was
+ * planned as a picture, every one of their assets failed to resolve, and the
+ * renderer did the sensible thing and drew the copy instead — in silence,
+ * because nothing compared the plan to what it had actually been handed.
+ */
+describe('the recipes that fall back to type when their material is missing', () => {
+  it('finds fallbacks in the renderer at all', async () => {
+    const fallbacks = await recipesInRendererWith('typeFallback()');
+    expect(fallbacks.size).toBeGreaterThan(5);
+  });
+
+  it('agrees with MATERIAL_BACKED_RECIPES, in both directions', async () => {
+    const fallbacks = await recipesInRendererWith('typeFallback()');
+    expect([...fallbacks].sort()).toEqual([...MATERIAL_BACKED_RECIPES].sort());
   });
 });
 

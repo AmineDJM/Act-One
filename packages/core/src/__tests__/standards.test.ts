@@ -364,6 +364,34 @@ describe('fitting a line where only one fits', () => {
     expect(endsDangling(result)).toBe(false);
   });
 
+  /*
+   * The line a real film ended on.
+   *
+   * The site's one-liner is French, `firstClause` cut it at seventy-two
+   * characters, and the dangling-word trim behind it only knew English — so
+   * the master's last frame read "pour accompagner les conducteurs à" and
+   * every check downstream called it a finished sentence.
+   */
+  it('trims a dangling word in the language the copy is in', () => {
+    const source =
+      'Auto-école en ligne et assurance pour accompagner les conducteurs à chaque étape de leur vie';
+    const cut = firstClause(source, 72, 'fr');
+    expect(cut.endsWith('à')).toBe(false);
+    expect(endsDangling(cut, 'fr')).toBe(false);
+    expect(source.startsWith(cut)).toBe(true);
+  });
+
+  it('reads a regional tag as its language', () => {
+    expect(endsDangling('accompagner les conducteurs à', 'fr-CA')).toBe(true);
+    expect(endsDangling('bis zu', 'de-AT')).toBe(true);
+  });
+
+  it('does not import another language\'s function words', () => {
+    // "no" ends a Portuguese phrase mid-thought and an English one perfectly.
+    expect(endsDangling('Say no', 'en')).toBe(false);
+    expect(endsDangling('o carro no', 'pt')).toBe(true);
+  });
+
   it('never cuts mid-word', () => {
     const source = 'Reconciliation automation for mid-market finance teams everywhere';
     const result = firstClause(source, 30);

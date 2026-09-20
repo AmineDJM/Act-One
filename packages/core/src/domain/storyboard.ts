@@ -239,6 +239,56 @@ export const CAMERA_DRIVEN_RECIPES: readonly MotionRecipeName[] = [
 ];
 
 /**
+ * Recipes that need material handed to them, and draw type when it is missing.
+ *
+ * The renderer is built to degrade rather than fail: a shot whose capture or
+ * footage does not resolve falls back to the scene's line of copy on the brand
+ * canvas, which is the right call — four seconds of brand-coloured nothing is
+ * worse than four seconds of the sentence the beat was written around.
+ *
+ * What was wrong is that it happened in silence. `assetUrls` was resolved,
+ * handed to the composition, and nobody compared it to what the plan asked
+ * for; so a film whose every capture had gone missing rendered as a deck of
+ * title cards and reported a clean pass, because the storyboard it was checked
+ * against still said "product_ui" for every one of them.
+ *
+ * `film-motion.test.ts` reads the renderer's own switch for `typeFallback()`
+ * and checks this list still matches it, because a list copied from a switch
+ * is a list that drifts from it.
+ */
+export const MATERIAL_BACKED_RECIPES: readonly MotionRecipeName[] = [
+  'product_window',
+  'product_sequence',
+  'floating_ui',
+  'feature_stack',
+  'product_zoom',
+  'footage',
+  'photo_hold',
+  'spatial_cards',
+  'image_wall',
+  'cursor_sequence',
+  'depth_transition',
+];
+
+/**
+ * Shots that will render as type because their material is not there.
+ *
+ * Takes what the renderer will actually be given rather than what the
+ * storyboard hoped for: `available` is the set of asset ids that resolved to a
+ * url. A scene with several references needs only one to survive, because a
+ * shot plays one thing.
+ */
+export function degradedShots(
+  storyboard: Storyboard,
+  available: ReadonlySet<string>,
+): { scene: Scene; wanted: number }[] {
+  return storyboard.scenes
+    .filter((scene) => MATERIAL_BACKED_RECIPES.includes(scene.motionRecipe.name))
+    .filter((scene) => !scene.assetRefs.some((id) => available.has(id)))
+    .map((scene) => ({ scene, wanted: scene.assetRefs.length }));
+}
+
+/**
  * Whether a shot is in motion for its whole length.
  *
  * True of real footage, which plays; and of a camera-driven composition whose
@@ -459,6 +509,81 @@ export function sceneAt(storyboard: Storyboard, seconds: number): Scene | undefi
   return storyboard.scenes.find(
     (scene) => seconds >= scene.startTime && seconds < scene.startTime + scene.duration,
   );
+}
+
+/**
+ * Visual types that put a picture on the screen.
+ *
+ * Everything else composes words, a lockup or a pause — all of which are real
+ * shots and none of which is a picture. A logo reveal is not picture: it is
+ * the mark, drawn. A transition is not picture: it is the gap between two.
+ *
+ * `mixed_media` is here because half of it is a picture and a scene is either
+ * counted or not; `pictureShare` below weighs it at a half, which is where the
+ * arithmetic belongs.
+ */
+export const PICTURE_VISUAL_TYPES: readonly VisualType[] = [
+  'product_ui',
+  'product_ui_3d',
+  'screenshot_motion',
+  'generated_broll',
+  'real_media',
+  'cinematic_3d',
+  'mixed_media',
+] as const;
+
+/** Whether this shot shows something rather than saying something. */
+export function carriesPicture(visualType: VisualType): boolean {
+  return PICTURE_VISUAL_TYPES.includes(visualType);
+}
+
+/**
+ * How much of the film is picture, as a share of runtime.
+ *
+ * The counterpart to the generative ceiling in `visualMix` below, and the one
+ * that was missing: there was a rule against too much generated footage and no
+ * rule at all against none of anything. A film of pure typography scored a
+ * perfect zero here and nothing read the number.
+ */
+export function pictureShare(storyboard: Storyboard): number {
+  const total = storyboardDuration(storyboard) || 1;
+  const picture = storyboard.scenes.reduce(
+    (sum, scene) =>
+      sum + (carriesPicture(scene.visualType) ? scene.duration * (scene.visualType === 'mixed_media' ? 0.5 : 1) : 0),
+    0,
+  );
+  return picture / total;
+}
+
+/**
+ * The longest stretch of the film with no picture in it.
+ *
+ * Measured across scene boundaries rather than per scene, because four
+ * three-second title cards in a row is twelve seconds of reading however the
+ * storyboard chose to divide it up.
+ */
+export function longestTypeOnlyRun(storyboard: Storyboard): {
+  seconds: number;
+  start: number;
+  end: number;
+  sceneIds: string[];
+} {
+  let best = { seconds: 0, start: 0, end: 0, sceneIds: [] as string[] };
+  let run = { seconds: 0, start: 0, end: 0, sceneIds: [] as string[] };
+  for (const scene of storyboard.scenes) {
+    if (carriesPicture(scene.visualType)) {
+      run = { seconds: 0, start: 0, end: 0, sceneIds: [] };
+      continue;
+    }
+    run = {
+      seconds: run.seconds + scene.duration,
+      start: run.sceneIds.length === 0 ? scene.startTime : run.start,
+      end: scene.startTime + scene.duration,
+      sceneIds: [...run.sceneIds, scene.id],
+    };
+    if (run.seconds > best.seconds) best = { ...run, sceneIds: [...run.sceneIds] };
+  }
+  return best;
 }
 
 /** Proportion of runtime by visual family — the guard-rail for generative overuse. */

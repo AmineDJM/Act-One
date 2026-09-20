@@ -29,6 +29,12 @@ import {
   superlativesIn,
   urgencyPhrasesIn,
   visualMix,
+  pictureShare,
+  longestTypeOnlyRun,
+  MIN_PICTURE_SHARE,
+  MAX_TYPE_ONLY_RUN_SECONDS,
+  PICTURE_STANDARDS,
+  type FilmCut,
   weaselPhrasesIn,
   type BrandSystem,
   type QaFinding,
@@ -66,6 +72,8 @@ export type DeterministicInput = {
   aspect: '16:9' | '9:16' | '1:1' | '4:5';
   /** Ids of evidence the project actually holds, for claim checking. */
   knownEvidenceIds?: Set<string>;
+  /** Which shape of film this is. A short holds less of everything, including picture. */
+  cut?: FilmCut;
   /** Minimum on-screen asset resolution, in pixels, for the target frame. */
   minAssetWidth?: number;
   assetResolutions?: Record<string, { width: number; height: number }>;
@@ -79,7 +87,7 @@ export function runDeterministicChecks(input: DeterministicInput): QaFinding[] {
     issues.push(...checkScene(scene, tokens, input));
   }
 
-  issues.push(...checkFilm(input.storyboard, tokens));
+  issues.push(...checkFilm(input.storyboard, tokens, input.cut ?? 'feature'));
 
   if (input.cta !== undefined && ctaIsVague(input.cta)) {
     issues.push({
@@ -189,7 +197,9 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
     // A held frame is read once, whole: a line that stops mid-thought reads as
     // a caption whose second half was lost.
     for (const line of scene.onScreenText) {
-      if (!endsDangling(line)) continue;
+      // In the film's own language. The list was English only, so a French
+      // film ending on "les conducteurs à" read as a finished sentence here.
+      if (!endsDangling(line, input.brand.communication.language)) continue;
       add({
         check: 'text_overflow',
         severity: 'soft_fail',
@@ -362,7 +372,7 @@ function checkScene(scene: Scene, tokens: DesignTokens, input: DeterministicInpu
   return issues;
 }
 
-function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaFinding[] {
+function checkFilm(storyboard: Storyboard, tokens: DesignTokens, cut: FilmCut): QaFinding[] {
   const issues: QaFinding[] = [];
   const add = (
     issue: Omit<QaFinding, 'id' | 'sceneId' | 'timecodeStart' | 'detectedBy' | 'evidenceAssetId'>,
@@ -585,6 +595,72 @@ function checkFilm(storyboard: Storyboard, tokens: DesignTokens): QaFinding[] {
         `carries none of it (${cite(CONVERSION_STANDARDS.soundOff)}).`,
       confidence: 1,
       repair: 'rewrite_copy',
+    });
+  }
+
+  /*
+   * Is there a picture in this film at all?
+   *
+   * The ceiling below has been here since the beginning — no more than 45% of
+   * the runtime may be generated footage — and there was never a floor to go
+   * with it. A film of nothing but typography on a bare canvas scores a
+   * perfect zero on the generative budget and passes, which is how thirty
+   * seconds of white type on black went out as a finished master.
+   *
+   * Three findings, because three different things go wrong. No picture at
+   * all is a failure of the whole production and does not ship. Thin picture
+   * is a film that lost most of its material somewhere. A long unbroken run
+   * of title cards is a film that has stopped showing and started telling.
+   */
+  const picture = pictureShare(storyboard);
+  const pictureFloor = MIN_PICTURE_SHARE[cut === 'short' ? 'short' : 'feature'];
+  if (picture <= 0) {
+    add({
+      check: 'composition',
+      severity: 'hard_fail',
+      message:
+        `Nothing in this film is a picture: all ${storyboardDuration(storyboard).toFixed(1)}s of it ` +
+        `is typography on the canvas (${cite(PICTURE_STANDARDS.substance)}). ` +
+        'Either the captures and shots never arrived, or the plan never asked for any.',
+      confidence: 1,
+      /*
+       * Not an automatic repair, and deliberately so. No edit to this
+       * storyboard puts a picture in it — the material is missing or was never
+       * commissioned, and both answers are upstream of the timeline. It goes
+       * to a person with the reason stated, which is the honest end of this
+       * particular road.
+       */
+      repair: 'manual_review',
+    });
+  } else if (picture < pictureFloor) {
+    add({
+      check: 'composition',
+      severity: 'soft_fail',
+      message:
+        `Only ${(picture * 100).toFixed(0)}% of the film carries a picture; the floor for a ` +
+        `${cut} is ${(pictureFloor * 100).toFixed(0)}% (${cite(PICTURE_STANDARDS.substance)}).`,
+      confidence: 1,
+      repair: 'regenerate_shot',
+    });
+  }
+
+  const typeRun = longestTypeOnlyRun(storyboard);
+  const runCeiling = MAX_TYPE_ONLY_RUN_SECONDS[cut === 'short' ? 'short' : 'feature'];
+  if (picture > 0 && typeRun.seconds > runCeiling) {
+    issues.push({
+      id: newId('evt'),
+      sceneId: typeRun.sceneIds[0] ?? null,
+      timecodeStart: typeRun.start,
+      detectedBy: 'deterministic',
+      evidenceAssetId: null,
+      check: 'composition',
+      severity: 'soft_fail',
+      message:
+        `${typeRun.seconds.toFixed(1)}s from ${typeRun.start.toFixed(1)}s with nothing on screen ` +
+        `but words, across ${typeRun.sceneIds.length} shots; ${runCeiling}s is the ceiling for a ` +
+        `${cut} (${cite(PICTURE_STANDARDS.typeRun)}).`,
+      confidence: 1,
+      repair: 'regenerate_shot',
     });
   }
 

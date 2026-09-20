@@ -82,6 +82,19 @@ export const TEMPORAL_STANDARDS = {
       'A pause is a tool and dead air is a hole. The difference is length, and past about a ' +
       'second a viewer checks whether the file has stopped.',
   },
+  silentMaster: {
+    id: 'temporal.silent_master',
+    rule: 'A film that was scored is never delivered with nothing on its track.',
+    source: 'Act One house rule',
+    authority: 'house',
+    enforcement: 'checked',
+    because:
+      'Every check the system had asked whether the audio track was well formed, and a track ' +
+      'of digital silence answers all of them correctly: AAC-LC, 48 kHz, stereo, no gap the ' +
+      'dead-air rule recognises because the one silence starts at zero and ends at the end, ' +
+      'where both of that rule\'s exemptions live. A customer opened a thirty-second film and ' +
+      'heard nothing.',
+  },
   levelJump: {
     id: 'temporal.level_jump',
     rule: 'Short-term loudness moves by no more than 5 LU between adjacent windows.',
@@ -152,6 +165,21 @@ export const LEVEL_JUMP_CEILING_LU = 5;
 
 /** Below this, in dBFS, the track counts as silent for the tail check. */
 export const TAIL_SILENCE_FLOOR_DB = -40;
+
+/**
+ * Below this peak, in dBFS, a whole film counts as having no sound at all.
+ *
+ * Distinct from `TAIL_SILENCE_FLOOR_DB`, which asks whether the last fifth of
+ * a second has faded. This asks the cruder question nobody had asked: is there
+ * anything on the track at all. A film delivered as a finished master measured
+ * −91 dB peak across all 2,879,488 samples — a track that exists, is AAC, is
+ * 48 kHz stereo, passes every container check, and is digital silence.
+ *
+ * −60 rather than −91, because an encode of a near-silent mix lands a few
+ * decibels above the floor and a film nobody can hear is a film nobody can
+ * hear either way.
+ */
+export const SILENT_MASTER_FLOOR_DB = -60;
 
 /** How much of the end must have faded. */
 export const TAIL_FADE_SECONDS = 0.2;
