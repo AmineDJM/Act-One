@@ -177,56 +177,98 @@ function meanDifference(left: Uint8Array, right: Uint8Array): number {
 }
 
 /**
+ * What Act One must never hand over again.
+ *
+ * A corpus rather than a list of ifs, because these are not arbitrary
+ * thresholds \u2014 each one is a film that was made, passed every check in this
+ * system, and was opened by somebody who did not recognise what they had
+ * bought. Written down with the name of the failure and the reason it is one,
+ * so the set can be read by an operator, shown in the Director Lab, and added
+ * to when a new way of disappointing somebody is discovered.
+ *
+ * Every entry is measured from the delivered file. None of them is a matter of
+ * taste, and none of them asks a model, because a reviewer asked whether a
+ * film is good will find something generous to say about almost anything.
+ */
+export type AntiPattern = {
+  id: string;
+  /** What this failure is called, in the words somebody would use to describe it. */
+  title: string;
+  /** Why it is a failure and not a style. */
+  why: string;
+  /** The sentence to say about this film, or null when the film is clear of it. */
+  test: (facts: MasterFacts, options: { typographicByDesign?: boolean }) => string | null;
+};
+
+export const NEGATIVE_CORPUS: readonly AntiPattern[] = [
+  {
+    id: 'silent_master',
+    title: 'A film nobody can hear',
+    why:
+      'Sound is half of a film. A master with no track, or a track holding silence, is the ' +
+      'experience of a broken file rather than of a film that chose quiet.',
+    test: (facts) => {
+      if (!facts.hasAudio) return 'The master has no audio track at all: it plays in silence.';
+      if (facts.audibleShare < MIN_AUDIBLE_SHARE) {
+        return `The film is silent for ${Math.round((1 - facts.audibleShare) * 100)}% of its length.`;
+      }
+      return null;
+    },
+  },
+  {
+    id: 'type_on_a_field',
+    title: 'The words of a film instead of the film',
+    why:
+      'A flat field with type on it for the whole running time is a title sequence. A film may ' +
+      'be typographic on purpose \u2014 a pitch cut in type is a real form \u2014 but a product tour ' +
+      'that never shows anything is the plan read aloud.',
+    test: (facts, options) => {
+      if (facts.sampled < 4 || options.typographicByDesign) return null;
+      if (facts.flatFrames / facts.sampled < ALL_FLAT) return null;
+      return (
+        `Every frame sampled (${facts.flatFrames} of ${facts.sampled}) is a flat field with type on it. ` +
+        'Nothing in this film is a picture.'
+      );
+    },
+  },
+  {
+    id: 'the_film_holds_still',
+    title: 'One image held for the running time',
+    why:
+      'A cut is what makes a film a film. Eleven shots that produce two images between them is ' +
+      'one image with a title on it, whatever the shot list says \u2014 and this one is checked even ' +
+      'where type was the chosen form, because the form lives on the cut.',
+    test: (facts) => {
+      if (facts.sampled < 6 || facts.distinctFrames > MIN_DISTINCT) return null;
+      return (
+        `${facts.sampled} moments across ${facts.durationSeconds.toFixed(0)}s produce ` +
+        `${facts.distinctFrames} distinct image${facts.distinctFrames === 1 ? '' : 's'}: the film holds still.`
+      );
+    },
+  },
+];
+
+/**
  * What the measurements alone are enough to refuse.
  *
- * Underneath the panel and the director, because a model asked whether a film
- * is any good will find something kind to say about almost anything, and the
- * three failures below are not matters of taste. A film nobody can hear, a
- * film that is a field of colour with words on it for its whole length, and a
- * film that shows two pictures in thirty seconds are not films that need a
- * second opinion — they are the exact thing a customer opened and did not
- * recognise as what they had bought.
- *
- * Never `block`. These are all repairable by the loop that follows, and a
- * block is for something no amount of re-cutting this material will fix.
+ * Underneath the panel and the director, because none of the corpus above is
+ * a matter of taste. Never `block`: every one of them is repairable by the
+ * loop that follows, and a block is for something no amount of re-cutting
+ * this material will fix.
  */
 export function masterFloor(
   facts: MasterFacts,
   options: { typographicByDesign?: boolean } = {},
-): { verdict: 'pass' | 'revise'; reasons: string[] } {
+): { verdict: 'pass' | 'revise'; reasons: string[]; matched: string[] } {
   const reasons: string[] = [];
-
-  if (!facts.hasAudio) {
-    reasons.push('The master has no audio track at all: it plays in silence.');
-  } else if (facts.audibleShare < MIN_AUDIBLE_SHARE) {
-    reasons.push(
-      `The film is silent for ${Math.round((1 - facts.audibleShare) * 100)}% of its length.`,
-    );
+  const matched: string[] = [];
+  for (const pattern of NEGATIVE_CORPUS) {
+    const said = pattern.test(facts, options);
+    if (said === null) continue;
+    reasons.push(said);
+    matched.push(pattern.id);
   }
-
-  if (facts.sampled >= 4) {
-    const flat = facts.flatFrames / facts.sampled;
-    /*
-     * A film may be typographic on purpose — a pitch cut in type is a real
-     * form. What it may not be is typographic and static: the form lives on
-     * the cut, and a held field of colour is the failure whether or not
-     * anybody chose type.
-     */
-    if (flat >= ALL_FLAT && !options.typographicByDesign) {
-      reasons.push(
-        `Every frame sampled (${facts.flatFrames} of ${facts.sampled}) is a flat field with type on it. ` +
-          'Nothing in this film is a picture.',
-      );
-    }
-    if (facts.sampled >= 6 && facts.distinctFrames <= MIN_DISTINCT) {
-      reasons.push(
-        `${facts.sampled} moments across ${facts.durationSeconds.toFixed(0)}s produce ` +
-          `${facts.distinctFrames} distinct image${facts.distinctFrames === 1 ? '' : 's'}: the film holds still.`,
-      );
-    }
-  }
-
-  return { verdict: reasons.length > 0 ? 'revise' : 'pass', reasons };
+  return { verdict: reasons.length > 0 ? 'revise' : 'pass', reasons, matched };
 }
 
 /** Below this, more than half the film plays in silence. */

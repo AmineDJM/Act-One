@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { masterFloor, type MasterFacts } from '../master-facts.ts';
+import { NEGATIVE_CORPUS, masterFloor, type MasterFacts } from '../master-facts.ts';
 
 /**
  * The floor underneath the creative gate.
@@ -84,5 +84,23 @@ describe('what the measurements alone are enough to refuse', () => {
   it('names every reason it has, not the first one', () => {
     const floor = masterFloor(facts({ hasAudio: false, flatFrames: 12, distinctFrames: 1 }));
     expect(floor.reasons).toHaveLength(3);
+  });
+});
+
+describe('the corpus is a corpus, not a pile of thresholds', () => {
+  it('names which failure a film fell into, so it can be counted over time', () => {
+    const floor = masterFloor(facts({ hasAudio: false, flatFrames: 12, distinctFrames: 1 }));
+    expect(floor.matched).toEqual(['silent_master', 'type_on_a_field', 'the_film_holds_still']);
+  });
+
+  it('says why each one is a failure rather than a preference', () => {
+    // A corpus an operator cannot read is a set of magic numbers, and the
+    // first thing somebody does with a magic number they do not understand is
+    // move it.
+    for (const pattern of NEGATIVE_CORPUS) {
+      expect(pattern.title.length).toBeGreaterThan(8);
+      expect(pattern.why.length).toBeGreaterThan(40);
+    }
+    expect(new Set(NEGATIVE_CORPUS.map((one) => one.id)).size).toBe(NEGATIVE_CORPUS.length);
   });
 });

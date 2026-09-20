@@ -76,6 +76,8 @@ export type CreativeGateResult = {
   facts: MasterFacts;
   /** What the measurements alone refused, before anybody was asked. */
   floorReasons: string[];
+  /** Which entries of the negative corpus this film fell into, by id. */
+  matched: string[];
   reviews: CriticReview[];
   decision: DirectorDecision | null;
   costUsd: number;
@@ -133,6 +135,7 @@ export async function runCreativeMasterGate(
       changes: [],
       facts,
       floorReasons: floor.reasons,
+      matched: floor.matched,
       reviews: [],
       decision: null,
       costUsd: 0,
@@ -148,6 +151,7 @@ export async function runCreativeMasterGate(
       changes: [],
       facts,
       floorReasons: floor.reasons,
+      matched: floor.matched,
       reviews: [],
       decision: null,
       costUsd: 0,
@@ -221,6 +225,7 @@ export async function runCreativeMasterGate(
     changes: [...floor.reasons, ...gate.changes].slice(0, 8),
     facts,
     floorReasons: floor.reasons,
+    matched: floor.matched,
     reviews: panelled.reviews,
     decision: gate.decision,
     costUsd,
