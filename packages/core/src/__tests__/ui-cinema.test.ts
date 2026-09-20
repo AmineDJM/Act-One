@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   MAX_UPSCALE,
+  cuesFor,
   minCropWidth,
   planUiSequence,
   quietCorner,
@@ -33,6 +34,7 @@ const ASHBY: UiStructure = {
     { x: 0.01, y: 0.09, width: 0.25, height: 0.09, weight: 0.042, density: 0.43 },
     { x: 0.01, y: 0.29, width: 0.13, height: 0.15, weight: 0.036, density: 0.42 },
   ],
+  controls: [],
 };
 
 const OPTIONS = { seconds: 7, frameAspect: 16 / 9, renderWidth: 1920, hasWords: true } as const;
@@ -191,7 +193,140 @@ describe('where the words can go', () => {
         { x: 0.5, y: 0, width: 0.5, height: 0.5, weight: 0.4, density: 0.6 },
         { x: 0, y: 0.5, width: 0.5, height: 0.5, weight: 0.2, density: 0.5 },
       ] satisfies UiRegion[],
+      controls: [],
     };
     expect(quietCorner(structure, { x: 0, y: 0, width: 1, height: 1 })).toBe('bottom_right');
+  });
+});
+
+/**
+ * Taking the interface apart.
+ *
+ * The properties here are all about honesty rather than taste. A layer that
+ * moves relative to the shell has to be cut out of it or the same panel is on
+ * screen twice; a layer that is cut out has to cover its own hole for every
+ * frame it exists, or the shot shows a rectangle of nothing where the product
+ * should be. Those two together are the entire licence this system has to
+ * move parts of a still picture independently.
+ */
+describe('the interface as layers', () => {
+  const WITH_CONTROL: UiStructure = {
+    ...ASHBY,
+    controls: [{ x: 0.18, y: 0.63, width: 0.05, height: 0.03, weight: 0.0015, density: 1 }],
+  };
+
+  it('moves nothing but the camera while the film is still establishing', () => {
+    for (const framing of planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'plain' }).framings) {
+      expect(framing.layers).toHaveLength(0);
+    }
+  });
+
+  it('takes the shell back so a panel can hold the frame', () => {
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'layered' });
+    const subject = plan.framings.find((framing) => framing.role === 'subject')!;
+    expect(subject.layers.map((layer) => `${layer.role}/${layer.motion}`)).toEqual([
+      'shell/recede',
+      'panel/advance',
+    ]);
+  });
+
+  it('presses a real control and lands on a real result, in one shot', () => {
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'layered' });
+    const action = plan.framings.find((framing) => framing.role === 'action')!;
+    const roles = action.layers.map((layer) => layer.role);
+    expect(roles).toContain('control');
+    expect(roles).toContain('overlay');
+
+    const control = action.layers.find((layer) => layer.role === 'control')!;
+    const overlay = action.layers.find((layer) => layer.role === 'overlay')!;
+    // Cause before result: the confirmation may not land before the press.
+    expect(overlay.delaySeconds).toBeGreaterThan(control.delaySeconds);
+    // Both are in the frame, or the shot promises an action off screen.
+    for (const rect of [control.rect, overlay.rect]) {
+      expect(rect.x).toBeGreaterThanOrEqual(action.to.x - 0.001);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(action.to.x + action.to.width + 0.001);
+      expect(rect.y).toBeGreaterThanOrEqual(action.to.y - 0.001);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(action.to.y + action.to.height + 0.001);
+    }
+  });
+
+  it('never presses a control the capture does not have', () => {
+    const plan = planUiSequence(ASHBY, { ...OPTIONS, ambition: 'layered' });
+    for (const framing of plan.framings) {
+      expect(framing.layers.some((layer) => layer.role === 'control')).toBe(false);
+    }
+  });
+
+  it('only cuts a hole where the layer that moves covers it', () => {
+    /*
+     * The rule that keeps this honest. A hole is a claim about what is under
+     * a thing, and we do not know what is under a toast in a screenshot — so
+     * a hole is only allowed where the layer scales about its own centre and
+     * therefore never leaves it.
+     */
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'layered' });
+    for (const framing of plan.framings) {
+      for (const layer of framing.layers) {
+        if (!layer.knockout) continue;
+        expect(['advance', 'press']).toContain(layer.motion);
+      }
+    }
+  });
+
+  it('opens into a space once, and only where the capture has panels to hang', () => {
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'expanded', seconds: 9 });
+    const volumes = plan.framings.filter((framing) => framing.space === 'volume');
+    expect(volumes).toHaveLength(1);
+    expect(volumes[0]!.layers.length).toBeGreaterThanOrEqual(3);
+    // Each plane is a part of the screen, not the screen.
+    for (const layer of volumes[0]!.layers) {
+      expect(layer.rect.width * layer.rect.height).toBeLessThan(0.5);
+    }
+  });
+
+  it('puts the words behind the product when there is a behind', () => {
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'expanded', seconds: 9 });
+    const volume = plan.framings.find((framing) => framing.space === 'volume')!;
+    expect(volume.wordsBehind).toBe(true);
+  });
+});
+
+describe('sound written off the picture', () => {
+  const WITH_CONTROL: UiStructure = {
+    ...ASHBY,
+    controls: [{ x: 0.18, y: 0.63, width: 0.05, height: 0.03, weight: 0.0015, density: 1 }],
+  };
+
+  it('puts a click where the control is actually pressed', () => {
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'layered' });
+    const cues = cuesFor(plan, 4);
+    const click = cues.find((cue) => cue.type === 'ui_click')!;
+    expect(click).toBeDefined();
+
+    let at = 4;
+    let expected = 0;
+    for (const framing of plan.framings) {
+      const control = framing.layers.find((layer) => layer.motion === 'press');
+      if (control) expected = at + control.delaySeconds + control.durationSeconds * 0.45;
+      at += framing.seconds;
+    }
+    expect(click.time).toBeCloseTo(expected, 2);
+  });
+
+  it('lands every cue inside the shot it belongs to', () => {
+    const plan = planUiSequence(WITH_CONTROL, { ...OPTIONS, ambition: 'layered' });
+    const runtime = plan.framings.reduce((sum, framing) => sum + framing.seconds, 0);
+    for (const cue of cuesFor(plan, 4)) {
+      expect(cue.time).toBeGreaterThanOrEqual(4);
+      expect(cue.time).toBeLessThanOrEqual(4 + runtime + 0.001);
+    }
+  });
+
+  it('stays quiet when the picture is', () => {
+    // A plain shot is a camera on a still; there is nothing to mark but the
+    // cuts, and a cue on every event is a cartoon.
+    const plain = cuesFor(planUiSequence(ASHBY, { ...OPTIONS, ambition: 'plain' }), 0);
+    expect(plain.some((cue) => cue.type === 'ui_click')).toBe(false);
+    expect(plain.length).toBeLessThanOrEqual(6);
   });
 });

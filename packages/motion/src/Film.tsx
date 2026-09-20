@@ -326,6 +326,7 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
           return (
             <UiCinema
               src={assets[0]}
+              sources={assetUrls}
               sequence={scene.uiSequence}
               tokens={tokens}
               words={text}
@@ -356,6 +357,7 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, tokens, brand, ass
           return (
             <UiCinema
               src={assets[0]}
+              sources={assetUrls}
               sequence={scene.uiSequence}
               tokens={tokens}
               words={text}

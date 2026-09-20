@@ -118,7 +118,18 @@ export async function runHeroShot(
     if (!scene.uiSequence) continue;
     const assetId = scene.assetRefs[0];
     if (!assetId) continue;
-    for (const framing of scene.uiSequence.framings) taken.push({ assetId, rect: framing.to });
+    for (const framing of scene.uiSequence.framings) {
+      /*
+       * What a shot showed, not what rectangle it used. A spatial shot does
+       * not crop — its rectangle is the whole capture — so what the audience
+       * actually saw is the panels it hung in the space.
+       */
+      if (framing.space === 'volume' && framing.layers.length > 0) {
+        for (const layer of framing.layers) taken.push({ assetId: layer.assetId ?? assetId, rect: layer.rect });
+        continue;
+      }
+      taken.push({ assetId, rect: framing.to });
+    }
   }
 
   const search = searchHeroShots(
@@ -178,6 +189,10 @@ export async function runHeroShot(
     sceneId: host.id,
     assetId: chosen.assetId,
     framing: { ...chosen.framing, seconds: Math.min(HERO_SECONDS, host.duration) },
+    sourceWidth: chosen.sourceWidth,
+    sourceHeight: chosen.sourceHeight,
+    background: chosen.background,
+    mechanism: chosen.mechanism,
     considered: search.considered,
     shortlisted: shortlist.length,
     score: chosen.score,
@@ -215,9 +230,18 @@ export function withHeroShot(storyboard: Storyboard, record: HeroShotRecord): St
     heroShot: record,
     scenes: storyboard.scenes.map((scene) => {
       if (scene.id !== record.sceneId) return scene;
-      const rest = (scene.uiSequence?.framings ?? []).filter(
-        (framing) => framing.role !== 'establish' && framing.role !== 'subject',
-      );
+      /*
+       * What the scene was going to show after its subject survives — but
+       * only when the hero is a frame of the same capture. Framings are
+       * rectangles of a specific picture; carried across to another one they
+       * are rectangles of nothing in particular.
+       */
+      const sameCapture = scene.assetRefs[0] === record.assetId && scene.uiSequence !== null;
+      const rest = sameCapture
+        ? scene.uiSequence!.framings.filter(
+            (framing) => framing.role !== 'establish' && framing.role !== 'subject',
+          )
+        : [];
       const left = Math.max(0, scene.duration - record.framing.seconds);
       const share = rest.length > 0 ? left / rest.reduce((sum, framing) => sum + framing.seconds, 0) : 0;
       const assetRefs = scene.assetRefs.includes(record.assetId)
@@ -227,16 +251,16 @@ export function withHeroShot(storyboard: Storyboard, record: HeroShotRecord): St
         ...scene,
         assetRefs,
         uiSequence: {
-          sourceWidth: scene.uiSequence?.sourceWidth ?? 0,
-          sourceHeight: scene.uiSequence?.sourceHeight ?? 0,
-          background: scene.uiSequence?.background ?? { r: 0, g: 0, b: 0 },
+          sourceWidth: record.sourceWidth,
+          sourceHeight: record.sourceHeight,
+          background: record.background,
           framings: [
             record.framing,
             ...(share > 0.15
               ? rest.map((framing) => ({ ...framing, seconds: framing.seconds * share, cut: true }))
               : []),
           ],
-          notes: scene.uiSequence?.notes ?? [],
+          notes: sameCapture ? scene.uiSequence!.notes : [],
         },
       } satisfies Scene;
     }),

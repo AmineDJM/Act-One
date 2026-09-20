@@ -32,6 +32,7 @@ export async function readUiStructure(
   bytes: Uint8Array,
   options: { analysisWidth?: number } = {},
 ): Promise<UiStructure> {
+  const controls = await findControls(bytes).catch(() => [] as UiRegion[]);
   const width = options.analysisWidth ?? 260;
   /*
    * The size that is reported is the capture's, not the analysis raster's.
@@ -102,7 +103,7 @@ export async function readUiStructure(
     .filter((region) => region.width * region.height >= MIN_REGION_AREA)
     .sort((left, right) => right.weight - left.weight);
 
-  return { width: source.width ?? info.width, height: source.height ?? info.height, background, regions };
+  return { width: source.width ?? info.width, height: source.height ?? info.height, background, regions, controls };
 }
 
 type Box = { ink: Uint8Array; w: number; h: number; x0: number; y0: number; x1: number; y1: number };
@@ -253,4 +254,212 @@ function modalColour(
     g: Math.round(best.g / Math.max(1, best.n)),
     b: Math.round(best.b / Math.max(1, best.n)),
   };
+}
+
+/**
+ * The product's own primary actions.
+ *
+ * Everything above finds panels — areas of the screen with work in them. A
+ * panel is not a thing you can press, and a shot that wants to show software
+ * being operated needs the thing that takes the action, not the region it
+ * lives in.
+ *
+ * Those are findable without a DOM, because of a convention every modern
+ * interface follows: the primary action is a solid block of the brand's
+ * colour, and nothing else on a working screen is a solid block of anything
+ * saturated. Charts are thin, avatars are photographic, badges are pale,
+ * type is not solid. So: quantise, keep the chromatic pixels, join them into
+ * components, and keep the ones that are filled rectangles of button size and
+ * button proportion.
+ *
+ * What comes back is a rectangle of the REAL capture, like everything else
+ * here. It is never drawn over, recoloured or replaced; the only thing being
+ * decided is where a shot may say "this is the thing that acts".
+ */
+
+/** Below this, a colour is interface grey rather than a brand. */
+const CHROMA = 42;
+/** A control is at least this fraction of the capture, and at most this. */
+const MIN_CONTROL_AREA = 0.0004;
+const MAX_CONTROL_AREA = 0.045;
+/** Buttons are wider than tall, and not endlessly so. */
+const MIN_ASPECT = 1.2;
+const MAX_ASPECT = 9;
+/**
+ * What actually distinguishes a button: its rim.
+ *
+ * Two wrong tests came before this one and both are worth keeping a note of.
+ * "Mostly the colour" found nothing, because a filled button carries a white
+ * label, so the coloured component is a ring with a word-shaped hole and
+ * fills about two fifths of its own box. "The box is entirely colour or
+ * white" found nothing either, because at analysis scale a third of the box
+ * is the anti-aliased blend between the two and is neither.
+ *
+ * The rim is immune to both. A filled control is a solid block, so its
+ * outline is unbroken colour the whole way round whatever is written on it,
+ * and nothing else on a working screen has that property: a chart is open, an
+ * avatar is photographic, a badge is pale, a heading is letters.
+ */
+const MIN_RIM = 0.72;
+/** And enough of the box is the colour that it is a block rather than an outline. */
+const MIN_COLOUR = 0.4;
+
+export async function findControls(
+  bytes: Uint8Array,
+  options: { analysisWidth?: number } = {},
+): Promise<UiRegion[]> {
+  const width = options.analysisWidth ?? 420;
+  const { data, info } = await sharp(Buffer.from(bytes))
+    .resize({ width, withoutEnlargement: true })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const w = info.width;
+  const h = info.height;
+  const channels = info.channels;
+
+  /*
+   * Colour identity, not colour value.
+   *
+   * Two pixels of the same button differ by a few units from anti-aliasing
+   * and from whatever gradient the designer used, so joining on exact colour
+   * finds a hundred one-pixel components. Quantising to a coarse bucket makes
+   * a button one colour and keeps it distinct from a different brand colour
+   * eighty units away.
+   */
+  const key = new Int16Array(w * h).fill(-1);
+  for (let p = 0; p < w * h; p += 1) {
+    const i = p * channels;
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+    if (chroma < CHROMA) continue;
+    key[p] = ((r >> 5) << 6) | ((g >> 5) << 3) | (b >> 5);
+  }
+
+  type Found = { colour: number; x0: number; y0: number; x1: number; y1: number; count: number };
+  const seen = new Uint8Array(w * h);
+  const parts: Found[] = [];
+  const stack: number[] = [];
+  for (let start = 0; start < w * h; start += 1) {
+    if (seen[start] || key[start] === -1) continue;
+    const colour = key[start]!;
+    const part: Found = { colour, x0: w, y0: h, x1: 0, y1: 0, count: 0 };
+    stack.length = 0;
+    stack.push(start);
+    seen[start] = 1;
+    while (stack.length > 0) {
+      const p = stack.pop()!;
+      const px = p % w;
+      const py = (p / w) | 0;
+      part.count += 1;
+      if (px < part.x0) part.x0 = px;
+      if (px + 1 > part.x1) part.x1 = px + 1;
+      if (py < part.y0) part.y0 = py;
+      if (py + 1 > part.y1) part.y1 = py + 1;
+      /*
+       * Eight-connected, because a one-pixel diagonal is what a rounded
+       * corner is at this scale, and four-connectivity cuts a button into
+       * four pieces at its corners.
+       */
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = px + dx;
+          const ny = py + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const n = ny * w + nx;
+          if (seen[n] || key[n] !== colour) continue;
+          seen[n] = 1;
+          stack.push(n);
+        }
+      }
+    }
+    if (part.count > 2) parts.push(part);
+  }
+
+  /*
+   * A label splits the ring.
+   *
+   * "Schedule" in white across a purple button leaves the colour above the
+   * word and below it as two components that a person would never call two
+   * things. Same colour, touching boxes, one control.
+   */
+  const merged: Found[] = [];
+  for (const part of parts.sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)) {
+    const host = merged.find(
+      (other) =>
+        other.colour === part.colour &&
+        part.x0 <= other.x1 + 2 &&
+        other.x0 <= part.x1 + 2 &&
+        part.y0 <= other.y1 + 2 &&
+        other.y0 <= part.y1 + 2,
+    );
+    if (!host) {
+      merged.push({ ...part });
+      continue;
+    }
+    host.x0 = Math.min(host.x0, part.x0);
+    host.y0 = Math.min(host.y0, part.y0);
+    host.x1 = Math.max(host.x1, part.x1);
+    host.y1 = Math.max(host.y1, part.y1);
+    host.count += part.count;
+  }
+
+  const found: UiRegion[] = [];
+  for (const part of merged) {
+    const bw = part.x1 - part.x0;
+    const bh = part.y1 - part.y0;
+    if (bw <= 0 || bh <= 0) continue;
+    const area = (bw * bh) / (w * h);
+    const aspect = bw / bh;
+    if (area < MIN_CONTROL_AREA || area > MAX_CONTROL_AREA) continue;
+    if (aspect < MIN_ASPECT || aspect > MAX_ASPECT) continue;
+
+    let colour = 0;
+    for (let y = part.y0; y < part.y1; y += 1) {
+      for (let x = part.x0; x < part.x1; x += 1) {
+        if (key[y * w + x] === part.colour) colour += 1;
+      }
+    }
+    if (colour / (bw * bh) < MIN_COLOUR) continue;
+
+    /*
+     * The outline, one pixel in from the box, so a rounded corner and the
+     * half-pixel the resize smeared do not count against a solid control.
+     */
+    let rim = 0;
+    let edge = 0;
+    for (let x = part.x0; x < part.x1; x += 1) {
+      for (const y of [part.y0, part.y1 - 1, part.y0 + 1, part.y1 - 2]) {
+        if (y < part.y0 || y >= part.y1) continue;
+        edge += 1;
+        if (key[y * w + x] === part.colour) rim += 1;
+      }
+    }
+    for (let y = part.y0; y < part.y1; y += 1) {
+      for (const x of [part.x0, part.x1 - 1]) {
+        if (x < part.x0 || x >= part.x1) continue;
+        edge += 1;
+        if (key[y * w + x] === part.colour) rim += 1;
+      }
+    }
+    if (edge === 0 || rim / edge < MIN_RIM) continue;
+
+    found.push({
+      x: Number((part.x0 / w).toFixed(4)),
+      y: Number((part.y0 / h).toFixed(4)),
+      width: Number((bw / w).toFixed(4)),
+      height: Number((bh / h).toFixed(4)),
+      // A control's weight is how much of the screen it claims; its density
+      // is one, because being solid is the property that found it.
+      weight: Number(area.toFixed(4)),
+      density: 1,
+    });
+  }
+
+  // Biggest first: the primary action is drawn bigger than the secondary one,
+  // which is the same convention that made it findable at all.
+  return found.sort((left, right) => right.width * right.height - left.width * left.height).slice(0, 12);
 }

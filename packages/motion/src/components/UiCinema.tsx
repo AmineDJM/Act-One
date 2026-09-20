@@ -4,6 +4,7 @@ import type { DesignTokens } from '@act-one/design';
 import type { EasingName, FramingRect, UiFraming, UiSequence, WordCorner } from '@act-one/core';
 import { ease, exitProgress, progress } from '../easing.ts';
 import { WordReveal } from './Type.tsx';
+import { LayeredShot, VolumeShot, plateGeometry } from './UiLayers.tsx';
 
 /**
  * The product, filmed.
@@ -22,6 +23,8 @@ import { WordReveal } from './Type.tsx';
  */
 export type UiCinemaProps = {
   src: string;
+  /** Every asset the film resolved, for a shot whose layers come from several captures. */
+  sources?: Record<string, string>;
   sequence: UiSequence;
   tokens: DesignTokens;
   /** The scene's on-screen line, set into the composition rather than onto a card. */
@@ -29,7 +32,7 @@ export type UiCinemaProps = {
   easing?: EasingName;
 };
 
-export const UiCinema: React.FC<UiCinemaProps> = ({ src, sequence, tokens, words, easing }) => {
+export const UiCinema: React.FC<UiCinemaProps> = ({ src, sources, sequence, tokens, words, easing }) => {
   const { fps } = useVideoConfig();
 
   let cursor = 0;
@@ -43,6 +46,7 @@ export const UiCinema: React.FC<UiCinemaProps> = ({ src, sequence, tokens, words
           <Sequence key={index} from={from} durationInFrames={frames} name={`${index + 1}. ${framing.role}`}>
             <Shot
               src={src}
+              sources={sources}
               sequence={sequence}
               framing={framing}
               tokens={tokens}
@@ -62,13 +66,14 @@ const CUT_IN_SECONDS = 0.22;
 
 const Shot: React.FC<{
   src: string;
+  sources?: Record<string, string>;
   sequence: UiSequence;
   framing: UiFraming;
   tokens: DesignTokens;
   words?: string;
   easing?: EasingName;
   last: boolean;
-}> = ({ src, sequence, framing, tokens, words, easing, last }) => {
+}> = ({ src, sources, sequence, framing, tokens, words, easing, last }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
@@ -82,20 +87,36 @@ const Shot: React.FC<{
    */
   const curve: EasingName =
     framing.move === 'lateral' ? 'linear' : framing.move === 'hold' ? 'linear' : (easing ?? 'out_quint');
-  const t = ease(curve, progress(frame, fps, { durationSeconds: framing.seconds }));
+  /*
+   * The camera's clock.
+   *
+   * Normally the whole beat. But when the shot is built around something the
+   * product itself brings on screen, the frame moves on THAT thing's timing
+   * rather than on the shot's — the camera opens out exactly as the toast
+   * rises, so the hole it is opening onto is never in shot on its own. A move
+   * timed to the subject instead of to the slot is the difference between a
+   * shot and a slide advancing.
+   */
+  const arriving =
+    framing.layers.find((layer) => layer.role === 'overlay' && layer.motion !== 'hold') ??
+    framing.layers.find((layer) => layer.role === 'control' && layer.motion !== 'hold');
+  const t = arriving
+    ? ease('out_expo', progress(frame, fps, {
+        delaySeconds: arriving.delaySeconds,
+        durationSeconds: arriving.durationSeconds,
+      }))
+    : ease(curve, progress(frame, fps, { durationSeconds: framing.seconds }));
   const rect = lerpRect(framing.from, framing.to, t);
 
   // Place the capture so `rect` exactly fills the frame. Nothing is letterboxed
   // and nothing is stretched: the crop was planned at the frame's own aspect.
-  const imageWidth = width / Math.max(0.02, rect.width);
-  const imageHeight = imageWidth * (sequence.sourceHeight / sequence.sourceWidth);
-  const left = -rect.x * imageWidth;
-  const top = -rect.y * imageHeight;
+  const geometry = plateGeometry(sequence, rect, width, height);
+  const { imageWidth, imageHeight, left, top } = geometry;
 
   const cutIn = framing.cut ? ease('out_quint', progress(frame, fps, { durationSeconds: CUT_IN_SECONDS })) : 1;
   const out = last ? exitProgress(frame, fps, framing.seconds, 0.3) : 0;
 
-  const lift = framing.lift ? onScreen(framing.lift, rect, width, height) : null;
+  const lift = framing.lift ? geometry.onScreen(framing.lift) : null;
   /*
    * Depth is applied to the plate, not to the lifted panel.
    *
@@ -106,6 +127,44 @@ const Shot: React.FC<{
    * 3D and no drawn arrow to say "look here".
    */
   const liftIn = lift ? ease('out_expo', progress(frame, fps, { delaySeconds: 0.12, durationSeconds: 0.5 })) : 0;
+
+  /*
+   * Three kinds of shot, in order of how much of the interface is moving.
+   *
+   * A volume is the interface in a constructed space. Layers are the
+   * interface taken apart in the frame. Neither is a default: most shots are
+   * the third kind, a camera on a plate, and a film that reached for the
+   * volume every time would be as templated as one that never did.
+   */
+  if (framing.space === 'volume' && framing.layers.length > 0) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: 1 - out }}>
+        <VolumeShot src={src} sources={sources} sequence={sequence} framing={framing} tokens={tokens} words={words} easing={easing} />
+        {words && framing.words !== 'none' && !framing.wordsBehind ? (
+          <WordsInFrame corner={framing.words} tokens={tokens} words={words} seconds={framing.seconds} easing={easing} />
+        ) : null}
+      </div>
+    );
+  }
+
+  if (framing.layers.length > 0) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: 1 - out, transform: `scale(${1 + (1 - cutIn) * 0.02})` }}>
+        <LayeredShot src={src} sequence={sequence} framing={framing} crop={rect} tokens={tokens} easing={easing} />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            background: 'radial-gradient(120% 110% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.26) 100%)',
+          }}
+        />
+        {words && framing.words !== 'none' ? (
+          <WordsInFrame corner={framing.words} tokens={tokens} words={words} seconds={framing.seconds} easing={easing} />
+        ) : null}
+      </div>
+    );
+  }
 
   const plate = (
     <Img
@@ -294,20 +353,5 @@ function lerpRect(from: FramingRect, to: FramingRect, t: number): FramingRect {
     y: from.y + (to.y - from.y) * t,
     width: from.width + (to.width - from.width) * t,
     height: from.height + (to.height - from.height) * t,
-  };
-}
-
-/** Where a rectangle of the source lands in the frame, given the crop the frame holds. */
-function onScreen(
-  rect: FramingRect,
-  crop: FramingRect,
-  width: number,
-  height: number,
-): { x: number; y: number; width: number; height: number } {
-  return {
-    x: ((rect.x - crop.x) / crop.width) * width,
-    y: ((rect.y - crop.y) / crop.height) * height,
-    width: (rect.width / crop.width) * width,
-    height: (rect.height / crop.height) * height,
   };
 }

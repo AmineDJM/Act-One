@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SoundCue } from './storyboard.ts';
 
 /**
  * How a product screenshot becomes shots.
@@ -51,6 +52,17 @@ export const UiStructure = z.object({
   background: z.object({ r: z.number(), g: z.number(), b: z.number() }),
   /** Regions, strongest first. */
   regions: z.array(UiRegion).default([]),
+  /**
+   * Filled, saturated blocks: the product's own primary actions.
+   *
+   * A panel is where work happens; a control is the thing that takes the
+   * action. Knowing the difference is what lets a shot press a button rather
+   * than gesture at the area a button is somewhere inside, and it is
+   * recoverable because every modern interface draws its primary action as a
+   * solid block of the brand's colour and nothing else on the screen looks
+   * like that.
+   */
+  controls: z.array(UiRegion).default([]),
 });
 export type UiStructure = z.infer<typeof UiStructure>;
 
@@ -84,6 +96,109 @@ export type FramingRole = z.infer<typeof FramingRole>;
 export const WordCorner = z.enum(['none', 'top_left', 'top_right', 'bottom_left', 'bottom_right']);
 export type WordCorner = z.infer<typeof WordCorner>;
 
+
+/**
+ * What a layer of an interface is.
+ *
+ * The first version of this module moved a camera across a still. That is a
+ * real improvement on showing the whole still, and it is still one object:
+ * whatever the camera does, every pixel on screen moves together, which is
+ * the tell that what you are watching is a photograph of software rather than
+ * software.
+ *
+ * An interface is not one object. It is a shell with things on it, and the
+ * product itself already treats them as separate — a drawer slides, a toast
+ * arrives, a modal comes forward and pushes the page back. Those are the
+ * product's own motion semantics, and they are recoverable, because the
+ * structure pass already found where the parts are.
+ *
+ * So a shot can hold the same capture several times over, each copy masked to
+ * one part, each moving on its own. Every pixel is still the customer's real
+ * interface at its real scale. Nothing is redrawn. What changes is that the
+ * interface stops being a picture and starts being a set of objects, which is
+ * the whole difference between a camera move and motion design.
+ */
+export const LayerRole = z.enum([
+  /** The interface itself: the ground everything else sits on. */
+  'shell',
+  /** A working region — the part of the screen the shot is about. */
+  'panel',
+  /** Something the product draws on top of itself: a toast, a drawer, a modal. */
+  'overlay',
+  /** A control that is acted on: a filled button, a primary action. */
+  'control',
+  /** The application's own furniture. */
+  'navigation',
+]);
+export type LayerRole = z.infer<typeof LayerRole>;
+
+export const LayerMotion = z.enum([
+  /** Locked to the shell: part of the picture. */
+  'hold',
+  /** Falls back in depth, softens and darkens, so something else can be read. */
+  'recede',
+  /** Comes forward and takes the frame. */
+  'advance',
+  /** Arrives the way the product draws it, from its own edge. */
+  'emerge',
+  /** Travels at a different rate to the shell, which is what makes depth read as depth. */
+  'parallax',
+  /** Is pressed: the real control takes the action, briefly and physically. */
+  'press',
+]);
+export type LayerMotion = z.infer<typeof LayerMotion>;
+
+/** Which edge a layer arrives from — the product's own direction, not a default. */
+export const LayerFrom = z.enum(['below', 'above', 'left', 'right', 'behind']);
+export type LayerFrom = z.infer<typeof LayerFrom>;
+
+export const UiLayer = z.object({
+  role: LayerRole,
+  motion: LayerMotion,
+  /** The rectangle of the SOURCE this layer is, normalised to the capture. */
+  rect: FramingRect,
+  /** Where it sits in depth: negative is behind the shell, positive in front. */
+  depth: z.number().min(-1).max(1).default(0),
+  /** Seconds into the framing before it moves. What makes choreography rather than a cue. */
+  delaySeconds: z.number().min(0).max(10).default(0),
+  durationSeconds: z.number().min(0.1).max(10).default(0.8),
+  from: LayerFrom.default('below'),
+  /**
+   * Which capture this layer is cut from, when it is not the shot's own.
+   *
+   * A volume can hold panels from several captures at once — four product
+   * surfaces at four depths is the film showing the four things it just
+   * claimed, rather than setting their names in type. Null means the shot's
+   * own capture, which is every other case.
+   */
+  assetId: z.string().nullable().default(null),
+  sourceWidth: z.number().int().positive().nullable().default(null),
+  sourceHeight: z.number().int().positive().nullable().default(null),
+  /**
+   * True when the shell must be cut away where this layer sits.
+   *
+   * An overlay that arrives is already drawn in the capture underneath it, so
+   * without the hole the toast is on screen before it slides in — the shot
+   * shows the result, then shows it arriving. The hole is what makes an
+   * emergence honest rather than a duplicate.
+   */
+  knockout: z.boolean().default(false),
+});
+export type UiLayer = z.infer<typeof UiLayer>;
+
+/**
+ * Where the shot happens.
+ *
+ * `flat` is the frame filled by the interface, which is the right answer
+ * almost always. `volume` puts the real panels in a constructed space with a
+ * camera that moves through them — the one place this system builds an
+ * environment rather than finding one. Everything in the environment is
+ * generated from the brand and the capture's own colour; everything that is
+ * the product is the product, at its own scale, unfiltered.
+ */
+export const ShotSpace = z.enum(['flat', 'volume']);
+export type ShotSpace = z.infer<typeof ShotSpace>;
+
 export const UiFraming = z.object({
   role: FramingRole,
   move: FramingMove,
@@ -104,6 +219,23 @@ export const UiFraming = z.object({
   words: WordCorner.default('none'),
   /** Which source region this framing was built around, for tracing and QA. */
   around: FramingRect.nullable().default(null),
+  /**
+   * The interface taken apart.
+   *
+   * Empty means the shot is the camera on a still, which is what every
+   * framing was until layers existed and is still right for an establishing
+   * frame. Non-empty means the parts move independently, and the renderer
+   * draws the capture once per layer rather than once.
+   */
+  layers: z.array(UiLayer).default([]),
+  space: ShotSpace.default('flat'),
+  /**
+   * Whether the type is set behind the product rather than over it.
+   *
+   * Only in a volume, where there is a behind. A word the interface passes in
+   * front of is a word that is part of the scene rather than a caption on it.
+   */
+  wordsBehind: z.boolean().default(false),
 });
 export type UiFraming = z.infer<typeof UiFraming>;
 
@@ -156,6 +288,19 @@ const BANNER_TOP = 0.28;
 const RESULT_TOP = 0.55;
 const RESULT_HEIGHT = 0.2;
 
+/**
+ * How much of the interface this shot is allowed to move.
+ *
+ * Not a quality setting. A film in which every product shot takes the
+ * interface apart is as templated as one in which none of them does, and it
+ * is worse, because the trick stops being a trick the second time. The
+ * ambition is assigned by where the shot sits in the film: plain while the
+ * film is still establishing what it is looking at, layered once the language
+ * is earned, expanded once — at the place the film is building toward.
+ */
+export const ShotAmbition = z.enum(['plain', 'layered', 'expanded']);
+export type ShotAmbition = z.infer<typeof ShotAmbition>;
+
 export type PlanUiOptions = {
   /** How long the whole shot runs. */
   seconds: number;
@@ -165,6 +310,7 @@ export type PlanUiOptions = {
   renderWidth: number;
   /** True when the scene carries on-screen words that have to live in the picture. */
   hasWords?: boolean;
+  ambition?: ShotAmbition;
 };
 
 /**
@@ -250,6 +396,24 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
   const action = pickAction(usable, [subject, result]);
   const context = pickContext(usable, [subject, result, action]);
 
+  const ambition = options.ambition ?? 'plain';
+  /*
+   * Cause, action, result — in one shot rather than three.
+   *
+   * When the capture holds a real control and a real result, the strongest
+   * thing the film can do with it is not to cut between them. It is to frame
+   * both, press the control, and let the confirmation arrive: the viewer
+   * watches the software do the thing instead of being shown the before and
+   * the after. That only works when the two are close enough to share a
+   * frame at the fidelity the capture can carry, so it is a question with an
+   * answer rather than a preference.
+   */
+  const control = pickControl(structure, action ?? subject);
+  const operable =
+    ambition !== 'plain' && control !== null && result !== null
+      ? actionFrame(control, result, structure, frameAspect, floor)
+      : null;
+
   /*
    * Which beats the shot has room for.
    *
@@ -259,12 +423,18 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
    */
   const beats: { role: FramingRole; region: UiRegion | null }[] = [{ role: 'establish', region: null }];
   const room = Math.floor(options.seconds / 1.5);
-  const candidates: { role: FramingRole; region: UiRegion | null }[] = [
-    { role: 'subject', region: subject },
-    { role: 'action', region: action },
-    { role: 'result', region: result },
-    { role: 'context', region: context },
-  ];
+  const candidates: { role: FramingRole; region: UiRegion | null }[] = operable
+    ? [
+        { role: 'subject', region: subject },
+        { role: 'action', region: action },
+        { role: 'context', region: context },
+      ]
+    : [
+        { role: 'subject', region: subject },
+        { role: 'action', region: action },
+        { role: 'result', region: result },
+        { role: 'context', region: context },
+      ];
   for (const candidate of candidates) {
     if (beats.length >= Math.max(2, Math.min(4, room))) break;
     if (!candidate.region) continue;
@@ -316,7 +486,37 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
       return;
     }
 
-    const target = frameOn(beat.region, structure, frameAspect, floor);
+    /*
+     * The one shot where the film's language opens out.
+     *
+     * Three real panels in a constructed space, with the words behind them.
+     * It is reserved for a single beat because it is the only shot here that
+     * builds an environment rather than finding one, and a film that reached
+     * for it twice would have made it a template the second time.
+     */
+    if (ambition === 'expanded' && beat.role === 'subject' && volumePanels(usable).length >= 3) {
+      const panels = volumePanels(usable).map((region) => ({ rect: clampRect(region) }));
+      framings.push(
+        UiFraming.parse({
+          role: 'subject',
+          move: 'hold',
+          from: { x: 0, y: 0, width: 1, height: 1 },
+          to: { x: 0, y: 0, width: 1, height: 1 },
+          seconds,
+          cut: true,
+          space: 'volume',
+          wordsBehind: options.hasWords === true,
+          words: options.hasWords ? 'bottom_left' : 'none',
+          around: clampRect(beat.region),
+          layers: volumeLayers(panels, seconds),
+        }),
+      );
+      previous = full;
+      return;
+    }
+
+    const operating = operable !== null && beat.role === 'action';
+    const target = operating ? operable! : frameOn(beat.region, structure, frameAspect, floor);
     /*
      * Move or cut.
      *
@@ -327,11 +527,49 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
      */
     const lateral = previous !== null && sameBand(previous, target);
     const openWide = widen(target, floor, frameAspect, structure, PUSH_FROM);
+    /*
+     * What moves inside the frame.
+     *
+     * Plain shots move the camera and nothing else, which is right while the
+     * film is still saying what it is looking at. Once the language is
+     * earned, the interface comes apart: the shell falls back and softens so
+     * the panel the shot is about can hold the eye at its own scale, and
+     * where the capture supports it the control takes the action and the
+     * confirmation arrives out of a hole cut in the shell.
+     */
+    const layers: UiLayer[] =
+      operating && control && result
+        ? operateLayers(control, result, seconds)
+        : ambition === 'plain' || beat.role === 'context'
+          ? []
+          : isolateLayers(beat.region, seconds);
+
     framings.push(
       UiFraming.parse({
         role: beat.role,
-        move: lateral ? 'lateral' : beat.role === 'result' ? 'hold' : 'push',
-        from: lateral ? previous! : beat.role === 'result' ? target : openWide,
+        move: operating
+          ? 'pull'
+          : lateral
+            ? 'lateral'
+            : beat.role === 'result'
+              ? 'hold'
+              : 'push',
+        /*
+         * The frame finds the confirmation.
+         *
+         * The shot opens framed above the result, on the control, and drops
+         * onto the result once the press has happened. A camera that already
+         * knew where to look would be a camera that had seen the outcome
+         * before it occurred, which is how every automated product film
+         * shoots this and why none of them feel like anything is happening.
+         */
+        from: operating
+          ? aboveResult(target, result!, structure, frameAspect)
+          : lateral
+            ? previous!
+            : beat.role === 'result'
+              ? target
+              : openWide,
         to: target,
         seconds,
         cut: !lateral,
@@ -339,10 +577,13 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
          * Depth, only where it means something. The result is the one part of
          * a screen a film is allowed to lift off the interface, because that
          * is what the interface itself is doing: the toast is already on top.
+         * Superseded by layers when there are any — a lifted still and a
+         * moving one are two answers to the same question.
          */
-        lift: beat.role === 'result' ? clampRect(beat.region) : null,
+        lift: layers.length === 0 && beat.role === 'result' ? clampRect(beat.region) : null,
         words: options.hasWords && index === 1 ? quietCorner(structure, target) : 'none',
         around: clampRect(beat.region),
+        layers,
       }),
     );
     previous = target;
@@ -363,6 +604,242 @@ export function planUiSequence(structure: UiStructure, options: PlanUiOptions): 
     framings,
     notes,
   });
+}
+
+/**
+ * The shell falls back so one panel can be read.
+ *
+ * Two copies of the same pixels: the whole interface, receding and softening,
+ * and the panel, holding its scale and its sharpness. Nothing is redrawn and
+ * nothing is invented; what changes is that the interface stops being one
+ * object, which is the difference between a camera move and motion design.
+ */
+export function isolateLayers(region: UiRegion, seconds: number): UiLayer[] {
+  return [
+    UiLayer.parse({
+      role: 'shell',
+      motion: 'recede',
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      depth: -0.5,
+      delaySeconds: 0.1,
+      durationSeconds: Math.min(1.5, seconds * 0.6),
+    }),
+    UiLayer.parse({
+      role: 'panel',
+      motion: 'advance',
+      rect: clampRect(region),
+      depth: 0.35,
+      delaySeconds: 0.1,
+      durationSeconds: Math.min(1.6, seconds * 0.7),
+      /*
+       * Cut out of the shell, and safe to cut.
+       *
+       * A shell that recedes takes its own copy of this panel with it, and
+       * the two separate: the sharp one stays where the eye is and the soft
+       * one drifts up behind it, which reads as a printing error rather than
+       * as depth. The hole fixes it, and here the hole can never be seen —
+       * the panel scales about its own centre and so covers its own gap for
+       * every frame it exists. That is exactly the property an arriving
+       * overlay does not have, which is why this one is allowed and that one
+       * is not.
+       */
+      knockout: true,
+    }),
+  ];
+}
+
+/**
+ * The software doing the thing.
+ *
+ * Cause, action, result, in one shot: the screen, the control taking the
+ * press, and the confirmation. What it does NOT do is slide the confirmation
+ * in, and the reason is worth writing down because it took building the slide
+ * to see it.
+ *
+ * A capture is one moment. The confirmation is burned into it, sitting on top
+ * of whatever it covers — a table row, a list, we have no idea. To animate it
+ * arriving you have to hide it first, and hiding it means painting something
+ * where it was. Every arrangement of that ends in the same place: either a
+ * rectangle of invented interface, or a hole that sits in the picture for a
+ * third of a second waiting to be filled. Both are lies, and one of them is
+ * also ugly. (The type still carries `emerge` and `knockout`, because with
+ * two captures of the same screen — one before, one after — the arrival is
+ * real and this is exactly how to shoot it.)
+ *
+ * What is true of one capture: the camera does not know where the
+ * confirmation is until it looks, and the confirmation is on top of the
+ * interface rather than in it. So the frame starts above it, the control is
+ * pressed, the frame opens down onto the result, and as it lands the
+ * interface falls back and the confirmation lifts off it. Nothing is invented
+ * and it still reads as software responding — because that is what the
+ * camera and the compositor are for.
+ */
+export function operateLayers(control: UiRegion, result: UiRegion, seconds: number): UiLayer[] {
+  const press = Math.min(seconds * 0.32, 1.0);
+  const land = press + 0.28;
+  return [
+    UiLayer.parse({
+      role: 'shell',
+      motion: 'recede',
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      depth: -0.35,
+      delaySeconds: land,
+      durationSeconds: Math.max(0.5, Math.min(1.1, seconds - land)),
+    }),
+    UiLayer.parse({
+      role: 'control',
+      motion: 'press',
+      rect: clampRect(control),
+      depth: 0.1,
+      delaySeconds: press,
+      durationSeconds: 0.55,
+      // A press returns to where it started, so it covers its own hole too.
+      knockout: true,
+    }),
+    UiLayer.parse({
+      role: 'overlay',
+      motion: 'advance',
+      rect: clampRect(result),
+      depth: 0.55,
+      delaySeconds: land,
+      durationSeconds: Math.max(0.4, Math.min(0.9, seconds - land)),
+      knockout: true,
+    }),
+  ];
+}
+
+/**
+ * The product's own primary action, where the shot is looking.
+ *
+ * Prefers a control inside the region the shot is about, because a button
+ * somewhere else on the screen is a button in another story. Falls back to
+ * the biggest one on the capture, and to nothing at all — a screen with no
+ * filled action cannot be shown being operated, and saying so is better than
+ * pressing a panel.
+ */
+export function pickControl(structure: UiStructure, within: UiRegion | null): UiRegion | null {
+  if (structure.controls.length === 0) return null;
+  if (within) {
+    const inside = structure.controls.filter(
+      (control) =>
+        control.x + control.width / 2 >= within.x &&
+        control.x + control.width / 2 <= within.x + within.width &&
+        control.y + control.height / 2 >= within.y &&
+        control.y + control.height / 2 <= within.y + within.height,
+    );
+    if (inside.length > 0) return inside[0]!;
+  }
+  return structure.controls[0]!;
+}
+
+/**
+ * Which regions can stand up as objects in a space.
+ *
+ * Not the heaviest three. A volume shows panels as things, and a thing has to
+ * have proportions: the widest and shortest region on a screen is a header
+ * strip, and hung in space at an angle it reads as a ruler. Anything too
+ * small to carry its own content at panel size is out for the same reason —
+ * the shot would be three postage stamps floating in a room.
+ */
+export function volumePanels(regions: readonly UiRegion[]): UiRegion[] {
+  return regions
+    .filter((region) => {
+      const aspect = region.width / Math.max(1e-6, region.height);
+      return region.width * region.height >= 0.03 && aspect >= 0.45 && aspect <= 3.6;
+    })
+    .slice(0, 3);
+}
+
+/**
+ * Real panels, in a constructed space.
+ *
+ * Three at most: beyond that it stops reading as depth and starts reading as
+ * clutter, which is the failure mode of every "spatial UI" template ever
+ * made. They arrive in order, nearest first, so the shot builds rather than
+ * appearing assembled — and each one may come from a different capture, which
+ * is what lets a beat that would otherwise have set four module names in type
+ * show the four modules instead.
+ */
+export function volumeLayers(
+  panels: readonly { rect: FramingRect; assetId?: string; sourceWidth?: number; sourceHeight?: number }[],
+  seconds: number,
+): UiLayer[] {
+  const depths = [0.25, -0.3, -0.72];
+  return panels.slice(0, 3).map((panel, index) =>
+    UiLayer.parse({
+      role: 'panel',
+      motion: 'advance',
+      rect: panel.rect,
+      depth: depths[index] ?? -0.8,
+      delaySeconds: Math.min(seconds * 0.4, index * 0.28),
+      durationSeconds: Math.max(0.6, Math.min(1.4, seconds * 0.5)),
+      assetId: panel.assetId ?? null,
+      sourceWidth: panel.sourceWidth ?? null,
+      sourceHeight: panel.sourceHeight ?? null,
+    }),
+  );
+}
+
+/** The same frame, raised so the result sits just under its bottom edge. */
+function aboveResult(
+  seated: FramingRect,
+  result: UiRegion,
+  structure: UiStructure,
+  frameAspect: number,
+): FramingRect {
+  // A touch tighter as well as higher, so the move reads as the camera
+  // opening out rather than as a straight pan down.
+  const width = Math.max(0.02, seated.width * 0.94);
+  const height = cropHeight(width, structure, frameAspect);
+  return slideInside({
+    x: seated.x + seated.width / 2 - width / 2,
+    y: result.y - height,
+    width,
+    height,
+  });
+}
+
+/**
+ * The frame that holds the action and its result — with the result on the floor.
+ *
+ * Centring both would be the obvious composition and it is wrong, for a
+ * reason that only appears once you render it. The confirmation has to be cut
+ * out of the shell, or the shot shows the result and then shows it arriving;
+ * and a hole in the middle of a screen is a bright rectangle of nothing
+ * sitting in the picture for the third of a second before the toast fills it.
+ *
+ * Put the result flush against the bottom of the frame and the hole is not a
+ * hole any more, it is the edge — the toast rises into shot from under the
+ * frame line, which is both invisible as a trick and exactly how you would
+ * shoot it with a camera.
+ */
+export function actionFrame(
+  a: UiRegion,
+  b: UiRegion,
+  structure: UiStructure,
+  frameAspect: number,
+  floor: number,
+): FramingRect | null {
+  const x0 = Math.min(a.x, b.x);
+  const x1 = Math.max(a.x + a.width, b.x + b.width);
+  const y0 = Math.min(a.y, b.y);
+  const y1 = Math.max(a.y + a.height, b.y + b.height);
+  const width = Math.min(1, Math.max(floor, (x1 - x0) * 1.18));
+  const height = cropHeight(width, structure, frameAspect);
+  // Both have to actually fit, or the shot promises an action whose result is
+  // off screen. Wider is not an option: the frame is already at the aspect.
+  if (x1 - x0 > width + 0.001 || y1 - y0 > height + 0.001) return null;
+  const sit = Math.max(0.004, height * 0.012);
+  const rect = slideInside({
+    x: x0 + (x1 - x0) / 2 - width / 2,
+    y: b.y + b.height + sit - height,
+    width,
+    height,
+  });
+  // Sliding the frame down to seat the result must not push the control out
+  // of it; when it would, there is no shot here and the beats stay separate.
+  if (a.y < rect.y - 0.001 || a.y + a.height > rect.y + rect.height + 0.001) return null;
+  return rect;
 }
 
 /**
@@ -533,4 +1010,69 @@ export function quietCorner(structure: UiStructure, crop: FramingRect): WordCorn
     if (ink < best.ink) best = { name: corner.name, ink };
   }
   return best.name;
+}
+
+
+/**
+ * The sound the picture is already making.
+ *
+ * Every cue here comes off a decision the picture has already taken: a cut, a
+ * control being pressed, a panel landing, a camera opening into a space. That
+ * is the whole design. Sound written from the storyboard's words lands near
+ * the edit and misses it; sound written from the edit lands on it, because it
+ * is reading the same numbers the renderer is.
+ *
+ * Deliberately sparse. A cue on every event is a cartoon, so the cuts get the
+ * quietest marks, the press gets the only literal one, and the landing of the
+ * thing the shot is about gets the weight.
+ */
+export function cuesFor(sequence: UiSequence, startTime: number): SoundCue[] {
+  const cues: SoundCue[] = [];
+  let at = startTime;
+  for (const [index, framing] of sequence.framings.entries()) {
+    if (index > 0 && framing.cut) {
+      cues.push({ time: round(at), type: 'impact', assetId: null, intensity: 0.28, durationSeconds: null });
+    }
+    if (framing.move === 'lateral' || framing.move === 'pull') {
+      cues.push({ time: round(at), type: 'whoosh', assetId: null, intensity: 0.3, durationSeconds: null });
+    }
+    if (framing.space === 'volume') {
+      // A riser under the move into the space, so the opening out is heard
+      // as well as seen, and it resolves on the beat the panels have landed.
+      cues.push({
+        time: round(at),
+        type: 'riser',
+        assetId: null,
+        intensity: 0.5,
+        durationSeconds: Number((framing.seconds * 0.7).toFixed(2)),
+      });
+    }
+    for (const layer of framing.layers) {
+      if (layer.motion === 'press') {
+        // Where the press bottoms out, not where it starts.
+        cues.push({
+          time: round(at + layer.delaySeconds + layer.durationSeconds * 0.45),
+          type: 'ui_click',
+          assetId: null,
+          intensity: 0.62,
+          durationSeconds: null,
+        });
+      }
+      if ((layer.motion === 'advance' || layer.motion === 'emerge') && layer.role === 'overlay') {
+        cues.push({
+          time: round(at + layer.delaySeconds + layer.durationSeconds * 0.35),
+          type: 'impact',
+          assetId: null,
+          intensity: 0.55,
+          durationSeconds: null,
+        });
+      }
+    }
+    at += framing.seconds;
+  }
+  return cues.sort((left, right) => left.time - right.time);
+}
+
+function round(value: number): number {
+  return Number(Math.max(0, value).toFixed(3));
 }

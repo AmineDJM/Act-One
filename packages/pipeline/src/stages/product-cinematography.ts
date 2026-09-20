@@ -1,9 +1,12 @@
 import {
   REAL_PRODUCT_VISUAL_TYPES,
+  cuesFor,
   planUiSequence,
   type AspectRatio,
   type RepairAction,
   type Scene,
+  type ShotAmbition,
+  type SoundCue,
   type Storyboard,
 } from '@act-one/core';
 import { readUiStructure } from '@act-one/research';
@@ -85,6 +88,27 @@ export async function filmTheProduct(
    */
   const structures = new Map<string, Awaited<ReturnType<typeof readUiStructure>> | null>();
 
+  /*
+   * The film grows.
+   *
+   * The first time the audience sees the product, the camera does the work
+   * and the interface stays whole: that is the shot that teaches them what
+   * they are looking at, and taking it apart before they know it is a screen
+   * is a trick performed on nobody. After that the interface can come apart.
+   * Once, at the place the film has been building toward, it opens into a
+   * space. A film that did the most elaborate thing every time would be as
+   * templated as one that never did it at all, and it would be worse, because
+   * the second time is when a trick stops being one.
+   */
+  const order = new Map(candidates.map((scene, index) => [scene.id, index] as const));
+  const expandAt = candidates.length >= 3 ? Math.max(1, Math.round((candidates.length - 1) * 0.66)) : -1;
+  const ambitionFor = (scene: Scene): ShotAmbition => {
+    const index = order.get(scene.id) ?? 0;
+    if (index === 0) return 'plain';
+    if (index === expandAt) return 'expanded';
+    return 'layered';
+  };
+
   const filmed = new Map<string, Scene['uiSequence']>();
   for (const scene of candidates) {
     const assetId = scene.assetRefs.find((id) => {
@@ -128,6 +152,7 @@ export async function filmTheProduct(
       frameAspect,
       renderWidth: options.renderWidth,
       hasWords: scene.onScreenText.some((line) => line.trim().length > 0),
+      ambition: ambitionFor(scene),
     });
     filmed.set(scene.id, sequence);
     result.filmed += 1;
@@ -156,11 +181,27 @@ export async function filmTheProduct(
 
   if (filmed.size === 0) return { storyboard, result };
 
+  /*
+   * And the sound comes off the picture, not off the brief.
+   *
+   * The cues are generated from the framings that were just planned — the
+   * cuts, the press, the landing, the move into the space — so they are on
+   * the frame the event happens on rather than near it. Cues the scene
+   * already carried are kept: a director who asked for something specific
+   * asked for it, and this is production filling in what production knows.
+   */
   const next: Storyboard = {
     ...storyboard,
-    scenes: storyboard.scenes.map((scene) =>
-      filmed.has(scene.id) ? { ...scene, uiSequence: filmed.get(scene.id)! } : scene,
-    ),
+    scenes: storyboard.scenes.map((scene) => {
+      const sequence = filmed.get(scene.id);
+      if (!sequence) return scene;
+      const motion = cuesFor(sequence, scene.startTime);
+      const kept = scene.soundCues.filter(
+        (cue) => !motion.some((made) => made.type === cue.type && Math.abs(made.time - cue.time) < 0.12),
+      );
+      const soundCues: SoundCue[] = [...kept, ...motion].sort((left, right) => left.time - right.time);
+      return { ...scene, uiSequence: sequence, soundCues };
+    }),
   };
   await context.store.storyboards.update(context.organizationId, storyboard.id, { scenes: next.scenes });
   return { storyboard: next, result };

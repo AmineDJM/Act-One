@@ -120,6 +120,7 @@ describe.skipIf(browser === undefined)('a capture filmed rather than staged', ()
         { x: 0.02, y: 0.28, width: 0.14, height: 0.32, weight: 0.18, density: 0.4 },
         { x: 0.04, y: 0.8, width: 0.2, height: 0.08, weight: 0.08, density: 0.46 },
       ],
+      controls: [],
     };
     const sequence = planUiSequence(structure, {
       seconds: SECONDS, frameAspect: 16 / 9, renderWidth: 1920, hasWords: true,

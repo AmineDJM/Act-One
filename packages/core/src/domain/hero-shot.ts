@@ -3,7 +3,13 @@ import {
   FramingRect,
   MAX_UPSCALE,
   UiFraming,
+  actionFrame,
+  isolateLayers,
   minCropWidth,
+  operateLayers,
+  pickControl,
+  volumeLayers,
+  volumePanels,
   type UiRegion,
   type UiStructure,
 } from './ui-cinema.ts';
@@ -40,12 +46,33 @@ export const HeroTerm = z.enum([
   'fill',
   'placement',
   'substance',
-  'depth',
+  'motion',
   'freshness',
 ]);
 export type HeroTerm = z.infer<typeof HeroTerm>;
 
+/**
+ * How the shot is made, not how it is cropped.
+ *
+ * The first version of this search generated one kind of candidate — a
+ * rectangle with a push on it — at three sizes, and then asked a director to
+ * choose between them. That is a choice between crops, and a film whose most
+ * memorable frame was chosen from a set of crops is a film whose most
+ * memorable frame is a crop.
+ *
+ * These are different things to do with the same pixels. `frame` is the
+ * camera on a still. `isolate` takes the interface apart so one panel holds
+ * the eye while the rest falls back. `operate` is the product being used: a
+ * real control pressed and a real result. `volume` puts real panels in a
+ * constructed space and moves the camera through them. Only `frame` is
+ * always available; the others need the capture to hold the parts, which is
+ * why they are searched for rather than specified.
+ */
+export const HeroMechanism = z.enum(['frame', 'isolate', 'operate', 'volume']);
+export type HeroMechanism = z.infer<typeof HeroMechanism>;
+
 export const HeroCandidate = z.object({
+  mechanism: HeroMechanism,
   /** The capture this is a frame of, and its real size — a crop means nothing without it. */
   assetId: z.string(),
   sourceWidth: z.number().int().positive(),
@@ -78,19 +105,36 @@ export type HeroCandidate = z.infer<typeof HeroCandidate>;
  * spare.
  */
 const WEIGHTS: Record<HeroTerm, number> = {
-  isolation: 0.28,
-  fill: 0.22,
-  resolution: 0.13,
-  substance: 0.13,
+  isolation: 0.24,
+  fill: 0.18,
+  /*
+   * How much of the interface actually moves.
+   *
+   * Real weight, because this is the term that separates the shot a person
+   * describes afterwards from the shot they do not. It is deliberately not
+   * the largest: a badly composed frame of the product being operated is
+   * still a badly composed frame, and the search should not be able to buy
+   * its way past composition with ambition.
+   */
+  motion: 0.18,
+  resolution: 0.11,
+  substance: 0.11,
   /*
    * Freshness carries real weight, which it would not in a general shot
    * search. The hero is the frame the film is remembered for, so a hero that
    * repeats a shot the audience saw eight seconds ago is not a hero — it is
    * the same shot held longer.
    */
-  freshness: 0.12,
-  placement: 0.09,
-  depth: 0.03,
+  freshness: 0.11,
+  placement: 0.07,
+};
+
+/** What each way of making the shot is worth on the motion term. */
+const MOVES: Record<HeroMechanism, number> = {
+  frame: 0.15,
+  isolate: 0.6,
+  volume: 0.85,
+  operate: 1,
 };
 
 /** Shot sizes, as multiples of the tightest crop the capture can carry. */
@@ -140,62 +184,155 @@ export function searchHeroShots(input: HeroSearchInput, shortlist = 6): HeroSear
       notes.push(`${capture.assetId}: no panel in this capture is big enough to build a shot around`);
       continue;
     }
+
+    const add = (
+      mechanism: HeroMechanism,
+      subject: UiRegion,
+      rect: FramingRect,
+      framing: Partial<UiFraming>,
+    ) => {
+      const terms = score(capture.assetId, subject, rect, capture.structure, input, mechanism);
+      const total = (Object.entries(terms) as [HeroTerm, number][]).reduce(
+        (sum, [term, value]) => sum + WEIGHTS[term] * value,
+        0,
+      );
+      all.push({
+        mechanism,
+        assetId: capture.assetId,
+        sourceWidth: capture.structure.width,
+        sourceHeight: capture.structure.height,
+        background: capture.structure.background,
+        framing: UiFraming.parse({
+          role: 'subject',
+          move: 'push',
+          from: widenBy(rect, capture.structure, input.frameAspect, 1.12),
+          to: rect,
+          seconds: input.seconds,
+          cut: true,
+          words: 'none',
+          around: clamp(subject),
+          ...framing,
+        }),
+        score: Number(total.toFixed(4)),
+        terms,
+        why: explain(terms),
+      });
+    };
+
     for (const subject of subjects) {
       for (const size of SIZES) {
         const width = Math.min(1, Math.max(floor, Math.max(subject.width * 1.15, floor) * size));
         const rect = frameAround(subject, capture.structure, input.frameAspect, width);
-        // A size that clamps to the same rectangle as the one before it is the
-        // same shot; scoring it twice only crowds the shortlist.
-        if (all.some((other) => other.assetId === capture.assetId && sameRect(other.framing.to, rect))) continue;
-
-        const liftable = isLiftable(subject);
-        for (const lift of liftable ? [null, subject] : [null]) {
-          const terms = score(capture.assetId, subject, rect, capture.structure, input, lift !== null);
-          const total = (Object.entries(terms) as [HeroTerm, number][]).reduce(
-            (sum, [term, value]) => sum + WEIGHTS[term] * value,
-            0,
-          );
-          all.push({
-            assetId: capture.assetId,
-            sourceWidth: capture.structure.width,
-            sourceHeight: capture.structure.height,
-            background: capture.structure.background,
-            framing: UiFraming.parse({
-              role: 'subject',
-              /*
-               * A hero shot moves, but barely. It is held long enough to be
-               * read, and the move is a slow settle onto the subject rather
-               * than a push that arrives somewhere: there is nowhere else to
-               * arrive, this is the place.
-               */
-              move: 'push',
-              from: widenBy(rect, capture.structure, input.frameAspect, 1.12),
-              to: rect,
-              seconds: input.seconds,
-              cut: true,
-              lift: lift ? clamp(lift) : null,
-              words: 'none',
-              around: clamp(subject),
-            }),
-            score: Number(total.toFixed(4)),
-            terms,
-            why: explain(terms),
-          });
+        if (all.some((other) => other.assetId === capture.assetId && other.mechanism === 'frame' && sameRect(other.framing.to, rect))) {
+          continue;
         }
+        /*
+         * The camera on a still, and the interface taken apart in the same
+         * frame. Same crop, same pixels, two different shots — which is the
+         * point: the choice above this one is between ways of shooting, not
+         * between rectangles.
+         */
+        add('frame', subject, rect, { lift: isLiftable(subject) ? clamp(subject) : null });
+        add('isolate', subject, rect, {
+          move: 'hold',
+          from: rect,
+          layers: isolateLayers(subject, input.seconds),
+        });
       }
+    }
+
+    /*
+     * The product being used. Needs a real control and a real result that fit
+     * in one frame at the fidelity this capture can carry — a screen with no
+     * filled action, or whose confirmation is at the other end of it, simply
+     * does not offer this shot.
+     */
+    const anchor = subjects[0] ?? null;
+    const control = pickControl(capture.structure, anchor);
+    const outcome = subjects.find(
+      (region) => region.y >= 0.55 && region.height <= 0.2 && region.width <= 0.55 && region.density >= 0.3,
+    );
+    if (control && outcome) {
+      const rect = actionFrame(control, outcome, capture.structure, input.frameAspect, floor);
+      if (rect) {
+        /*
+         * Scored against the action, not against either half of it.
+         *
+         * The subject of this shot is the event — a control pressed and a
+         * result appearing — and measuring "does one thing dominate the
+         * frame" against the toast alone answers a question nobody asked. The
+         * two together are the thing, so the two together are what is
+         * measured.
+         */
+        add('operate', union(control, outcome), rect, {
+          role: 'action',
+          move: 'pull',
+          from: aboveRect(rect, outcome, capture.structure, input.frameAspect),
+          layers: operateLayers(control, outcome, input.seconds),
+        });
+      }
+    }
+
+    /*
+     * The interface in a space. Three panels is the most that reads as depth
+     * rather than as clutter, so a capture needs at least three to offer it.
+     */
+    const spatial = volumePanels(subjects);
+    if (spatial.length >= 3) {
+      const panels = spatial.map((region) => ({
+        rect: clamp(region),
+        assetId: capture.assetId,
+        sourceWidth: capture.structure.width,
+        sourceHeight: capture.structure.height,
+      }));
+      /*
+       * Scored as though the nearest panel were being framed, because that is
+       * what the eye reads in a volume: the plane in front. Scoring it
+       * against the whole capture would measure a shot nobody is watching.
+       */
+      const near = spatial[0]!;
+      const nearFrame = frameAround(
+        near,
+        capture.structure,
+        input.frameAspect,
+        Math.min(1, Math.max(floor, near.width * 1.5)),
+      );
+      add('volume', near, nearFrame, {
+        move: 'hold',
+        from: { x: 0, y: 0, width: 1, height: 1 },
+        to: { x: 0, y: 0, width: 1, height: 1 },
+        space: 'volume',
+        wordsBehind: true,
+        layers: volumeLayers(panels, input.seconds),
+      });
     }
   }
 
   all.sort((left, right) => right.score - left.score);
   /*
-   * One entry per capture in the top half of the shortlist, so a single
-   * screenshot with six good panels cannot take the whole list and leave the
-   * judgement with nothing to actually choose between.
+   * The best of each way of shooting it, then the best of the rest.
+   *
+   * Taken purely by score the list comes back as six variations on whichever
+   * mechanism happens to suit this capture — six crops, or six isolations —
+   * and the judgement above becomes a choice between rectangles again. One
+   * slot reserved per mechanism costs at most three places and is the
+   * difference between "which of these frames" and "what should this shot
+   * be".
    */
   const picked: HeroCandidate[] = [];
   const perCapture = new Map<string, number>();
   const cap = Math.max(1, Math.ceil(shortlist / Math.max(1, input.captures.length)) + 1);
+  const seeded = new Set<HeroMechanism>();
   for (const candidate of all) {
+    if (seeded.has(candidate.mechanism)) continue;
+    if (candidate.terms.freshness !== undefined && candidate.terms.freshness < 0.15) continue;
+    seeded.add(candidate.mechanism);
+    picked.push(candidate);
+    perCapture.set(candidate.assetId, (perCapture.get(candidate.assetId) ?? 0) + 1);
+    if (picked.length >= shortlist) break;
+  }
+  for (const candidate of all) {
+    if (picked.includes(candidate)) continue;
     /*
      * A frame the film already has is not a candidate at all.
      *
@@ -208,7 +345,19 @@ export function searchHeroShots(input: HeroSearchInput, shortlist = 6): HeroSear
     if (candidate.terms.freshness !== undefined && candidate.terms.freshness < 0.15) continue;
     const used = perCapture.get(candidate.assetId) ?? 0;
     if (used >= cap) continue;
-    if (picked.some((other) => other.assetId === candidate.assetId && overlaps(other.framing.to, candidate.framing.to) > 0.7)) {
+    /*
+     * Same capture, same rectangle, same way of shooting it, is the same
+     * shot. Same rectangle shot a different way is not, which is the whole
+     * reason the mechanism is part of the identity here.
+     */
+    if (
+      picked.some(
+        (other) =>
+          other.assetId === candidate.assetId &&
+          other.mechanism === candidate.mechanism &&
+          overlaps(other.framing.to, candidate.framing.to) > 0.7,
+      )
+    ) {
       continue;
     }
     picked.push(candidate);
@@ -216,8 +365,9 @@ export function searchHeroShots(input: HeroSearchInput, shortlist = 6): HeroSear
     if (picked.length >= shortlist) break;
   }
 
+  picked.sort((left, right) => right.score - left.score);
   if (picked.length === 0) notes.push('no capture held a frame worth putting forward as the hero shot');
-  return { candidates: picked, considered: all.length, notes };
+  return { candidates: picked.slice(0, shortlist), considered: all.length, notes };
 }
 
 function score(
@@ -226,7 +376,7 @@ function score(
   rect: FramingRect,
   structure: UiStructure,
   input: HeroSearchInput,
-  lifted: boolean,
+  mechanism: HeroMechanism,
 ): Record<HeroTerm, number> {
   const sourcePixels = rect.width * structure.width;
 
@@ -282,27 +432,43 @@ function score(
   /** Substance: a panel with nothing in it makes a beautifully composed empty frame. */
   const substance = clamp01(subject.density / 0.55);
 
-  /*
-   * Depth, and only where it is motivated. Lifting a toast off the interface
-   * is what the interface is already doing; lifting a sidebar is a gimmick.
-   */
-  const depth = lifted ? (isLiftable(subject) ? 1 : 0) : 0.35;
+  /** How much of the interface this way of shooting it actually moves. */
+  const motion = MOVES[mechanism];
 
   /*
    * Freshness: how unlike the shots the film already has this one is.
    *
    * Only against crops of the same capture, because two frames of different
    * screenshots are different frames whatever their coordinates happen to be.
+   * And only against crops that are actually crops: a shot framed on the
+   * whole capture — which is what every volume's rectangle is, since a volume
+   * does not crop at all — contains every other rectangle by definition, and
+   * counting it would mark every candidate as a repeat of a shot that showed
+   * nothing in particular.
    */
   const worst = Math.max(
     0,
     ...(input.taken ?? [])
-      .filter((entry) => entry.assetId === assetId)
+      .filter((entry) => entry.assetId === assetId && entry.rect.width < 0.92)
       .map((entry) => overlaps(entry.rect, rect)),
   );
   const freshness = clamp01(1 - worst);
 
-  return { resolution, isolation, fill, placement, substance, depth, freshness };
+  return { resolution, isolation, fill, placement, substance, motion, freshness };
+}
+
+/** Two parts of a screen treated as the one thing they are together. */
+function union(a: UiRegion, b: UiRegion): UiRegion {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return {
+    x,
+    y,
+    width: Math.min(1 - x, Math.max(a.x + a.width, b.x + b.width) - x),
+    height: Math.min(1 - y, Math.max(a.y + a.height, b.y + b.height) - y),
+    weight: Math.min(1, a.weight + b.weight),
+    density: Math.max(a.density, b.density),
+  };
 }
 
 /** A toast, a badge, a confirmation: small, dense, and sitting on top of the screen already. */
@@ -316,7 +482,7 @@ const SAYS: Record<HeroTerm, string> = {
   fill: 'the subject is sized like a subject',
   substance: 'there is something in it',
   placement: 'it is composed rather than cropped',
-  depth: 'the lifted element is one the interface already puts on top',
+  motion: 'the interface moves rather than the camera',
   freshness: 'the film has not already shown this',
 };
 
@@ -341,6 +507,18 @@ function frameAround(
     width,
     height,
   });
+}
+
+/** The same frame, raised so a low rectangle sits just under its bottom edge. */
+function aboveRect(
+  seated: FramingRect,
+  low: UiRegion,
+  structure: UiStructure,
+  frameAspect: number,
+): FramingRect {
+  const width = Math.max(0.02, seated.width * 0.94);
+  const height = ((width * structure.width) / frameAspect) / structure.height;
+  return slide({ x: seated.x + seated.width / 2 - width / 2, y: low.y - height, width, height });
 }
 
 function widenBy(rect: FramingRect, structure: UiStructure, frameAspect: number, by: number): FramingRect {
@@ -400,6 +578,17 @@ export const HeroShotRecord = z.object({
   sceneId: z.string(),
   assetId: z.string(),
   framing: UiFraming,
+  /**
+   * The capture's real size and ground colour.
+   *
+   * Carried on the record rather than looked up later, because the shot this
+   * becomes may land on a scene that was filming a different capture, and a
+   * crop placed with the wrong source dimensions is not a crop of anything.
+   */
+  sourceWidth: z.number().int().positive(),
+  sourceHeight: z.number().int().positive(),
+  background: z.object({ r: z.number(), g: z.number(), b: z.number() }),
+  mechanism: HeroMechanism,
   /** Every frame the search generated and scored. */
   considered: z.number().int().min(0),
   /** How many of them were rendered and looked at. */

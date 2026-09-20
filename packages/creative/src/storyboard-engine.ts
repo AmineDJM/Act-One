@@ -517,11 +517,38 @@ export class StoryboardEngine {
           !usablePicture &&
           (archetype.visualType === 'generated_broll' || archetype.visualType === 'mixed_media'));
 
+      /*
+       * A beat that tells what it could show.
+       *
+       * The director attached a product moment to this beat and the moment
+       * has a real capture behind it — and the archetype was still going to
+       * set the line in type on the brand's canvas and leave the capture
+       * unused. Half of every film came out that way: a claim, a card, a
+       * claim, a card, with the product arriving late and briefly as
+       * punctuation.
+       *
+       * This is not "put a picture behind the words". It is the narrower and
+       * more defensible thing: where the film has already decided which part
+       * of the product a beat is about, the beat is that part of the product,
+       * with its line set into the frame. Where no moment was attached, or
+       * the moment has nothing to show, the words stay on the canvas — which
+       * is what makes typography an exception rather than the glue.
+       */
+      const tellsWhatItCouldShow =
+        !vetoed &&
+        !pickedIsPhoto &&
+        archetype.visualType === 'kinetic_typography' &&
+        Boolean(moment && moment.screenshots.length > 0) &&
+        // A pitch may cut to the product; it may not be built out of it.
+        format !== 'pitch';
+
       const visualType: VisualType = pickedIsPhoto
         ? 'real_media'
         : vetoed
           ? routed.visualType
-          : archetype.visualType;
+          : tellsWhatItCouldShow
+            ? 'screenshot_motion'
+            : archetype.visualType;
 
       const typeScale =
         visualType === 'kinetic_typography' && index === 0

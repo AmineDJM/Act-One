@@ -33,6 +33,9 @@ const framing = (role: Scene['uiSequence'] extends null ? never : string, second
   lift: null,
   words: 'none' as const,
   around: null,
+  layers: [],
+  space: 'flat' as const,
+  wordsBehind: false,
 });
 
 function board(scenes: Scene[]): Storyboard {
@@ -48,6 +51,10 @@ const record: HeroShotRecord = {
   sceneId: 'scn_hero',
   assetId: 'ast_2',
   framing: { ...framing('subject', 3.2), move: 'push', to: rect(0.3, 0.2, 0.46, 0.26) },
+  sourceWidth: 2324,
+  sourceHeight: 1224,
+  background: { r: 240, g: 240, b: 242 },
+  mechanism: 'isolate',
   considered: 116,
   shortlisted: 6,
   score: 0.81,
@@ -63,7 +70,7 @@ const record: HeroShotRecord = {
 describe('putting the hero shot into the film', () => {
   it('does not make the film longer', () => {
     const before = board([
-      scene({ id: 'scn_hero', duration: 6, uiSequence: {
+      scene({ id: 'scn_hero', duration: 6, assetRefs: ['ast_2'], uiSequence: {
         sourceWidth: 2324, sourceHeight: 1224, background: { r: 240, g: 240, b: 242 },
         framings: [framing('establish', 1.4), framing('subject', 2.3), framing('result', 2.3)],
         notes: [],
@@ -81,7 +88,7 @@ describe('putting the hero shot into the film', () => {
 
   it('opens the shot with the hero and keeps what followed it', () => {
     const before = board([
-      scene({ id: 'scn_hero', duration: 6, uiSequence: {
+      scene({ id: 'scn_hero', duration: 6, assetRefs: ['ast_2'], uiSequence: {
         sourceWidth: 2324, sourceHeight: 1224, background: { r: 240, g: 240, b: 242 },
         framings: [framing('establish', 1.4), framing('subject', 2.3), framing('result', 2.3)],
         notes: [],
@@ -104,6 +111,26 @@ describe('putting the hero shot into the film', () => {
     const after = withHeroShot(before, record);
     expect(after.scenes[0]!.uiSequence!.framings).toHaveLength(1);
     expect(after.heroShot).toEqual(record);
+  });
+
+  it('drops framings built for a different capture', () => {
+    /*
+     * A framing is a rectangle of a specific picture. When the hero comes
+     * from another capture, the rest of the shot's plan is a set of
+     * rectangles of something else, and keeping them would frame parts of
+     * one screenshot using coordinates measured on another.
+     */
+    const before = board([
+      scene({ id: 'scn_hero', duration: 6, assetRefs: ['ast_1'], uiSequence: {
+        sourceWidth: 1400, sourceHeight: 900, background: { r: 10, g: 10, b: 10 },
+        framings: [framing('establish', 1.4), framing('result', 2.3)],
+        notes: ['something production could not do'],
+      } }),
+    ]);
+    const after = withHeroShot(before, record).scenes[0]!;
+    expect(after.uiSequence!.framings).toHaveLength(1);
+    expect(after.uiSequence!.sourceWidth).toBe(2324);
+    expect(after.uiSequence!.notes).toEqual([]);
   });
 
   it('leaves every other shot alone', () => {

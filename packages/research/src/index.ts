@@ -8,5 +8,5 @@ export * from './product-explorer.ts';
 export * from './research-agent.ts';
 export * from './public-captures.ts';
 export { assessCapture, fitForRender, type CaptureAssessment } from './capture-quality.ts';
-export { readUiStructure, type UiRegion, type UiStructure } from './ui-structure.ts';
+export { readUiStructure, findControls, type UiRegion, type UiStructure } from './ui-structure.ts';
 export { normalizeUrl, registrableDomainOf, pathOf, absolutize } from './url.ts';
