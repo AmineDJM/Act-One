@@ -13,12 +13,24 @@ be learned from somebody else's work.
 Usage: temporal_grammar.py FILM.mp4 OUT.json [--fps 15] [--width 320]
 """
 import json
+import os
 import subprocess
 import sys
 import numpy as np
 import cv2
 
-FFMPEG = "/home/user/Act-One/node_modules/ffmpeg-static/ffmpeg"
+# Resolved rather than written down: this runs on a laptop, in CI and on a
+# render host, and an absolute path from one of them is a crash on the other
+# two. ACT_ONE_FFMPEG_PATH is what the rest of the system already reads.
+FFMPEG = (
+    os.environ.get("ACT_ONE_FFMPEG_PATH")
+    or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "node_modules", "ffmpeg-static", "ffmpeg",
+    )
+)
+if not os.path.exists(FFMPEG):
+    FFMPEG = "ffmpeg"
 
 
 def probe(path):

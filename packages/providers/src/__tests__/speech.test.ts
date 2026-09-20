@@ -609,6 +609,7 @@ describe('the registry', () => {
             preview: 'openai-speech',
             recognizer: 'openai-speech',
             enabled: true,
+            standIn: 'none' as const,
             cloning: false,
             takes: 2,
             maxRegenerations: 1,
@@ -632,7 +633,7 @@ describe('the registry', () => {
 
     // Chosen but without a key: OpenAI reads, rather than nothing.
     const keyless = speechOverrides(
-      { primary: 'elevenlabs', preview: 'same', recognizer: 'elevenlabs', enabled: true, cloning: false, takes: 1, maxRegenerations: 1, maxCostPerProjectUsd: 0, curated: {} },
+      { primary: 'elevenlabs', preview: 'same', recognizer: 'elevenlabs', enabled: true, standIn: 'none', cloning: false, takes: 1, maxRegenerations: 1, maxCostPerProjectUsd: 0, curated: {} },
       { openai, elevenlabs: null },
     );
     expect(keyless.speech.name).toBe('openai-speech');
@@ -655,6 +656,7 @@ describe('the registry', () => {
       preview: 'same' as const,
       recognizer: 'openai-speech' as const,
       enabled: true,
+      standIn: 'none' as const,
       cloning: false,
       takes: 1,
       maxRegenerations: 1,

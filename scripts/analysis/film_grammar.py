@@ -30,6 +30,7 @@ Nothing of anyone's creative work is retained. What comes out is the shape:
 durations, curves, ratios, offsets.
 """
 import json
+import os
 import math
 import subprocess
 import sys
@@ -38,7 +39,18 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
-FFMPEG = "/home/user/Act-One/node_modules/ffmpeg-static/ffmpeg"
+# Resolved rather than written down: this runs on a laptop, in CI and on a
+# render host, and an absolute path from one of them is a crash on the other
+# two. ACT_ONE_FFMPEG_PATH is what the rest of the system already reads.
+FFMPEG = (
+    os.environ.get("ACT_ONE_FFMPEG_PATH")
+    or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "node_modules", "ffmpeg-static", "ffmpeg",
+    )
+)
+if not os.path.exists(FFMPEG):
+    FFMPEG = "ffmpeg"
 
 
 # ---------------------------------------------------------------- decoding

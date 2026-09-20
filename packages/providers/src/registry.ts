@@ -8,9 +8,16 @@ import { LocalChromiumProvider } from './browser/local.ts';
 import { KernelProvider } from './browser/kernel.ts';
 import type { BrowserAutomationProvider } from './browser/types.ts';
 import { HiggsfieldProvider } from './media/higgsfield.ts';
+import { RunwayProvider } from './media/runway.ts';
+import { RecraftProvider } from './media/recraft.ts';
+import { IdeogramProvider } from './media/ideogram.ts';
 import type { GenerativeMediaProvider } from './media/types.ts';
+import type { StillCapability, StillImageProvider } from './media/still-types.ts';
+import { GeminiVideoAnalyst } from './analysis/gemini-video.ts';
+import type { VideoAnalyst } from './analysis/types.ts';
 import { OpenAiSpeechProvider } from './speech/openai.ts';
 import { ElevenLabsProvider } from './speech/elevenlabs.ts';
+import { RunwayAudioProvider } from './speech/runway-audio.ts';
 import type { MusicComposer, SoundEffectEngine, SpeechAligner, SpeechProvider, SpeechRecognizer } from './speech/types.ts';
 import { LocalFsStorageProvider } from './storage/local.ts';
 import { SupabaseStorageProvider } from './storage/supabase.ts';
@@ -75,7 +82,16 @@ const BrowserConfig = z.object({
 });
 
 const MediaConfig = z.object({
-  primary: z.enum(['higgsfield', 'none']).default('higgsfield'),
+  primary: z.enum(['higgsfield', 'runway', 'none']).default('higgsfield'),
+  /**
+   * A second engine for moving shots.
+   *
+   * Off by default, because two engines producing shots for one film is a film
+   * with two looks in it unless somebody chose that. Worth having because the
+   * vendors have genuinely different catalogues and one of them being down is
+   * otherwise a production that stops.
+   */
+  fallback: z.enum(['higgsfield', 'runway', 'none']).default('none'),
   enabled: z.boolean().default(true),
   maxCostPerRequestUsd: z.number().min(0).default(6),
   /** Global cost ceiling per rendered second, across all generative shots. */
@@ -104,6 +120,16 @@ const SpeechConfig = z.object({
   preview: z.enum(['same', 'openai-speech', 'elevenlabs']).default('same'),
   recognizer: SpeechEngine.default('openai-speech'),
   enabled: z.boolean().default(true),
+  /**
+   * Who reads when the configured engine has no working credential.
+   *
+   * `none` keeps today's behaviour exactly: the voice falls back to OpenAI and
+   * music and sound effects simply do not happen. `runway-audio` reaches the
+   * same ElevenLabs models through a vendor whose key works, which is a
+   * stopgap for a revoked key and is named rather than silent — every asset it
+   * makes is recorded under its own provider name.
+   */
+  standIn: z.enum(['none', 'runway-audio']).default('none'),
   /** Whether customers may clone a voice at all, consent aside. */
   cloning: z.boolean().default(false),
   /** Alternative reads offered per passage on plans that carry them, 1 to 3. */
@@ -122,6 +148,21 @@ const SpeechConfig = z.object({
 });
 export type SpeechConfig = z.infer<typeof SpeechConfig>;
 
+/**
+ * Watching a film, as opposed to making one.
+ *
+ * Its own capability rather than a corner of the LLM config, because handing
+ * frames to a chat model and reading a file natively on its own clock are
+ * different things and a caller that cannot tell them apart will ask the wrong
+ * one about easing.
+ */
+const AnalysisConfig = z.object({
+  primary: z.enum(['gemini', 'none']).default('gemini'),
+  enabled: z.boolean().default(true),
+  /** Pin a model only to reproduce an old reading; otherwise the catalogue decides. */
+  models: z.object({ broad: z.string().optional(), deep: z.string().optional() }).default({}),
+});
+
 const StorageConfig = z.object({
   primary: z.enum(['supabase-storage', 'local-fs']).default('supabase-storage'),
   enabled: z.boolean().default(true),
@@ -132,6 +173,7 @@ export const ProviderConfig = z.object({
   browser: BrowserConfig.default(() => BrowserConfig.parse({})),
   media: MediaConfig.default(() => MediaConfig.parse({})),
   speech: SpeechConfig.default(() => SpeechConfig.parse({})),
+  analysis: AnalysisConfig.default(() => AnalysisConfig.parse({})),
   storage: StorageConfig.default(() => StorageConfig.parse({})),
 });
 export type ProviderConfig = z.infer<typeof ProviderConfig>;
@@ -156,6 +198,7 @@ export type RegistryOptions = {
     soundEffects: SoundEffectEngine;
     aligner: SpeechAligner;
     storage: StorageProvider;
+    analyst: VideoAnalyst;
   }>;
 };
 
@@ -219,14 +262,82 @@ export class ProviderRegistry {
         'Generative media is disabled for this deployment.',
       );
     }
-    return this.memo(
-      'media',
-      () =>
-        new HiggsfieldProvider({
-          costSink: this.costSink,
-          maxCostPerRequestUsd: this.config.media.maxCostPerRequestUsd,
-        }),
+    return this.memo(`media:${this.config.media.primary}`, () =>
+      this.buildMedia(this.config.media.primary as 'higgsfield' | 'runway'),
     );
+  }
+
+  /**
+   * The second engine for moving shots, when an operator configured one.
+   *
+   * Null unless asked for. Falling back between two generative engines is not
+   * like falling back between two browsers: research re-run on another vendor
+   * produces the same facts, where a shot re-generated on another vendor
+   * produces a different shot. So this is a choice somebody makes, and the
+   * pipeline that uses it has to be willing to have one shot look different
+   * from its neighbours.
+   */
+  mediaFallback(): GenerativeMediaProvider | null {
+    const name = this.config.media.fallback;
+    if (name === 'none' || name === this.config.media.primary) return null;
+    const provider = this.memo(`media:${name}`, () => this.buildMedia(name));
+    return provider.isConfigured?.() === false ? null : provider;
+  }
+
+  private buildMedia(name: 'higgsfield' | 'runway'): GenerativeMediaProvider {
+    if (name === 'runway') {
+      return new RunwayProvider({
+        costSink: this.costSink,
+        maxCostPerRequestUsd: this.config.media.maxCostPerRequestUsd,
+      });
+    }
+    return new HiggsfieldProvider({
+      costSink: this.costSink,
+      maxCostPerRequestUsd: this.config.media.maxCostPerRequestUsd,
+    });
+  }
+
+  /**
+   * Providers of stills, by what they are actually for.
+   *
+   * The router matches on a declared capability rather than on a name, so
+   * creative code asks for "something that can make a recolourable vector" or
+   * "a composed style frame" and never learns which vendor answered. Only
+   * providers that can authenticate are offered, and the list is ordered by
+   * how well each one fits the capability asked for.
+   *
+   * Nothing selects these automatically. They are available to the art
+   * direction; an art direction that does not ask gets the film it would have
+   * got before any of them existed.
+   */
+  stills(capability: StillCapability): StillImageProvider[] {
+    const all = this.memo('stills', () => [
+      new RecraftProvider({ costSink: this.costSink }),
+      new IdeogramProvider({ costSink: this.costSink }),
+    ]);
+    return all.filter(
+      (provider) => provider.isConfigured?.() !== false && provider.capabilities().includes(capability),
+    );
+  }
+
+  /**
+   * A model that watches a film, or nothing.
+   *
+   * Null rather than an error when unconfigured, because analysing a reference
+   * is something the system does when it can and lives without when it cannot
+   * — unlike a renderer, whose absence is a production that fails.
+   */
+  videoAnalystOrNull(): VideoAnalyst | null {
+    if (this.overrides?.analyst) return this.overrides.analyst;
+    if (!this.config.analysis.enabled || this.config.analysis.primary === 'none') return null;
+    const analyst = this.memo('analyst', () => {
+      const models = this.config.analysis.models;
+      return new GeminiVideoAnalyst({
+        costSink: this.costSink,
+        ...(models.broad || models.deep ? { models } : {}),
+      });
+    });
+    return analyst.isConfigured() ? analyst : null;
   }
 
   mediaOrNull(): GenerativeMediaProvider | null {
@@ -305,8 +416,25 @@ export class ProviderRegistry {
     if (this.overrides?.soundEffects) return this.overrides.soundEffects;
     return this.memo('sound-effects', () => {
       const elevenlabs = new ElevenLabsProvider({ costSink: this.costSink });
-      return elevenlabs.isConfigured() ? elevenlabs : null;
+      if (elevenlabs.isConfigured()) return elevenlabs;
+      return this.standIn();
     });
+  }
+
+  /**
+   * The named stand-in for a voice engine whose credential does not work.
+   *
+   * Returns null unless an operator set `speech.standIn`, so this changes
+   * nothing on a deployment that has not asked for it. It exists because the
+   * ElevenLabs key currently answers `invalid_api_key` on every call while the
+   * same models are reachable through another vendor whose key works — and the
+   * right response to a bad credential is a documented detour, not a rewrite
+   * of a provider that is doing its job correctly.
+   */
+  private standIn(): RunwayAudioProvider | null {
+    if (this.config.speech.standIn !== 'runway-audio') return null;
+    const runway = new RunwayAudioProvider({ costSink: this.costSink });
+    return runway.isConfigured() ? runway : null;
   }
 
   alignerOrNull(): SpeechAligner | null {
@@ -326,6 +454,10 @@ export class ProviderRegistry {
       // Chosen but without a key: the film still gets a voice, from OpenAI,
       // rather than no voice and an error at the last stage of a render.
       if (elevenlabs.isConfigured()) return elevenlabs;
+      // Unless an operator named a stand-in, which reaches the same models
+      // through a vendor whose credential works.
+      const standIn = this.standIn();
+      if (standIn) return standIn;
     }
     return new OpenAiSpeechProvider({ costSink: this.costSink });
   }

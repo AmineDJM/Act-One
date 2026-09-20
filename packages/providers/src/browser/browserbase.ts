@@ -2,6 +2,7 @@ import { chromium } from 'playwright-core';
 import { z } from 'zod';
 import { httpRequest } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
+import { canAuthenticate, credentialIsManaged } from '../managed-credentials.ts';
 import { PlaywrightSession, type AuditHook } from './playwright-session.ts';
 import type { BrowserAutomationProvider, BrowserSession, SessionOptions } from './types.ts';
 
@@ -66,7 +67,7 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
   }
 
   isConfigured(): boolean {
-    return this.apiKey.length > 0;
+    return canAuthenticate('browserbase', this.apiKey);
   }
 
   /**
@@ -152,6 +153,21 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
     }
 
     const session = SessionResponse.parse(created);
+    /*
+     * The vendor hands back a connect URL that carries its own authorisation.
+     * The hand-built fallback exists for older responses that did not, and it
+     * is the one place the key travels in a URL rather than a header — so a
+     * process that does not hold the key cannot build it. Better to say that
+     * than to open a socket with `apiKey=` and read the refusal as the vendor
+     * being down.
+     */
+    if (!session.connectUrl && !this.apiKey) {
+      throw new ProviderError(
+        this.name,
+        'The session gave no connect URL and this process holds no key to build one with.',
+        { retryable: false },
+      );
+    }
     const connectUrl =
       session.connectUrl ??
       `wss://connect.browserbase.com?apiKey=${encodeURIComponent(this.apiKey)}&sessionId=${session.id}`;
@@ -279,6 +295,12 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
   }
 
   private headers(): Record<string, string> {
+    /*
+     * Nothing to send when a gateway in front of this process holds the key
+     * and writes the header itself. A placeholder here would be a wrong key
+     * anywhere the gateway is not there, which fails less legibly than none.
+     */
+    if (!this.apiKey && credentialIsManaged('browserbase')) return { accept: 'application/json' };
     return { 'x-bb-api-key': this.apiKey, accept: 'application/json' };
   }
 }

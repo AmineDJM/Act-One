@@ -11,6 +11,7 @@ import {
 } from '@higgsfield/client/v2';
 import type { CostOperation } from '@act-one/core';
 import { isPrivateAddress } from '../browser/policy.ts';
+import { canAuthenticate, credentialIsManaged } from '../managed-credentials.ts';
 import { httpRequest, redact, sleep } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import type {
@@ -297,7 +298,7 @@ export class HiggsfieldProvider implements GenerativeMediaProvider {
   }
 
   isConfigured(): boolean {
-    return this.credentials.length > 0;
+    return canAuthenticate('higgsfield', this.credentials);
   }
 
   /**
@@ -760,6 +761,15 @@ export class HiggsfieldProvider implements GenerativeMediaProvider {
   }
 
   private headers(): Record<string, string> {
+    /*
+     * No credential and a gateway in front: send no authorization header and
+     * let the gateway write one. A placeholder would reach the vendor's logs
+     * and, off the gateway, would fail as a wrong key rather than a missing
+     * one — which is the harder of the two to read.
+     */
+    if (!this.credentials && credentialIsManaged('higgsfield')) {
+      return { accept: 'application/json' };
+    }
     return { authorization: `Key ${this.credentials}`, accept: 'application/json' };
   }
 

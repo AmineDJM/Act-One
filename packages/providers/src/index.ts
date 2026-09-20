@@ -47,3 +47,18 @@ export {
 export * from './storage/types.ts';
 export { LocalFsStorageProvider } from './storage/local.ts';
 export { SupabaseStorageProvider } from './storage/supabase.ts';
+
+export * from './managed-credentials.ts';
+
+export * from './analysis/types.ts';
+export { GeminiVideoAnalyst, type GeminiVideoConfig } from './analysis/gemini-video.ts';
+export {
+  RunwayProvider,
+  type RunwayConfig,
+  type RunwayCapability,
+  type RunwayCapabilities,
+} from './media/runway.ts';
+
+export * from './media/still-types.ts';
+export { RecraftProvider, type RecraftConfig } from './media/recraft.ts';
+export { IdeogramProvider, type IdeogramConfig } from './media/ideogram.ts';

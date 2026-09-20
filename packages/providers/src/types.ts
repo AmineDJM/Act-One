@@ -10,7 +10,7 @@ import type { CostOperation } from '@act-one/core';
  *  3. Every provider declares health, so routing can fall back without the
  *     pipeline knowing which vendor it is talking to.
  */
-export type ProviderKind = 'llm' | 'browser' | 'media' | 'speech' | 'storage';
+export type ProviderKind = 'llm' | 'browser' | 'media' | 'speech' | 'storage' | 'analysis';
 
 export type CostRecord = {
   provider: string;
