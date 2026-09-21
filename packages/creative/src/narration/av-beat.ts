@@ -143,10 +143,25 @@ export function layout(
  * emphasis of several words matches at the first of them.
  */
 export function findEmphasis(words: readonly SpokenWord[], emphasis: string): SpokenWord | null {
+  return emphasisSpan(words, emphasis)?.[0] ?? null;
+}
+
+/**
+ * ALL the words the emphasis covers, not just the first.
+ *
+ * The first version returned one word and the layout closed the phrase on it,
+ * which split every emphasis longer than a word: "not made yet." became "not"
+ * on its own line and then "made yet.", and "a hundred times." put the article
+ * on a line by itself. An emphasis is a phrase the picture reacts to, and half
+ * of it is not that phrase.
+ */
+export function emphasisSpan(words: readonly SpokenWord[], emphasis: string): SpokenWord[] | null {
   const wanted = emphasis.trim().toLowerCase().split(/\s+/).map(bare).filter(Boolean);
   if (!wanted.length) return null;
   for (let i = 0; i + wanted.length <= words.length; i += 1) {
-    if (wanted.every((want, j) => bare(words[i + j]!.word.toLowerCase()) === want)) return words[i]!;
+    if (wanted.every((want, j) => bare(words[i + j]!.word.toLowerCase()) === want)) {
+      return words.slice(i, i + wanted.length);
+    }
   }
   return null;
 }
@@ -160,7 +175,10 @@ export function phrasesOf(
   if (!words.length) return [];
   const breath = options.breathSeconds ?? 0.18;
   const maxWords = options.maxWords ?? 5;
-  const emphasisWord = emphasis ? findEmphasis(words, emphasis) : null;
+  const span = emphasis ? emphasisSpan(words, emphasis) : null;
+  const first = span?.[0] ?? null;
+  const last = span?.[span.length - 1] ?? null;
+  const inSpan = new Set(span ?? []);
 
   const phrases: Phrase[] = [];
   let current: SpokenWord[] = [];
@@ -171,7 +189,7 @@ export function phrasesOf(
       text: current.map((w) => w.word).join(' '),
       atSeconds: round(current[0]!.startSeconds),
       endSeconds: round(current[current.length - 1]!.endSeconds),
-      carriesEmphasis: emphasisWord !== null && current.includes(emphasisWord),
+      carriesEmphasis: current.some((word) => inSpan.has(word)),
     });
     current = [];
   };
@@ -186,11 +204,14 @@ export function phrasesOf(
      * when the field arrives on it. This is the one place where the layout
      * overrides the breathing.
      */
-    if (word === emphasisWord && current.length) close();
+    if (word === first && current.length) close();
     current.push(word);
     const next = words[i + 1];
     const gap = next ? next.startSeconds - word.endSeconds : Infinity;
-    if (word === emphasisWord || gap >= breath || current.length >= maxWords) close();
+    // Inside the emphasis nothing breaks it: it is one phrase however it
+    // breathes and however long it runs.
+    if (inSpan.has(word) && word !== last) continue;
+    if (word === last || gap >= breath || current.length >= maxWords) close();
   }
   close();
   return phrases;

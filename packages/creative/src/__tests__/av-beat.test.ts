@@ -39,6 +39,14 @@ describe('breaking a reading into what goes on screen', () => {
     expect(phrases.map((p) => p.text)).toEqual(['You said', 'one, two']);
   });
 
+  it('keeps a multi-word emphasis together as one phrase', () => {
+    // "not made yet." must not become "not" and then "made yet."
+    const words = read('it@0-0.1  has@0.12-0.2  not@0.22-0.4  made@0.42-0.6  yet.@0.62-0.9');
+    const phrases = phrasesOf(words, 'not made yet.', { breathSeconds: 0.5 });
+    expect(phrases.map((p) => p.text)).toEqual(['it has', 'not made yet.']);
+    expect(phrases[1]!.carriesEmphasis).toBe(true);
+  });
+
   it('gives the emphasis word a line of its own', () => {
     const words = read('Not@0-0.21  one@0.27-0.38  safe@0.42-0.61  idea.@0.64-0.88  Three.@0.91-1.35');
     const phrases = phrasesOf(words, 'Three', { breathSeconds: 0.5 });
