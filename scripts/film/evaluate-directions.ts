@@ -113,7 +113,17 @@ async function measure(file: string): Promise<Record<string, unknown>> {
 async function watch(file: string): Promise<VideoAnalysis> {
   const analyst = new GeminiVideoAnalyst({});
   if (!analyst.isConfigured()) throw new Error('No Gemini credential is available in this process.');
-  return analyst.analyse({ source: path.resolve(file), depth: 'deep', fps: 4, focus: FOCUS }, CONTEXT);
+  /*
+   * Depth is switchable because the deep model's gateway is not always up.
+   *
+   * The deep path already retries four times before giving up, and there are
+   * stretches where all four come back 502 — a full upload each, several
+   * minutes each, and no reading at the end of it. When that happens the
+   * choice is between no reading and a broader one, and a broader one is
+   * worth more than nothing. ACT_ONE_EVAL_DEPTH=normal takes it.
+   */
+  const depth = (process.env['ACT_ONE_EVAL_DEPTH'] as 'deep' | 'normal' | undefined) ?? 'deep';
+  return analyst.analyse({ source: path.resolve(file), depth, fps: depth === 'deep' ? 4 : 2, focus: FOCUS }, CONTEXT);
 }
 
 
