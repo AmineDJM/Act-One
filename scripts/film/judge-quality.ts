@@ -33,6 +33,32 @@ import { promisify } from 'node:util';
 import { httpRequest } from '@act-one/providers';
 
 const run = promisify(execFile);
+
+/**
+ * JSON out of a model that was asked for JSON and nearly obliged.
+ *
+ * The audio critic returned a valid object with one spurious brace in the
+ * middle — `..."tell":"..."},"oneChange":"..."}` — and a strict parse threw,
+ * which killed the whole run and took the OTHER critic's answer with it. A
+ * judgement that is unreadable is a judgement lost; a judgement that is
+ * readable after removing a brace nobody meant to type is not.
+ *
+ * Two repairs, both narrow: a closing brace immediately before a new key, and
+ * a trailing comma. Anything else still throws, because silently accepting
+ * arbitrary malformed output is how a critic starts agreeing with you.
+ */
+function readJson(text: string): Record<string, unknown> {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error(`no JSON in reply: ${text.slice(0, 200)}`);
+  const body = text.slice(start, end + 1);
+  try {
+    return JSON.parse(body);
+  } catch {
+    const repaired = body.replace(/\}\s*,\s*"/g, ',"').replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(repaired);
+  }
+}
 const file = process.env['ACT_ONE_JUDGE'] ?? '.renders/one-timeline.mp4';
 
 const CRAFT = [
@@ -59,6 +85,14 @@ const BRIEF =
   'You are not scoring it against a template. Judge the CRAFT: the look, the invention, the motion, the type.\n' +
   `Be specific and be hard on it.\n\n${CRAFT.map((c) => `- ${c}`).join('\n')}\n\n${SCHEMA}`;
 
+/*
+ * Each critic is settled separately.
+ *
+ * They were sequential and unguarded, so a malformed answer from the second
+ * one threw before the first one's judgement was ever printed — a full render
+ * judged, and nothing to show for it. They are independent opinions and they
+ * should fail independently.
+ */
 const video = readFileSync(file).toString('base64');
 const gem = await httpRequest<any>(
   'gemini',
@@ -70,7 +104,7 @@ const gem = await httpRequest<any>(
     timeoutMs: 300_000, attempts: 3,
   },
 );
-const g = JSON.parse(gem?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') ?? '{}');
+const g: any = readJson(gem?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') ?? '{}');
 
 /*
  * A second EAR, not a second pair of eyes on stills.
@@ -114,8 +148,7 @@ const oai = await httpRequest<any>('openai', 'https://api.openai.com/v1/chat/com
   },
   timeoutMs: 300_000, attempts: 3,
 });
-const oaiText = String(oai?.choices?.[0]?.message?.content ?? '');
-const o = JSON.parse(oaiText.slice(oaiText.indexOf('{'), oaiText.lastIndexOf('}') + 1) || '{}');
+const o: any = readJson(String(oai?.choices?.[0]?.message?.content ?? ''));
 
 console.log('\n=== GEMINI — watched the film, with its sound ===');
 for (const c of CRAFT) {
