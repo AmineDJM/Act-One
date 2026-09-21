@@ -18,13 +18,13 @@
 import path from 'node:path';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { BrandSystem, inspectScenes } from '@act-one/core';
+import { BrandSystem, DIALOGUE_LEAD_MIN, inspectScenes } from '@act-one/core';
 import { layout, type SpokenWord } from '@act-one/creative';
 import { neutralRamp } from '@act-one/design';
 import { EASINGS, renderScenes } from '@act-one/motion';
 import {
   DEFAULT_LIBRARY, buildMix, masterLoudness, mixArgs, muxArgs, runFfmpeg, soundForScenes,
-  analyseVoice,
+  analyseVoice, bedReductionDb, readDialogueLead,
 } from '@act-one/sound';
 import { ElevenLabsProvider } from '@act-one/providers';
 import { BEATS, VISUALS } from './beats.ts';
@@ -175,13 +175,32 @@ const out = path.resolve('.renders/one-timeline.mp4');
  * nothing to misread.
  */
 if (existsSync(out)) rmSync(out);
-const started = Date.now();
-await renderScenes({
-  scenes, brand, assetUrls: ASSETS, aspect: '16:9',
-  quality: (process.env['ACT_ONE_QUALITY'] as 'preview' | 'hd' | undefined) ?? 'hd',
-  outputPath: silent, concurrency: 3, theme: 'light',
-});
-console.log(`  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+
+/*
+ * ACT_ONE_MIX_ONLY reuses the existing silent picture.
+ *
+ * The audio half of this film costs seconds to rebuild and the picture costs
+ * three minutes, and every audio question was being paid for at picture
+ * prices. That is not a convenience: an audio defect that takes three minutes
+ * to re-test gets tested once and guessed at thereafter, which is how the mix
+ * went out unmeasured. It is refused when there is no picture to reuse, rather
+ * than quietly muxing onto nothing.
+ */
+const mixOnly = process.env['ACT_ONE_MIX_ONLY'] === '1';
+if (mixOnly && !existsSync(silent)) {
+  throw new Error('ACT_ONE_MIX_ONLY needs an existing silent render at .renders/one-timeline.silent.mp4; there is none.');
+}
+if (mixOnly) {
+  console.log('  reusing the existing picture (ACT_ONE_MIX_ONLY)');
+} else {
+  const started = Date.now();
+  await renderScenes({
+    scenes, brand, assetUrls: ASSETS, aspect: '16:9',
+    quality: (process.env['ACT_ONE_QUALITY'] as 'preview' | 'hd' | undefined) ?? 'hd',
+    outputPath: silent, concurrency: 3, theme: 'light',
+  });
+  console.log(`  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
 
 const design = soundForScenes(scenes, {
   behaviour: { musicCharacter: 'percussive', openOnMusic: false, uiSoundDensity: 'rhythmic', impactsOnCuts: true, endWithSting: true },
@@ -208,7 +227,59 @@ const voiceTracks = timed
     durationSeconds: readings.get(beat.id)!.durationSeconds,
   }));
 
-const plan = buildMix({ design, resolvedPaths: resolved, durationSeconds: seconds, voiceTracks });
+let plan = buildMix({ design, resolvedPaths: resolved, durationSeconds: seconds, voiceTracks });
+
+/*
+ * DOES THE MUSIC COVER THE WORDS? MEASURED, not assumed.
+ *
+ * The critic that listens to the mix said twice, on two different renders,
+ * that "the music briefly overpowers the narration" — and the number that
+ * decides it was never taken here. The sidechain compressor ducks the bed
+ * under the voice, which is the right tool and still a guess about how much:
+ * a quiet bed ducks to nothing and a loud one ducks to not enough.
+ *
+ * The pipeline has measured and corrected this for a long time
+ * (pipeline/stages/render.ts). This script never called it. So the film that
+ * is the acceptance criterion for the whole project was the one film going out
+ * unmeasured, and the correction existed the entire time.
+ *
+ * Meter the bed and the voice separately over the stretches where somebody is
+ * actually speaking, take the bed down by the shortfall, and meter again — the
+ * second reading is the one that proves it, because the first only says what
+ * was wrong.
+ */
+if (voiceTracks.length > 0 && design.music) {
+  let read = await readDialogueLead(plan, voiceTracks);
+  let lead = 'leadLu' in read ? read : null;
+  if (lead) {
+    const reduction = bedReductionDb(lead);
+    console.log(`  voice leads music by ${lead.leadLu.toFixed(1)} LU (voice ${lead.voiceLufs.toFixed(1)}, bed ${lead.musicLufs.toFixed(1)} LUFS)`);
+    if (reduction > 0) {
+      plan = buildMix({
+        design: { ...design, music: { ...design.music, baseGainDb: design.music.baseGainDb - reduction } },
+        resolvedPaths: resolved,
+        durationSeconds: seconds,
+        voiceTracks,
+      });
+      read = await readDialogueLead(plan, voiceTracks);
+      lead = 'leadLu' in read ? read : null;
+      console.log(`  bed taken down ${reduction} dB -> voice now leads by ${lead ? lead.leadLu.toFixed(1) : '?'} LU`);
+    }
+    // Said out loud rather than swallowed: one correction is not guaranteed to
+    // be enough, and a mix that still fails the floor must not look like a pass.
+    if (lead && lead.leadLu < DIALOGUE_LEAD_MIN) {
+      console.log(`  STILL UNDER THE FLOOR: ${lead.leadLu.toFixed(1)} LU against a floor of ${DIALOGUE_LEAD_MIN}. The words do not carry.`);
+    }
+  } else {
+    /*
+     * Null has three causes and they are not the same problem: the mix has no
+     * music bus, no voice bus, or ffmpeg/the meter did not produce two
+     * readings. Reporting them as one line was how this stayed unexplained.
+     */
+    console.log(`  dialogue lead could not be measured [${(read as { reason: string }).reason}]: ${(read as { detail: string }).detail}`);
+  }
+}
+
 const premix = path.resolve('.renders/one-timeline.premix.wav');
 const mixed = await runFfmpeg(mixArgs(plan, premix), { timeoutMs: 8 * 60_000 });
 if (!mixed.ok) throw new Error(`mix failed: ${mixed.stderr.slice(-300)}`);

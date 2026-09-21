@@ -35,10 +35,26 @@ export function dialogueLeadArgs(plan: MixPlan, windows: VoiceWindow[]): string[
     .join('+');
   const gate = `aselect='${select}',asetpts=N/SR/TB`;
 
+  /*
+   * EVERY BUS NEEDS A SINK, including the ones this measurement ignores.
+   *
+   * This graph reuses the mix's own bus graph and taps two of its busses. The
+   * effects bus is built there too — with `amix`, when there is more than one
+   * cue — and nothing here consumed it, so ffmpeg refused the whole graph with
+   * "Filter amix:default has an unconnected output" and the measurement
+   * returned null. Since a narrated film essentially always has effects cues,
+   * this failed on every real mix it was ever given: the pipeline's correction
+   * silently skipped, and the one film that is this project's acceptance
+   * criterion shipped with a bed nobody had metered. The unit test passed
+   * throughout, because its fixture has no cues and therefore no effects bus.
+   */
+  const spare = plan.busses.sfx ? `;[${plan.busses.sfx}]anullsink` : '';
+
   const graph =
     `${plan.busGraph};` +
     `[${plan.busses.music}]${gate},ebur128=peak=none[bed];` +
-    `[${plan.busses.voice}]${gate},ebur128=peak=none[voice]`;
+    `[${plan.busses.voice}]${gate},ebur128=peak=none[voice]` +
+    spare;
 
   const args: string[] = ['-hide_banner', '-nostdin'];
   for (const input of plan.inputs) args.push('-i', input.path);
@@ -61,18 +77,45 @@ export function parseEbur128Summaries(stderr: string): number[] {
   return found.sort((a, b) => a.index - b.index).map((entry) => entry.lufs);
 }
 
+/**
+ * Why a measurement did not happen.
+ *
+ * `null` was the only answer for four different failures — no music bus, no
+ * voice bus, ffmpeg refusing the graph, and a meter that printed nothing — and
+ * the caller could do nothing with it but skip the correction silently. The
+ * film that is this project's acceptance criterion went out unmeasured for
+ * weeks behind that null, and so would any production hitting the same graph,
+ * because the pipeline skips its correction on null too.
+ */
+export type LeadFailure = { reason: 'no_music_bus' | 'no_voice_bus' | 'no_windows' | 'ffmpeg_failed' | 'no_meter_output'; detail: string };
+
 export async function measureDialogueLead(
   plan: MixPlan,
   windows: VoiceWindow[],
   options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<DialogueLead | null> {
-  const args = dialogueLeadArgs(plan, windows);
-  if (!args) return null;
+  const out = await readDialogueLead(plan, windows, options);
+  return 'leadLu' in out ? out : null;
+}
+
+/** The same measurement, with the reason when it could not be taken. */
+export async function readDialogueLead(
+  plan: MixPlan,
+  windows: VoiceWindow[],
+  options: { signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<DialogueLead | LeadFailure> {
+  if (!plan.busses.music) return { reason: 'no_music_bus', detail: 'The mix has no music bus, so there is nothing for the voice to lead.' };
+  if (!plan.busses.voice) return { reason: 'no_voice_bus', detail: 'The mix has no voice bus.' };
+  if (windows.length === 0) return { reason: 'no_windows', detail: 'No voice windows were given, so there is no stretch to meter over.' };
+
+  const args = dialogueLeadArgs(plan, windows)!;
   const result = await runFfmpeg(args, { signal: options.signal, timeoutMs: options.timeoutMs ?? 300_000 });
-  if (!result.ok) return null;
+  if (!result.ok) return { reason: 'ffmpeg_failed', detail: result.stderr.trim().split('\n').slice(-3).join(' | ').slice(-400) };
+
   const [musicLufs, voiceLufs] = parseEbur128Summaries(result.stderr);
-  if (musicLufs === undefined || voiceLufs === undefined) return null;
-  if (!Number.isFinite(musicLufs) || !Number.isFinite(voiceLufs)) return null;
+  if (musicLufs === undefined || voiceLufs === undefined || !Number.isFinite(musicLufs) || !Number.isFinite(voiceLufs)) {
+    return { reason: 'no_meter_output', detail: `The meters printed ${parseEbur128Summaries(result.stderr).length} reading(s); two are needed.` };
+  }
   return { voiceLufs, musicLufs, leadLu: voiceLufs - musicLufs };
 }
 
