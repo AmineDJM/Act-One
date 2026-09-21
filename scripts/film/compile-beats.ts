@@ -121,6 +121,31 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * the frame until the voice moves on. That is also why its type can be
    * large: it never has to leave room for the line after it.
    */
+  /*
+   * A ground under words that sit on a screenshot.
+   *
+   * The worst moment a model found in the finished film was "'fails itself
+   * first' awkwardly overlaps smaller background text, creating illegible
+   * visual clutter" — a caption over a product page, competing with the
+   * page's own type. White on a screenshot is not a colour problem that a
+   * different white fixes; the words need something to sit on.
+   *
+   * A soft band, only where the picture underneath has type in it.
+   */
+  if (visual.kind === 'product' && beat.phrases.length) {
+    objects.push({
+      kind: 'shape', id: `${beat.id}_ground`, shape: 'rect',
+      width: 1.4, height: 0.42,
+      fill: palette.ink, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+      role: 'structure', enterAt: 0,
+      reason: 'The words sit on this rather than on the interface behind them.',
+      transform: Transform.parse({
+        x: 0.5, y: 1.06, z: 0.1, anchor: { x: 0.5, y: 0.5 },
+        opacity: 0.82,
+      }),
+    } as SceneObject);
+  }
+
   beat.phrases.forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
     const next = beat.phrases[i + 1];
@@ -241,7 +266,7 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
 
   if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
-    return { x: 0.07, top: 0.68, lineGap: 0.1, anchor: 0, width: 0.52, heroScale: 1.1 };
+    return { x: 0.07, top: 0.88, lineGap: 0.1, anchor: 0, width: 0.52, heroScale: 1.05 };
   }
   if (visual.kind === 'mark') {
     return { x: 0.09, top: 0.48, lineGap: 0.12, anchor: 0, width: 0.54, heroScale: 1.3 };

@@ -178,9 +178,25 @@ function buildFilterGraph(
     voiceToMix = 'voicemix';
     // A real sidechain, not a static envelope: static ducking pumps audibly
     // every time the narration pauses for breath.
+    /*
+     * Deeper and quicker than it was.
+     *
+     * A model listening to the finished mix found the one place it fails:
+     * "the background music briefly swells too loud, competing with the
+     * narrator and making the words harder to catch". The old setting caught
+     * the voice but not hard enough — ratio 7 at a 0.055 threshold leaves the
+     * bed audibly arguing with a quiet syllable, and a 12ms attack lets the
+     * first word of a line through before the duck arrives.
+     *
+     * The attack comes down so the duck is already there when the voice is,
+     * the threshold down so quieter words still trigger it, and the ratio up
+     * so the bed gets out of the way properly. The release stays long: that
+     * is what stops it pumping between words, which is the fault a static
+     * envelope has and the reason this is a sidechain at all.
+     */
     parts.push(
       `[${musicBus}][voicekey]sidechaincompress=` +
-        'threshold=0.055:ratio=7:attack=12:release=320:makeup=1[musicducked]',
+        'threshold=0.03:ratio=12:attack=5:release=340:makeup=1[musicducked]',
     );
     duckedMusic = 'musicducked';
   } else if (musicBus && hasDuckCues(design.cues)) {
