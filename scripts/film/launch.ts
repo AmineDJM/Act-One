@@ -228,7 +228,7 @@ const scenes: Graph[] = [
       } as SceneObject,
     ],
     audio: [{ at: 0.1, kind: 'texture', intensity: 0.45, causedBy: 'l1_room', reason: 'Room tone under the shot.' }],
-    handover: { mechanism: 'field_change', carries: [], durationSeconds: 0.3, reason: 'The room gives way to the page.' },
+    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.55, reason: 'The camera pushes through the dark of the room into the line.' },
     macro: null,
   }),
 
@@ -252,7 +252,7 @@ const scenes: Graph[] = [
       }, { x: 0.12, y: 0.56, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [{ at: 0.08, kind: 'impact', intensity: 0.45, causedBy: 'l2_line', reason: 'The line lands.' }],
-    handover: { mechanism: 'field_change', carries: [], durationSeconds: 0.25, reason: 'Ink to paper.' },
+    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.5, reason: 'The page wipes in over the ink; the edge is the event.' },
     macro: null,
   }),
 
@@ -261,17 +261,17 @@ const scenes: Graph[] = [
     intent: 'PAIN SHOWN: the work spread across a desk, too much of it, held at angles.',
     background: PAPER,
     camera: {
-      focalLengthMm: { from: 34, to: 30, curve: 'in_out_cubic' },
+      focalLengthMm: { from: 80, to: 72, curve: 'in_out_cubic' },
       dollyZ: { from: 0, to: 0.4, curve: 'in_out_cubic' },
       scale: { from: 1.0, to: 1.04, curve: 'in_out_cubic' },
     },
     objects: [
       bloom('l3_bloom', { x: 0.5, y: 0.45 }, '#FFE8D8', 0.9),
       chapterWord('l3_chapter', 'SIX WEEKS', '#E6E0D4'),
-      card('l3_c1', 'ast_how_stages', { x: 0, y: 0, width: 1, height: 0.52 }, { x: 0.27, y: 0.4, z: 0.42 }, { rx: 9, ry: 20, rz: -4 }, 0.40, 0.1, 'The brief, as one of too many pages.'),
-      card('l3_c2', 'ast_work_films', { x: 0, y: 0, width: 1, height: 0.52 }, { x: 0.63, y: 0.3, z: -0.05 }, { rx: -7, ry: -17, rz: 3 }, 0.40, 0.45, 'The references, as another.'),
-      card('l3_c3', 'ast_pricing_terms', { x: 0, y: 0, width: 1, height: 0.52 }, { x: 0.42, y: 0.72, z: 0.2 }, { rx: 13, ry: 7, rz: -2 }, 0.38, 0.8, 'The terms, as a third.'),
-      card('l3_c4', 'ast_home_steps', { x: 0, y: 0, width: 1, height: 0.52 }, { x: 0.72, y: 0.68, z: -0.3 }, { rx: -9, ry: -25, rz: 5 }, 0.36, 1.15, 'The schedule, as a fourth.'),
+      card('l3_c1', 'ast_how_stages', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.27, y: 0.4, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.30, 0.1, 'The brief, as one of too many pages.'),
+      card('l3_c2', 'ast_work_films', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.63, y: 0.32, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.32, 0.45, 'The references, as another.'),
+      card('l3_c3', 'ast_pricing_terms', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.44, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.28, 0.8, 'The terms, as a third.'),
+      card('l3_c4', 'ast_home_steps', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.78, y: 0.72, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.26, 1.15, 'The schedule, as a fourth.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
         token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 2.2,
       }, { x: 0.1, y: 0.9, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
@@ -280,7 +280,7 @@ const scenes: Graph[] = [
       { at: 0.15, kind: 'ui_click', intensity: 0.3, causedBy: 'l3_c1', reason: 'Each page sets down.' },
       { at: 3.4, kind: 'riser', intensity: 0.5, causedBy: 'l3_c4', reason: 'Too much of it; something has to give.' },
     ],
-    handover: { mechanism: 'field_change', carries: [], durationSeconds: 0.2, reason: 'The page goes to ink for the mark.' },
+    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.55, reason: 'The camera pushes into the paper until the mark is all that is left.' },
     macro: null,
   }),
 
@@ -306,7 +306,7 @@ const scenes: Graph[] = [
       }, { x: 0.5, y: 0.58, anchor: { x: 0.5, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [{ at: 0.25, kind: 'logo_sting', intensity: 0.65, causedBy: 'l4_mark', reason: 'The mark.' }],
-    handover: { mechanism: 'field_change', carries: [], durationSeconds: 0.25, reason: 'Into the work.' },
+    handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.5, reason: 'The move continues out of the mark and into the work.' },
     macro: null,
   }),
 ];
@@ -331,8 +331,17 @@ const step = (
     id, durationSeconds: seconds,
     intent: `HOW IT WORKS: ${title.toLowerCase()}, with the real interface beside it.`,
     background: PAPER,
+    /*
+      * A long lens, because a wide one shears.
+      *
+      * Perspective is tied to focal length, so 42mm put the vanishing point
+      * close enough that a card turned 13 degrees came back as a blade rather
+      * than as a card held at an angle. Product photographers shoot objects
+      * at 85 to 105mm for exactly this reason: the long lens flattens the
+      * foreshortening and the object keeps its shape.
+      */
     camera: {
-      focalLengthMm: 42,
+      focalLengthMm: 95,
       scale: { from: 1.02, to: 1.0, curve: 'out_quint' },
       x: { from: 0.008, to: -0.008, curve: 'in_out_cubic' },
     },
@@ -341,17 +350,26 @@ const step = (
       line(`${id}_index`, index, {
         token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
       }, { x: 0.09, y: 0.26, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      /*
+        * The title gets room to be two lines and the body sits below where two
+        * lines end.
+        *
+        * At 0.32 wrap width the display face broke these titles to THREE lines
+        * and the third one landed on the body copy — two paragraphs occupying
+        * the same band of the page. A text box is a wrap width, and a title
+        * given less width than it needs does not get smaller, it gets taller.
+        */
       line(`${id}_title`, title, {
-        maxWidth: 0.32, maxLines: 2,
-      }, { x: 0.09, y: 0.38, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } }),
+        maxWidth: 0.38, maxLines: 2,
+      }, { x: 0.09, y: 0.4, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } }),
       line(`${id}_body`, body, {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.3, maxLines: 3, enterAt: 0.55,
-      }, { x: 0.09, y: 0.54, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
-      card(`${id}_card`, asset, crop, { x: 0.68, y: 0.5, z: -0.12 }, { rx: 4, ry: -13, rz: 1.5 }, 0.52, 0.3,
+        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.32, maxLines: 3, enterAt: 0.55,
+      }, { x: 0.09, y: 0.62, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      card(`${id}_card`, asset, crop, { x: 0.7, y: 0.5, z: -0.08 }, { rx: 2, ry: -7, rz: 1 }, 0.46, 0.3,
         'The real interface at this step, held where a hand would hold it.'),
     ],
     audio: [{ at: 0.12, kind: 'ui_click', intensity: 0.35, causedBy: `${id}_card`, reason: 'The step lands.' }],
-    handover: { mechanism: 'object_handoff', carries: [`${id}_card`], durationSeconds: 0.3, reason: 'The same frame, the next step in it.' },
+    handover: { mechanism: 'camera_carry', carries: [`${id}_card`], durationSeconds: 0.45, reason: 'The camera travels sideways to the next step; the card is the same card.' },
     macro: null,
   });
 
@@ -365,13 +383,13 @@ scenes.push(
     */
   step('l5', '01', 'We read your product.',
     'A real capture, never a drawing of one.',
-    'ast_home_hero', { x: 0, y: 0, width: 0.86, height: 0.72 }, 6.2),
+    'ast_home_hero', { x: 0, y: 0, width: 0.8, height: 1 }, 6.2),
   step('l6', '02', 'Three directions.',
     'Rendered and watched before one is chosen.',
-    'ast_work_films', { x: 0, y: 0, width: 1, height: 0.62 }, 6.2),
+    'ast_work_films', { x: 0, y: 0, width: 0.62, height: 1 }, 6.2),
   step('l7', '03', 'One afternoon.',
     'The engine checks its own frames, then hands you a master.',
-    'ast_how_stages', { x: 0, y: 0, width: 1, height: 0.58 }, 6.2),
+    'ast_how_stages', { x: 0, y: 0, width: 0.62, height: 1 }, 6.2),
 );
 
 // --- 4. THE BENEFIT -------------------------------------------------------
@@ -397,7 +415,7 @@ scenes.push(
       }, { x: 0.1, y: 0.66, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [{ at: 0.1, kind: 'sub_drop', intensity: 0.8, causedBy: 'l8_stat', reason: 'The number lands.' }],
-    handover: { mechanism: 'field_change', carries: [], durationSeconds: 0.25, reason: 'To the year.' },
+    handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.45, reason: 'The move carries on into the year.' },
     macro: null,
   }),
 
@@ -425,7 +443,7 @@ scenes.push(
       }, { x: 0.5, y: 0.68, anchor: { x: 0.5, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [{ at: 0.08, kind: 'riser', intensity: 0.5, causedBy: 'l9_year', reason: 'The year arrives.' }],
-    handover: { mechanism: 'field_change', carries: [], durationSeconds: 0.2, reason: 'To the call.' },
+    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.45, reason: 'The call wipes in under the year.' },
     macro: null,
   }),
 

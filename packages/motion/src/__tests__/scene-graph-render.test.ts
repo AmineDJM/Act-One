@@ -15,6 +15,7 @@ import {
   type SceneObject,
 } from '@act-one/core';
 import { EASINGS } from '../easing.ts';
+import { handoverOverlap } from '../components/Handover.tsx';
 import { renderScenes, resolveBrowserExecutable } from '../render.ts';
 
 /**
@@ -382,5 +383,52 @@ describe('type as the reference films set it', () => {
 
     expect(() => build([{ text: 'Six ' }, { text: 'months' }])).toThrow();
     expect(() => build([{ text: 'Six ' }, { text: 'weeks' }])).not.toThrow();
+  });
+});
+
+describe('the boundary between two scenes', () => {
+  /**
+   * A handover that was declared and ignored.
+   *
+   * Every scene carries a `handover` — mechanism, duration, the ids that
+   * survive — and the film assembly laid scenes end to end in butt-joined
+   * sequences, so ten declared transitions rendered as ten hard cuts. A model
+   * reading the reference films found their boundaries were mostly not cuts at
+   * all: "camera pans down to new UI layout", "camera zooms into white space
+   * of a message". Those films are one space travelled through.
+   *
+   * What this pins is the thing that would break silently: a cut must stay a
+   * cut, and a transition must not move the timeline. The sound is placed
+   * against cumulative scene durations, so an overlap implemented by pulling
+   * the incoming scene EARLIER would slide every cue in the film against the
+   * picture by a growing amount — inaudible on the first boundary, unfixable
+   * by the tenth.
+   */
+  it('overlaps only where a mechanism asks for it, and never on a cut', () => {
+    const handover = (over: Record<string, unknown>) =>
+      SceneGraph.parse({
+        id: 'scn_h',
+        durationSeconds: 2,
+        intent: 'A scene that hands over.',
+        objects: [marker('m', 0, 0.5, '#ff0000')],
+        handover: over,
+        macro: null,
+      }).handover;
+
+    // A cut is a cut, and asking for one with a duration is still asking for a
+    // cut: quietly giving a dissolve would be the renderer overruling the
+    // director.
+    expect(handoverOverlap(handover({ mechanism: 'cut', durationSeconds: 0.5 }))).toBe(0);
+    expect(handoverOverlap(handover({ mechanism: 'field_change', durationSeconds: 0.5 }))).toBe(0);
+
+    // A mechanism with no duration has not asked for anything either.
+    expect(handoverOverlap(handover({ mechanism: 'scale_through', durationSeconds: 0 }))).toBe(0);
+
+    expect(handoverOverlap(handover({ mechanism: 'scale_through', durationSeconds: 0.55 }))).toBeCloseTo(0.55, 3);
+    expect(handoverOverlap(handover({ mechanism: 'camera_carry', durationSeconds: 0.45 }))).toBeCloseTo(0.45, 3);
+
+    // Clamped, because a two-second scene handing over for three seconds is a
+    // scene that never plays.
+    expect(handoverOverlap(handover({ mechanism: 'mask_reveal', durationSeconds: 3 }))).toBe(1.5);
   });
 });

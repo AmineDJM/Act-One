@@ -3,6 +3,7 @@ import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
 import { resolveTokens, type DesignTokens } from '@act-one/design';
 import type { AspectRatio, BrandSystem, RenderQuality, SceneGraph } from '@act-one/core';
 import { SceneGraphRenderer } from './components/SceneGraphRenderer.tsx';
+import { Handover, handoverOverlap } from './components/Handover.tsx';
 
 /**
  * A film made of scene graphs rather than of named recipes.
@@ -49,13 +50,47 @@ export const SceneGraphFilm: React.FC<SceneGraphFilmProps> = ({ scenes, brand, a
   let elapsed = 0;
   return (
     <AbsoluteFill style={{ backgroundColor: tokens.canvas }}>
-      {scenes.map((scene) => {
+      {scenes.map((scene, index) => {
         const from = Math.round(elapsed * fps);
-        const duration = Math.max(1, Math.round(scene.durationSeconds * fps));
         elapsed += scene.durationSeconds;
+
+        /*
+         * The handover, which until now was written down and then ignored.
+         *
+         * Every scene declares how it hands over to the next — `scale_through`,
+         * `camera_carry`, `object_handoff`, `mask_reveal` — and this component
+         * laid the scenes end to end in butt-joined sequences, so every
+         * boundary in every film was a hard cut whatever the graph said. A
+         * model reading the films this system is asked to match found their
+         * boundaries were mostly NOT cuts: "camera pans down to new UI layout",
+         * "camera zooms into white space of a message", "text dissolves into
+         * flame logo". Those films are one space travelled through. Ours was
+         * ten slides.
+         *
+         * THE TIMELINE DOES NOT MOVE. The outgoing scene is EXTENDED past its
+         * own end rather than the incoming one starting early, so every scene
+         * still begins exactly where the sum of the durations before it says
+         * it does. That matters more than it looks: the sound is placed
+         * against those same cumulative times, and a transition that shortened
+         * the film would slide every cue in it against the picture.
+         */
+        const handover = scene.handover;
+        const overlapSeconds = index === scenes.length - 1 ? 0 : handoverOverlap(handover);
+        const duration = Math.max(1, Math.round((scene.durationSeconds + overlapSeconds) * fps));
+
+        const incoming = index === 0 ? null : scenes[index - 1]!.handover;
+        const incomingOverlap = incoming ? handoverOverlap(incoming) : 0;
+
         return (
           <Sequence key={scene.id} from={from} durationInFrames={duration} name={scene.id}>
-            <SceneGraphRenderer scene={scene} tokens={tokens} assetUrls={assetUrls} />
+            <Handover
+              /* How this scene ARRIVES is decided by the scene before it. */
+              incoming={incoming && incomingOverlap > 0 ? { mechanism: incoming.mechanism, seconds: incomingOverlap } : null}
+              /* How it LEAVES is its own declaration. */
+              outgoing={overlapSeconds > 0 ? { mechanism: handover.mechanism, seconds: overlapSeconds, holdSeconds: scene.durationSeconds } : null}
+            >
+              <SceneGraphRenderer scene={scene} tokens={tokens} assetUrls={assetUrls} />
+            </Handover>
           </Sequence>
         );
       })}
