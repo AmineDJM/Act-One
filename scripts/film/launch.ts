@@ -84,6 +84,18 @@ const ASSETS: Record<string, string> = Object.fromEntries(
 );
 if (existsSync(path.join(PUBLIC, 'before.mp4'))) ASSETS['ast_before'] = `${BASE}/before.mp4`;
 if (existsSync(path.join(PUBLIC, 'output.mp4'))) ASSETS['ast_output'] = `${BASE}/output.mp4`;
+/*
+ * The three direction films, which this system actually made.
+ *
+ * Not stand-ins and not mock-ups: these are three real renders from the
+ * direction exploration that produced this film's own look. A model watching
+ * the finished film said it was "missing actual examples of output films,
+ * which a benchmark film would include" — and the examples existed all along,
+ * sitting in .renders as the evidence for a decision nobody was shown.
+ */
+for (const name of ['dir-a-paper', 'dir-b-depth', 'dir-c-field'] as const) {
+  if (existsSync(path.join(PUBLIC, `${name}.mp4`))) ASSETS[`ast_${name.replace(/-/g, '_')}`] = `${BASE}/${name}.mp4`;
+}
 
 const brand = BrandSystem.parse({
   id: 'brn_launch', organizationId: 'org_launch', name: 'Act One',
@@ -741,7 +753,7 @@ scenes.push(
     id: 'l7', durationSeconds: 2.6,
     intent: 'THREE DIRECTIONS: three colour fields arrive side by side, and the line names them.',
     background: PAPER,
-    camera: camera({ scale: [1.00, 1.16], x: [0.07, 0.005], focal: 60, curve: 'linear' }),
+    camera: camera({ scale: [1.00, 1.08], x: [0.03, 0], focal: 60, curve: 'linear' }),
     objects: [
       ...([
         ['#1F6F4A', 0.1667, 0.0],
@@ -765,6 +777,57 @@ scenes.push(
         reason: 'One of the three directions, as a field of its own colour.',
         transform: Transform.parse({ x, y: 0.5, z: 0.4, anchor: { x: 0.5, y: 0.5 } }),
       }) as SceneObject),
+      /*
+       * THE THREE DIRECTIONS, PLAYING.
+       *
+       * The fields were bare colour, and a model watching the film reported
+       * exactly one confusion: "colour blocks feel disconnected from UI". It
+       * was right, and the fault was not decorative — this beat's claim is that
+       * the system directs THREE of them, and three rectangles of paint do not
+       * carry that. They read as a palette, which is a statement about the
+       * brand rather than about the work.
+       *
+       * These are the three real direction renders this system made while
+       * choosing the look of this very film. Putting them here makes the claim
+       * literally true rather than illustrated, and answers the same model's
+       * other note — that the film was "missing actual examples of output
+       * films" — with films instead of with a picture of films.
+       *
+       * They are NOT interface cards, which is why they are clips. Three
+       * readable interfaces cannot sit side by side: at a third of the frame
+       * each, every one of them is a thumbnail, and the inspector says so.
+       * Footage does not have that problem, because footage at a third of the
+       * frame is still footage.
+       */
+      ...([
+        // Inset within their fields rather than filling them: a film sitting
+        // ON a coloured panel reads as deliberate, where a film bleeding off
+        // the frame edge reads as a crop nobody chose. The outer two are
+        // pulled in to 0.20 and 0.80 so both edges clear at the widest the
+        // camera goes.
+        ['ast_dir_a_paper', 0.2, 0.06],
+        ['ast_dir_b_depth', 0.5, 0.22],
+        ['ast_dir_c_field', 0.8, 0.38],
+      ] as const)
+        .filter(([asset]) => ASSETS[asset])
+        .map(([asset, x, enterAt], i) => ({
+          kind: 'clip', id: `l7_film_${i}`, assetId: asset,
+          crop: { x: 0, y: 0, width: 1, height: 1 },
+          width: 0.26,
+          // Each starts at a different second, so three films playing at once
+          // do not cut in step and read as one image in three panels.
+          sourceInSeconds: 1.2 + i * 2.6, playbackRate: 1, generated: true,
+          /*
+           * Support, not payload, and the inspector is what settled it: four
+           * payloads at 0.8s means "the eye goes to one of them and the film
+           * chooses which by accident". The LINE is what this beat asks you to
+           * read. The three films are the evidence for it, and evidence does
+           * not compete with the claim it supports.
+           */
+          role: 'support',
+          reason: 'One of the three directions, as the film it actually is.',
+          transform: Transform.parse({ x, y: 0.5, z: 0.2, anchor: { x: 0.5, y: 0.5 }, opacity: ARRIVES }),
+        }) as SceneObject),
       line('l7_index', '02', {
         token: 'mono', color: PAPER, maxWidth: 0.1, maxLines: 1, role: 'structure', enterAt: 0.7,
       }, { x: 0.09, y: 0.3, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
