@@ -159,7 +159,14 @@ export async function narrate(options: {
    * the voice for a film we did not make.
    */
   const direction = {
-    energy: options.energy ?? 'medium',
+    /*
+     * medium-high, which is what the audition chose rather than what I would
+     * have guessed. 'high' was the reference's energy and sounded like a pitch
+     * over our picture; 'medium' was the correction and read flat against an
+     * edit that had got faster underneath it. The candidates at medium-high
+     * beat their medium twins on both critics.
+     */
+    energy: options.energy ?? 'medium-high',
     pace: 'natural',
     style: 'confident',
     profile: 'neutral',
