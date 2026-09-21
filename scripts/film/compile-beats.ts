@@ -81,6 +81,8 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       token: hero ? 'display' : 'statement',
       color: hero ? palette.accent : (onPaper ? palette.ink : palette.paper),
       align: 'left', maxWidth: hero ? 0.62 : 0.52, maxLines: 2,
+      // Heard, not read: this text is the reading it was generated from.
+      spoken: true,
       staggerBy: 'none', staggerSeconds: 0,
       role: hero ? 'payload' : 'support',
       enterAt: phrase.atSeconds,

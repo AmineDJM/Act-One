@@ -282,6 +282,20 @@ export const TextObject = z.object({
   ...objectBase,
   kind: z.literal('text'),
   content: z.string().max(400),
+  /**
+   * This text is being SAID while it is shown.
+   *
+   * A caption of the narration is not read, it is heard — the words are on
+   * screen for exactly as long as the voice takes to say them, which is faster
+   * than anybody reads and is not a defect. Copy the viewer must read on their
+   * own gets no such exemption, and that is most copy: this is false unless a
+   * film can point at the reading it came from.
+   *
+   * The distinction is not cosmetic. A film whose captions come from a
+   * measured voice performance cannot drift out of step with it; one whose
+   * captions were written separately always eventually does.
+   */
+  spoken: z.boolean().default(false),
   /** A brand type token, resolved by the renderer against the design system. */
   token: z.enum(['display', 'statement', 'body', 'caption', 'mono']).default('statement'),
   color: AnimatableColor.default('onCanvas.primary'),

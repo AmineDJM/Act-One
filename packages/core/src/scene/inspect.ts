@@ -169,6 +169,16 @@ export function inspectScene(
   // --- legibility -----------------------------------------------------------
   for (const object of scene.objects) {
     if (object.kind !== 'text' || object.role !== 'payload') continue;
+    /*
+     * A caption of the narration is heard, not read.
+     *
+     * Reading speed is the wrong yardstick for words the viewer is listening
+     * to: they are on screen for exactly as long as the voice takes to say
+     * them, which is faster than anybody reads, and holding them longer would
+     * put them out of step with the performance they came from. Copy the
+     * viewer must read unaided is still checked, and that is most copy.
+     */
+    if (object.spoken) continue;
     const exit = object.exitAt ?? scene.durationSeconds;
     const onScreen = exit - object.enterAt;
     const needed = readingSecondsFor(object.content);

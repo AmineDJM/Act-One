@@ -432,3 +432,51 @@ describe('the boundary between two scenes', () => {
     expect(handoverOverlap(handover({ mechanism: 'mask_reveal', durationSeconds: 3 }))).toBe(1.5);
   });
 });
+
+describe('a caption of the narration', () => {
+  /** One scene holding one line of copy, on screen for `onScreen` seconds. */
+  const captioned = (spoken: boolean) =>
+    SceneGraph.parse({
+      id: 'b1',
+      durationSeconds: 3.41,
+      intent: 'HOOK: the hook, spoken.',
+      background: '#0B0C10',
+      camera: { focalLengthMm: 50 },
+      objects: [
+        {
+          kind: 'text',
+          id: 'say',
+          content: 'not made yet.',
+          token: 'display',
+          color: '#F4F2EC',
+          align: 'left',
+          maxWidth: 0.62,
+          maxLines: 2,
+          staggerBy: 'none',
+          staggerSeconds: 0,
+          spoken,
+          role: 'payload',
+          // Enters when the voice says it and stays until the beat ends: 1.73s,
+          // against the ~1.87s this line takes to READ.
+          enterAt: 1.68,
+          reason: 'The word the beat turns on, on screen as it is said.',
+          transform: Transform.parse({ x: 0.09, y: 0.5, anchor: { x: 0, y: 0.5 } }),
+        } as SceneObject,
+      ],
+      macro: null,
+    });
+
+  it('is not held to reading speed, because it is heard rather than read', () => {
+    expect(
+      inspectScenes([captioned(true)], EASINGS).filter((f) => f.check === 'unreadable_duration'),
+    ).toEqual([]);
+  });
+
+  it('still checks copy the viewer has to read unaided', () => {
+    const findings = inspectScenes([captioned(false)], EASINGS).filter(
+      (f) => f.check === 'unreadable_duration',
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.severity).toBe('hard_fail');
+  });
+});
