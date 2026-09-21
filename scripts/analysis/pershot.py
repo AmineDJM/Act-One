@@ -26,12 +26,28 @@ import numpy as np
 # The film's cut list, in seconds. Kept here rather than read from the scene
 # graph because this has to be runnable against a reference film too, and a
 # reference has no graph.
-SHOTS = [
-    ('l1', 0, 3.6), ('l2', 3.6, 8.4), ('l3', 8.4, 13.6), ('l4', 13.6, 17.0),
-    ('l5', 17.0, 19.6), ('l6', 19.6, 24.2), ('l7', 24.2, 26.8), ('l8', 26.8, 31.4),
-    ('l9', 31.4, 33.4), ('l10', 33.4, 38.0), ('l11', 38.0, 43.2), ('l12', 43.2, 46.4),
-    ('l13', 46.4, 50.8), ('l14', 50.8, 54.0), ('l15', 54.0, 57.8),
+_CUT = [
+    ('l1', 3.6), ('l2', 4.8), ('l3', 5.2), ('l4', 3.4), ('l5', 2.6), ('l6', 4.6),
+    ('l7', 2.6), ('l8', 4.6), ('l9', 2.0), ('l10', 4.6), ('l11', 5.2), ('l12', 3.2),
+    ('l13', 4.4), ('l13b', 3.6), ('l14', 3.2), ('l15', 3.8),
 ]
+
+
+def _shots(cut):
+    """Start and end of each shot, from the durations.
+
+    Written as durations rather than as absolute times because absolute times
+    were what had to be hand-edited every time a shot changed length or a shot
+    was inserted, and a stale row here silently measures the wrong footage.
+    """
+    out, at = [], 0.0
+    for name, length in cut:
+        out.append((name, at, at + length))
+        at += length
+    return out
+
+
+SHOTS = _shots(_CUT)
 
 # Below this mean flow magnitude a frame counts as static.
 #

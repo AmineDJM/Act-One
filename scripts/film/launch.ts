@@ -83,6 +83,7 @@ const ASSETS: Record<string, string> = Object.fromEntries(
     .map((n) => [`ast_${n}`, `${BASE}/${n}.png`]),
 );
 if (existsSync(path.join(PUBLIC, 'before.mp4'))) ASSETS['ast_before'] = `${BASE}/before.mp4`;
+if (existsSync(path.join(PUBLIC, 'output.mp4'))) ASSETS['ast_output'] = `${BASE}/output.mp4`;
 
 const brand = BrandSystem.parse({
   id: 'brn_launch', organizationId: 'org_launch', name: 'Act One',
@@ -948,6 +949,49 @@ scenes.push(
       { at: 1.15, kind: 'ui_confirm', intensity: 0.3, causedBy: 'l13_sub', reason: 'The qualifier under it.' },
     ],
     handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.4, reason: 'The move carries on into the year.' },
+    macro: null,
+  }),
+
+  /*
+   * THE OUTPUT. The one note a model watching this film put above every other:
+   * "the viewer never sees the actual output (the generated film), only the
+   * ordering interface", with hero moments scored at zero. A film about making
+   * films that only ever showed the order form.
+   *
+   * It is the opening shot twelve hours later. That rhyme is the whole idea —
+   * the film began on this desk at dusk, cluttered, somebody pushing back from
+   * it after too long; this is the same desk at dawn, cleared, the light rising
+   * across it. The opening is the six weeks and this is the afternoon.
+   *
+   * WORDLESS, and full-bleed, on purpose. Everything around it is composed —
+   * type on a field, captures on a plane — and this is the only thing in the
+   * film that looks photographed. That difference is what says "this is the
+   * thing you get" more clearly than a caption naming it would, and a hero
+   * moment that has to be labelled is not one.
+   */
+  SceneGraph.parse({
+    id: 'l13b', durationSeconds: 3.6,
+    intent: 'THE OUTPUT: the film that came back, full-bleed and wordless. The opening desk at dawn.',
+    background: INK,
+    camera: camera({ scale: [1.08, 0.96], x: [-0.03, 0.03], focal: 50, curve: 'linear' }),
+    objects: [
+      {
+        kind: 'clip', id: 'l13b_film', assetId: 'ast_output',
+        crop: { x: 0, y: 0, width: 1, height: 1 },
+        // Wider than frame so the camera has somewhere to travel without
+        // finding an edge, the same reason the colour field is oversized.
+        width: 1.25, sourceInSeconds: 0.1, playbackRate: 0.9, generated: true,
+        role: 'payload',
+        reason: 'The delivered film. Photographed rather than composed, which is what marks it as the output.',
+        transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+      } as SceneObject,
+    ],
+    audio: [
+      { at: 0.02, kind: 'sub_drop', intensity: 0.55, causedBy: 'l13b_film', reason: 'The film lands, and the bed opens under it.' },
+      { at: 0.12, kind: 'texture', intensity: 0.45, causedBy: 'l13b_film', reason: 'Room tone: the same room as the opening.' },
+      { at: 2.9, kind: 'riser', intensity: 0.38, causedBy: 'l13b_film', reason: 'Into the year.' },
+    ],
+    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.45, reason: 'The dawn light carries through into the field of colour.' },
     macro: null,
   }),
 

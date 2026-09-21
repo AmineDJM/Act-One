@@ -45,7 +45,8 @@
     "directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/directions.ts",
     "watch:film": "vite-node scripts/watch-film.ts",
     "cast:voices": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/cast-voices.ts",
-    "audition": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/audition.ts"
+    "audition": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/audition.ts",
+    "commission:output": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/commission-output.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
