@@ -167,7 +167,21 @@ function mechanismsFrom(id: string, read: Record<string, unknown>, measuredCuts:
  * either of them to assemble a profile would be paying twice for identical
  * work on a file that has not changed.
  */
-export function loadBenchmarkLab(directory = '.renders/ref', cacheFile = '.renders/ref/lab.json'): BenchmarkLab {
+/*
+ * READS THE DURABLE COPY FIRST.
+ *
+ * `.renders` is ignored by git, correctly — it holds masters and mp4s. But the
+ * REFERENCE ANALYSES were living there too, and they are neither artefacts nor
+ * cheap: each one is a paid Gemini reading of a whole film, and a fresh clone
+ * or a reset container would have silently started with an empty corpus. The
+ * profiles and readings are small JSON and now live under `memory/`, which is
+ * tracked. `.renders/ref` is still read when nothing durable is there, so an
+ * existing working copy keeps working.
+ */
+export function loadBenchmarkLab(
+  directory = existsSync(path.resolve('memory/reference')) ? 'memory/reference' : '.renders/ref',
+  cacheFile = '.renders/ref/lab.json',
+): BenchmarkLab {
   const dir = path.resolve(directory);
   const readingsFile = path.join(dir, 'target-readings.json');
   const readings: Record<string, Record<string, unknown>> = existsSync(readingsFile)

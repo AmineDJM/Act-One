@@ -55,7 +55,7 @@ export class CreativeJournal {
   private readonly file: string;
   private entries: JournalEntry[];
 
-  constructor(file = '.renders/creative-journal.json') {
+  constructor(file = 'memory/creative-journal.json') {
     this.file = path.resolve(file);
     this.entries = existsSync(this.file)
       ? z.array(JournalEntry).parse(JSON.parse(readFileSync(this.file, 'utf8')))

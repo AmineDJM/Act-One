@@ -101,7 +101,7 @@ export class OutcomeMemory {
   private readonly file: string;
   private records: InterventionOutcome[];
 
-  constructor(file = '.renders/intervention-outcomes.json') {
+  constructor(file = 'memory/intervention-outcomes.json') {
     this.file = path.resolve(file);
     this.records = existsSync(this.file)
       ? z.array(InterventionOutcome).parse(JSON.parse(readFileSync(this.file, 'utf8')))

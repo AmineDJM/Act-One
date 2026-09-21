@@ -19,8 +19,16 @@ import path from 'node:path';
 import { analyseBenchmark, countMoments, loadBenchmarkLab } from '@act-one/qa';
 import { GeminiVideoAnalyst } from '@act-one/providers';
 
+/*
+ * The mp4s stay in .renders, which is ignored; the ANALYSES go to memory/,
+ * which is tracked. A paid reading of a whole film is not a build artefact,
+ * and losing the corpus to a fresh clone is exactly the failure the Lab's
+ * health reporting exists to make visible.
+ */
 const REF = path.resolve('.renders/ref');
+const DURABLE = path.resolve('memory/reference');
 mkdirSync(REF, { recursive: true });
+mkdirSync(DURABLE, { recursive: true });
 
 const args = process.argv.slice(2);
 const files = args.filter((a) => a.endsWith('.mp4'));
@@ -40,7 +48,7 @@ if (files.length === 0 && !retry) {
   process.exit(1);
 }
 
-const readingsFile = path.join(REF, 'target-readings.json');
+const readingsFile = path.join(DURABLE, 'target-readings.json');
 const readings: Record<string, unknown> = existsSync(readingsFile)
   ? JSON.parse(readFileSync(readingsFile, 'utf8'))
   : {};
@@ -81,7 +89,7 @@ async function reanalyse(id: string): Promise<void> {
     console.log(`  kept the existing reading: the new one described ${result.mechanismCount} moments against ${before}.`);
     return;
   }
-  writeFileSync(path.join(REF, `${id}.profile.json`), JSON.stringify(result.measured ?? {}, null, 2));
+  writeFileSync(path.join(DURABLE, `${id}.profile.json`), JSON.stringify(result.measured ?? {}, null, 2));
   if (result.reading) readings[id] = result.reading;
   writeFileSync(readingsFile, JSON.stringify(readings, null, 2));
   console.log(`  ${result.status}  ${before} -> ${result.mechanismCount} described moments`);
@@ -109,7 +117,7 @@ for (const file of files) {
     { organizationId: 'org_platform' } as never,
   );
 
-  writeFileSync(path.join(REF, `${id}.profile.json`), JSON.stringify(result.measured ?? {}, null, 2));
+  writeFileSync(path.join(DURABLE, `${id}.profile.json`), JSON.stringify(result.measured ?? {}, null, 2));
   if (result.reading) readings[id] = result.reading;
   writeFileSync(readingsFile, JSON.stringify(readings, null, 2));
 

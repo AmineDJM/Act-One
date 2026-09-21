@@ -1,0 +1,15 @@
+{
+  "durationSeconds": 40.98,
+  "shots": 18,
+  "cutsPerMinute": 24.89,
+  "meanShotSeconds": 2.28,
+  "shortestShotSeconds": 0.03,
+  "longestShotSeconds": 14.5,
+  "shotLengthSpread": 1.719,
+  "flatShare": 0.344,
+  "distinctShare": 0.625,
+  "fields": 4,
+  "motionDensity": 0.121,
+  "loudnessRangeLu": 26.44,
+  "audibleShare": 0.982
+}

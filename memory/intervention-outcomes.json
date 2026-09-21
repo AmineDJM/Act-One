@@ -1,0 +1,301 @@
+[
+  {
+    "at": "2026-09-21T13:25:27.807Z",
+    "context": "Act One launch film, one-timeline architecture, benchmark convergence loop",
+    "observedProblem": "Caption on a screenshot beat was unreadable: white words on a dark interface, and the emphasis phrase lost its first letters as the camera pushed in.",
+    "intervention": "Moved the band from y 1.06/h 0.30 to y 1.0/h 0.36 so it sits UNDER the caption rather than below it, and centred the caption (invariant under centre-scaling) instead of chasing the left margin.",
+    "scope": "round_3",
+    "beforeArtifact": "judge1",
+    "afterArtifact": "judge2",
+    "before": {
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 4,
+      "colour": 4,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 3
+    },
+    "after": {
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 5,
+      "colour": 5,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 4
+    },
+    "criticChanges": [
+      "The worst-moment note about \"fails itself first\" overlapping background text did not recur."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "improved",
+    "confounded": true,
+    "note": "Confounded: a music-ducking change shipped in the same render. Typography, colour and would-a-client-approve each rose a point; nothing fell."
+  },
+  {
+    "at": "2026-09-21T13:25:27.809Z",
+    "context": "Act One launch film, one-timeline architecture, benchmark convergence loop",
+    "observedProblem": "The opening shot was named the worst frame in the film: \"entirely generic, establishing a dreary tone disconnected from a software product\".",
+    "intervention": "Wrote a new shot brief around ABSENCE — a blank projection screen with the projector running — and commissioned it from Higgsfield (seedance-2.5) for $1.85.",
+    "scope": "round_3",
+    "beforeArtifact": "judge2",
+    "afterArtifact": "judge3",
+    "before": {
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 5,
+      "colour": 5,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 4
+    },
+    "after": {
+      "visualInvention": 3,
+      "motionDesign": 3,
+      "typography": 4,
+      "colour": 4,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 3
+    },
+    "criticChanges": [
+      "The replacement was judged HARDER than the shot it replaced: \"an incredibly generic stock projection screen that completely undercuts the messaging about bespoke, rapid filmmaking\"."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 1.849,
+    "latencySeconds": 0,
+    "result": "reverted",
+    "confounded": true,
+    "note": "Confounded: the frame rotation and the b13 cut shipped in the same render, which is why the attribution is weak. The shot came back exactly as briefed, so neither the brief nor the vendor was the fault. LESSON: swapping one stock image for another is not a fix for a generic opening; that is a concept problem and it was escalated to Council Round 1."
+  },
+  {
+    "at": "2026-09-21T13:25:27.809Z",
+    "context": "Act One launch film, one-timeline architecture, benchmark convergence loop",
+    "observedProblem": "Two pairs of beats were near-identical pictures: b2/b10 at 97% and b4/b14 at 96%, reported by the scene inspector.",
+    "intervention": "Rotated the four statement frames over the ordinal of beats OF THE SAME KIND rather than the global beat index, and gave the two mark beats opposite compositions.",
+    "scope": "round_3",
+    "beforeArtifact": "judge2",
+    "afterArtifact": "judge4",
+    "before": {
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 5,
+      "colour": 5,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 4
+    },
+    "after": {
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 4,
+      "colour": 3,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 3
+    },
+    "criticChanges": [
+      "Both flagged similarity pairs disappeared from the inspector.",
+      "Critic scores fell on typography and colour, but the opening revert landed in the same render."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "unclear",
+    "confounded": true,
+    "note": "The inspector measurement is unambiguous and independent of the critic; the score movement is not attributable because the opening revert shipped with it. Keep: the defect it fixed was measured, not judged."
+  },
+  {
+    "at": "2026-09-21T14:19:53.442Z",
+    "context": "Act One launch film, one-timeline. Audio-only change: ACT_ONE_MIX_ONLY reused the identical picture.",
+    "observedProblem": "The audio critic reported \"the music briefly overpowers the narration\" on two separate renders, at ~3s both times.",
+    "intervention": "Found that measureDialogueLead returned null on every real mix (the effects bus was an unconnected amix output, which ffmpeg rejects), sank that bus, and wired the measure-and-correct loop into the film script. Measured 3.5 LU against a floor of 4; took the bed down 1 dB to 4.5 LU.",
+    "scope": "round_3",
+    "beforeArtifact": "judge4",
+    "afterArtifact": "judge5",
+    "before": {
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 4,
+      "colour": 3,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 3,
+      "soundsHuman": 8,
+      "toneMatchesClaim": 9,
+      "authoredTogether": 8,
+      "wouldYouKeepListening": 9
+    },
+    "after": {
+      "visualInvention": 3,
+      "motionDesign": 4,
+      "typography": 5,
+      "colour": 4,
+      "soundAndPicture": 5,
+      "wouldAClientApprove": 3,
+      "soundsHuman": 8,
+      "toneMatchesClaim": 7,
+      "authoredTogether": 8,
+      "wouldYouKeepListening": 8
+    },
+    "criticChanges": [
+      "The masking complaint disappeared. Both prior readings named it at ~3s; this reading names phrasing instead.",
+      "soundAndPicture 4 -> 5, which is the criterion the change targets."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "improved",
+    "confounded": false,
+    "note": "CLEANEST A/B SO FAR, and it measures the critic as well as the film. The picture was byte-identical, yet visualInvention moved 4->3, typography 4->5 and colour 3->4 — criteria that could not have changed. That is a directly observed noise floor of +/-1 per criterion on this judge, and it means no single-point move should ever again be read as signal. The durable evidence here is textual: a complaint present in two consecutive readings is absent in the third."
+  },
+  {
+    "at": "2026-09-21T15:58:49.366Z",
+    "context": "Act One launch film. film_v1 -> Council Rounds 4/5 -> film_v2. First full screening-to-rebuild loop.",
+    "observedProblem": "Five directors watched film_v1 independently and all five went for the opening (critical). Three more converged at 30s. The diagnosis they reached separately was one sentence: the film describes its mechanism instead of showing it operate.",
+    "intervention": "ONE HYPOTHESIS, two changes. Replaced the atmosphere opener with an AUDIT beat — the real page, square-on, with the system's own verbs performed on it: underline what is there, pin it in the margin, strike what cannot be proved. And turned the three-panel beat from a count into a verdict: a mark per lane, one lane struck in accent and its film dimmed, so \"rendered, watched and scored\" is shown rather than asserted.",
+    "scope": "round_2",
+    "beforeArtifact": ".renders/one-timeline.mp4 (v1, judge5)",
+    "afterArtifact": ".renders/film-v2.mp4",
+    "before": {
+      "soundsHuman": 8,
+      "toneMatchesClaim": 7,
+      "authoredTogether": 8,
+      "wouldYouKeepListening": 8,
+      "inspectorSoftFails": 4
+    },
+    "after": {
+      "soundsHuman": 8,
+      "toneMatchesClaim": 7,
+      "authoredTogether": 8,
+      "wouldYouKeepListening": 8,
+      "inspectorSoftFails": 4
+    },
+    "criticChanges": [
+      "The craft critic could not be reached: Gemini returned 402, prepayment credits depleted. The VISUAL verdict on this change is outstanding.",
+      "The audio critic is unchanged on every criterion, which is expected: no audio design changed, only two picture beats and their cues.",
+      "Inspector: the change first introduced one new soft_fail (b1 competing_payloads, 3 things asking to be read at once) and it is now gone. film_v2 carries exactly the four soft_fails film_v1 carried, none new."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "unclear",
+    "confounded": false,
+    "note": "TWO CHANGES, ONE HYPOTHESIS — that the film states its mechanism where it should perform it — so they ship together and remain attributable as one experiment. The outcome memory did its job here before the render existed: the revision room explicitly wrote \"this is different from the failed projection-screen test: it is not another atmosphere shot; it performs the audit verb\", which is the third opening attempt NOT being a third stock image. The predicted regression also arrived exactly as written (\"if the page is too text-heavy, first-frame appetite could drop\") and the inspector caught it as competing payloads; the cause was semantic — the page had been marked as the beat's payload when the payload is the act of marking — and fixing the role cleared it. RESULT IS UNCLEAR, NOT IMPROVED: with no craft critic reachable there is no measurement of the thing this change targets, and the audio scores say nothing about picture. Do not read this row as a win until Gemini is reachable and film_v2 is screened."
+  },
+  {
+    "at": "2026-09-21T19:21:11.171Z",
+    "context": "Act One launch film, v7 -> v12. Voice/motion/grammar pass after the second Council screening.",
+    "observedProblem": "The narration was monotone end to end — named as the strongest machine tell in four consecutive craft readings, and independently by the person who commissioned the film. Separately, four of five directors could not read the evidence panels at 24s (\"the claim of rendering, scoring and failing is not proven\").",
+    "intervention": "ONE HYPOTHESIS: a film is monotone because one decision was made once and applied everywhere, and because that decision never reached the picture. Beats now carry a dramatic intent (confide/state/press/land/invite) that sets the voice register AND the camera travel AND the speed words assemble at. Breath written into the script as ellipses, since no voice setting produces a pause. Evidence panels enlarged from 0.25 to 0.31 of frame with the rejected lane struck through in accent.",
+    "scope": "round_2",
+    "beforeArtifact": "judge11 (v7)",
+    "afterArtifact": "judge15 (v12)",
+    "before": {
+      "soundsHuman": 8,
+      "toneMatchesClaim": 7,
+      "authoredTogether": 7,
+      "wouldYouKeepListening": 8,
+      "visualInvention": 4,
+      "motionDesign": 5,
+      "typography": 6,
+      "colour": 3,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 5
+    },
+    "after": {
+      "soundsHuman": 8,
+      "toneMatchesClaim": 9,
+      "authoredTogether": 8,
+      "wouldYouKeepListening": 9,
+      "visualInvention": 4,
+      "motionDesign": 4,
+      "typography": 5,
+      "colour": 4,
+      "soundAndPicture": 4,
+      "wouldAClientApprove": 3
+    },
+    "criticChanges": [
+      "Audio: toneMatchesClaim 7->9 and wouldYouKeepListening 8->9, both at their session best.",
+      "Craft: oscillating. wouldAClientApprove has read 3, 4, 5 and 6 across this session on films that only improved.",
+      "The masking complaint has not recurred since the per-line dialogue fix, across four readings."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "unclear",
+    "confounded": true,
+    "note": "THE INSTRUMENT IS THE LIMIT NOW, and this row is mostly a record of that. A byte-identical picture once moved three criteria by a point, so the single craft reading cannot resolve the differences I have been steering by — and across this session I chased its \"worst frame\" note from beat to beat, changing one thing per reading and watching the score oscillate between 3 and 6 with no trend. That is optimising against noise. The FIVE-DIRECTOR screening is the reliable instrument: it converges (4 of 5 on the same second, twice) and its findings are stable across runs. Steer by convergence and by the textual notes that repeat; treat any single-reading score move under two points as nothing. Confounded by design: several changes ship here, but they test one claim about coupling decisions across dimensions."
+  },
+  {
+    "at": "2026-09-21T21:18:13.062Z",
+    "context": "Act One launch film. Voice model A/B on the finished mix, three readings of each candidate.",
+    "observedProblem": "The narration has been the single strongest machine tell in every craft reading of this film without exception, and the person who commissioned it said the same: monotone from A to Z.",
+    "intervention": "Switched the narration model from eleven_multilingual_v2 to eleven_v3, after per-beat direction and written breath had already been added. Measured with an audio-only critic, three readings per candidate, spreads reported rather than means alone.",
+    "scope": "round_3",
+    "beforeArtifact": ".renders/film-v19.mp4 (eleven_multilingual_v2)",
+    "afterArtifact": ".renders/film-v3voice.mp4 (eleven_v3)",
+    "before": {
+      "soundsHuman": 6.7,
+      "toneMatchesClaim": 8,
+      "authoredTogether": 7.7,
+      "wouldYouKeepListening": 7.3,
+      "bedReductionDb": 4.1
+    },
+    "after": {
+      "soundsHuman": 8,
+      "toneMatchesClaim": 9,
+      "authoredTogether": 8.7,
+      "wouldYouKeepListening": 9,
+      "bedReductionDb": 0.6
+    },
+    "criticChanges": [
+      "Three of the four score spreads do not overlap: soundsHuman [6,7,7] vs [8,8,8]; toneMatchesClaim [8,8,8] vs [9,9,9]; wouldYouKeepListening [7,7,8] vs [9,9,9].",
+      "The tells changed character. v2: \"flat\", \"mechanical\", \"lacking natural pauses\" in all three readings. v3: \"the pacing and intonation vary naturally, with subtle emphasis and pauses that mimic human thought and emotion patterns.\"",
+      "The v3 voice sits better in the mix unaided: the quietest line leads the bed by 3.9 LU rather than 0.4, so the correction removes 0.6 dB of music instead of 4.1."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "improved",
+    "confounded": false,
+    "note": "THE EARLIER DECISION WAS RIGHT AND IS NOW WRONG, FOR THE SAME REASON. v2 was chosen deliberately over v3 because v3 accepts no continuity at all — previous_text, next_text and previous_request_ids each hard-400 — so it reads every line as a cold start, and a critic called the result rigid and disjointed. That was true of a film where all fourteen lines shared one direction object. Once each beat carried its own register and breath was written into the script, the continuity v2 was supplying came from the script instead, and what was left to compare was expressiveness. A conclusion that depends on a condition has to be re-tested when the condition changes. METHOD NOTE: this is the first clean voice result in the project, and the thing that made it clean was repeating the reading. The single craft judge has a measured noise floor of about a point; three readings with non-overlapping spreads is a measurement, one reading is a coin toss. Audio-only readings are cheap enough that there is no excuse for asking once."
+  },
+  {
+    "at": "2026-09-21T22:44:46.385Z",
+    "context": "Act One launch film, v21 -> v23. Two Council screenings either side of the change.",
+    "observedProblem": "Three directors of five, three different lenses, CRITICAL at the first second: \"the film acts as a subtitle track to the voiceover rather than utilising the visual medium\". Separately, the three-directions beat was marked critical by five of five after two failed attempts to fix it with typography.",
+    "intervention": "ONE HYPOTHESIS: the picture is redundant because it says what the voice says, and it fails to prove claims because it labels them instead of showing them. The screen now carries only the TURN of each beat (the measured emphasis phrase) rather than the whole sentence, with an empty editorial string meaning it says nothing at all. The three directions are shown as three full-bleed renders in sequence, and the beat after them is the verdict on them with no film at all.",
+    "scope": "round_2",
+    "beforeArtifact": ".renders/film-v21.mp4",
+    "afterArtifact": ".renders/film-v23.mp4",
+    "before": {
+      "convergenceSubtitleTrack": 3,
+      "convergenceThreeDirections": 5,
+      "soundsHuman": 8,
+      "wouldYouKeepListening": 8
+    },
+    "after": {
+      "convergenceSubtitleTrack": 0,
+      "convergenceThreeDirections": 3,
+      "soundsHuman": 9,
+      "wouldYouKeepListening": 9
+    },
+    "criticChanges": [
+      "The subtitle-track finding left the convergence list entirely — it was 3 of 5 critical and is no longer reported at all.",
+      "The three-directions cluster went 5 of 5 CRITICAL -> 3 of 5 MEDIUM, the largest single movement the Council has recorded.",
+      "No finding anywhere in the film is critical any more.",
+      "soundsHuman reached 9, the highest recorded in this project."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "improved",
+    "confounded": false,
+    "note": "THE TYPOGRAPHY CHANGE WAS MY OWN BRIEF, UNFINISHED. The brief asked for three separate things — narration, subtitles, on-screen editorial copy — and I built the first two and never built the third, so every word on screen was the sentence being spoken at the second it was spoken. Building subtitles from the measured performance was right and stays; what was missing was a reason for the type to exist beyond repeating the read. LESSON ON LABELS VS PROOF: naming the three directions inside the colour columns made the beat WORSE, from 4 of 5 high to 5 of 5 critical, because \"Paper\" and \"Depth\" are internal words that mean nothing to a viewer. A room asking for visual proof will not accept a label for the claim, however well set. Showing the three actual renders full frame in sequence is what moved it."
+  }
+]

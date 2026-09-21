@@ -1,0 +1,4439 @@
+{
+  "target1": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target1.mp4",
+      "durationSeconds": 88
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-20T23:48:34.179Z",
+    "boundaries": [
+      {
+        "at": 0,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "fade in",
+        "confidence": "observed",
+        "evidence": "First frame of the video."
+      },
+      {
+        "at": 2.25,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "rapid scale up of text 'EN VRAI' filling screen",
+        "confidence": "observed",
+        "evidence": "Sudden visual shift to full orange screen with massive text."
+      },
+      {
+        "at": 3.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to dark background with new text",
+        "confidence": "observed",
+        "evidence": "Complete change of visual elements and background color."
+      },
+      {
+        "at": 5.25,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "text '1600' scales down, becomes center of a starburst revealing video thumbnails",
+        "confidence": "observed",
+        "evidence": "Continuous motion linking the text to the new layout."
+      },
+      {
+        "at": 8.25,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to 'Notre métier' text",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 9,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "scattered 'Blabla' text animates into a circle",
+        "confidence": "observed",
+        "evidence": "Elements on screen reorganize into a new shape."
+      },
+      {
+        "at": 11,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "circle morphs into a glowing ring framing a UI mockup",
+        "confidence": "observed",
+        "evidence": "The shape boundary is maintained while the content inside changes."
+      },
+      {
+        "at": 15.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Mais pourquoi...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 17.75,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to glowing '2026' text with particle effects",
+        "confidence": "observed",
+        "evidence": "New visual style introduced."
+      },
+      {
+        "at": 20,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "text block scales up from center, replacing previous elements",
+        "confidence": "observed",
+        "evidence": "Continuous motion transition."
+      },
+      {
+        "at": 23.25,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to 3D phone object",
+        "confidence": "observed",
+        "evidence": "New object introduced."
+      },
+      {
+        "at": 25,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'La vidéo...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 26.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "UI cards slide in from sides",
+        "confidence": "observed",
+        "evidence": "Objects enter frame to create new layout."
+      },
+      {
+        "at": 31.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Ce n'est pas juste joli...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 35.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Alors Pourquoi 1600...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 40,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "UI cards scatter outwards from center",
+        "confidence": "observed",
+        "evidence": "Continuous motion of elements."
+      },
+      {
+        "at": 42,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to counting numbers",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 44,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "logos appear within a central UI frame",
+        "confidence": "observed",
+        "evidence": "Sequential reveal of elements in a fixed container."
+      },
+      {
+        "at": 51,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Non, on ne vend pas...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 56.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Stripe notifications pop up sequentially",
+        "confidence": "observed",
+        "evidence": "Elements appear over time."
+      },
+      {
+        "at": 62,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Et comment ça se passe...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 64,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "icons appear and scale up",
+        "confidence": "observed",
+        "evidence": "Elements animate into view."
+      },
+      {
+        "at": 66,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "lines of text animate in to represent a script",
+        "confidence": "observed",
+        "evidence": "Elements animate into view."
+      },
+      {
+        "at": 67,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Figma UI elements slide in",
+        "confidence": "observed",
+        "evidence": "Elements animate into view."
+      },
+      {
+        "at": 70.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Et moins de 30 jours...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 75.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "hard cut to text 'Alors si vous voulez...'",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 81.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "button appears and is clicked by a cursor",
+        "confidence": "observed",
+        "evidence": "Interactive element animation."
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 15.5
+        },
+        "idea": "Define the core value proposition: 60 seconds to explain complex ideas simply.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Establish the problem and the agency's solution.",
+        "confidence": "inferred",
+        "evidence": "Text explicitly states '60 seconds' and 'understand what you do'."
+      },
+      {
+        "span": {
+          "start": 15.5,
+          "end": 35.5
+        },
+        "idea": "Contrast video with text; video is the preferred format.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Persuade the viewer that text is dead and video is necessary.",
+        "confidence": "inferred",
+        "evidence": "Shows dense text block vs engaging video UI, states 'nobody wants to read'."
+      },
+      {
+        "span": {
+          "start": 35.5,
+          "end": 62
+        },
+        "idea": "Establish credibility and focus: 1600 only does presentation videos and drives results.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Build trust through client numbers and focus on conversion.",
+        "confidence": "inferred",
+        "evidence": "Shows client logos, counting numbers, and Stripe notifications."
+      },
+      {
+        "span": {
+          "start": 62,
+          "end": 75.5
+        },
+        "idea": "Explain the simple process.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Demystify the production process to lower barriers to entry.",
+        "confidence": "inferred",
+        "evidence": "Step-by-step visual representation of script, storyboard, animation."
+      },
+      {
+        "span": {
+          "start": 75.5,
+          "end": 88
+        },
+        "idea": "Call to action.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Prompt the user to book a meeting.",
+        "confidence": "observed",
+        "evidence": "Final button says 'prenez rendez-vous'."
+      }
+    ],
+    "narrative": null,
+    "viewerStates": [],
+    "visualHierarchy": [],
+    "typography": [
+      {
+        "span": {
+          "start": 0,
+          "end": 2
+        },
+        "text": "60 secondes.",
+        "treatment": "Center, white, sans-serif, glowing red dot.",
+        "role": "supporting",
+        "reportedRole": "Hook",
+        "confidence": "observed",
+        "evidence": "First text seen, central focus."
+      },
+      {
+        "span": {
+          "start": 2.25,
+          "end": 3.5
+        },
+        "text": "EN VRAI",
+        "treatment": "Massive scale, black on orange, bold sans-serif.",
+        "role": "supporting",
+        "reportedRole": "Emphasis",
+        "confidence": "observed",
+        "evidence": "Fills the entire screen."
+      },
+      {
+        "span": {
+          "start": 17.75,
+          "end": 20
+        },
+        "text": "2026",
+        "treatment": "Glowing red outline, large, center.",
+        "role": "supporting",
+        "reportedRole": "Temporal anchor",
+        "confidence": "observed",
+        "evidence": "Distinct styling from other text."
+      },
+      {
+        "span": {
+          "start": 28,
+          "end": 31
+        },
+        "text": "Ecrite, Construite, Racontée",
+        "treatment": "Massive scale, orange, bold, sequential reveal.",
+        "role": "supporting",
+        "reportedRole": "Value pillars",
+        "confidence": "observed",
+        "evidence": "Words scale up to fill background behind UI."
+      }
+    ],
+    "ui": [
+      {
+        "span": {
+          "start": 11,
+          "end": 15
+        },
+        "action": "Graph animating, clicks counting up.",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "Elements animate independently within the frame."
+      },
+      {
+        "span": {
+          "start": 56.5,
+          "end": 58
+        },
+        "action": "Stripe payment notifications appearing.",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "Popups appear sequentially with sound effects."
+      },
+      {
+        "span": {
+          "start": 67,
+          "end": 70
+        },
+        "action": "Figma interface showing storyboard frames.",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "Cursor moves, elements are highlighted."
+      }
+    ],
+    "objectTransformations": [],
+    "camera": [
+      {
+        "span": {
+          "start": 0,
+          "end": 88
+        },
+        "move": "other",
+        "reportedMove": "Mostly static with slow push-ins; rapid object scaling simulates camera moves.",
+        "attribution": "objects",
+        "confidence": "inferred",
+        "evidence": "Backgrounds remain mostly static while text and UI elements scale rapidly towards the viewer."
+      }
+    ],
+    "motion": [],
+    "transitions": [],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "voice",
+        "reportedLayer": "voice",
+        "description": "Fast-paced, energetic French male voiceover.",
+        "confidence": "observed",
+        "evidence": "Continuous narration."
+      },
+      {
+        "at": 0,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Driving electronic beat, builds in intensity.",
+        "confidence": "observed",
+        "evidence": "Underpins the entire video."
+      },
+      {
+        "at": 2.25,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Heavy whoosh/impact sound.",
+        "confidence": "observed",
+        "evidence": "Syncs with 'EN VRAI' text scaling."
+      },
+      {
+        "at": 56.5,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Cash register/ding sounds.",
+        "confidence": "observed",
+        "evidence": "Syncs with Stripe notifications appearing."
+      }
+    ],
+    "voice": [],
+    "music": [],
+    "sfx": [],
+    "sync": [
+      {
+        "at": 2.25,
+        "visualEvent": "Text 'EN VRAI' scales up.",
+        "audioEvent": "Heavy impact SFX.",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Visual and audio hit exactly together for emphasis."
+      },
+      {
+        "at": 56.5,
+        "visualEvent": "Stripe notifications appear.",
+        "audioEvent": "Ding SFX.",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Each popup is accompanied by a sound."
+      }
+    ],
+    "cognitiveLoad": [],
+    "heroMoments": [],
+    "memorability": null,
+    "comprehension": null,
+    "limitations": [
+      "Cannot determine exact easing curves for animations.",
+      "Cannot identify specific fonts used.",
+      "Cannot confirm if 3D elements are true 3D or 2.5D compositing.",
+      "Sampled at 4 fps; nothing shorter than one sampled frame was visible."
+    ]
+  },
+  "target2": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target2.mp4",
+      "durationSeconds": 117
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-21T19:39:51.276Z",
+    "boundaries": [
+      {
+        "at": 4.8,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to black screen with arrow",
+        "confidence": "observed",
+        "evidence": "Complete change of visual environment."
+      },
+      {
+        "at": 5.8,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to green screen with logo",
+        "confidence": "observed",
+        "evidence": "Color and content change instantly."
+      },
+      {
+        "at": 6.8,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to white screen with text",
+        "confidence": "observed",
+        "evidence": "Background changes to white grid."
+      },
+      {
+        "at": 8,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "text change",
+        "confidence": "observed",
+        "evidence": "Text changes to 'Link in Bio'."
+      },
+      {
+        "at": 10,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "text scales down and becomes UI element",
+        "confidence": "observed",
+        "evidence": "The word 'Link in Bio' morphs into a phone mockup."
+      },
+      {
+        "at": 22,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "UI elements fly away, text appears",
+        "confidence": "observed",
+        "evidence": "Transition from UI demo to feature highlights."
+      },
+      {
+        "at": 27.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to white screen with text",
+        "confidence": "observed",
+        "evidence": "New section 'Deep Links' begins."
+      },
+      {
+        "at": 30,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "text splits and becomes two phone mockups",
+        "confidence": "observed",
+        "evidence": "Text morphs into a split-screen comparison."
+      },
+      {
+        "at": 38.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to white screen with text",
+        "confidence": "observed",
+        "evidence": "New section 'Analytics' begins."
+      },
+      {
+        "at": 41.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "text morphs into dashboard UI",
+        "confidence": "observed",
+        "evidence": "Text disappears, replaced by expanding UI panels."
+      },
+      {
+        "at": 51.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to white screen with text",
+        "confidence": "observed",
+        "evidence": "New section 'Domaines Personnalisés' begins."
+      },
+      {
+        "at": 56.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to white screen with text",
+        "confidence": "observed",
+        "evidence": "New section 'QR Codes' begins."
+      },
+      {
+        "at": 107.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to white screen with text",
+        "confidence": "observed",
+        "evidence": "Outro sequence begins."
+      },
+      {
+        "at": 110,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "hard cut to dark grid with floating UI",
+        "confidence": "observed",
+        "evidence": "Visual style changes for final montage."
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 6.8
+        },
+        "idea": "Problem statement and brand introduction.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Establish the pain point of untrackable links.",
+        "confidence": "observed",
+        "evidence": "Text explicitly states the problem, followed by the brand logo."
+      },
+      {
+        "span": {
+          "start": 6.8,
+          "end": 27.5
+        },
+        "idea": "Link in Bio feature demonstration.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Show ease of creating a customizable profile.",
+        "confidence": "observed",
+        "evidence": "UI animation shows adding widgets to a profile."
+      },
+      {
+        "span": {
+          "start": 27.5,
+          "end": 38.5
+        },
+        "idea": "Deep Links feature demonstration.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Compare standard links vs deep links.",
+        "confidence": "observed",
+        "evidence": "Split screen shows native app opening vs browser login prompt."
+      },
+      {
+        "span": {
+          "start": 38.5,
+          "end": 51.5
+        },
+        "idea": "Analytics feature demonstration.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Show data tracking capabilities.",
+        "confidence": "observed",
+        "evidence": "Various charts and maps are displayed."
+      },
+      {
+        "span": {
+          "start": 51.5,
+          "end": 56.5
+        },
+        "idea": "Custom Domains feature.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Show ability to use own domain.",
+        "confidence": "observed",
+        "evidence": "UI shows changing a taap.it link to a custom domain."
+      },
+      {
+        "span": {
+          "start": 56.5,
+          "end": 107.5
+        },
+        "idea": "QR Codes feature demonstration.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Show generation and scanning of QR codes.",
+        "confidence": "observed",
+        "evidence": "UI shows customizing a QR code, then a phone scanning it."
+      },
+      {
+        "span": {
+          "start": 107.5,
+          "end": 117
+        },
+        "idea": "Final call to action.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Summarize benefits and prompt interaction.",
+        "confidence": "observed",
+        "evidence": "Text 'Tu partages, Tu convertis' followed by clickable logo."
+      }
+    ],
+    "narrative": {
+      "movements": [
+        {
+          "span": {
+            "start": 0,
+            "end": 4.8
+          },
+          "claim": "Current link sharing is broken and loses conversions."
+        },
+        {
+          "span": {
+            "start": 4.8,
+            "end": 6.8
+          },
+          "claim": "taap.it is the solution."
+        },
+        {
+          "span": {
+            "start": 6.8,
+            "end": 107.5
+          },
+          "claim": "It offers a comprehensive suite of tools (Link in Bio, Deep Links, Analytics, Custom Domains, QR Codes)."
+        },
+        {
+          "span": {
+            "start": 107.5,
+            "end": 117
+          },
+          "claim": "Using these tools leads to better sharing and conversion."
+        }
+      ],
+      "dependency": "unclear",
+      "confidence": "observed",
+      "evidence": "The sequence logically flows from identifying a problem to presenting a toolset that solves it."
+    },
+    "viewerStates": [
+      {
+        "at": 0,
+        "knows": "Nothing.",
+        "openQuestion": "What is this video about?",
+        "confidence": "observed",
+        "evidence": "Start of video."
+      },
+      {
+        "at": 4.8,
+        "knows": "Links are currently inefficient.",
+        "openQuestion": "How do I fix this?",
+        "confidence": "observed",
+        "evidence": "Problem statement text."
+      },
+      {
+        "at": 6.8,
+        "knows": "taap.it is a tool to fix link issues.",
+        "openQuestion": "What specific tools does it offer?",
+        "confidence": "observed",
+        "evidence": "Logo and 'all tools in one' text."
+      },
+      {
+        "at": 107.5,
+        "knows": "taap.it offers Link in Bio, Deep Links, Analytics, Custom Domains, and QR Codes.",
+        "openQuestion": "What is the final takeaway?",
+        "confidence": "observed",
+        "evidence": "All features have been demonstrated."
+      }
+    ],
+    "visualHierarchy": [
+      {
+        "at": 2,
+        "order": [
+          "Central text",
+          "Floating icons"
+        ],
+        "confidence": "observed",
+        "evidence": "Text is large and centered."
+      },
+      {
+        "at": 15,
+        "order": [
+          "Phone mockup",
+          "Widget menu",
+          "Cursor"
+        ],
+        "confidence": "observed",
+        "evidence": "Phone is central, menu pops up, cursor draws attention."
+      },
+      {
+        "at": 32,
+        "order": [
+          "Right phone (Avec taap.it)",
+          "Left phone (Sans taap.it)",
+          "Labels"
+        ],
+        "confidence": "inferred",
+        "evidence": "Right side shows successful action, drawing focus."
+      },
+      {
+        "at": 45,
+        "order": [
+          "Main chart",
+          "Side panels",
+          "Cursor"
+        ],
+        "confidence": "observed",
+        "evidence": "Chart is largest element."
+      }
+    ],
+    "typography": [
+      {
+        "span": {
+          "start": 0,
+          "end": 4.8
+        },
+        "text": "Des liens que l'on ne peut ni suivre... Zéro conversion. À vous de changer ça.",
+        "treatment": "Large, sans-serif, animated typing/appearing.",
+        "role": "supporting",
+        "reportedRole": "Problem statement.",
+        "confidence": "observed",
+        "evidence": "Text is the primary visual element."
+      },
+      {
+        "span": {
+          "start": 6.8,
+          "end": 8
+        },
+        "text": "Tous tes outils en un seul",
+        "treatment": "Medium, sans-serif, centered.",
+        "role": "supporting",
+        "reportedRole": "Value proposition.",
+        "confidence": "observed",
+        "evidence": "Appears right after logo."
+      },
+      {
+        "span": {
+          "start": 8,
+          "end": 10
+        },
+        "text": "Link in Bio",
+        "treatment": "Large, sans-serif, centered.",
+        "role": "supporting",
+        "reportedRole": "Feature title.",
+        "confidence": "observed",
+        "evidence": "Introduces next section."
+      },
+      {
+        "span": {
+          "start": 22,
+          "end": 27.5
+        },
+        "text": "100% éditable, +100 Widgets, 0 Friction",
+        "treatment": "Large, bold, alternating colors (green/black).",
+        "role": "supporting",
+        "reportedRole": "Feature benefits.",
+        "confidence": "observed",
+        "evidence": "Flashes on screen to emphasize points."
+      },
+      {
+        "span": {
+          "start": 27.5,
+          "end": 30
+        },
+        "text": "Deep Links",
+        "treatment": "Large, sans-serif, centered.",
+        "role": "supporting",
+        "reportedRole": "Feature title.",
+        "confidence": "observed",
+        "evidence": "Introduces next section."
+      },
+      {
+        "span": {
+          "start": 38.5,
+          "end": 41.5
+        },
+        "text": "Analytics",
+        "treatment": "Large, sans-serif, centered.",
+        "role": "supporting",
+        "reportedRole": "Feature title.",
+        "confidence": "observed",
+        "evidence": "Introduces next section."
+      },
+      {
+        "span": {
+          "start": 51.5,
+          "end": 54
+        },
+        "text": "Domaines Personnalisés",
+        "treatment": "Large, sans-serif, centered.",
+        "role": "supporting",
+        "reportedRole": "Feature title.",
+        "confidence": "observed",
+        "evidence": "Introduces next section."
+      },
+      {
+        "span": {
+          "start": 56.5,
+          "end": 59
+        },
+        "text": "QR Codes",
+        "treatment": "Large, sans-serif, centered.",
+        "role": "supporting",
+        "reportedRole": "Feature title.",
+        "confidence": "observed",
+        "evidence": "Introduces next section."
+      },
+      {
+        "span": {
+          "start": 107.5,
+          "end": 110
+        },
+        "text": "Tu partages, Tu convertis",
+        "treatment": "Large, sans-serif, centered, alternating backgrounds.",
+        "role": "supporting",
+        "reportedRole": "Call to action/Summary.",
+        "confidence": "observed",
+        "evidence": "Final text before logo."
+      }
+    ],
+    "ui": [
+      {
+        "span": {
+          "start": 10,
+          "end": 21
+        },
+        "action": "Building a Link in Bio page, adding widgets.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Cursor moves automatically, elements appear as if clicked."
+      },
+      {
+        "span": {
+          "start": 30,
+          "end": 38
+        },
+        "action": "Clicking a link on Instagram, showing browser vs native app behavior.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Simulated interaction on two phone mockups."
+      },
+      {
+        "span": {
+          "start": 41.5,
+          "end": 51
+        },
+        "action": "Navigating an analytics dashboard, applying filters.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Cursor moves, charts update."
+      },
+      {
+        "span": {
+          "start": 59,
+          "end": 106
+        },
+        "action": "Customizing a QR code, then scanning it with a phone.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Color picker used, then phone camera UI appears."
+      }
+    ],
+    "objectTransformations": [
+      {
+        "span": {
+          "start": 9.5,
+          "end": 10.5
+        },
+        "subject": "Text 'Link in Bio'",
+        "mechanism": "Scales down and morphs into a phone UI container.",
+        "confidence": "observed",
+        "evidence": "Continuous animation from text to shape."
+      },
+      {
+        "span": {
+          "start": 29.5,
+          "end": 30.5
+        },
+        "subject": "Text 'Deep Links'",
+        "mechanism": "Splits horizontally and morphs into two phone UI containers.",
+        "confidence": "observed",
+        "evidence": "Continuous animation from text to shapes."
+      },
+      {
+        "span": {
+          "start": 41,
+          "end": 42
+        },
+        "subject": "Text 'Analytics'",
+        "mechanism": "Morphs into a dashboard panel.",
+        "confidence": "observed",
+        "evidence": "Continuous animation from text to shape."
+      }
+    ],
+    "camera": [
+      {
+        "span": {
+          "start": 0,
+          "end": 4.8
+        },
+        "move": "push",
+        "reportedMove": "Push in",
+        "attribution": "both",
+        "confidence": "observed",
+        "evidence": "Text scales up while background grid and icons move outward."
+      },
+      {
+        "span": {
+          "start": 110,
+          "end": 113
+        },
+        "move": "pull",
+        "reportedMove": "Pull out",
+        "attribution": "both",
+        "confidence": "observed",
+        "evidence": "UI elements scale down and move towards center."
+      }
+    ],
+    "motion": [
+      {
+        "span": {
+          "start": 10,
+          "end": 21
+        },
+        "subject": "UI widgets",
+        "easing": "ease-out",
+        "staggerMs": 100,
+        "confidence": "inferred",
+        "evidence": "Elements slide in smoothly with slight delays."
+      },
+      {
+        "span": {
+          "start": 41.5,
+          "end": 51
+        },
+        "subject": "Dashboard panels",
+        "easing": "ease-out",
+        "staggerMs": 150,
+        "confidence": "inferred",
+        "evidence": "Panels appear sequentially."
+      }
+    ],
+    "transitions": [
+      {
+        "at": 4.8,
+        "kind": "hard_cut",
+        "reportedKind": "hard cut",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Instant change to black."
+      },
+      {
+        "at": 8,
+        "kind": "other",
+        "reportedKind": "toggle switch",
+        "carriedAcross": "concept of activation",
+        "confidence": "observed",
+        "evidence": "A UI toggle switch appears and clicks to transition to the feature."
+      }
+    ],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Upbeat, modern electronic track.",
+        "confidence": "observed",
+        "evidence": "Plays continuously."
+      },
+      {
+        "at": 3,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Cash register 'cha-ching' sound.",
+        "confidence": "observed",
+        "evidence": "Syncs with 'Zéro conversion' text."
+      },
+      {
+        "at": 9,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "UI toggle click.",
+        "confidence": "observed",
+        "evidence": "Syncs with visual toggle."
+      },
+      {
+        "at": 14,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Mouse click and pop.",
+        "confidence": "observed",
+        "evidence": "Syncs with cursor clicking 'Add'."
+      }
+    ],
+    "voice": [],
+    "music": [],
+    "sfx": [],
+    "sync": [
+      {
+        "at": 9,
+        "visualEvent": "Toggle switch activates.",
+        "audioEvent": "Click sound.",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Sound and visual happen together."
+      },
+      {
+        "at": 14,
+        "visualEvent": "Cursor clicks button.",
+        "audioEvent": "Click sound.",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Sound and visual happen together."
+      }
+    ],
+    "cognitiveLoad": [
+      {
+        "span": {
+          "start": 0,
+          "end": 6.8
+        },
+        "level": "low",
+        "reportedLevel": "low",
+        "competingFor": [
+          "reading text"
+        ],
+        "confidence": "observed",
+        "evidence": "Simple text on screen."
+      },
+      {
+        "span": {
+          "start": 10,
+          "end": 21
+        },
+        "level": "moderate",
+        "reportedLevel": "medium",
+        "competingFor": [
+          "following cursor",
+          "reading widget names"
+        ],
+        "confidence": "observed",
+        "evidence": "Multiple UI elements moving."
+      },
+      {
+        "span": {
+          "start": 30,
+          "end": 38
+        },
+        "level": "high",
+        "reportedLevel": "high",
+        "competingFor": [
+          "watching left screen",
+          "watching right screen",
+          "reading labels"
+        ],
+        "confidence": "observed",
+        "evidence": "Split screen requires divided attention."
+      }
+    ],
+    "heroMoments": [
+      {
+        "span": {
+          "start": 30,
+          "end": 38
+        },
+        "subject": "Deep Links comparison",
+        "setup": "Text 'Deep Links' followed by split screen.",
+        "confidence": "observed",
+        "evidence": "Clearly demonstrates the core value proposition visually."
+      },
+      {
+        "span": {
+          "start": 113,
+          "end": 117
+        },
+        "subject": "Final logo and cursor click",
+        "setup": "Montage zooming out to reveal logo.",
+        "confidence": "observed",
+        "evidence": "Strong final call to action."
+      }
+    ],
+    "memorability": {
+      "images": [
+        {
+          "at": 35,
+          "description": "Split screen showing a broken link vs a working native app link."
+        },
+        {
+          "at": 100,
+          "description": "Customizing a QR code with colors and a logo."
+        }
+      ],
+      "confidence": "inferred",
+      "evidence": "These are the most visually distinct and functionally explanatory moments."
+    },
+    "comprehension": {
+      "understoodProposition": "taap.it is a comprehensive link management tool that improves conversion by offering customizable bio links, deep linking, analytics, and QR codes.",
+      "confusions": [],
+      "clearBy": 107.5,
+      "confidence": "observed",
+      "evidence": "The sequence of features clearly builds this proposition."
+    },
+    "limitations": [
+      "Cannot precisely measure staggerMs for UI animations; values are estimates.",
+      "Cannot identify specific UI frameworks or exact font names used."
+    ]
+  },
+  "target3": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target3.mp4",
+      "durationSeconds": 71
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-20T23:52:02.397Z",
+    "boundaries": [
+      {
+        "at": 1.8,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Button scales to fill screen with blue",
+        "confidence": "observed",
+        "evidence": "Blue color expands from button center"
+      },
+      {
+        "at": 2.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Blue screen wipes to reveal floating UI cards",
+        "confidence": "observed",
+        "evidence": "Transition from solid blue to white background"
+      },
+      {
+        "at": 5.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to new UI layout",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 9.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Camera zooms into white space of chat bubble",
+        "confidence": "observed",
+        "evidence": "Scale increases until white fills frame"
+      },
+      {
+        "at": 12.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to spreadsheet",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 14.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans right to floating messages",
+        "confidence": "observed",
+        "evidence": "Continuous horizontal motion"
+      },
+      {
+        "at": 19.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Camera zooms into white space of a message",
+        "confidence": "observed",
+        "evidence": "Scale increases until white fills frame"
+      },
+      {
+        "at": 21,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Text 'change' dissolves into flame logo",
+        "confidence": "observed",
+        "evidence": "Visual morph with particle effect"
+      },
+      {
+        "at": 23,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to radar graphic",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 29.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans right to form UI",
+        "confidence": "observed",
+        "evidence": "Continuous horizontal motion"
+      },
+      {
+        "at": 34,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to node graphic",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 37.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans right to dashboard UI",
+        "confidence": "observed",
+        "evidence": "Continuous horizontal motion"
+      },
+      {
+        "at": 41.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to floating cards",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 45.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans right to list UI",
+        "confidence": "observed",
+        "evidence": "Continuous horizontal motion"
+      },
+      {
+        "at": 49.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to workflow UI",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 53.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans right to red wave graphic",
+        "confidence": "observed",
+        "evidence": "Continuous horizontal motion"
+      },
+      {
+        "at": 56.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to large typography",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      },
+      {
+        "at": 60.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans right to text",
+        "confidence": "observed",
+        "evidence": "Continuous horizontal motion"
+      },
+      {
+        "at": 63.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Camera pans down to final CTA",
+        "confidence": "observed",
+        "evidence": "Continuous vertical motion"
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 20
+        },
+        "idea": "Establish pain points of manual cold outreach",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Relate to user frustration",
+        "confidence": "observed",
+        "evidence": "Shows tedious tasks and negative replies"
+      },
+      {
+        "span": {
+          "start": 20,
+          "end": 29
+        },
+        "idea": "Introduce Gojiberry as the solution",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Brand introduction",
+        "confidence": "observed",
+        "evidence": "Logo reveal and core value proposition"
+      },
+      {
+        "span": {
+          "start": 29,
+          "end": 53
+        },
+        "idea": "Explain how the product works",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Feature comprehension",
+        "confidence": "observed",
+        "evidence": "Step-by-step UI walkthroughs"
+      },
+      {
+        "span": {
+          "start": 53,
+          "end": 71
+        },
+        "idea": "Highlight benefits and call to action",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Drive conversion",
+        "confidence": "observed",
+        "evidence": "ROI stats and 'Try now' button"
+      }
+    ],
+    "narrative": {
+      "movements": [
+        {
+          "span": {
+            "start": 0,
+            "end": 20
+          },
+          "claim": "Manual outreach is inefficient and demoralizing."
+        },
+        {
+          "span": {
+            "start": 20,
+            "end": 53
+          },
+          "claim": "Gojiberry automates intent-based targeting."
+        },
+        {
+          "span": {
+            "start": 53,
+            "end": 71
+          },
+          "claim": "This leads to better results with less effort."
+        }
+      ],
+      "dependency": "unclear",
+      "confidence": "observed",
+      "evidence": "Standard marketing narrative arc"
+    },
+    "viewerStates": [
+      {
+        "at": 5,
+        "knows": "The video is about sending messages",
+        "openQuestion": "What is the point of this?",
+        "confidence": "observed",
+        "evidence": "Generic UI shown initially"
+      },
+      {
+        "at": 15,
+        "knows": "Cold outreach is painful",
+        "openQuestion": "How do I fix it?",
+        "confidence": "observed",
+        "evidence": "Rejection messages shown"
+      },
+      {
+        "at": 30,
+        "knows": "Gojiberry targets high-intent people",
+        "openQuestion": "How does it know who they are?",
+        "confidence": "observed",
+        "evidence": "Radar graphic shown"
+      },
+      {
+        "at": 65,
+        "knows": "The tool automates the process for better ROI",
+        "openQuestion": "Where do I sign up?",
+        "confidence": "observed",
+        "evidence": "CTA displayed"
+      }
+    ],
+    "visualHierarchy": [
+      {
+        "at": 10,
+        "order": [
+          "Kinetic typography",
+          "White background"
+        ],
+        "confidence": "observed",
+        "evidence": "Text is the only element on screen"
+      },
+      {
+        "at": 30,
+        "order": [
+          "Animated cursor/typing",
+          "Form UI",
+          "Background grid"
+        ],
+        "confidence": "observed",
+        "evidence": "Action draws eye to form fields"
+      },
+      {
+        "at": 58,
+        "order": [
+          "Large '3-5x' text",
+          "Floating red pills",
+          "Background"
+        ],
+        "confidence": "observed",
+        "evidence": "Scale and color prioritize the stat"
+      }
+    ],
+    "typography": [
+      {
+        "span": {
+          "start": 9,
+          "end": 20
+        },
+        "text": "Let's be honest Your problem isn't what you sell It's spending hours building lists contacting people who are not interested and hoping volume will fix the problem",
+        "treatment": "Bold sans-serif, kinetic, word-by-word reveal, blue highlights",
+        "role": "supporting",
+        "reportedRole": "Deliver core problem statement",
+        "confidence": "observed",
+        "evidence": "Text animates in sync with VO"
+      },
+      {
+        "span": {
+          "start": 56,
+          "end": 60
+        },
+        "text": "3-5x more replies and demos",
+        "treatment": "Massive scale, orange gradient, centered",
+        "role": "supporting",
+        "reportedRole": "Highlight key benefit",
+        "confidence": "observed",
+        "evidence": "Dominates the frame"
+      }
+    ],
+    "ui": [
+      {
+        "span": {
+          "start": 0,
+          "end": 2
+        },
+        "action": "Typing and sending a message",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "Simplified vector representation of LinkedIn"
+      },
+      {
+        "span": {
+          "start": 29,
+          "end": 33
+        },
+        "action": "Filling out a website URL",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Cursor moves and text appears automatically"
+      },
+      {
+        "span": {
+          "start": 49,
+          "end": 53
+        },
+        "action": "Workflow nodes connecting",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "Abstract representation of campaign building"
+      }
+    ],
+    "objectTransformations": [
+      {
+        "span": {
+          "start": 20,
+          "end": 22
+        },
+        "subject": "Text 'change'",
+        "mechanism": "Dissolves into particles and forms flame logo",
+        "confidence": "observed",
+        "evidence": "Visual morph"
+      }
+    ],
+    "camera": [
+      {
+        "span": {
+          "start": 0,
+          "end": 71
+        },
+        "move": "other",
+        "reportedMove": "Continuous 2D panning and zooming across a large canvas",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "Elements remain static relative to each other while frame moves"
+      }
+    ],
+    "motion": [
+      {
+        "span": {
+          "start": 2,
+          "end": 5
+        },
+        "subject": "Floating UI cards",
+        "easing": "ease-out",
+        "staggerMs": 100,
+        "confidence": "observed",
+        "evidence": "Cards appear sequentially with smooth deceleration"
+      }
+    ],
+    "transitions": [
+      {
+        "at": 9.5,
+        "kind": "other",
+        "reportedKind": "zoom-through",
+        "carriedAcross": "White background",
+        "confidence": "observed",
+        "evidence": "Camera pushes into white space to clear frame"
+      }
+    ],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Upbeat, driving electronic track",
+        "confidence": "observed",
+        "evidence": "Constant background music"
+      },
+      {
+        "at": 0,
+        "layer": "voice",
+        "reportedLayer": "voice",
+        "description": "Confident, energetic male voiceover",
+        "confidence": "observed",
+        "evidence": "Narrates the entire video"
+      },
+      {
+        "at": 1,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Whoosh and click",
+        "confidence": "observed",
+        "evidence": "Accompanies sending the message"
+      }
+    ],
+    "voice": [],
+    "music": [
+      {
+        "span": {
+          "start": 0,
+          "end": 71
+        },
+        "function": "Drive momentum and maintain energy",
+        "change": "None, consistent loop",
+        "confidence": "observed",
+        "evidence": "Track does not significantly alter arrangement"
+      }
+    ],
+    "sfx": [
+      {
+        "at": 21,
+        "description": "Fire/burn sound",
+        "attachedTo": "Logo reveal",
+        "confidence": "observed",
+        "evidence": "Matches visual flame effect"
+      },
+      {
+        "at": 41,
+        "description": "Pop sounds",
+        "attachedTo": "Icon cards appearing",
+        "confidence": "observed",
+        "evidence": "Synchronized with visual pops"
+      }
+    ],
+    "sync": [
+      {
+        "at": 10,
+        "visualEvent": "Text 'Let's be honest' appears",
+        "audioEvent": "VO says 'Let's be honest'",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Visuals reinforce audio exactly"
+      }
+    ],
+    "cognitiveLoad": [
+      {
+        "span": {
+          "start": 29,
+          "end": 53
+        },
+        "level": "high",
+        "reportedLevel": "High",
+        "competingFor": [
+          "Reading UI text",
+          "Following camera moves",
+          "Listening to VO"
+        ],
+        "confidence": "inferred",
+        "evidence": "Dense information section with rapid visual changes"
+      }
+    ],
+    "heroMoments": [
+      {
+        "span": {
+          "start": 20,
+          "end": 23
+        },
+        "subject": "Gojiberry logo reveal",
+        "setup": "Build up of pain points, text 'time to change', dramatic morph",
+        "confidence": "observed",
+        "evidence": "Central brand introduction"
+      }
+    ],
+    "memorability": {
+      "images": [
+        {
+          "at": 8,
+          "description": "The 'F*CK YOU' rejection message"
+        },
+        {
+          "at": 21,
+          "description": "The flame logo morph"
+        },
+        {
+          "at": 58,
+          "description": "The massive '3-5x' text"
+        }
+      ],
+      "confidence": "inferred",
+      "evidence": "High contrast, emotional impact, or scale"
+    },
+    "comprehension": {
+      "understoodProposition": "Gojiberry automates targeted LinkedIn outreach based on intent signals.",
+      "confusions": [],
+      "clearBy": 30,
+      "confidence": "inferred",
+      "evidence": "Core value prop is stated clearly by this point"
+    },
+    "limitations": [
+      "Cannot determine exact easing curves or stagger timings without frame-by-frame analysis.",
+      "UI text is often too small or blurry to read completely.",
+      "Cannot identify specific fonts used.",
+      "Sampled at 4 fps; nothing shorter than one sampled frame was visible.",
+      "1 voice entry was dropped — text: Too big: expected string to have <=600 characters"
+    ]
+  },
+  "target5": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target5.mp4",
+      "durationSeconds": 71
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-21T19:28:52.498Z",
+    "boundaries": [
+      {
+        "at": 3,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "text replacement and introduction of logo grid",
+        "confidence": "observed",
+        "evidence": "New text appears, logos slide in from right."
+      },
+      {
+        "at": 9,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "layout reorganization",
+        "confidence": "observed",
+        "evidence": "Logos move to center, text disappears."
+      },
+      {
+        "at": 15,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "addition of connecting lines and new text",
+        "confidence": "observed",
+        "evidence": "Lines draw between logos, text appears on left."
+      },
+      {
+        "at": 21.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "color inversion and wipe",
+        "confidence": "observed",
+        "evidence": "Background changes from dark blue to white/light blue."
+      },
+      {
+        "at": 27.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "morphing",
+        "confidence": "observed",
+        "evidence": "Tree diagram lines collapse into the central Eskimoz star logo."
+      },
+      {
+        "at": 30,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "introduction of UI elements",
+        "confidence": "observed",
+        "evidence": "A software interface slides in, replacing the logo."
+      },
+      {
+        "at": 35,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "UI scroll and text change",
+        "confidence": "observed",
+        "evidence": "Interface scrolls down, new text overlays appear."
+      },
+      {
+        "at": 40,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "UI view change",
+        "confidence": "observed",
+        "evidence": "Interface switches to a graph view."
+      },
+      {
+        "at": 50,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "camera zoom out and addition of elements",
+        "confidence": "observed",
+        "evidence": "UI scales down, avatars and names pop up around it."
+      },
+      {
+        "at": 54,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "morphing",
+        "confidence": "observed",
+        "evidence": "Avatars and UI collapse into the Eskimoz star logo."
+      },
+      {
+        "at": 57,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "scale up and element introduction",
+        "confidence": "observed",
+        "evidence": "Star expands, revealing '1000' and brand logos."
+      },
+      {
+        "at": 101,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "text and graphic replacement",
+        "confidence": "observed",
+        "evidence": "Logos disappear, 'Global Search' and a graph line appear."
+      },
+      {
+        "at": 103.5,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "wipe to final CTA",
+        "confidence": "observed",
+        "evidence": "Screen transitions to a static UI background with final branding and button."
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 21.5
+        },
+        "idea": "Highlighting the problem of fragmented digital marketing channels.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Establish the pain point of losing market share due to siloed efforts.",
+        "confidence": "inferred",
+        "evidence": "Voiceover discusses losing market share while showing disparate platforms."
+      },
+      {
+        "span": {
+          "start": 21.5,
+          "end": 30
+        },
+        "idea": "Posing the question of how to unify these efforts.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Transition from problem to the need for a solution.",
+        "confidence": "inferred",
+        "evidence": "Text asks 'Comment capter la demande partout' with a branching diagram."
+      },
+      {
+        "span": {
+          "start": 30,
+          "end": 50
+        },
+        "idea": "Introducing the Eskimoz technology as the unifying solution.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Demonstrate the software's capability to centralize data and track competitors.",
+        "confidence": "observed",
+        "evidence": "UI is shown with various dashboards, graphs, and features."
+      },
+      {
+        "span": {
+          "start": 50,
+          "end": 63.5
+        },
+        "idea": "Combining technology with human expertise for scale.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Show that the tool is backed by experts and trusted by many brands.",
+        "confidence": "observed",
+        "evidence": "Avatars appear, then '1000' brands, culminating in 'Global Search'."
+      },
+      {
+        "span": {
+          "start": 63.5,
+          "end": 71
+        },
+        "idea": "Call to action.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Prompt the user to try the product.",
+        "confidence": "observed",
+        "evidence": "Final screen with 'Get found everywhere' and a clickable button."
+      }
+    ],
+    "narrative": {
+      "movements": [
+        {
+          "span": {
+            "start": 0,
+            "end": 21.5
+          },
+          "claim": "You are losing market share because channels are fragmented."
+        },
+        {
+          "span": {
+            "start": 21.5,
+            "end": 30
+          },
+          "claim": "You need a way to capture demand everywhere without diluting effort."
+        },
+        {
+          "span": {
+            "start": 30,
+            "end": 50
+          },
+          "claim": "Our technology unifies all channels into one cockpit."
+        },
+        {
+          "span": {
+            "start": 50,
+            "end": 63.5
+          },
+          "claim": "Combined with 300 experts, we drive Global Search performance for 1000 brands."
+        },
+        {
+          "span": {
+            "start": 63.5,
+            "end": 71
+          },
+          "claim": "Try it now to get found everywhere."
+        }
+      ],
+      "dependency": "unclear",
+      "confidence": "inferred",
+      "evidence": "The script follows a classic marketing funnel structure."
+    },
+    "viewerStates": [
+      {
+        "at": 5,
+        "knows": "The video is about digital market share.",
+        "openQuestion": "What is the specific problem being addressed?",
+        "confidence": "inferred",
+        "evidence": "Initial text poses a question about losing market share."
+      },
+      {
+        "at": 25,
+        "knows": "The problem is managing multiple channels (SEO, Paid, Social, etc.).",
+        "openQuestion": "How can this be solved without diluting effort?",
+        "confidence": "inferred",
+        "evidence": "Tree diagram shows multiple channels and asks how to capture demand everywhere."
+      },
+      {
+        "at": 45,
+        "knows": "Eskimoz offers a software platform to unify these channels.",
+        "openQuestion": "Is it just software, or is there more to it?",
+        "confidence": "inferred",
+        "evidence": "UI demonstration shows unified tracking and competitor analysis."
+      },
+      {
+        "at": 55,
+        "knows": "The software is backed by 300 human experts.",
+        "openQuestion": "Who uses this service?",
+        "confidence": "inferred",
+        "evidence": "Avatars and '300 experts' text appear."
+      },
+      {
+        "at": 65,
+        "knows": "It's used by 1000 brands for Global Search.",
+        "openQuestion": "How do I start?",
+        "confidence": "inferred",
+        "evidence": "Brand logos and 'Global Search' text are shown."
+      }
+    ],
+    "visualHierarchy": [
+      {
+        "at": 5,
+        "order": [
+          "Text on left",
+          "Logo grid on right",
+          "Glowing star"
+        ],
+        "confidence": "observed",
+        "evidence": "Text is large and high contrast; logos are secondary."
+      },
+      {
+        "at": 25,
+        "order": [
+          "Central text 'Comment capter...'",
+          "Branching diagram",
+          "Right text 'Sans diluer...'"
+        ],
+        "confidence": "observed",
+        "evidence": "Central text is largest; diagram draws the eye outward."
+      },
+      {
+        "at": 35,
+        "order": [
+          "UI interface",
+          "Text overlays ('Un seul cockpit')",
+          "Eskimoz logo"
+        ],
+        "confidence": "observed",
+        "evidence": "UI takes up most of the screen; text overlays are bold."
+      },
+      {
+        "at": 52,
+        "order": [
+          "Large '300' text",
+          "Avatars",
+          "UI in background"
+        ],
+        "confidence": "observed",
+        "evidence": "'300' is massive and central; avatars pop around it."
+      },
+      {
+        "at": 65,
+        "order": [
+          "Eskimoz logo",
+          "Headline 'Get found everywhere'",
+          "CTA button",
+          "Background UI"
+        ],
+        "confidence": "observed",
+        "evidence": "Logo and headline are top center; button is prominent and central."
+      }
+    ],
+    "typography": [
+      {
+        "span": {
+          "start": 0,
+          "end": 3
+        },
+        "text": "Et si vous arrêtiez de perdre des parts de marché en ligne ?",
+        "treatment": "Serif, white, centered",
+        "role": "supporting",
+        "reportedRole": "Hook",
+        "confidence": "observed",
+        "evidence": "First text on screen."
+      },
+      {
+        "span": {
+          "start": 3,
+          "end": 9
+        },
+        "text": "Ça pourrait paraître simple, n'est-ce pas ?",
+        "treatment": "Serif, white, left-aligned",
+        "role": "supporting",
+        "reportedRole": "Transition",
+        "confidence": "observed",
+        "evidence": "Replaces initial hook."
+      },
+      {
+        "span": {
+          "start": 21.5,
+          "end": 23
+        },
+        "text": "Une question se pose",
+        "treatment": "Serif, dark blue, centered",
+        "role": "supporting",
+        "reportedRole": "Section header",
+        "confidence": "observed",
+        "evidence": "Appears after scene change."
+      },
+      {
+        "span": {
+          "start": 30,
+          "end": 35
+        },
+        "text": "Construire une technologie qui unifie tout",
+        "treatment": "Serif, dark blue, centered",
+        "role": "supporting",
+        "reportedRole": "Value proposition",
+        "confidence": "observed",
+        "evidence": "Introduces the UI section."
+      },
+      {
+        "span": {
+          "start": 50,
+          "end": 54
+        },
+        "text": "300",
+        "treatment": "Serif, dark blue, massive scale",
+        "role": "supporting",
+        "reportedRole": "Data point",
+        "confidence": "observed",
+        "evidence": "Dominates the screen."
+      },
+      {
+        "span": {
+          "start": 63.5,
+          "end": 71
+        },
+        "text": "Get found everywhere",
+        "treatment": "Serif, dark blue, large",
+        "role": "supporting",
+        "reportedRole": "Tagline",
+        "confidence": "observed",
+        "evidence": "Final screen headline."
+      }
+    ],
+    "ui": [
+      {
+        "span": {
+          "start": 30,
+          "end": 50
+        },
+        "action": "Scrolling, switching tabs, displaying graphs",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "The interface animates to show different features automatically."
+      }
+    ],
+    "objectTransformations": [
+      {
+        "span": {
+          "start": 26,
+          "end": 28
+        },
+        "subject": "Tree diagram lines",
+        "mechanism": "Morphing into the Eskimoz star logo",
+        "confidence": "observed",
+        "evidence": "Lines retract and form the star shape."
+      },
+      {
+        "span": {
+          "start": 53,
+          "end": 55
+        },
+        "subject": "Avatars and UI",
+        "mechanism": "Morphing into the Eskimoz star logo",
+        "confidence": "observed",
+        "evidence": "Elements shrink and merge into the central star."
+      }
+    ],
+    "camera": [
+      {
+        "span": {
+          "start": 30,
+          "end": 50
+        },
+        "move": "other",
+        "reportedMove": "Subtle pans and zooms over the UI",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "The perspective shifts slightly to focus on different parts of the interface."
+      },
+      {
+        "span": {
+          "start": 50,
+          "end": 54
+        },
+        "move": "pull",
+        "reportedMove": "Zoom out",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "The UI scales down to reveal the surrounding avatars."
+      }
+    ],
+    "motion": [
+      {
+        "span": {
+          "start": 3,
+          "end": 5
+        },
+        "subject": "Logo grid",
+        "easing": "ease-out",
+        "staggerMs": 0,
+        "confidence": "observed",
+        "evidence": "Grid slides in smoothly from the right."
+      },
+      {
+        "span": {
+          "start": 23,
+          "end": 25
+        },
+        "subject": "Tree diagram branches",
+        "easing": "ease-out",
+        "staggerMs": 100,
+        "confidence": "observed",
+        "evidence": "Branches draw out sequentially."
+      },
+      {
+        "span": {
+          "start": 50,
+          "end": 52
+        },
+        "subject": "Avatars",
+        "easing": "spring",
+        "staggerMs": 50,
+        "confidence": "observed",
+        "evidence": "Avatars pop up with a slight bounce."
+      }
+    ],
+    "transitions": [
+      {
+        "at": 21.5,
+        "kind": "mask",
+        "reportedKind": "wipe",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Screen wipes from dark blue to white."
+      },
+      {
+        "at": 103.5,
+        "kind": "mask",
+        "reportedKind": "wipe",
+        "carriedAcross": "Eskimoz logo",
+        "confidence": "observed",
+        "evidence": "Screen wipes to final CTA, logo remains central."
+      }
+    ],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Electronic, pulsing beat starts.",
+        "confidence": "observed",
+        "evidence": "Music begins immediately."
+      },
+      {
+        "at": 0,
+        "layer": "voice",
+        "reportedLayer": "voice",
+        "description": "Male voiceover begins.",
+        "confidence": "observed",
+        "evidence": "Narration starts."
+      },
+      {
+        "at": 3,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Whoosh sound.",
+        "confidence": "observed",
+        "evidence": "Accompanies the logo grid sliding in."
+      },
+      {
+        "at": 21.5,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Swoosh/impact sound.",
+        "confidence": "observed",
+        "evidence": "Accompanies the scene change to white."
+      },
+      {
+        "at": 63.5,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Mouse click.",
+        "confidence": "observed",
+        "evidence": "Accompanies the cursor clicking the CTA button."
+      }
+    ],
+    "voice": [
+      {
+        "span": {
+          "start": 0,
+          "end": 21.5
+        },
+        "text": "Et si vous arrêtiez de perdre des parts de marché en ligne ? Ça pourrait paraître simple, n'est-ce pas ? Vous optimisez Google, vous intégrez ChatGPT. Mais vos clients, eux, vont bien plus loin. Ils explorent sur YouTube, comparent sur Reddit ou Amazon, scrollent sur TikTok. Les parcours sont fragmentés. Et pendant que vous optimisez un canal, vos concurrents gagnent du terrain ailleurs.",
+        "delivery": "Professional, slightly urgent",
+        "confidence": "observed",
+        "evidence": "Tone highlights a problem."
+      },
+      {
+        "span": {
+          "start": 21.5,
+          "end": 30
+        },
+        "text": "Alors une question se pose : comment capter la demande partout sans diluer ses efforts ? Chez Eskimoz, on a fait un choix.",
+        "delivery": "Inquisitive, transitioning to solution",
+        "confidence": "observed",
+        "evidence": "Posing a question and introducing the brand."
+      },
+      {
+        "span": {
+          "start": 30,
+          "end": 50
+        },
+        "text": "Construire une technologie qui unifie tout. Du search classique aux moteurs IA. Un seul cockpit, une seule vision pour piloter ce qui compte vraiment : votre croissance. Vous voyez où investir, où vos concurrents prennent de l'avance, et vous optimisez votre ROI en temps réel.",
+        "delivery": "Confident, explanatory",
+        "confidence": "observed",
+        "evidence": "Describing features and benefits."
+      },
+      {
+        "span": {
+          "start": 50,
+          "end": 63.5
+        },
+        "text": "Mais cette technologie, on ne vous laisse jamais seul avec. Derrière, 300 experts pilotent votre stratégie et opèrent vos campagnes. C'est cette combinaison, expertise humaine et puissance technologique, qui permet à plus de 1000 marques en Europe de performer sur le Global Search.",
+        "delivery": "Reassuring, authoritative",
+        "confidence": "observed",
+        "evidence": "Emphasizing human support and scale."
+      }
+    ],
+    "music": [
+      {
+        "span": {
+          "start": 0,
+          "end": 71
+        },
+        "function": "Drive momentum and build energy",
+        "change": "Builds in intensity around 30s when UI is introduced, peaks at 57s with '1000' brands.",
+        "confidence": "observed",
+        "evidence": "Beat becomes more prominent and layered as the video progresses."
+      }
+    ],
+    "sfx": [
+      {
+        "at": 3,
+        "description": "Whoosh",
+        "attachedTo": "Logo grid entering",
+        "confidence": "observed",
+        "evidence": "Sound syncs with visual movement."
+      },
+      {
+        "at": 21.5,
+        "description": "Swoosh/Impact",
+        "attachedTo": "Scene transition to white",
+        "confidence": "observed",
+        "evidence": "Sound syncs with the visual wipe."
+      },
+      {
+        "at": 27.5,
+        "description": "Digital morphing sound",
+        "attachedTo": "Tree diagram collapsing into logo",
+        "confidence": "observed",
+        "evidence": "Sound syncs with the transformation."
+      },
+      {
+        "at": 63.5,
+        "description": "Mouse click",
+        "attachedTo": "Cursor clicking CTA button",
+        "confidence": "observed",
+        "evidence": "Sound syncs with the visual click."
+      }
+    ],
+    "sync": [
+      {
+        "at": 21.5,
+        "visualEvent": "Scene wipe to white",
+        "audioEvent": "Swoosh SFX",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Visual and audio happen exactly together."
+      },
+      {
+        "at": 63.5,
+        "visualEvent": "Button click animation",
+        "audioEvent": "Mouse click SFX",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Visual and audio happen exactly together."
+      }
+    ],
+    "cognitiveLoad": [
+      {
+        "span": {
+          "start": 0,
+          "end": 21.5
+        },
+        "level": "low",
+        "reportedLevel": "low",
+        "competingFor": [
+          "Reading text",
+          "Recognizing logos"
+        ],
+        "confidence": "inferred",
+        "evidence": "Simple visuals, clear text."
+      },
+      {
+        "span": {
+          "start": 30,
+          "end": 50
+        },
+        "level": "high",
+        "reportedLevel": "high",
+        "competingFor": [
+          "Listening to VO",
+          "Reading overlay text",
+          "Parsing UI details"
+        ],
+        "confidence": "inferred",
+        "evidence": "Complex UI is shown while VO explains features and text overlays appear."
+      }
+    ],
+    "heroMoments": [
+      {
+        "span": {
+          "start": 30,
+          "end": 50
+        },
+        "subject": "The Eskimoz software interface",
+        "setup": "The problem of fragmentation is established, leading to the reveal of the unified solution.",
+        "confidence": "inferred",
+        "evidence": "The UI is the central focus for a significant portion of the video."
+      },
+      {
+        "span": {
+          "start": 57,
+          "end": 61
+        },
+        "subject": "The scale of the operation (1000 brands)",
+        "setup": "The combination of tech and human expertise builds up to this proof point.",
+        "confidence": "inferred",
+        "evidence": "Massive text and brand logos fill the screen."
+      }
+    ],
+    "memorability": {
+      "images": [
+        {
+          "at": 25,
+          "description": "The branching tree diagram showing multiple channels."
+        },
+        {
+          "at": 52,
+          "description": "The giant '300' surrounded by expert avatars."
+        },
+        {
+          "at": 59,
+          "description": "The giant '1000' surrounded by recognizable brand logos."
+        }
+      ],
+      "confidence": "inferred",
+      "evidence": "These are visually distinct and emphasize key value propositions."
+    },
+    "comprehension": null,
+    "limitations": [
+      "Cannot verify the exact UI elements shown as they move quickly and are stylized.",
+      "Stagger times for animations are estimated.",
+      "Cannot identify all brand logos shown at 0:59."
+    ]
+  },
+  "target6": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target6.mp4",
+      "durationSeconds": 57
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-21T19:30:17.083Z",
+    "boundaries": [
+      {
+        "at": 2,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Emojis pop around the central profile card.",
+        "confidence": "observed",
+        "evidence": "Sudden appearance of multiple emoji graphics."
+      },
+      {
+        "at": 4,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Profile blurs, three error tags appear.",
+        "confidence": "observed",
+        "evidence": "Visual shift from profile to text tags."
+      },
+      {
+        "at": 7,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Tags disappear, text appears, profile returns.",
+        "confidence": "observed",
+        "evidence": "Layout reorganised to show text and profile."
+      },
+      {
+        "at": 9,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Megaphone graphic bursts from profile.",
+        "confidence": "observed",
+        "evidence": "New large graphic element introduced."
+      },
+      {
+        "at": 11,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to solid purple background with text.",
+        "confidence": "observed",
+        "evidence": "Complete change of visual environment."
+      },
+      {
+        "at": 14,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to light background with text and floating headshots.",
+        "confidence": "observed",
+        "evidence": "New layout and elements."
+      },
+      {
+        "at": 17,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to 'STOP!' text on purple.",
+        "confidence": "observed",
+        "evidence": "Sudden full-screen text."
+      },
+      {
+        "at": 18,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to animated illustration.",
+        "confidence": "observed",
+        "evidence": "Change to illustrative style."
+      },
+      {
+        "at": 20,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to a new, high-quality profile card.",
+        "confidence": "observed",
+        "evidence": "New central subject introduced."
+      },
+      {
+        "at": 23,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to Atraki logo on purple.",
+        "confidence": "observed",
+        "evidence": "Brand introduction."
+      },
+      {
+        "at": 25,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Fast zoom into a grid of profile cards.",
+        "confidence": "observed",
+        "evidence": "Spatial transition to a new layout."
+      },
+      {
+        "at": 27,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Zoom into one specific profile, breaking it down.",
+        "confidence": "observed",
+        "evidence": "Focus shifts to specific UI components."
+      },
+      {
+        "at": 30,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Focus shifts from banner to profile picture.",
+        "confidence": "observed",
+        "evidence": "Camera pans and scales to highlight the photo."
+      },
+      {
+        "at": 33,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Focus shifts to text sections of the profile.",
+        "confidence": "observed",
+        "evidence": "Camera pans down to highlight text."
+      },
+      {
+        "at": 39,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to profile with a drawn crown.",
+        "confidence": "observed",
+        "evidence": "New visual metaphor introduced."
+      },
+      {
+        "at": 44,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to profile surrounded by smiling faces with checkmarks.",
+        "confidence": "observed",
+        "evidence": "New layout illustrating social proof."
+      },
+      {
+        "at": 48,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to kinetic typography sequence.",
+        "confidence": "observed",
+        "evidence": "Text-only sequence begins."
+      },
+      {
+        "at": 51,
+        "kind": "scene",
+        "reportedKind": "scene",
+        "mechanism": "Hard cut to final CTA screen.",
+        "confidence": "observed",
+        "evidence": "Button and logo appear for conclusion."
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 11
+        },
+        "idea": "Highlighting the flaws of a standard, amateur LinkedIn profile.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Identify with the problem.",
+        "confidence": "observed",
+        "evidence": "Visuals of a poor profile, error tags, and 'AMATEUR' megaphone."
+      },
+      {
+        "span": {
+          "start": 11,
+          "end": 17
+        },
+        "idea": "Showing the negative business consequences of a bad profile.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Feel the pain points.",
+        "confidence": "observed",
+        "evidence": "Text listing '0 conversions' and quotes about price negotiation."
+      },
+      {
+        "span": {
+          "start": 17,
+          "end": 23
+        },
+        "idea": "Pivoting to the solution: a profile that commands respect.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Understand the desired state.",
+        "confidence": "observed",
+        "evidence": "'STOP' text followed by a premium-looking profile."
+      },
+      {
+        "span": {
+          "start": 23,
+          "end": 27
+        },
+        "idea": "Introducing the brand and its core offering.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Recognize the brand.",
+        "confidence": "observed",
+        "evidence": "Atraki logo and grid of transformed profiles."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 39
+        },
+        "idea": "Detailed breakdown of the profile improvements.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Process the specific features.",
+        "confidence": "observed",
+        "evidence": "Highlighting banner, photo, and copy."
+      },
+      {
+        "span": {
+          "start": 39,
+          "end": 48
+        },
+        "idea": "Explaining the positive outcomes of the new profile.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Connect features to benefits.",
+        "confidence": "observed",
+        "evidence": "Visuals of a crown and approving clients."
+      },
+      {
+        "span": {
+          "start": 48,
+          "end": 57
+        },
+        "idea": "Call to action to purchase the kit.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Know what to do next.",
+        "confidence": "observed",
+        "evidence": "Final CTA button and URL."
+      }
+    ],
+    "narrative": {
+      "movements": [
+        {
+          "span": {
+            "start": 0,
+            "end": 17
+          },
+          "claim": "Your current LinkedIn profile is costing you business because it looks amateur."
+        },
+        {
+          "span": {
+            "start": 17,
+            "end": 27
+          },
+          "claim": "You need a professional overhaul, which Atraki provides."
+        },
+        {
+          "span": {
+            "start": 27,
+            "end": 39
+          },
+          "claim": "We optimize every element: banner, photo, and copy."
+        },
+        {
+          "span": {
+            "start": 39,
+            "end": 57
+          },
+          "claim": "This leads to better visibility, credibility, and clients. Buy now."
+        }
+      ],
+      "dependency": "unclear",
+      "confidence": "observed",
+      "evidence": "Classic marketing structure followed sequentially."
+    },
+    "viewerStates": [
+      {
+        "at": 0,
+        "knows": "The topic is LinkedIn profiles.",
+        "openQuestion": "What is wrong with my profile?",
+        "confidence": "observed",
+        "evidence": "Blurred LinkedIn UI shown."
+      },
+      {
+        "at": 11,
+        "knows": "A bad profile leads to poor results.",
+        "openQuestion": "How do I fix it?",
+        "confidence": "observed",
+        "evidence": "Pain points established."
+      },
+      {
+        "at": 23,
+        "knows": "Atraki is the solution.",
+        "openQuestion": "What exactly does Atraki do?",
+        "confidence": "observed",
+        "evidence": "Brand introduced after solution concept."
+      },
+      {
+        "at": 39,
+        "knows": "Atraki optimizes specific profile elements.",
+        "openQuestion": "What is the final result?",
+        "confidence": "observed",
+        "evidence": "Feature breakdown completed."
+      },
+      {
+        "at": 51,
+        "knows": "The service improves credibility and attracts clients.",
+        "openQuestion": "Where do I sign up?",
+        "confidence": "observed",
+        "evidence": "Benefits explained, leading to CTA."
+      }
+    ],
+    "visualHierarchy": [
+      {
+        "at": 2,
+        "order": [
+          "Central profile card",
+          "Surrounding emojis",
+          "Background"
+        ],
+        "confidence": "observed",
+        "evidence": "Profile is central and largest."
+      },
+      {
+        "at": 12,
+        "order": [
+          "Animated text 'Peu de vues'",
+          "Connecting lines",
+          "Background"
+        ],
+        "confidence": "observed",
+        "evidence": "Text is central and high contrast."
+      },
+      {
+        "at": 28,
+        "order": [
+          "Profile banner",
+          "Descriptive text 'Pro et impactante'",
+          "Background"
+        ],
+        "confidence": "observed",
+        "evidence": "Banner is scaled up, text overlays it."
+      },
+      {
+        "at": 52,
+        "order": [
+          "CTA Button",
+          "Atraki Logo",
+          "Headline text"
+        ],
+        "confidence": "observed",
+        "evidence": "Button is central and animated."
+      }
+    ],
+    "typography": [
+      {
+        "span": {
+          "start": 4,
+          "end": 7
+        },
+        "text": "Visuel flou, Tagline générique, Résumé sans impact",
+        "treatment": "White sans-serif on purple pill shapes.",
+        "role": "supporting",
+        "reportedRole": "Highlighting specific errors.",
+        "confidence": "observed",
+        "evidence": "Text clearly legible in tags."
+      },
+      {
+        "span": {
+          "start": 9,
+          "end": 11
+        },
+        "text": "AMATEUR",
+        "treatment": "Large, bold, stylized 3D text bursting from megaphone.",
+        "role": "supporting",
+        "reportedRole": "Emphasizing the core problem.",
+        "confidence": "observed",
+        "evidence": "Dominates the screen."
+      },
+      {
+        "span": {
+          "start": 17,
+          "end": 18
+        },
+        "text": "STOP !",
+        "treatment": "Large, bold, white on purple, slight rotation.",
+        "role": "supporting",
+        "reportedRole": "Pattern interrupt.",
+        "confidence": "observed",
+        "evidence": "Fills the screen briefly."
+      },
+      {
+        "span": {
+          "start": 51,
+          "end": 57
+        },
+        "text": "Passe en mode pro avec Atraki",
+        "treatment": "Bold sans-serif, dark blue on light background.",
+        "role": "supporting",
+        "reportedRole": "Final call to action headline.",
+        "confidence": "observed",
+        "evidence": "Positioned above the CTA button."
+      }
+    ],
+    "ui": [
+      {
+        "span": {
+          "start": 0,
+          "end": 11
+        },
+        "action": "LinkedIn profile card is shown, blurred, and interacted with via graphics.",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "UI elements are separated and animated independently of a real browser."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 39
+        },
+        "action": "Specific sections of a LinkedIn profile (banner, photo, text) are scaled and highlighted.",
+        "liveness": "decomposed",
+        "confidence": "observed",
+        "evidence": "UI parts are treated as separate graphical assets."
+      }
+    ],
+    "objectTransformations": [
+      {
+        "span": {
+          "start": 9,
+          "end": 10
+        },
+        "subject": "Megaphone graphic",
+        "mechanism": "Scales up rapidly from the center of the profile card.",
+        "confidence": "observed",
+        "evidence": "Appears to burst out of the UI."
+      }
+    ],
+    "camera": [
+      {
+        "span": {
+          "start": 25,
+          "end": 27
+        },
+        "move": "other",
+        "reportedMove": "Fast zoom into a grid of images.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "Perspective changes as if moving through 3D space."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 39
+        },
+        "move": "other",
+        "reportedMove": "Panning and zooming across different sections of a profile card.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "Focus shifts smoothly between UI elements."
+      }
+    ],
+    "motion": [
+      {
+        "span": {
+          "start": 2,
+          "end": 4
+        },
+        "subject": "Emojis",
+        "easing": "spring",
+        "staggerMs": 100,
+        "confidence": "observed",
+        "evidence": "Emojis pop in with a bouncy overshoot."
+      },
+      {
+        "span": {
+          "start": 11,
+          "end": 14
+        },
+        "subject": "Result text blocks",
+        "easing": "ease-out",
+        "staggerMs": 300,
+        "confidence": "observed",
+        "evidence": "Text blocks appear sequentially."
+      }
+    ],
+    "transitions": [
+      {
+        "at": 11,
+        "kind": "hard_cut",
+        "reportedKind": "hard cut",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Instantaneous change of scene."
+      },
+      {
+        "at": 25,
+        "kind": "camera_move",
+        "reportedKind": "zoom",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Spatial movement into the next scene."
+      }
+    ],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Upbeat, rhythmic electronic track starts.",
+        "confidence": "observed",
+        "evidence": "Music is present from the beginning."
+      },
+      {
+        "at": 0,
+        "layer": "voice",
+        "reportedLayer": "voice",
+        "description": "Energetic male voiceover begins.",
+        "confidence": "observed",
+        "evidence": "VO drives the narrative."
+      },
+      {
+        "at": 2,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Popping sounds.",
+        "confidence": "observed",
+        "evidence": "Synced with emojis appearing."
+      },
+      {
+        "at": 9,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Feedback/distortion sound.",
+        "confidence": "observed",
+        "evidence": "Synced with megaphone graphic."
+      },
+      {
+        "at": 53,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Mouse click sound.",
+        "confidence": "observed",
+        "evidence": "Synced with cursor clicking the CTA button."
+      }
+    ],
+    "voice": [
+      {
+        "span": {
+          "start": 0,
+          "end": 11
+        },
+        "text": "Ton profil LinkedIn... Mais personne ne te prend au sérieux. Visuel flou, tagline générique, résumé sans impact. Tu veux te vendre comme un pro, mais ton profil crie AMATEUR.",
+        "delivery": "Fast, slightly critical, energetic.",
+        "confidence": "observed",
+        "evidence": "Tone matches the negative visuals."
+      },
+      {
+        "span": {
+          "start": 23,
+          "end": 39
+        },
+        "text": "Voici Atraki. On refond entièrement ton profil LinkedIn. Nouvelle bannière design, pro et impactante. Photo de profil optimisée pour inspirer confiance. Résumé réécrit avec un copy qui convertit, accroche et titre repositionnés pour refléter ta valeur réelle.",
+        "delivery": "Confident, explanatory, upbeat.",
+        "confidence": "observed",
+        "evidence": "Tone shifts to positive when introducing the solution."
+      }
+    ],
+    "music": [
+      {
+        "span": {
+          "start": 0,
+          "end": 57
+        },
+        "function": "Drive pace and maintain energy.",
+        "change": "Remains consistent throughout.",
+        "confidence": "observed",
+        "evidence": "Beat matches the fast-paced editing."
+      }
+    ],
+    "sfx": [
+      {
+        "at": 2,
+        "description": "Pops",
+        "attachedTo": "Emojis appearing",
+        "confidence": "observed",
+        "evidence": "Sound matches visual action."
+      },
+      {
+        "at": 53,
+        "description": "Click",
+        "attachedTo": "Cursor clicking button",
+        "confidence": "observed",
+        "evidence": "Sound matches visual action."
+      }
+    ],
+    "sync": [
+      {
+        "at": 9,
+        "visualEvent": "Megaphone appears",
+        "audioEvent": "Feedback SFX",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Sound and visual hit exactly together."
+      },
+      {
+        "at": 53,
+        "visualEvent": "Button click animation",
+        "audioEvent": "Click SFX",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Sound and visual hit exactly together."
+      }
+    ],
+    "cognitiveLoad": [
+      {
+        "span": {
+          "start": 27,
+          "end": 39
+        },
+        "level": "high",
+        "reportedLevel": "high",
+        "competingFor": [
+          "Listening to VO",
+          "Reading on-screen text",
+          "Tracking camera movement across UI"
+        ],
+        "confidence": "inferred",
+        "evidence": "Multiple streams of information presented simultaneously."
+      }
+    ],
+    "heroMoments": [
+      {
+        "span": {
+          "start": 23,
+          "end": 25
+        },
+        "subject": "Atraki Logo",
+        "setup": "Introduced immediately after the 'STOP' pattern interrupt and solution tease.",
+        "confidence": "observed",
+        "evidence": "Logo is centered on a solid background with a dedicated VO mention."
+      }
+    ],
+    "memorability": {
+      "images": [
+        {
+          "at": 9,
+          "description": "Megaphone shouting AMATEUR out of a profile."
+        },
+        {
+          "at": 39,
+          "description": "Profile picture wearing a drawn crown."
+        }
+      ],
+      "confidence": "inferred",
+      "evidence": "These are the most distinct, non-standard UI visual metaphors used."
+    },
+    "comprehension": {
+      "understoodProposition": "Atraki provides professional LinkedIn profile makeovers to help freelancers/professionals get taken seriously and win clients.",
+      "confusions": [],
+      "clearBy": 27,
+      "confidence": "observed",
+      "evidence": "The problem and solution are clearly stated by the halfway point."
+    },
+    "limitations": [
+      "Exact stagger timings for fast kinetic typography and UI element pops are estimated.",
+      "Cannot verify the exact text of the blurred LinkedIn profiles used in the background."
+    ]
+  },
+  "target7": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target7.mp4",
+      "durationSeconds": 39
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-21T19:32:35.111Z",
+    "boundaries": [
+      {
+        "at": 3,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change from black screen with text to colorful abstract background."
+      },
+      {
+        "at": 4,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to new color palette and text."
+      },
+      {
+        "at": 4.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to new color palette and text."
+      },
+      {
+        "at": 5.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to dark background with line drawing."
+      },
+      {
+        "at": 11,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "element introduction",
+        "confidence": "observed",
+        "evidence": "Red hands enter the frame to interact with the sphere."
+      },
+      {
+        "at": 14,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "glitch effect",
+        "confidence": "observed",
+        "evidence": "Visual distortion transitions the scene to the 'Robotics' shot."
+      },
+      {
+        "at": 15,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to 'Defense' shot."
+      },
+      {
+        "at": 16,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to 'AI agents' shot."
+      },
+      {
+        "at": 17.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to 'Longevity' shot."
+      },
+      {
+        "at": 19.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to repeating text background."
+      },
+      {
+        "at": 20.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "element introduction",
+        "confidence": "observed",
+        "evidence": "Pill shape with 'This is happening' appears over the background."
+      },
+      {
+        "at": 21.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to cascading 'NOW' text."
+      },
+      {
+        "at": 22.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to 'We build' pill."
+      },
+      {
+        "at": 27.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to glowing horizontal line."
+      },
+      {
+        "at": 31,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "scale expansion",
+        "confidence": "observed",
+        "evidence": "Glowing line expands vertically to fill the screen with color."
+      },
+      {
+        "at": 33.5,
+        "kind": "shot",
+        "reportedKind": "shot",
+        "mechanism": "hard cut",
+        "confidence": "observed",
+        "evidence": "Instantaneous change to dark background for logo reveal."
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 5.5
+        },
+        "idea": "Establish core thesis: investing in human enhancement.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Read text and process rapid visual reinforcement.",
+        "confidence": "observed",
+        "evidence": "Typing text followed by rapid cuts of 'Faster', 'Smarter', 'Stronger'."
+      },
+      {
+        "span": {
+          "start": 5.5,
+          "end": 14
+        },
+        "idea": "Visualize human potential and interaction with advanced technology.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Observe abstract representation of human and technology merging.",
+        "confidence": "observed",
+        "evidence": "Line drawing of face interacting with glowing sphere."
+      },
+      {
+        "span": {
+          "start": 14,
+          "end": 19.5
+        },
+        "idea": "List specific investment sectors.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Identify key technology areas.",
+        "confidence": "observed",
+        "evidence": "Rapid sequence of labeled sectors (Robotics, Defense, etc.)."
+      },
+      {
+        "span": {
+          "start": 19.5,
+          "end": 27.5
+        },
+        "idea": "Emphasize immediacy and action.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Process urgency and scale of ambition.",
+        "confidence": "observed",
+        "evidence": "Text 'NOW' and cascading pills representing building the future."
+      },
+      {
+        "span": {
+          "start": 27.5,
+          "end": 39
+        },
+        "idea": "Reveal brand identity and call to action.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Remember brand name and purpose.",
+        "confidence": "observed",
+        "evidence": "Logo animation and final tagline."
+      }
+    ],
+    "narrative": {
+      "movements": [
+        {
+          "span": {
+            "start": 0,
+            "end": 14
+          },
+          "claim": "We invest in technologies that push human limits."
+        },
+        {
+          "span": {
+            "start": 14,
+            "end": 19.5
+          },
+          "claim": "These are the specific fields we focus on."
+        },
+        {
+          "span": {
+            "start": 19.5,
+            "end": 27.5
+          },
+          "claim": "This is happening right now, driven by ambition."
+        },
+        {
+          "span": {
+            "start": 27.5,
+            "end": 39
+          },
+          "claim": "We are Augment, the fund for this future."
+        }
+      ],
+      "dependency": "unclear",
+      "confidence": "observed",
+      "evidence": "The voiceover and visual sequence follow a clear logical argument."
+    },
+    "viewerStates": [
+      {
+        "at": 0,
+        "knows": "Nothing.",
+        "openQuestion": "What is this video about?",
+        "confidence": "observed",
+        "evidence": "Blank screen at start."
+      },
+      {
+        "at": 3,
+        "knows": "The video is about investing in technology.",
+        "openQuestion": "What kind of technology?",
+        "confidence": "observed",
+        "evidence": "First sentence completes."
+      },
+      {
+        "at": 14,
+        "knows": "The focus is on human enhancement.",
+        "openQuestion": "What specific areas are they investing in?",
+        "confidence": "observed",
+        "evidence": "Abstract visuals conclude, transitioning to specific sectors."
+      },
+      {
+        "at": 34,
+        "knows": "The brand is Augment.",
+        "openQuestion": "How do I learn more?",
+        "confidence": "observed",
+        "evidence": "Logo appears."
+      }
+    ],
+    "visualHierarchy": [
+      {
+        "at": 1,
+        "order": [
+          "Typing text",
+          "Dark background"
+        ],
+        "confidence": "observed",
+        "evidence": "High contrast white text on black."
+      },
+      {
+        "at": 4,
+        "order": [
+          "Central word 'Smarter.'",
+          "Colorful background"
+        ],
+        "confidence": "observed",
+        "evidence": "Large, centered typography."
+      },
+      {
+        "at": 8,
+        "order": [
+          "Glowing sphere",
+          "Line drawing profile"
+        ],
+        "confidence": "observed",
+        "evidence": "Sphere is bright and colorful, drawing is thin white line."
+      },
+      {
+        "at": 15,
+        "order": [
+          "Central pill with 'Defense.'",
+          "Background text 'DEFENSE'"
+        ],
+        "confidence": "observed",
+        "evidence": "Pill is in foreground with image, background text is repetitive."
+      },
+      {
+        "at": 35,
+        "order": [
+          "Augment logo",
+          "Tagline",
+          "URL"
+        ],
+        "confidence": "observed",
+        "evidence": "Logo is largest and colorful, tagline is smaller white text."
+      }
+    ],
+    "typography": [
+      {
+        "span": {
+          "start": 0,
+          "end": 3
+        },
+        "text": "{We invest in technologies that make humans}",
+        "treatment": "Monospace, typing effect, white on black.",
+        "role": "supporting",
+        "reportedRole": "Establish core premise.",
+        "confidence": "observed",
+        "evidence": "Visible on screen."
+      },
+      {
+        "span": {
+          "start": 3,
+          "end": 4
+        },
+        "text": "Faster.",
+        "treatment": "Large, sans-serif, white, centered.",
+        "role": "supporting",
+        "reportedRole": "Emphasize key benefit.",
+        "confidence": "observed",
+        "evidence": "Visible on screen."
+      },
+      {
+        "span": {
+          "start": 14,
+          "end": 15
+        },
+        "text": "Robotics.",
+        "treatment": "Sans-serif, black, inside frosted pill shape.",
+        "role": "supporting",
+        "reportedRole": "Label sector.",
+        "confidence": "observed",
+        "evidence": "Visible on screen."
+      },
+      {
+        "span": {
+          "start": 21.5,
+          "end": 22.5
+        },
+        "text": "NOW.",
+        "treatment": "Monospace, repeating, cascading vertically.",
+        "role": "supporting",
+        "reportedRole": "Create urgency.",
+        "confidence": "observed",
+        "evidence": "Visible on screen."
+      },
+      {
+        "span": {
+          "start": 34,
+          "end": 39
+        },
+        "text": "augment.",
+        "treatment": "Custom lowercase logotype, gradient color.",
+        "role": "supporting",
+        "reportedRole": "Brand identification.",
+        "confidence": "observed",
+        "evidence": "Visible on screen."
+      }
+    ],
+    "ui": [],
+    "objectTransformations": [
+      {
+        "span": {
+          "start": 14,
+          "end": 14.5
+        },
+        "subject": "Entire scene",
+        "mechanism": "Glitch and displacement map effect.",
+        "confidence": "observed",
+        "evidence": "Visual distortion transitions between abstract and concrete imagery."
+      },
+      {
+        "span": {
+          "start": 31,
+          "end": 32
+        },
+        "subject": "Glowing horizontal line",
+        "mechanism": "Vertical scale expansion.",
+        "confidence": "observed",
+        "evidence": "Line grows to fill the entire frame."
+      }
+    ],
+    "camera": [
+      {
+        "span": {
+          "start": 5.5,
+          "end": 14
+        },
+        "move": "other",
+        "reportedMove": "Slow push in.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "The line drawing and sphere gradually become larger in frame."
+      },
+      {
+        "span": {
+          "start": 22.5,
+          "end": 27.5
+        },
+        "move": "other",
+        "reportedMove": "Pull back and tilt up.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "The cascade of pills recedes into the distance."
+      }
+    ],
+    "motion": [
+      {
+        "span": {
+          "start": 5.5,
+          "end": 11
+        },
+        "subject": "Glowing sphere",
+        "easing": "ease-out",
+        "staggerMs": 0,
+        "confidence": "observed",
+        "evidence": "Sphere descends slowly into frame."
+      },
+      {
+        "span": {
+          "start": 21.5,
+          "end": 22.5
+        },
+        "subject": "'NOW' text elements",
+        "easing": "linear",
+        "staggerMs": 50,
+        "confidence": "inferred",
+        "evidence": "Words appear sequentially downwards."
+      }
+    ],
+    "transitions": [
+      {
+        "at": 14,
+        "kind": "other",
+        "reportedKind": "glitch",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Digital distortion effect used as a cut."
+      }
+    ],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Keyboard typing sounds.",
+        "confidence": "observed",
+        "evidence": "Heard synchronously with text appearing."
+      },
+      {
+        "at": 0,
+        "layer": "voice",
+        "reportedLayer": "voice",
+        "description": "Male voiceover, authoritative tone.",
+        "confidence": "observed",
+        "evidence": "Heard throughout."
+      },
+      {
+        "at": 3,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Electronic beat begins.",
+        "confidence": "observed",
+        "evidence": "Music starts with the first visual cut."
+      },
+      {
+        "at": 14,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Digital glitch sound.",
+        "confidence": "observed",
+        "evidence": "Heard synchronously with visual glitch."
+      }
+    ],
+    "voice": [
+      {
+        "span": {
+          "start": 0,
+          "end": 3
+        },
+        "text": "We invest in technologies that make humans",
+        "delivery": "Measured, deliberate.",
+        "confidence": "observed",
+        "evidence": "Heard in audio track."
+      },
+      {
+        "span": {
+          "start": 3,
+          "end": 5
+        },
+        "text": "faster, smarter, stronger.",
+        "delivery": "Punchy, rhythmic.",
+        "confidence": "observed",
+        "evidence": "Heard in audio track."
+      }
+    ],
+    "music": [
+      {
+        "span": {
+          "start": 3,
+          "end": 39
+        },
+        "function": "Drive momentum and build tension.",
+        "change": "Increases in complexity and volume, peaking around 27s.",
+        "confidence": "observed",
+        "evidence": "Beat becomes heavier and more layered as the video progresses."
+      }
+    ],
+    "sfx": [
+      {
+        "at": 3,
+        "description": "Heavy bass impact.",
+        "attachedTo": "Visual cut to 'Faster.'",
+        "confidence": "observed",
+        "evidence": "Sound coincides with the cut."
+      }
+    ],
+    "sync": [
+      {
+        "at": 3,
+        "visualEvent": "Cut to 'Faster.'",
+        "audioEvent": "Voice says 'faster', bass impact.",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Events occur at the same time."
+      },
+      {
+        "at": 14,
+        "visualEvent": "Glitch transition.",
+        "audioEvent": "Glitch sound effect.",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Events occur at the same time."
+      }
+    ],
+    "cognitiveLoad": [
+      {
+        "span": {
+          "start": 14,
+          "end": 19.5
+        },
+        "level": "high",
+        "reportedLevel": "high",
+        "competingFor": [
+          "Reading background text",
+          "Reading foreground text",
+          "Processing images",
+          "Listening to voiceover"
+        ],
+        "confidence": "observed",
+        "evidence": "Rapid cuts with multiple layers of information."
+      }
+    ],
+    "heroMoments": [
+      {
+        "span": {
+          "start": 34,
+          "end": 39
+        },
+        "subject": "Augment logo",
+        "setup": "Build up of tension and visual complexity, followed by a release into a clean, dark screen for the logo reveal.",
+        "confidence": "observed",
+        "evidence": "The entire video builds to this final brand reveal."
+      }
+    ],
+    "memorability": {
+      "images": [
+        {
+          "at": 8,
+          "description": "Continuous line drawing of a face looking up at a glowing sphere."
+        },
+        {
+          "at": 25,
+          "description": "A long cascade of glowing pill shapes receding into the distance."
+        }
+      ],
+      "confidence": "observed",
+      "evidence": "These are the most visually distinct and sustained images."
+    },
+    "comprehension": {
+      "understoodProposition": "Augment is an investment fund focused on advanced technologies that enhance human capabilities.",
+      "confusions": [],
+      "clearBy": 39,
+      "confidence": "observed",
+      "evidence": "The voiceover and final text clearly state this proposition."
+    },
+    "limitations": [
+      "Cannot determine exact stagger timings for cascading text elements.",
+      "Cannot identify specific typefaces used."
+    ]
+  },
+  "target4": {
+    "source": {
+      "reference": "/home/user/Act-One/.renders/ref/target4.mp4",
+      "durationSeconds": 68
+    },
+    "depth": "deep",
+    "model": "gemini-3.1-pro-preview",
+    "analysedAt": "2026-09-21T19:38:23.055Z",
+    "boundaries": [
+      {
+        "at": 1.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Text morphs into a search bar UI.",
+        "confidence": "observed",
+        "evidence": "The word 'brand' scales up and reveals a search interface."
+      },
+      {
+        "at": 2.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Search bar scales down, replaced by text.",
+        "confidence": "observed",
+        "evidence": "UI element shrinks into the background, new text appears."
+      },
+      {
+        "at": 4.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "New visual elements introduced for point 1.",
+        "confidence": "observed",
+        "evidence": "Text '1. Good content' appears with document cards."
+      },
+      {
+        "at": 6,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Camera pans to point 2.",
+        "confidence": "observed",
+        "evidence": "Text '2. Solid reputation' appears with review UI cards."
+      },
+      {
+        "at": 8.5,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Camera pans to point 3.",
+        "confidence": "observed",
+        "evidence": "Text '3. Websites to talk about you' appears with browser cards."
+      },
+      {
+        "at": 10.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Cards fly past camera, revealing text.",
+        "confidence": "observed",
+        "evidence": "Fast Z-axis camera move through cards to 'That last one?'."
+      },
+      {
+        "at": 13.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Text blurs and transitions to logo.",
+        "confidence": "observed",
+        "evidence": "Motion blur transition to CrowdReply logo."
+      },
+      {
+        "at": 16.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Logo scales down, revealing dashboard UI.",
+        "confidence": "observed",
+        "evidence": "Background changes to light, UI slides up."
+      },
+      {
+        "at": 20.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "UI slides down, replaced by text.",
+        "confidence": "observed",
+        "evidence": "Dashboard exits, 'Here's the deal' enters."
+      },
+      {
+        "at": 22,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Abstract cards appear.",
+        "confidence": "observed",
+        "evidence": "Four website cards pop in."
+      },
+      {
+        "at": 25,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "AI UI card appears.",
+        "confidence": "observed",
+        "evidence": "A chat interface card slides in next to website cards."
+      },
+      {
+        "at": 27.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Cards exit, text enters.",
+        "confidence": "observed",
+        "evidence": "Cards slide out, 'But which ones?' appears."
+      },
+      {
+        "at": 30.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Text transitions to input UI.",
+        "confidence": "observed",
+        "evidence": "URL input field pops up over text."
+      },
+      {
+        "at": 36.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "UI exits, counter enters.",
+        "confidence": "observed",
+        "evidence": "Input UI slides down, large numbers roll up."
+      },
+      {
+        "at": 39,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Counter exits, filter UI enters.",
+        "confidence": "observed",
+        "evidence": "Numbers disappear, filter dropdown appears."
+      },
+      {
+        "at": 42,
+        "kind": "creative_beat",
+        "reportedKind": "creative_beat",
+        "mechanism": "Filter UI expands to list UI.",
+        "confidence": "observed",
+        "evidence": "Camera pulls back to reveal full table of results."
+      },
+      {
+        "at": 47.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "List UI transitions to detail UI.",
+        "confidence": "observed",
+        "evidence": "Camera pushes into a single row, revealing details."
+      },
+      {
+        "at": 50.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Detail UI transitions to checkout UI.",
+        "confidence": "observed",
+        "evidence": "Screen slides to order summary."
+      },
+      {
+        "at": 53.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Checkout UI transitions to brief UI.",
+        "confidence": "observed",
+        "evidence": "Screen slides to 'Add brief' interface."
+      },
+      {
+        "at": 56.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "UI exits, text enters.",
+        "confidence": "observed",
+        "evidence": "Brief UI slides down, 'When someone asks AI' appears."
+      },
+      {
+        "at": 57.5,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Text transitions to Claude UI.",
+        "confidence": "observed",
+        "evidence": "Text scales down, Claude chat interface appears."
+      },
+      {
+        "at": 63,
+        "kind": "transformation",
+        "reportedKind": "transformation",
+        "mechanism": "Claude UI transitions to CTA.",
+        "confidence": "observed",
+        "evidence": "UI scales down to reveal CrowdReply logo and CTA."
+      }
+    ],
+    "beats": [
+      {
+        "span": {
+          "start": 0,
+          "end": 4
+        },
+        "idea": "Hook: How to get AI to recommend you.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Establish the problem space.",
+        "confidence": "observed",
+        "evidence": "Opening text and search bar visual."
+      },
+      {
+        "span": {
+          "start": 4,
+          "end": 12
+        },
+        "idea": "The three pillars of AI citation, highlighting the hardest one.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Educate on requirements and identify the pain point.",
+        "confidence": "observed",
+        "evidence": "Numbered list with visual cards, ending on 'brands fall short'."
+      },
+      {
+        "span": {
+          "start": 12,
+          "end": 20
+        },
+        "idea": "Introduce CrowdReply as the solution.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Present the product.",
+        "confidence": "observed",
+        "evidence": "Logo reveal and dashboard overview."
+      },
+      {
+        "span": {
+          "start": 20,
+          "end": 27
+        },
+        "idea": "Explain how AI learns from backlinks.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Explain the mechanism of action.",
+        "confidence": "observed",
+        "evidence": "Animation of AI reading website cards."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 56
+        },
+        "idea": "Walkthrough of the CrowdReply process (input, scan, filter, order).",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Demonstrate ease of use and features.",
+        "confidence": "observed",
+        "evidence": "Sequence of UI screens showing the user journey."
+      },
+      {
+        "span": {
+          "start": 56,
+          "end": 68
+        },
+        "idea": "The result: Your brand is recommended by AI.",
+        "primaryCognitiveJob": "watch",
+        "reportedCognitiveJob": "Show the successful outcome and call to action.",
+        "confidence": "observed",
+        "evidence": "Claude UI showing brand recommendation, followed by CTA."
+      }
+    ],
+    "narrative": {
+      "movements": [
+        {
+          "span": {
+            "start": 0,
+            "end": 12
+          },
+          "claim": "Getting AI to recommend you requires backlinks, which is hard."
+        },
+        {
+          "span": {
+            "start": 12,
+            "end": 27
+          },
+          "claim": "CrowdReply automates getting these backlinks."
+        },
+        {
+          "span": {
+            "start": 27,
+            "end": 56
+          },
+          "claim": "The platform finds the best sites and handles the placement."
+        },
+        {
+          "span": {
+            "start": 56,
+            "end": 68
+          },
+          "claim": "This results in AI recommending your brand."
+        }
+      ],
+      "dependency": "unclear",
+      "confidence": "observed",
+      "evidence": "The video follows a classic marketing narrative structure."
+    },
+    "viewerStates": [
+      {
+        "at": 2,
+        "knows": "The video is about AI recommendations.",
+        "openQuestion": "How do I get AI to recommend my brand?",
+        "confidence": "observed",
+        "evidence": "Opening text poses the premise."
+      },
+      {
+        "at": 11,
+        "knows": "Backlinks are crucial but difficult to get.",
+        "openQuestion": "What is the solution to getting backlinks?",
+        "confidence": "observed",
+        "evidence": "Narration states this is where brands fall short."
+      },
+      {
+        "at": 18,
+        "knows": "CrowdReply is an AI backlink marketplace.",
+        "openQuestion": "How does CrowdReply work?",
+        "confidence": "observed",
+        "evidence": "Product is introduced as the solution."
+      },
+      {
+        "at": 55,
+        "knows": "CrowdReply automates finding and buying backlinks.",
+        "openQuestion": "Does it actually work?",
+        "confidence": "observed",
+        "evidence": "UI walkthrough completes."
+      },
+      {
+        "at": 62,
+        "knows": "The end goal is visibility in AI chats.",
+        "openQuestion": "Where do I sign up?",
+        "confidence": "observed",
+        "evidence": "Final result shown in Claude UI."
+      }
+    ],
+    "visualHierarchy": [
+      {
+        "at": 5,
+        "order": [
+          "Text '1. Good content'",
+          "Document cards",
+          "Background"
+        ],
+        "confidence": "observed",
+        "evidence": "Large white text is central, colorful cards are secondary."
+      },
+      {
+        "at": 38,
+        "order": [
+          "Number '40,000'",
+          "Text 'publishers'",
+          "Floating icons"
+        ],
+        "confidence": "observed",
+        "evidence": "Massive red numbers dominate the screen."
+      },
+      {
+        "at": 45,
+        "order": [
+          "Text 'Hands you the exact'",
+          "Table UI",
+          "Background"
+        ],
+        "confidence": "observed",
+        "evidence": "Large text overlays the UI, drawing immediate attention."
+      },
+      {
+        "at": 60,
+        "order": [
+          "Red highlight 'Your Brand'",
+          "Claude UI",
+          "Text 'The right mention'"
+        ],
+        "confidence": "observed",
+        "evidence": "Bright red block in the UI is the focal point."
+      }
+    ],
+    "typography": [
+      {
+        "span": {
+          "start": 0,
+          "end": 15
+        },
+        "text": "Various hook texts",
+        "treatment": "Large, bold, sans-serif, white, centered.",
+        "role": "supporting",
+        "reportedRole": "Primary messaging.",
+        "confidence": "observed",
+        "evidence": "Text is the main visual element."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 30
+        },
+        "text": "Exactly. But which ones?",
+        "treatment": "Massive, bold, overlapping, white and red.",
+        "role": "supporting",
+        "reportedRole": "Emphasis and transition.",
+        "confidence": "observed",
+        "evidence": "Fills the entire screen."
+      },
+      {
+        "span": {
+          "start": 37,
+          "end": 39
+        },
+        "text": "39,263 -> 40,000",
+        "treatment": "Huge, bold, red, counting up.",
+        "role": "supporting",
+        "reportedRole": "Data visualization.",
+        "confidence": "observed",
+        "evidence": "Used to show scale."
+      }
+    ],
+    "ui": [
+      {
+        "span": {
+          "start": 30,
+          "end": 36
+        },
+        "action": "Entering URL and selecting prompts.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Cursor moves and clicks automatically."
+      },
+      {
+        "span": {
+          "start": 39,
+          "end": 42
+        },
+        "action": "Applying filters.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Cursor clicks 'Apply'."
+      },
+      {
+        "span": {
+          "start": 48,
+          "end": 52
+        },
+        "action": "Reviewing details and clicking 'Add to cart' then 'Pay'.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Cursor moves to buttons and clicks."
+      },
+      {
+        "span": {
+          "start": 57,
+          "end": 62
+        },
+        "action": "Claude AI generating a response.",
+        "liveness": "driven",
+        "confidence": "observed",
+        "evidence": "Text types out in the chat interface."
+      }
+    ],
+    "objectTransformations": [
+      {
+        "span": {
+          "start": 0.5,
+          "end": 1.5
+        },
+        "subject": "Logos in text",
+        "mechanism": "Scale down and morph into a search bar.",
+        "confidence": "observed",
+        "evidence": "Visual transition from text to UI."
+      },
+      {
+        "span": {
+          "start": 13,
+          "end": 14
+        },
+        "subject": "Text 'fall short'",
+        "mechanism": "Motion blur into CrowdReply logo.",
+        "confidence": "observed",
+        "evidence": "Fast transition."
+      }
+    ],
+    "camera": [
+      {
+        "span": {
+          "start": 4,
+          "end": 10
+        },
+        "move": "other",
+        "reportedMove": "Continuous pan right and down.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "Moves across the three pillars."
+      },
+      {
+        "span": {
+          "start": 10,
+          "end": 11
+        },
+        "move": "other",
+        "reportedMove": "Fast push in on Z-axis.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "Flies through the website cards."
+      },
+      {
+        "span": {
+          "start": 42,
+          "end": 47
+        },
+        "move": "other",
+        "reportedMove": "Slow pull out, then fast push in.",
+        "attribution": "camera",
+        "confidence": "observed",
+        "evidence": "Reveals table, then zooms into a row."
+      }
+    ],
+    "motion": [
+      {
+        "span": {
+          "start": 4,
+          "end": 10
+        },
+        "subject": "Cards popping up",
+        "easing": "spring",
+        "staggerMs": 100,
+        "confidence": "observed",
+        "evidence": "Cards appear with a slight bounce, sequentially."
+      },
+      {
+        "span": {
+          "start": 22,
+          "end": 26
+        },
+        "subject": "Website and AI cards",
+        "easing": "ease-out",
+        "staggerMs": 200,
+        "confidence": "observed",
+        "evidence": "Cards slide in smoothly."
+      }
+    ],
+    "transitions": [
+      {
+        "at": 16,
+        "kind": "mask",
+        "reportedKind": "wipe",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Background changes from dark to light as UI slides up."
+      },
+      {
+        "at": 27,
+        "kind": "mask",
+        "reportedKind": "wipe",
+        "carriedAcross": "none",
+        "confidence": "observed",
+        "evidence": "Background changes from light to orange."
+      }
+    ],
+    "audio": [
+      {
+        "at": 0,
+        "layer": "music",
+        "reportedLayer": "music",
+        "description": "Upbeat, driving electronic beat starts.",
+        "confidence": "observed",
+        "evidence": "Music begins immediately."
+      },
+      {
+        "at": 0,
+        "layer": "voice",
+        "reportedLayer": "voice",
+        "description": "Male voiceover begins.",
+        "confidence": "observed",
+        "evidence": "Narration starts."
+      },
+      {
+        "at": 4,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Pop sounds for cards appearing.",
+        "confidence": "observed",
+        "evidence": "Synchronized with visual pops."
+      },
+      {
+        "at": 10.5,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Whoosh sound for camera move.",
+        "confidence": "observed",
+        "evidence": "Synchronized with fast Z-axis push."
+      },
+      {
+        "at": 37,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Rapid ticking sound.",
+        "confidence": "observed",
+        "evidence": "Synchronized with counter rolling up."
+      },
+      {
+        "at": 51.5,
+        "layer": "sfx",
+        "reportedLayer": "sfx",
+        "description": "Cash register/success chime.",
+        "confidence": "observed",
+        "evidence": "Synchronized with 'Pay' button click."
+      }
+    ],
+    "voice": [
+      {
+        "span": {
+          "start": 0,
+          "end": 12
+        },
+        "text": "Want AI to recommend your brand? Here's what actually gets you cited. Good content, a solid reputation, and above all, getting other websites to talk about you. That last one? It's where most brands fall short.",
+        "delivery": "Energetic, problem-posing.",
+        "confidence": "observed",
+        "evidence": "Tone is engaging and highlights a pain point."
+      },
+      {
+        "span": {
+          "start": 13,
+          "end": 27
+        },
+        "text": "That's exactly what CrowdReply fixes. Meet the AI backlink marketplace that does it for you. Here's the deal. AI reads other websites. So the more of them mention you, the more AI does too.",
+        "delivery": "Confident, explanatory.",
+        "confidence": "observed",
+        "evidence": "Tone shifts to presenting the solution."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 56
+        },
+        "text": "But which ones? Exactly. That's the whole job. So you tell CrowdReply your brand, your keywords, the prompts you want to rank for. It scans 40,000 publishers, filters by relevance, authority, traffic, and hands you the exact sites, articles, and wording that actually gets you cited. You review the recommendations, you place the order, CrowdReply handles the rest. The brief, the placement, everything.",
+        "delivery": "Fast-paced, instructional.",
+        "confidence": "observed",
+        "evidence": "Matches the rapid UI walkthrough."
+      },
+      {
+        "span": {
+          "start": 56,
+          "end": 68
+        },
+        "text": "So when someone asks AI about your space... the right mention on the right site got you there. CrowdReply. Get seen by AI. Try it free.",
+        "delivery": "Triumphant, concluding.",
+        "confidence": "observed",
+        "evidence": "Tone is satisfying, ending with a clear CTA."
+      }
+    ],
+    "music": [
+      {
+        "span": {
+          "start": 0,
+          "end": 68
+        },
+        "function": "Drive momentum and keep energy high.",
+        "change": "Maintains consistent tempo throughout.",
+        "confidence": "observed",
+        "evidence": "Beat is steady and prominent."
+      }
+    ],
+    "sfx": [
+      {
+        "at": 4.5,
+        "description": "Pop",
+        "attachedTo": "Card appearance",
+        "confidence": "observed",
+        "evidence": "Sound matches visual."
+      },
+      {
+        "at": 37.5,
+        "description": "Ticking",
+        "attachedTo": "Counter animation",
+        "confidence": "observed",
+        "evidence": "Sound matches visual."
+      },
+      {
+        "at": 51.5,
+        "description": "Chime",
+        "attachedTo": "Payment success",
+        "confidence": "observed",
+        "evidence": "Sound matches visual action."
+      }
+    ],
+    "sync": [
+      {
+        "at": 4.5,
+        "visualEvent": "Card pops up",
+        "audioEvent": "Pop SFX",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Perfect alignment."
+      },
+      {
+        "at": 37.5,
+        "visualEvent": "Numbers roll",
+        "audioEvent": "Ticking SFX",
+        "offsetMs": 0,
+        "relationship": "coincides",
+        "confidence": "observed",
+        "evidence": "Perfect alignment."
+      }
+    ],
+    "cognitiveLoad": [
+      {
+        "span": {
+          "start": 0,
+          "end": 12
+        },
+        "level": "low",
+        "reportedLevel": "Low",
+        "competingFor": [
+          "Reading text",
+          "Listening to VO"
+        ],
+        "confidence": "observed",
+        "evidence": "Simple visuals, clear text."
+      },
+      {
+        "span": {
+          "start": 27,
+          "end": 56
+        },
+        "level": "high",
+        "reportedLevel": "High",
+        "competingFor": [
+          "Following fast UI changes",
+          "Listening to rapid VO",
+          "Reading UI text"
+        ],
+        "confidence": "observed",
+        "evidence": "Many screens shown quickly with dense information."
+      }
+    ],
+    "heroMoments": [
+      {
+        "span": {
+          "start": 13,
+          "end": 16
+        },
+        "subject": "CrowdReply Logo",
+        "setup": "Problem established, logo revealed as solution.",
+        "confidence": "observed",
+        "evidence": "Dramatic transition to logo."
+      },
+      {
+        "span": {
+          "start": 57,
+          "end": 62
+        },
+        "subject": "Brand recommended in Claude UI",
+        "setup": "Process completed, showing the final desired result.",
+        "confidence": "observed",
+        "evidence": "Red highlight emphasizes the success."
+      }
+    ],
+    "memorability": {
+      "images": [
+        {
+          "at": 38,
+          "description": "Massive 40,000 counter."
+        },
+        {
+          "at": 60,
+          "description": "Red 'Your Brand' block in Claude chat."
+        }
+      ],
+      "confidence": "observed",
+      "evidence": "These are the most visually striking and lingering frames."
+    },
+    "comprehension": null,
+    "limitations": [
+      "Cannot verify exact UI text during fast pans.",
+      "Stagger times for animations are estimated.",
+      "Audio sync offsets are approximate."
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "file": "target3.mp4",
+  "durationSeconds": 70.75,
+  "cuts": 3,
+  "cutsPerMinute": 2.54,
+  "shotSeconds": {
+    "median": 1.25,
+    "min": 0.35,
+    "max": 67.9,
+    "spread": 29.0
+  },
+  "motion": {
+    "mean": 0.8554,
+    "p90": 2.2509,
+    "variation": 1.2869,
+    "staticShare": 0.1484
+  },
+  "scaleVariation": 0.6573,
+  "novelty": 0.0932,
+  "luma": {
+    "mean": 0.9224,
+    "range": 0.1199,
+    "darkShare": 0.0
+  },
+  "distinctHues": 7,
+  "audio": {
+    "meanRms": 0.4265,
+    "dynamicRange": 0.5412,
+    "silentShare": 0.0269,
+    "accents": 126
+  }
+}

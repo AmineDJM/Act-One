@@ -1,0 +1,668 @@
+[
+  {
+    "at": "2026-09-21T13:10:25.880Z",
+    "kind": "thesis",
+    "what": "Act One is not a faster showreel. It is an audit that becomes a film: it reads the public site, keeps receipts, rejects what it cannot prove, makes three real directions, fails one, repairs it, and removes waiting.",
+    "why": "The viewer sees proof before persuasion. Muted, it reads as a real site being inspected. With sound, it feels like evidence being logged: pin, measure, strike out. The thrill comes late, when the strict audit breaks into three distinct creative systems and then judges itself.",
+    "refs": [
+      ".renders/council-round1.json"
+    ]
+  },
+  {
+    "at": "2026-09-21T13:10:25.881Z",
+    "kind": "av_strategy",
+    "what": "No bed at the start. Tap, page breath, underline drag, sample tick, measured ticks, muted strike-out. These sounds recur with the visual verbs. Music enters only when the system starts making choices, pivots to counted ticks on scoring, then thins for the final proof hold.",
+    "why": "Courtroom restraint. Four shot classes only: full browser read, 130–160% evidence-close, 3-up verdict, near-full-frame proof. Every claim uses one of three verbs: pin, measure, strike out. The triptych is the single rupture where inspection becomes choice.",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.881Z",
+    "kind": "rejected",
+    "what": "Opening with “This is the brief.”",
+    "why": "Tempting and strategically right, but too writerly for the first breath. The image can prove it faster. We spend those seconds on visible extraction and refusal instead. (proposed by story)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.881Z",
+    "kind": "rejected",
+    "what": "A 10–12 second near-still opening inspection.",
+    "why": "The severity is right, but not the duration. By six seconds the viewer must see concrete verbs on the live site, not just restraint. (proposed by art)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.881Z",
+    "kind": "rejected",
+    "what": "Ending with the finished film back inside the live page.",
+    "why": "It closes the loop neatly, but miniaturises the result when we need inspectable scale. Cost: we lose the clever “site in, film out” visual rhyme. (proposed by product)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.882Z",
+    "kind": "rejected",
+    "what": "A separate collapsing timeline graphic.",
+    "why": "Too familiar for a speed claim. The calendar argument must happen over the finished render, and only empty waiting may disappear. (proposed by motion)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.882Z",
+    "kind": "rejected",
+    "what": "Triptych as the only invention.",
+    "why": "One rupture is a gimmick if the rest stays templated. The recurring pin/measure/strike grammar now carries the whole film. (proposed by art)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.882Z",
+    "kind": "rejected",
+    "what": "Scoring all three lanes with lots of overlays.",
+    "why": "That would read as software garnish. We compare three systems, then isolate one named failure and repair it visibly. (proposed by contrarian)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.882Z",
+    "kind": "design_decision",
+    "what": "Left unresolved: Exact performed VO timings must drive the edit, especially “Three,” “scores,” the failure mark and the repair silence.",
+    "why": "The Executive chose to keep this argument live rather than settle it.",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.882Z",
+    "kind": "design_decision",
+    "what": "Left unresolved: The three lanes must be proven in renders at matched timestamps; if they read as skins, the hero section gets rebuilt.",
+    "why": "The Executive chose to keep this argument live rather than settle it.",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.882Z",
+    "kind": "design_decision",
+    "what": "Left unresolved: The final CTA wording stays secondary. It must not outshout the proof frame.",
+    "why": "The Executive chose to keep this argument live rather than settle it.",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T13:10:25.883Z",
+    "kind": "design_decision",
+    "what": "Left unresolved: There is still a live argument between closure and inspectability; this decision chooses inspectability and accepts the loss of the browser-return metaphor.",
+    "why": "The Executive chose to keep this argument live rather than settle it.",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T15:38:30.465Z",
+    "kind": "criticism",
+    "what": "@0s: Visual language disconnect.",
+    "why": "Seen independently by story, art, motion, sound, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T15:38:30.466Z",
+    "kind": "criticism",
+    "what": "@30s: Failure to visualize the core thesis.",
+    "why": "Seen independently by story, art, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T15:38:30.466Z",
+    "kind": "criticism",
+    "what": "@26s: Redundant narration causing attention drop.",
+    "why": "Seen independently by sound, art, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T15:38:30.466Z",
+    "kind": "criticism",
+    "what": "@16s: Visual contradicts the narrative premise.",
+    "why": "Seen independently by story, motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T15:38:30.466Z",
+    "kind": "criticism",
+    "what": "@23s: Failure is not visualized.",
+    "why": "Seen independently by motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T15:38:30.467Z",
+    "kind": "intervention",
+    "what": "Using performed word timings, place four local events: a dry UI tap on the “no” of “no kickoff call,” underline scrape on “opens your site,” three counted ticks exactly on the three score marks, then a 0.4s bed-thin plus muted strike on “fails.” Hold near-silence through the first repair frame before the pulse returns. Do not change the final 00:43 drop.",
+    "why": "Picture and audio cues are laid under the VO rather than triggered by the active verbs. The film has a clock, but not enough cause-and-effect at the words where decisions happen. (expected: The process feels judged in real time. The hesitation is ratified, 30s becomes a structural turn, and the liked closing audio contrast remains intact.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T15:38:30.467Z",
+    "kind": "intervention",
+    "what": "Replace 0–6s with a product beat on a real public page: full browser read, cursor stops on one visible claim, underline drag lands on the claim, then a small receipt pin appears. At “no kickoff call,” add a strike-through over a ghosted calendar invite, not over the VO. This is different from the failed projection-screen test: it is not another atmosphere shot; it performs the audit verb.",
+    "why": "The opener is using an ambient clip language before the film has established its audit grammar. The viewer sees mood and drift when the thesis needs a real public site being inspected with consequences. (expected: Muted, the first seconds read as site inspection: read, pin, refuse. With sound, the VO hesitation gets a visible consequence instead of sounding like texture.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T15:38:30.467Z",
+    "kind": "intervention",
+    "what": "Keep the 00:20 colour-field rupture as the count. Within the next beat, each field becomes a real rendered film panel at the same hero-section timestamp. On “scores,” add one small verdict mark per panel. On “fails itself first,” freeze lane 2, strike one unsupported claim, drop its score. During the repair silence, replace only that lane’s frame with the fixed version and restore the mark.",
+    "why": "The film uses fields and labels where it needs outcomes. Three colours enumerate options, but the panels do not show distinct film systems being judged, rejected, and repaired. (expected: The middle becomes observable: three directions exist, one fails for a named reason, and repair changes the image. The argument advances without extra explanatory copy.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T17:52:38.782Z",
+    "kind": "criticism",
+    "what": "@27s: Attention drop.",
+    "why": "Seen independently by motion, sound, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T17:52:38.782Z",
+    "kind": "criticism",
+    "what": "@23s: Visual disconnect.",
+    "why": "Seen independently by product, story.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T17:52:38.782Z",
+    "kind": "criticism",
+    "what": "@0s: Unmotivated camera drift.",
+    "why": "Seen independently by motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T17:52:38.783Z",
+    "kind": "criticism",
+    "what": "@16s: Claim without proof.",
+    "why": "Seen independently by product, story.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T17:52:38.783Z",
+    "kind": "criticism",
+    "what": "@20s: Weak visual consequence.",
+    "why": "Seen independently by motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T17:52:38.784Z",
+    "kind": "intervention",
+    "what": "Keep the audit opener, but lock the first full-browser frame until the cursor stops on the claim. Start any scale push only on the underline drag, land the push on the receipt pin, and add the calendar strike on “no kickoff call” without panning away from the page.",
+    "why": "The browser/page is behaving like atmosphere. The camera drift starts before a cursor, underline, pin or strike gives the frame a reason to move. (expected: Muted, the first seconds read as read → underline → pin → refuse. With sound, the “no kickoff call” line gets a visible consequence.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T17:52:38.784Z",
+    "kind": "intervention",
+    "what": "Using performed word timings, place three counted ticks exactly on the three score marks; on “fails,” thin the bed for 0.4s and add a muted strike cue only when lane 2 is visibly crossed out. Hold near-silence through the first repaired frame, then return the pulse. Do not change the 43s–46s ending drop.",
+    "why": "Cues are laid under the narration as accompaniment rather than attached to visible decisions, so the ear hears urgency while the eye sees panels and labels continuing normally. (expected: The judgement beat would feel like an event: score, failure, pause, repair, instead of a continuous presentation track.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T17:52:38.784Z",
+    "kind": "intervention",
+    "what": "Rebuild 16s–30s as one receipt path using existing product/fields/films kinds: show a non-Act-One public page URL, pin one visible claim, carry that same pinned phrase into all three rendered film panels at the same hero timestamp, mark each panel on “scores,” then strike lane 2’s unsupported use of that phrase on “fails” and replace only that lane during the repair silence.",
+    "why": "The middle is built as a sequence of labelled beats, not as a causal chain. The site, the three film lanes, the score mark, the failed claim and the repair do not appear to be the same evidence moving through the system. (expected: The rendered film would show one claim being read, tested, failed and repaired, so the thesis becomes observable instead of narrated.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T19:09:19.070Z",
+    "kind": "criticism",
+    "what": "@24s: Indistinct UI visuals break the stark aesthetic.",
+    "why": "Seen independently by story, sound, art, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T19:09:19.070Z",
+    "kind": "criticism",
+    "what": "@28s: Disconnect between voiceover and visual action.",
+    "why": "Seen independently by art, motion, sound, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T19:09:19.071Z",
+    "kind": "criticism",
+    "what": "@8s: Animation speed mismatches vocal delivery.",
+    "why": "Seen independently by story, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T19:09:19.071Z",
+    "kind": "criticism",
+    "what": "@17s: Passive screen recording lacks visual intent.",
+    "why": "Seen independently by motion, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T19:09:19.071Z",
+    "kind": "criticism",
+    "what": "@4s: Motion ignores the voice's pacing.",
+    "why": "Seen independently by motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T19:09:19.072Z",
+    "kind": "intervention",
+    "what": "After the receipt-path rebuild, attach cues only to visible events: three dry ticks exactly on the three score marks, a muted strike only when lane 2 is crossed out, then 0.4s bed-thin through the first repaired frame before the pulse returns. Do not alter the @38 value-proposition cut or the @43–46 ending drop.",
+    "why": "The audio cues are running as accompaniment, not as consequences of visible marks. Because the strike and repair are not the same on-screen event, the ear hears urgency while the eye sees panels continuing normally. (expected: @28 becomes a structural turn: score, strike, pause, repair. The middle gains the same event logic that makes @38 memorable.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T19:09:19.072Z",
+    "kind": "intervention",
+    "what": "Retiming only: use performed word timings for @0–8. Put phrase arrivals on the spoken turns, hold each completed phrase at least 0.55s, and let exits happen on the next breath rather than on a fixed fade. Preserve the stark type layout and the @10 hard cut to white for “Six weeks.”",
+    "why": "The default rise/fade duration is being reused across the first phrases. Emphasis words arrive after the spoken turn and sometimes leave before the eye has finished the line, so severity becomes lateness. (expected: The opening still refuses showreel pace, but the frame now obeys the read. Typography becomes readable without turning the start into syllable-chasing.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T20:31:13.963Z",
+    "kind": "criticism",
+    "what": "@21s: Abstract representation of creative work.",
+    "why": "Seen independently by story, art, motion, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:31:13.964Z",
+    "kind": "criticism",
+    "what": "@24s: Attention dips due to visual stagnation.",
+    "why": "Seen independently by sound, product, art, motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:31:13.964Z",
+    "kind": "criticism",
+    "what": "@17s: Audit claim lacks visual proof.",
+    "why": "Seen independently by story, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:31:13.964Z",
+    "kind": "criticism",
+    "what": "@31s: Visual disconnect from narrative.",
+    "why": "Seen independently by story, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:31:13.965Z",
+    "kind": "criticism",
+    "what": "@28s: Audio elements are disconnected.",
+    "why": "Seen independently by sound, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:31:13.965Z",
+    "kind": "intervention",
+    "what": "After the receipt-path rebuild, retime only local cues: three dry ticks exactly on the three score marks; one muted strike only when lane 2 is crossed out; thin the bed for 0.4s through the first repaired lane-2 frame, then return the pulse. Do not alter the @38 hard cut or @43–46 ending drop.",
+    "why": "Audio is timed as a bed under the paragraph rather than as feedback from the score marks, strike and repair frame. The ear hears a clock; the eye sees panels continuing normally. (expected: @28–31 becomes score → failure → held repair, giving the middle the same cause-and-effect logic that makes @38 land.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T20:31:13.965Z",
+    "kind": "intervention",
+    "what": "Rebuild @16–31 as one receipt path using existing product and films kinds: show a real public page with visible URL; pin one exact claim phrase; carry that same phrase into three rendered film panels at the same hero-section timestamp; on “scores” mark all three; on “fails” freeze lane 2, strike that phrase, drop its mark; during repair silence replace only lane 2 with the fixed frame. No colour …",
+    "why": "The middle is cut as separate illustrative beats. The public page, the three film lanes, the score marks, the failed claim and the repair are not the same receipt moving through the system, so every verb becomes narration over placeholder imagery. (expected: The viewer sees one claim read, tested in three films, rejected once, then repaired. The thesis becomes observable without adding explanator…",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T20:41:18.195Z",
+    "kind": "criticism",
+    "what": "@16s: Passive visual execution of an active idea.",
+    "why": "Seen independently by motion, art, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:41:18.195Z",
+    "kind": "criticism",
+    "what": "@21s: Visuals undercut the script's promise.",
+    "why": "Seen independently by story, art, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:41:18.195Z",
+    "kind": "criticism",
+    "what": "@28s: Fails to prove its own thesis.",
+    "why": "Seen independently by story, sound, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:41:18.196Z",
+    "kind": "criticism",
+    "what": "@31s: Missing visual consequence for the thesis.",
+    "why": "Seen independently by motion, sound, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:41:18.196Z",
+    "kind": "criticism",
+    "what": "@34s: Attention drops from visual fatigue.",
+    "why": "Seen independently by story, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T20:41:18.196Z",
+    "kind": "intervention",
+    "what": "For the @16–18 product beat, keep the browser square-on and make the page claim the hero. Put the spoken words in a narrow lower receipt strip, not over the page. Leave the URL, highlighted claim and pin visible for at least 0.7s before the next push.",
+    "why": "The frame has two payloads fighting for the same centre: large generated VO text and the public page text. The audit verb depends on reading the page, but the layout gives hierarchy to the narration instead. (expected: Muted, the viewer can read the source claim and see it pinned. With VO, the line sounds like inspection of that page instead of a caption covering it.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T20:41:18.196Z",
+    "kind": "intervention",
+    "what": "After the panel rebuild, place three dry ticks exactly on the three score marks. Put one muted strike only on the green lane cross-out. Thin the bed for 0.4s through the first repaired green frame, then return the pulse. Do not change the @38 hit or @43–46 ending drop.",
+    "why": "The soundtrack supplies pressure, but its cues are not locked to visible verdict events. The ear hears a clock while the eye sees panels changing with no scored cause-and-effect. (expected: The viewer hears score → failure → held repair as events, not ambience. @31 becomes the turn into repair rather than another text beat.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T20:41:18.196Z",
+    "kind": "intervention",
+    "what": "Keep the @21 three-colour rupture, but by the next tick each field must contain a real rendered film panel at the same hero timestamp. Carry the exact pinned phrase from @16 into all three panels. On “scores,” add one small mark per lane. On “fails,” freeze the green lane, strike that phrase, drop its mark, then during the repair silence replace only that lane’s frame.",
+    "why": "After the public page, the film stops carrying one receipt forward. Colour fields enumerate options, but they are not rendered film candidates judged against the same pinned claim, so the green removal reads as a verdict without criteria. (expected: The middle shows one claim read, tested in three directions, failed once for a visible reason, and repaired. The green elimination gains cause withou…",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:01:49.405Z",
+    "kind": "criticism",
+    "what": "@30s: A key conceptual action (failing an idea) is reduced to a lazy label rather than shown as a process.",
+    "why": "Seen independently by art, story, motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:01:49.406Z",
+    "kind": "criticism",
+    "what": "@0s: The film acts as a subtitle track to the voiceover rather than utilizing the visual medium.",
+    "why": "Seen independently by art, motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:01:49.406Z",
+    "kind": "criticism",
+    "what": "@20s: Shot recycling",
+    "why": "Seen independently by story, art, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:01:49.407Z",
+    "kind": "criticism",
+    "what": "@24s: Vocal delivery ignores visual scaling.",
+    "why": "Seen independently by sound, art, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:01:49.407Z",
+    "kind": "criticism",
+    "what": "@33s: Process claims lack visual receipts.",
+    "why": "Seen independently by product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:01:49.407Z",
+    "kind": "intervention",
+    "what": "After the receipt-path rebuild, retime only local cues: three dry ticks exactly on the three score marks; one muted strike only when lane 2 is crossed out; thin the bed for 0.4s through the first repaired lane-2 frame, then return the pulse. Do not alter @43–46 ending drop.",
+    "why": "Cues are attached to paragraph rhythm rather than visible decisions. The tick governs the film more than the audit marks, so judgement feels timed but not caused. (expected: @24–31 becomes score → strike → held repair instead of presentation under narration. Sound starts confirming visible decisions, not merely keeping pace.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:01:49.408Z",
+    "kind": "intervention",
+    "what": "Keep the severe opening and VO cadence, but lock the first browser frame until the cursor reaches the claim. Start the scale push only on the underline drag; land it on the receipt pin. Put spoken words in a narrow lower receipt strip, not over the page. Hold URL + underline + pin for 0.7s.",
+    "why": "Motion begins before a visible verb justifies it, and the spoken line owns the centre of the frame. The audit action is secondary, so the first seconds teach “words are evidence.” (expected: The opening still has the metered manifesto feel, but the first movement is caused by underline/pin/refuse rather than drift. Muted, it reads as inspection.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:01:49.408Z",
+    "kind": "intervention",
+    "what": "Rebuild @20–34 as one receipt path. Show one non-Act-One public URL, pin one exact visible phrase, carry that phrase into three real rendered film panels at the same hero timestamp, score all three on “scores,” then on “fails” freeze lane 2, strike that phrase and drop its mark. During repair silence, replace only lane 2’s frame.",
+    "why": "The middle is built as separate illustrative beats. The public page, pinned claim, three candidate films, score mark, failed claim and repair are not the same receipt, so every verb has to be carried by narration or labels. (expected: Muted, the viewer can follow read → pin → test in three films → reject one → repair one. “GONE” remains abrupt, but now has a visible reason.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:15:57.968Z",
+    "kind": "criticism",
+    "what": "@34s: Telling instead of showing.",
+    "why": "Seen independently by art, product, motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:15:57.968Z",
+    "kind": "criticism",
+    "what": "@26s: Abstract shapes fail the thesis.",
+    "why": "Seen independently by story, art, motion, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:15:57.969Z",
+    "kind": "criticism",
+    "what": "@44s: Music acts as wallpaper rather than a structural partner.",
+    "why": "Seen independently by motion, story.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:15:57.969Z",
+    "kind": "criticism",
+    "what": "@41s: Monotonous visual grammar.",
+    "why": "Seen independently by art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:15:57.970Z",
+    "kind": "criticism",
+    "what": "@3s: Default opacity fade masking as motion design.",
+    "why": "Seen independently by motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:15:57.970Z",
+    "kind": "intervention",
+    "what": "Do not change the 0:50 silence. Add a local sound turn at 0:41: when the repaired proof frame lands, mute the tick layer for 0.6s and leave only the room tone plus a short pin click. Bring the pulse back 2 dB lower under “Only the calendar,” with no extra clock or calendar sound. Keep the final drop intact.",
+    "why": "The bed is timed to paragraph flow rather than to the repaired proof frame. The ear hears steady time while the picture claims that waiting has been removed, so the calendar line is underlined by the wrong behaviour. (expected: The 0:41 proof frame gets an audible absence before the final silence. The score stops illustrating time and starts confirming that waiting has been cut away.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:15:57.970Z",
+    "kind": "intervention",
+    "what": "After the lane-2 strike at 0:34, hold the frozen bad frame for 0.35s with the orange strike still on the pinned phrase. Then hard replace only lane 2 on the word “repairs” with the fixed frame; lanes 1 and 3 stay unchanged and dim to 70%. At 0:41 cut to near-full-frame proof of the repaired lane with the receipt pin still visible; put “Only the calendar” in the lower receipt strip, not centre typ…",
+    "why": "The failed lane is treated as a verdict graphic rather than a before/after object. Once the strike happens, the frame does not give the viewer enough changed pixels to compare the broken and repaired states. (expected: The repair becomes a before/after event, and 0:41 stops reading as a new slogan. The viewer can compare what changed instead of being told that something changed.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:15:57.970Z",
+    "kind": "intervention",
+    "what": "Rebuild 0:21–0:36 as one receipt path. At 0:21 pin one exact site phrase. At 0:26 keep the three fields only for the first tick, then replace them with three real rendered film panels at the same hero timestamp. The pinned phrase sits in each lane. On “scores,” add one mark per lane. On “fails,” freeze lane 2, strike that phrase in orange, drop its mark. During the repair silence, replace only la…",
+    "why": "The receipt from the public page is not carried forward as the same object. The middle is assembled as illustrative beats, so the viewer sees categories and narration, not one claim being tested in three films and visibly rejected once. (expected: Muted, the middle reads: public claim → three film tests → one rejection → one repair. The words “three,” “scores,” and “fails” gain visible consequenc…",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:25:59.823Z",
+    "kind": "criticism",
+    "what": "@26s: Attention drops at weak visual metaphor",
+    "why": "Seen independently by sound, product, story, art, motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:25:59.824Z",
+    "kind": "criticism",
+    "what": "@11s: Unmotivated drift during a pause",
+    "why": "Seen independently by motion, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:25:59.824Z",
+    "kind": "criticism",
+    "what": "@21s: Visual redundancy",
+    "why": "Seen independently by sound, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:25:59.825Z",
+    "kind": "criticism",
+    "what": "@3s: Arbitrary easing",
+    "why": "Seen independently by motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:25:59.825Z",
+    "kind": "criticism",
+    "what": "@37s: Missing visual consequence",
+    "why": "Seen independently by motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:25:59.825Z",
+    "kind": "intervention",
+    "what": "After the receipt-path rebuild, retime only local cues: three dry ticks exactly on the three score marks; one muted strike only when lane 2 is crossed out; remove the tick layer for 0.4s through the first repaired lane-2 frame, leaving room tone and the pin click; bring the pulse back 2 dB lower under “Only the calendar.” Do not alter @43–46 or the final silence.",
+    "why": "Ticks and bed are timed to paragraph momentum, not to visible verdict events. The ear hears time passing while the picture claims decisions are being made. (expected: @26–37 becomes score → strike → held repair. Sound confirms visible decisions instead of acting as a clock under them.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:25:59.825Z",
+    "kind": "intervention",
+    "what": "Keep the severe opening and current VO. Hold the first browser frame still until the cursor/underline reaches the claim; start the scale push only on the underline drag; land the push on the receipt pin; hold URL + underline + pin for 0.7s before the next beat. Put spoken words in the lower receipt strip, not over the page centre.",
+    "why": "The camera push is being used as default energy during silence. Because it is not locked to underline, pin, measure, or strike, the opening tells the viewer that motion is decorative. (expected: The first movement is caused by inspection. Muted, the opening reads as a site being audited rather than a caption track drifting over a page.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:25:59.826Z",
+    "kind": "intervention",
+    "what": "Rebuild @21–41 as one receipt path using existing product and films kinds: pin one exact public-site phrase with URL visible; carry that same phrase into three real rendered film panels at the same hero timestamp; on “scores” add one mark per lane; on “fails” freeze lane 2, strike the pinned phrase in orange, drop its mark; on “repairs” replace only lane 2; at @41 cut near-full-frame to the repai…",
+    "why": "The pinned public-page evidence becomes a dead-end shot. The three directions, score, failure, and repair are separate illustrative beats, so the viewer never sees one claim travel through the system and change state. (expected: Muted, the middle reads: source claim → three tests → one rejection → one repair → proof frame. The thesis is shown instead of asserted.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:43:31.706Z",
+    "kind": "criticism",
+    "what": "@24s: Generic visual execution.",
+    "why": "Seen independently by sound, product, motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:43:31.707Z",
+    "kind": "criticism",
+    "what": "@0s: The film audits its own agency website, not a client's site.",
+    "why": "Seen independently by story, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:43:31.707Z",
+    "kind": "criticism",
+    "what": "@32s: Spoken ideas lack visual consequence.",
+    "why": "Seen independently by story, motion.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:43:31.708Z",
+    "kind": "criticism",
+    "what": "@3s: Indecisive easing on the highlight.",
+    "why": "Seen independently by motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:43:31.708Z",
+    "kind": "criticism",
+    "what": "@27s: Fails to visualize the core product offering.",
+    "why": "Seen independently by story.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-21T22:43:31.708Z",
+    "kind": "intervention",
+    "what": "In the first product beat, hold a square-on browser for 0.7s before any push. Keep URL, site mark and the exact claim visible. Start the push only when the underline begins; land on the orange receipt pin. Move spoken words to the lower receipt strip, never over the page centre.",
+    "why": "The first frame crops and moves before it has established source, distance and verb. The viewer sees a line of copy plus VO text, not a public page being inspected by a separate system. (expected: Muted, the opening reads: public page → claim found → receipt pinned. The first camera move is caused by inspection, not by drift.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:43:31.708Z",
+    "kind": "intervention",
+    "what": "Keep the @41 orange reset and audio cut. Immediately after it, cut to a near-full-frame hold of the repaired lane-2 film for 1.6–2.0s with the same receipt pin still visible. Put “Only the calendar” in the lower receipt strip; keep the final CTA secondary and do not return the film to a browser.",
+    "why": "After the reset, emphasis stays with interruption and copy. The repaired film is not held at inspectable scale with its receipt still attached, so “waiting removed” is asserted rather than witnessed. (expected: The ending answers the start: the absent film is now present, repaired, and tied to the original receipt before the time claim arrives.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-21T22:43:31.709Z",
+    "kind": "intervention",
+    "what": "Rebuild @21–36 as one receipt path using existing product/films kinds: carry the exact pinned phrase into three real rendered film panels at the same hero timestamp. On “scores,” add one mark per lane. On “fails,” freeze lane 2, strike the pinned phrase in orange, drop its mark. On the repair silence, replace only lane 2’s frame; remove paragraph body copy from this run.",
+    "why": "The receipt from the public page stops being the same object. The three directions, score, failed lane and repair are built as separate illustrative beats, so the viewer cannot track one claim being tested and changed. (expected: Muted, the middle reads: source claim → three tests → one rejection → one repair. “Three,” “scores,” and “fails” produce visible consequences instead of labels.)",
+    "refs": []
+  }
+]
