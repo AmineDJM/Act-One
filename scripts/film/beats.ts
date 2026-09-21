@@ -119,10 +119,12 @@ export const VISUALS: Record<string, BeatVisual> = {
   b3: { kind: 'statement', field: '#FFB03A' },
   b4: { kind: 'mark' },
   b5: { kind: 'statement', field: null },
-  b6: { kind: 'product', assetId: 'ast_home', window: { x: 0.03, width: 0.58, fromY: 0.02, toY: 0.34 } },
+  b6: { kind: 'product', assetId: 'ast_home', window: { x: 0.03, width: 0.58, fromY: 0.02, toY: 0.34 }, holdIndex: 0 },
   b7: { kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'] },
-  b8: { kind: 'product', assetId: 'ast_work', window: { x: 0.03, width: 0.58, fromY: 0.26, toY: 0.02 } },
-  b9: { kind: 'product', assetId: 'ast_how', window: { x: 0.06, width: 0.58, fromY: 0.30, toY: 0.06 } },
+  // The three real renders this system made, at the beat that says they are
+  // rendered and scored. The claim becomes literal instead of illustrated.
+  b8: { kind: 'films', assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'], colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'] },
+  b9: { kind: 'product', assetId: 'ast_how', window: { x: 0.06, width: 0.58, fromY: 0.30, toY: 0.06 }, holdIndex: 2 },
   b10: { kind: 'statement', field: null },
   b11: { kind: 'statement', field: '#FF4D1F' },
   b12: { kind: 'statement', field: null },

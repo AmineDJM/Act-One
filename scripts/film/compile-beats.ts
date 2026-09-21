@@ -27,9 +27,10 @@ export type Palette = {
 export type BeatVisual =
   | { kind: 'statement'; field: string | null }
   | { kind: 'mark' }
-  | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number } }
+  | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; holdIndex?: number }
   | { kind: 'clip'; assetId: string; sourceInSeconds?: number; crop?: { x: number; y: number; width: number; height: number } }
-  | { kind: 'fields'; colours: readonly string[]; assetIds?: readonly string[] };
+  | { kind: 'fields'; colours: readonly string[]; assetIds?: readonly string[] }
+  | { kind: 'films'; assetIds: readonly string[]; colours: readonly string[] };
 
 export type CompileOptions = {
   palette: Palette;
@@ -108,7 +109,18 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       kind: 'text', id: `${beat.id}_say_${i}`, content: phrase.text,
       token: hero ? 'display' : 'statement',
       color: hero ? heroColour : restColour,
-      align: 'left', maxWidth: hero ? 0.62 : 0.52, maxLines: 2,
+      align: composition.anchor === 1 ? 'right' : composition.anchor === 0.5 ? 'center' : 'left',
+      /*
+       * The box is the FINISHED width divided back out.
+       *
+       * `maxWidth` is measured before the transform scales it, and the camera
+       * scales it again on top of that, so a 0.68 box at hero scale 1.5 is
+       * 102% of the frame and the inspector refuses it — which it did, three
+       * times. Dividing by the scale and by the camera's own reach means the
+       * number in `composition` is what you actually see.
+       */
+      maxWidth: (hero ? composition.width : composition.width * 0.9) / ((hero ? composition.heroScale : 1) * 1.07),
+      maxLines: 2,
       // Heard, not read: this text is the reading it was generated from.
       spoken: true,
       staggerBy: 'none', staggerSeconds: 0,
@@ -140,7 +152,9 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
           curve: 'out_expo',
         },
         anchor: { x: place.anchor, y: 0.5 },
-        scale: hero ? { from: 0.9, to: 1, curve: 'out_expo' } : { from: 0.98, to: 1, curve: 'out_expo' },
+        scale: hero
+          ? { from: composition.heroScale * 0.9, to: composition.heroScale, curve: 'out_expo' }
+          : { from: 0.98, to: 1, curve: 'out_expo' },
         opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.08, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
       }),
     } as SceneObject);
@@ -190,27 +204,57 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
  * margin so consecutive beats do not stack identically.
  */
 function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
-  x: number; top: number; lineGap: number; anchor: number;
+  x: number; top: number; lineGap: number; anchor: number; width: number; heroScale: number;
 } {
   const lines = Math.max(1, beat.phrases.length);
-  const lineGap = 0.115;
+
   if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
-    return { x: 0.07, top: 0.62 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0 };
+    return { x: 0.07, top: 0.66 - (lines - 1) * 0.1, lineGap: 0.1, anchor: 0, width: 0.5, heroScale: 1 };
   }
   if (visual.kind === 'mark') {
-    return { x: 0.09, top: 0.44 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0 };
+    return { x: 0.09, top: 0.44 - (lines - 1) * 0.06, lineGap: 0.12, anchor: 0, width: 0.5, heroScale: 1.25 };
+  }
+  if (visual.kind === 'films') {
+    /*
+     * Under the panels, across the frame: the films are the subject.
+     *
+     * The line count has to come off the top or a three-phrase caption walks
+     * out of the bottom of the safe area — which it did, at y 1.05. The
+     * statement branch already did this and this one did not, which is what a
+     * fixed number rather than a computed one buys you.
+     */
+    return { x: 0.5, top: 0.84 - (lines - 1) * 0.085, lineGap: 0.085, anchor: 0.5, width: 0.62, heroScale: 1 };
   }
   if (visual.kind === 'fields') {
-    // Centred in the FIRST field rather than left-margined, which put the line
-    // across the seam between two colours — the one place on that frame where
-    // no text can be legible.
-    return { x: 0.5 / visual.colours.length, top: 0.5 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0.5 };
+    // Inside the first field, and narrow enough to stay in it. The earlier
+    // version centred a 54%-wide box at a sixth of the frame and put the line
+    // off the left edge — the inspector refused it, correctly.
+    const share = 1 / visual.colours.length;
+    return { x: share * 0.5, top: 0.5 - (lines - 1) * 0.07, lineGap: 0.13, anchor: 0.5, width: share * 0.82, heroScale: 1.1 };
   }
-  // A typographic beat gets the frame. Alternating the margin stops a run of
-  // them reading as one long slide.
-  const left = index % 2 === 0;
-  return { x: left ? 0.08 : 0.5, top: 0.5 - (lines - 1) * lineGap * 0.5, lineGap, anchor: left ? 0 : 0.5 };
+
+  /*
+   * Typographic beats, deliberately unalike.
+   *
+   * The inspector found b12 to be 99% the same picture as b2, b8 95% the same
+   * as b6, b14 92% the same as b4 — five pairs in a fourteen-beat film. It is
+   * the same fault a critic scored as visual invention 3 out of 10: fourteen
+   * beats generated from five templates look like five beats shown three
+   * times. A compiler that lays every statement out identically has not
+   * composed anything, it has filled a slot.
+   *
+   * So a statement beat takes one of four frames in rotation, and they differ
+   * in the things an eye actually notices: which margin, how big, how high.
+   */
+  const frames = [
+    { x: 0.08, top: 0.34, lineGap: 0.13, anchor: 0, width: 0.56, heroScale: 1.3 },
+    { x: 0.94, top: 0.58, lineGap: 0.11, anchor: 1, width: 0.5, heroScale: 1 },
+    { x: 0.5, top: 0.46, lineGap: 0.14, anchor: 0.5, width: 0.68, heroScale: 1.5 },
+    { x: 0.08, top: 0.62, lineGap: 0.1, anchor: 0, width: 0.44, heroScale: 1.15 },
+  ];
+  const frame = frames[index % frames.length]!;
+  return { ...frame, top: frame.top - (lines - 1) * frame.lineGap * 0.5 };
 }
 
 /** The camera, scaled to how long the beat actually runs. */
@@ -267,16 +311,33 @@ function visualObjects(
   }
 
   if (visual.kind === 'product' && options.assets[visual.assetId]) {
+    /*
+     * Three product beats were 95-99% the same picture as each other: same
+     * crop shape, same full-bleed placement, same camera. A film that shows
+     * the interface three times should be showing three different things
+     * about it, and the window in the page is only half of that — the FRAME
+     * has to change too, or the viewer sees one shot repeated.
+     *
+     * So the page is held differently each time: full-bleed, then inset with
+     * the frame breathing around it, then pushed off-centre so the type has
+     * the other half.
+     */
+    const holds = [
+      { width: 1.08, x: 0.5, y: 0.5 },
+      { width: 0.82, x: 0.56, y: 0.44 },
+      { width: 0.92, x: 0.62, y: 0.54 },
+    ] as const;
+    const hold = holds[(visual.holdIndex ?? 0) % holds.length]!;
     return [{
       kind: 'ui_layer', id: `${beat.id}_page`, assetId: visual.assetId, semantic: 'page',
       crop: {
         x: visual.window.x, width: visual.window.width, height: visual.window.width / 1.111,
         y: { from: visual.window.fromY, to: visual.window.toY, curve: 'in_out_cubic' },
       },
-      width: 1.08, cornerRadiusPx: 0, shadow: false,
+      width: hold.width, cornerRadiusPx: 0, shadow: false,
       role: 'support', enterAt: 0,
       reason: 'The real interface, travelled through rather than held up as a card.',
-      transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+      transform: Transform.parse({ x: hold.x, y: hold.y, anchor: { x: 0.5, y: 0.5 } }),
     } as SceneObject];
   }
 
@@ -303,6 +364,52 @@ function visualObjects(
         x: (i + 0.5) / visual.colours.length, y: 0.5, z: 0.6, anchor: { x: 0.5, y: 0.5 },
       }),
     }) as SceneObject);
+  }
+
+  if (visual.kind === 'films') {
+    /*
+     * THE FILMS THEMSELVES, at the beat that says they are made.
+     *
+     * This beat's line is "Each one rendered, watched, and scored before you
+     * see it", and it was showing a page of our own website — a picture of
+     * the place you order from, under a sentence about the things that come
+     * back. These are three real renders this system made while choosing the
+     * look of this very film, so the claim is literal rather than
+     * illustrated.
+     *
+     * It also breaks the run: three product beats had identical ingredients —
+     * a page and a caption, three times — and the inspector said so. Varying
+     * where the page sits does not change what the beat is MADE of.
+     */
+    const available = visual.assetIds.filter((id) => options.assets[id]);
+    const objects: SceneObject[] = [];
+    available.forEach((assetId, i) => {
+      const share = 1 / available.length;
+      objects.push({
+        kind: 'shape', id: `${beat.id}_panel_${i}`, shape: 'rect',
+        width: share + 0.01,
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.1 + i * 0.04, value: 1.6, curve: 'out_expo' }, { t: 1, value: 1.6 }], curve: 'out_expo' },
+        fill: visual.colours[i] ?? palette.ember, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: 'structure', enterAt: 0,
+        reason: 'The panel the film sits on, in the colour of its direction.',
+        transform: Transform.parse({ x: (i + 0.5) * share, y: 0.5, z: 0.7, anchor: { x: 0.5, y: 0.5 } }),
+      } as SceneObject);
+      objects.push({
+        kind: 'clip', id: `${beat.id}_film_${i}`, assetId,
+        crop: { x: 0, y: 0, width: 1, height: 1 },
+        width: share * 0.86,
+        // Each starts at a different second so three films at once do not cut
+        // in step and read as one image in three panels.
+        sourceInSeconds: 1.2 + i * 2.4, playbackRate: 1, generated: true,
+        role: 'support', enterAt: 0.12 + i * 0.05,
+        reason: 'One of the three directions, as the film it actually is.',
+        transform: Transform.parse({
+          x: (i + 0.5) * share, y: 0.44, z: 0.2, anchor: { x: 0.5, y: 0.5 },
+          opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.14, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
+        }),
+      } as SceneObject);
+    });
+    return objects;
   }
 
   if (visual.kind === 'mark') {

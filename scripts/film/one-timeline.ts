@@ -41,7 +41,10 @@ const ASSETS: Record<string, string> = {};
 for (const name of ['home', 'how', 'work', 'pricing'] as const) {
   if (existsSync(path.join(PUBLIC, `${name}.png`))) ASSETS[`ast_${name}`] = `${BASE}/${name}.png`;
 }
-for (const [key, file] of [['ast_before', 'before.mp4'], ['ast_output', 'output.mp4']] as const) {
+for (const [key, file] of [
+  ['ast_before', 'before.mp4'], ['ast_output', 'output.mp4'],
+  ['ast_dir_a', 'dir-a-paper.mp4'], ['ast_dir_b', 'dir-b-depth.mp4'], ['ast_dir_c', 'dir-c-field.mp4'],
+] as const) {
   if (existsSync(path.join(PUBLIC, file))) ASSETS[key] = `${BASE}/${file}`;
 }
 
@@ -131,9 +134,24 @@ const scenes = compileBeats(timed, { palette: PALETTE, visuals: VISUALS, assets:
 
 const findings = inspectScenes(scenes, EASINGS, {});
 const problems = findings.filter((f) => f.severity === 'hard_fail');
-for (const f of findings.filter((f) => f.severity !== 'note').slice(0, 12)) {
-  console.log(`  ${f.severity.padEnd(9)} ${f.check.padEnd(28)} ${f.sceneId} ${f.message.slice(0, 88)}`);
+/*
+ * Blockers first, and never truncated.
+ *
+ * This printed the first twelve findings of any severity, and this film's
+ * palette IS its brand, so a dozen brand_token_violations filled the list and
+ * pushed the one hard failure off the end. It said "refusing to render" and
+ * showed nothing that would refuse to render, which cost a render and a wrong
+ * diagnosis — I had begun debugging a change that was never exercised.
+ */
+for (const f of problems) {
+  console.log(`  HARD FAIL ${f.check.padEnd(28)} ${f.sceneId} ${f.message.slice(0, 120)}`);
 }
+const soft = findings.filter((f) => f.severity === 'soft_fail' && f.check !== 'brand_token_violation');
+for (const f of soft.slice(0, 8)) {
+  console.log(`  soft_fail ${f.check.padEnd(28)} ${f.sceneId} ${f.message.slice(0, 96)}`);
+}
+const tokenNotes = findings.length - problems.length - soft.length;
+if (tokenNotes > 0) console.log(`  (${tokenNotes} notes suppressed: this film's palette is its brand)`);
 if (problems.length) { console.log('  refusing to render'); process.exit(1); }
 if (process.env['ACT_ONE_INSPECT_ONLY']) process.exit(0);
 
