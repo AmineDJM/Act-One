@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { RunwayAudioProvider } from '@act-one/providers';
+import { ElevenLabsProvider } from '@act-one/providers';
 import { analyseVoice, runFfmpeg } from '@act-one/sound';
 import { place, retimeForNarration } from '@act-one/creative';
 
@@ -74,7 +74,10 @@ export const NARRATION: NarrationLine[] = [
  * the part of a read that cannot be fixed downstream — the others would have
  * had to be slowed, and a slowed read sounds slowed.
  */
-export const NARRATOR = 'Mark';
+export const NARRATOR = 'cjVigY5qzO86Huf0OWal';
+
+/** The same voice by the name a person would use when talking about it. */
+export const NARRATOR_NAME = 'Eric — Smooth, Trustworthy';
 
 export type NarrationTake = {
   sceneId: string;
@@ -105,15 +108,33 @@ export type NarrationTake = {
 export async function narrate(options: {
   directory: string;
   voiceId?: string;
+  /** 'final' is eleven_v3 and cannot hold continuity; 'preview' is steadier and can. */
+  quality?: 'final' | 'preview';
   signal?: AbortSignal;
 }): Promise<NarrationTake[]> {
   const voiceId = options.voiceId ?? NARRATOR;
+  const quality = options.quality ?? 'final';
   mkdirSync(options.directory, { recursive: true });
-  const provider = new RunwayAudioProvider({ voiceId });
+  const provider = new ElevenLabsProvider(
+    quality === 'preview' ? { models: { preview: 'eleven_multilingual_v2', final: 'eleven_v3' } } : {},
+  );
 
+  /*
+   * DIRECTED FOR THIS PICTURE, not for the reference's.
+   *
+   * This was `energy: 'high', pace: 'fast'`, taken from the reference read —
+   * 160 words a minute, driving, close to a pitch. Auditioned against our own
+   * film it scored 3.88 out of 10, and the critic put its finger exactly on
+   * why: at 32 seconds, "the sudden burst of artificial enthusiasm feels
+   * entirely disconnected from the sleek, restrained visual aesthetic."
+   *
+   * The reference's picture is fast and saturated. Ours is dark, editorial and
+   * slow-cut. Copying the energy of somebody else's read onto it was casting
+   * the voice for a film we did not make.
+   */
   const direction = {
-    energy: 'high',
-    pace: 'fast',
+    energy: 'medium',
+    pace: 'natural',
     style: 'confident',
     profile: 'neutral',
     gender: 'male',
@@ -121,9 +142,25 @@ export async function narrate(options: {
   };
 
   const takes: NarrationTake[] = [];
-  for (const line of NARRATION) {
+  /*
+   * ONE PERFORMANCE, NOT FOURTEEN COLD STARTS.
+   *
+   * Every line was being read in isolation, so the engine had no idea what had
+   * just been said or what was coming; the seams between them are most of what
+   * "disjointed" meant. This vendor takes the neighbouring lines as context and
+   * will condition on the previous takes' request ids, which is the difference
+   * between a read and fourteen reads laid end to end. The Runway route did
+   * not expose any of it.
+   *
+   * It also makes the cache order-dependent, which is why the neighbours are in
+   * the key: changing line 7 changes how lines 6 and 8 are read.
+   */
+  const spoken: string[] = [];
+  for (const [index, line] of NARRATION.entries()) {
+    const previousText = index > 0 ? NARRATION[index - 1]!.text : null;
+    const nextText = index < NARRATION.length - 1 ? NARRATION[index + 1]!.text : null;
     const key = createHash('sha256')
-      .update(JSON.stringify({ text: line.text, voiceId, direction, v: 2 }))
+      .update(JSON.stringify({ text: line.text, previousText, nextText, voiceId, direction, quality, v: 3 }))
       .digest('hex')
       .slice(0, 16);
     const wav = path.join(options.directory, `${line.sceneId}-${key}.wav`);
@@ -132,13 +169,21 @@ export async function narrate(options: {
       const result = await provider.synthesize(
         {
           text: line.text,
+          voiceId,
           persona: 'narrator_low',
           language: 'en',
-          quality: 'final',
+          quality,
           direction: direction as never,
+          continuity: {
+            previousText,
+            nextText,
+            // At most the last three, which is all the vendor reads.
+            previousRequestIds: spoken.slice(-3),
+          },
         },
         { organizationId: 'org_launch', projectId: 'prj_launch', ...(options.signal ? { signal: options.signal } : {}) } as never,
       );
+      if (result.requestId) spoken.push(result.requestId);
       const mp3 = `${wav}.mp3`;
       writeFileSync(mp3, result.audio);
 

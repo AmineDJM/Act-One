@@ -120,9 +120,9 @@ async function watch(file: string): Promise<VideoAnalysis> {
    * stretches where all four come back 502 — a full upload each, several
    * minutes each, and no reading at the end of it. When that happens the
    * choice is between no reading and a broader one, and a broader one is
-   * worth more than nothing. ACT_ONE_EVAL_DEPTH=normal takes it.
+   * worth more than nothing. ACT_ONE_EVAL_DEPTH=broad takes it.
    */
-  const depth = (process.env['ACT_ONE_EVAL_DEPTH'] as 'deep' | 'normal' | undefined) ?? 'deep';
+  const depth = process.env['ACT_ONE_EVAL_DEPTH'] === 'broad' ? 'broad' : 'deep';
   return analyst.analyse({ source: path.resolve(file), depth, fps: depth === 'deep' ? 4 : 2, focus: FOCUS }, CONTEXT);
 }
 

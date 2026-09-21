@@ -571,11 +571,31 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
             // The v3 and multilingual models read the language off the text and
             // refuse to be told; the flash and turbo models take a hint.
             ...(language && /flash|turbo/.test(model) ? { language_code: language } : {}),
-            ...(request.continuity?.previousText ? { previous_text: request.continuity.previousText } : {}),
-            ...(request.continuity?.nextText ? { next_text: request.continuity.nextText } : {}),
-            ...(request.continuity?.previousRequestIds?.length
-              ? { previous_request_ids: request.continuity.previousRequestIds.slice(-3) }
-              : {}),
+            /*
+             * CONTINUITY IS NOT AVAILABLE ON v3. Any of it.
+             *
+             * The vendor refuses `previous_text`/`next_text` and
+             * `previous_request_ids` alike on `eleven_v3`, each with its own
+             * hard 400 — "not yet supported with the 'eleven_v3' model" — so
+             * sending them costs the read rather than being ignored.
+             *
+             * This is a real choice and not a detail to paper over. v3 is the
+             * expressive model and reads every line as a cold start; the
+             * multilingual model is steadier and will read a script as one
+             * performance, conditioned on the lines around each take and on
+             * the takes themselves. For a long piece cut into many short
+             * lines, which is what a film narration is, the second is often
+             * the better film even though the first is the better demo.
+             */
+            ...(v3
+              ? {}
+              : {
+                  ...(request.continuity?.previousText ? { previous_text: request.continuity.previousText } : {}),
+                  ...(request.continuity?.nextText ? { next_text: request.continuity.nextText } : {}),
+                  ...(request.continuity?.previousRequestIds?.length
+                    ? { previous_request_ids: request.continuity.previousRequestIds.slice(-3) }
+                    : {}),
+                }),
             ...(typeof request.seed === 'number' ? { seed: Math.abs(Math.floor(request.seed)) % 4_294_967_295 } : {}),
           },
           expect: 'buffer',
