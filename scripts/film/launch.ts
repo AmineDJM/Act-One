@@ -1205,7 +1205,12 @@ scenes.push(
  * held longer once its frames exist.
  */
 const castVoice = process.env['ACT_ONE_VOICE'] ?? NARRATOR;
-const takes = await narrate({ directory: path.resolve('.renders/vo'), voiceId: castVoice });
+const takes = await narrate({
+  directory: path.resolve('.renders/vo'),
+  voiceId: castVoice,
+  ...(process.env['ACT_ONE_VOICE_MODEL'] ? { model: process.env['ACT_ONE_VOICE_MODEL'] } : {}),
+  ...(process.env['ACT_ONE_VOICE_ENERGY'] ? { energy: process.env['ACT_ONE_VOICE_ENERGY'] as never } : {}),
+});
 const firstPass = place(takes, scenes);
 const retimed = retimeForNarration(scenes, firstPass);
 for (const scene of scenes) {

@@ -79,6 +79,19 @@ export const NARRATOR = 'cjVigY5qzO86Huf0OWal';
 /** The same voice by the name a person would use when talking about it. */
 export const NARRATOR_NAME = 'Eric — Smooth, Trustworthy';
 
+/**
+ * The model that reads the film.
+ *
+ * `eleven_multilingual_v2`, which the vendor describes as its "most life-like,
+ * emotionally rich" model and recommends for voice overs and audiobooks. It is
+ * also the only one of the seven that has BOTH a style dial and the continuity
+ * fields — the lines either side of a take, and the previous takes themselves.
+ * `eleven_v3` is more expressive in isolation and reads every line as a cold
+ * start, which is most of what "rigid" and "disjointed" meant when a critic
+ * watched the film.
+ */
+export const NARRATION_MODEL = 'eleven_multilingual_v2';
+
 export type NarrationTake = {
   sceneId: string;
   /** The trimmed read, as the mix takes it. */
@@ -108,16 +121,19 @@ export type NarrationTake = {
 export async function narrate(options: {
   directory: string;
   voiceId?: string;
-  /** 'final' is eleven_v3 and cannot hold continuity; 'preview' is steadier and can. */
-  quality?: 'final' | 'preview';
+  /** The vendor model id. `eleven_v3` cannot hold continuity; the others can. */
+  model?: string;
+  /** Overrides the directed energy, for auditioning the axis itself. */
+  energy?: 'low' | 'medium-low' | 'medium' | 'medium-high' | 'high';
   signal?: AbortSignal;
 }): Promise<NarrationTake[]> {
   const voiceId = options.voiceId ?? NARRATOR;
-  const quality = options.quality ?? 'final';
+  const model = options.model ?? NARRATION_MODEL;
   mkdirSync(options.directory, { recursive: true });
-  const provider = new ElevenLabsProvider(
-    quality === 'preview' ? { models: { preview: 'eleven_multilingual_v2', final: 'eleven_v3' } } : {},
-  );
+  // Both slots are the same model: this function reads finals, and the tier
+  // split is not the axis being chosen here.
+  const provider = new ElevenLabsProvider({ models: { final: model, preview: model } });
+  const quality = 'final' as const;
 
   /*
    * DIRECTED FOR THIS PICTURE, not for the reference's.
@@ -133,7 +149,7 @@ export async function narrate(options: {
    * the voice for a film we did not make.
    */
   const direction = {
-    energy: 'medium',
+    energy: options.energy ?? 'medium',
     pace: 'natural',
     style: 'confident',
     profile: 'neutral',
@@ -160,7 +176,7 @@ export async function narrate(options: {
     const previousText = index > 0 ? NARRATION[index - 1]!.text : null;
     const nextText = index < NARRATION.length - 1 ? NARRATION[index + 1]!.text : null;
     const key = createHash('sha256')
-      .update(JSON.stringify({ text: line.text, previousText, nextText, voiceId, direction, quality, v: 3 }))
+      .update(JSON.stringify({ text: line.text, previousText, nextText, voiceId, direction, model, v: 4 }))
       .digest('hex')
       .slice(0, 16);
     const wav = path.join(options.directory, `${line.sceneId}-${key}.wav`);
