@@ -509,6 +509,48 @@ const stepTitle = (
     macro: null,
   });
 
+
+/**
+ * A caption that stays legible over anything.
+ *
+ * THE PROBLEM IT SOLVES. A caption placed at a fixed point over a full-bleed
+ * product lands on whatever the product happens to have there — and once the
+ * camera travels, what it lands on changes every frame. Three shots had white
+ * type sitting directly on the interface's own white type. The references
+ * solve this the way films have always solved it: the caption sits on a band,
+ * and the band is part of the design rather than an apology for it.
+ *
+ * A shape and a text object, both of which already existed. The band is drawn
+ * from the object list rather than added to the text primitive, because a
+ * scrim is a composition decision — how dark, how tall, whether it is there at
+ * all — and burying it inside `text` would make every caption in every film
+ * wear one.
+ */
+const caption = (
+  id: string, content: string, at: { y: number }, colour: string, band: string,
+): SceneObject[] => [
+  {
+    kind: 'shape', id: `${id}_band`, shape: 'rect',
+    width: 1.2, height: 0.155,
+    fill: band, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+    role: 'structure', enterAt: 0.3,
+    reason: 'The band the caption is read on, so it never fights the interface underneath it.',
+    transform: Transform.parse({
+      x: 0.5, y: at.y, z: -0.9, anchor: { x: 0.5, y: 0.5 },
+      opacity: { from: 0, to: 1, curve: 'out_cubic' },
+    }),
+  } as SceneObject,
+  line(id, content, {
+    token: 'statement', color: colour, maxWidth: 0.38, maxLines: 2, enterAt: 0.42,
+  }, {
+    // Further in than a page margin would suggest, because the camera moves
+    // during these shots and a caption pinned to the margin travels with it.
+    x: 0.16, y: at.y, anchor: { x: 0, y: 0.5 },
+    z: -0.95,
+    opacity: { from: 0, to: 1, curve: 'out_cubic' },
+  }),
+];
+
 /**
  * A shot INSIDE the interface, rather than of a card with an interface on it.
  *
@@ -566,9 +608,7 @@ const stepTravel = (
         reason: 'The real interface as a place the camera moves through, not a card it sits on.',
         transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
       } as SceneObject,
-      line(`${id}_body`, body, {
-        token: 'statement', color: PAPER, maxWidth: 0.3, maxLines: 3, enterAt: 0.4,
-      }, { x: 0.08, y: 0.87, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      ...caption(`${id}_body`, body, { y: 0.9 }, PAPER, 'rgba(8,8,12,0.78)'),
     ],
     audio: [
       { at: 0.04, kind: 'whoosh', intensity: 0.42, causedBy: `${id}_page`, reason: 'The camera enters the interface.' },
@@ -594,9 +634,7 @@ const stepProduct = (
       bloom(`${id}_bloom`, { x: 0.62, y: 0.44 }, '#FFEADC', 0.95),
       card(`${id}_card`, asset, crop, place, tilt, width, 0.0,
         'The real interface at this step, big enough to be the product rather than a picture of it.'),
-      line(`${id}_body`, body, {
-        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.26, maxLines: 4, enterAt: 0.5,
-      }, { x: 0.14, y: 0.84, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      ...caption(`${id}_body`, body, { y: 0.9 }, INK, 'rgba(244,242,236,0.82)'),
     ],
     audio: [
       { at: 0.05, kind: 'ui_confirm', intensity: 0.34, causedBy: `${id}_card`, reason: 'The interface arrives.' },
@@ -613,10 +651,59 @@ scenes.push(
   stepTravel('l6', 'A real capture, never a drawing of one.', 'ast_home',
     { x: 0.04, width: 0.44, fromY: 0.02, toY: 0.30 }, 4.6, { scale: [1.06, 1.0], focal: 70 }),
 
-  stepTitle('l7', '02', 'Three directions.', 2.0, 1.5, 'ast_work'),
+  /*
+   * THE PALETTE GAP, ANSWERED BY THE SCRIPT RATHER THAN BY DECORATION.
+   *
+   * The references use six to eight distinct hues; this film used three —
+   * ink, paper and one orange — and read as monochrome beside them. The wrong
+   * fix is to tint things. The right one was already in the copy: this beat
+   * says "three directions", and until now it said it over an empty cream
+   * field. So it SHOWS three, as three colour fields arriving one after
+   * another and standing side by side.
+   *
+   * It is the only place in the film where colour is the subject, which is
+   * also why it can afford to be loud: everywhere else the palette stays ink,
+   * paper and the one accent, and this beat is the exception that makes the
+   * restraint elsewhere read as a choice.
+   */
+  SceneGraph.parse({
+    id: 'l7', durationSeconds: 2.6,
+    intent: 'THREE DIRECTIONS: three colour fields arrive side by side, and the line names them.',
+    background: PAPER,
+    camera: camera({ scale: [1.1, 1.0], x: [0.04, -0.02], focal: 60, curve: 'out_expo' }),
+    objects: [
+      ...([
+        ['#1F6F4A', 0.1667, 0.0],
+        ['#2B4B9B', 0.5, 0.12],
+        [ACCENT, 0.8333, 0.24],
+      ] as const).map(([fill, x, enterAt], i) => ({
+        kind: 'shape', id: `l7_field_${i}`, shape: 'rect',
+        width: 0.3333, height: { from: 0, to: 1.02, curve: 'out_expo' },
+        fill, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: 'support', enterAt,
+        reason: 'One of the three directions, as a field of its own colour.',
+        transform: Transform.parse({ x, y: 0.5, z: 0.4, anchor: { x: 0.5, y: 0.5 } }),
+      }) as SceneObject),
+      line('l7_index', '02', {
+        token: 'mono', color: PAPER, maxWidth: 0.1, maxLines: 1, role: 'structure', enterAt: 0.5,
+      }, { x: 0.09, y: 0.3, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      line('l7_title', 'Three directions.', {
+        maxWidth: 0.46, maxLines: 2, color: PAPER, stagger: 0.07, enterAt: 0.5,
+      }, { x: 0.09, y: 0.44, anchor: { x: 0, y: 0.5 } }),
+    ],
+    audio: [
+      { at: 0.02, kind: 'impact', intensity: 0.5, causedBy: 'l7_field_0', reason: 'The first field lands.' },
+      { at: 0.14, kind: 'impact', intensity: 0.45, causedBy: 'l7_field_1', reason: 'The second.' },
+      { at: 0.26, kind: 'impact', intensity: 0.5, causedBy: 'l7_field_2', reason: 'The third.' },
+      { at: 0.55, kind: 'ui_click', intensity: 0.22, causedBy: 'l7_title', reason: 'The line over them.' },
+      { at: 2.1, kind: 'whoosh', intensity: 0.4, causedBy: 'l7_field_2', reason: 'Into the work.' },
+    ],
+    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.4, reason: 'The middle field opens onto the work itself.' },
+    macro: null,
+  }),
   // Travelling across the work: the same idea on the other axis.
   stepTravel('l8', 'Rendered and watched before one is chosen.', 'ast_work',
-    { x: 0.04, width: 0.52, fromY: 0.34, toY: 0.08 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
+    { x: 0.04, width: 0.52, fromY: 0.36, toY: 0.12 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
 
   stepTitle('l9', '03', 'One afternoon.', 2.0, 1.5, 'ast_pricing'),
   /*

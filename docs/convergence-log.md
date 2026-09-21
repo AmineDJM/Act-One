@@ -137,3 +137,53 @@ full-bleed via an animated crop, with the third deliberately left as a held
 card so the act does not become the same shot three times; the page each step
 lands inside now slides into its title beat from the frame edge, so the cut is
 a continuation rather than a surprise; the music bed is `percussive`.
+
+---
+
+## Iteration 3/4 — 57.1s, 15 shots
+
+**Evidence — the film is now inside the reference band on almost everything:**
+
+| metric | it 1 | it 2 | it 4 | bar | verdict |
+|---|---|---|---|---|---|
+| motion mean | 0.37 | 0.63 | **0.89** | 0.83–0.92 | **in band** |
+| motion p90 | 0.61 | 1.77 | **2.44** | 1.71–2.66 | **in band** |
+| cuts/min | 4.6 | 3.2 | **7.4** | 2.5–16.3 | **in band** |
+| shot median | 9.3 | 12.5 | **4.6** | 1.25–5.4 | **in band** |
+| audio accents | 3 | 11 | **48** | 44–168 | **in band** |
+| audio dynamic | 0.28 | 0.63 | **0.59** | 0.28–0.80 | **in band** |
+| luma range | 0.80 | 0.86 | **0.86** | 0.12–0.86 | **in band** |
+| novelty | 0.22 | 0.29 | **0.31** | 0.09–0.27 | above all three |
+| static share | 0.51 | 0.36 | 0.275 | 0.13–0.25 | marginally out |
+| scale variation | 0.69 | 0.75 | 0.63 | 0.66–0.91 | marginally out |
+| **distinct hues** | 3 | 3 | **3** | **6–8** | **the remaining gap** |
+
+The music change accounted for nearly all of the audio movement: 11 accents
+to 48 from one word. Motion and rhythm are now indistinguishable from the
+references by this instrument.
+
+**Top three gaps:**
+
+1. **Captions land on live product content.** A caption at a fixed point over
+   a full-bleed interface sits on whatever the interface has there — and once
+   the camera travels, that changes every frame. Three shots had white type on
+   the product's own white type.
+2. **Three distinct hues against six to eight.** The only metric still clearly
+   outside the band.
+3. **The work window cut its own headline** at the end of its travel.
+
+**Root causes and fixes:**
+
+1. No scrim, and a caption pinned to the page margin that the camera then
+   carried away from the band meant to protect it. Captions now sit on a band
+   — a shape and a text object, both of which already existed. The band is
+   authored from the object list rather than built into the `text` primitive,
+   because a scrim is a composition decision and burying it there would make
+   every caption in every film wear one.
+2. **Answered by the script rather than by decoration.** The wrong fix is to
+   tint things. The right one was already in the copy: the beat says "three
+   directions" and said it over an empty cream field. It now SHOWS three, as
+   three colour fields arriving in turn. It is the only place in the film
+   where colour is the subject, which is what lets the restraint everywhere
+   else read as a choice.
+3. The window's end position, moved to land on whole content.
