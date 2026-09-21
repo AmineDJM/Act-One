@@ -33,6 +33,7 @@ export {
 
 export * from './speech/types.ts';
 export { OpenAiSpeechProvider, estimateNarrationSeconds, languageCode } from './speech/openai.ts';
+export { GeminiSpeechProvider, wavFromPcm } from './speech/gemini-speech.ts';
 export {
   ElevenLabsProvider,
   ELEVENLABS_MODELS,

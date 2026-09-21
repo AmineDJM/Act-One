@@ -37,6 +37,7 @@
     "evaluate:directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/evaluate-directions.ts",
     "commission:device": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/commission-device.ts",
     "commission:shot": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/commission-shot.ts",
+    "read:audio": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/read-audio.ts",
     "read:targets": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/read-targets.ts",
     "probe": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/probe.ts",
     "launch": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/launch.ts",

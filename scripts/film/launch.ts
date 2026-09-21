@@ -1011,6 +1011,23 @@ scenes.push(
 const seconds = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
 console.log(`=== the launch film: ${seconds.toFixed(1)}s, ${scenes.length} shots ===`);
 
+/* The shot table, on demand: what each shot is, when it starts, and what it
+ * says on screen. Narration is written against this — a voice that reads the
+ * words already on the frame adds nothing, so the writing needs to see them. */
+if (process.env['ACT_ONE_SHOT_TABLE']) {
+  let at = 0;
+  for (const scene of scenes) {
+    const words = scene.objects
+      .filter((o) => o.kind === 'text')
+      .map((o) => (o as { content?: string }).content ?? '')
+      .filter(Boolean);
+    console.log(`${scene.id}\t${at.toFixed(1)}\t${scene.durationSeconds}\t${scene.intent}`);
+    for (const w of words) console.log(`\t\tTEXT ${JSON.stringify(w)}`);
+    at += scene.durationSeconds;
+  }
+  process.exit(0);
+}
+
 const registry = new CapabilityRegistry();
 let problems = 0;
 for (const scene of scenes) {

@@ -46,6 +46,50 @@ const API_VERSION = '2024-11-06';
 const VOICE_MODEL = { final: 'eleven_v3', preview: 'eleven_multilingual_v2' } as const;
 const EFFECT_MODEL = 'eleven_text_to_sound_v2';
 
+/**
+ * The voices this vendor will read in.
+ *
+ * Not fetched: `GET /v1/voices` returns the account's own cloned voices, which
+ * is an empty list here and a different catalogue entirely. The presets appear
+ * only in a validation error, so this is a transcription of one and will need
+ * updating when the vendor's list moves. Checking here means a bad name fails
+ * with the alternatives in hand instead of as a 400 from a submitted job.
+ */
+export const PRESET_VOICES: readonly string[] = [
+  'Maya', 'Arjun', 'Serene', 'Bernard', 'Billy', 'Mark', 'Clint', 'Mabel', 'Chad', 'Leslie',
+  'Eleanor', 'Elias', 'Elliot', 'Grungle', 'Brodie', 'Sandra', 'Kirk', 'Kylie', 'Lara', 'Lisa',
+  'Malachi', 'Marlene', 'Martin', 'Miriam', 'Monster', 'Paula', 'Pip', 'Rusty', 'Ragnar', 'Xylar',
+  'Maggie', 'Jack', 'Katie', 'Noah', 'James', 'Rina', 'Ella', 'Mariah', 'Frank', 'Claudia',
+  'Niki', 'Vincent', 'Kendrick', 'Myrna', 'Tom', 'Wanda', 'Benjamin', 'Kiana', 'Rachel',
+];
+
+/** The performance controls `eleven_v3` actually reads, from the direction we hold. */
+export function performanceOf(request: SpeechRequest): {
+  speed: number;
+  stability: number;
+  style: number;
+  useSpeakerBoost: boolean;
+} {
+  const direction = request.direction;
+  const energy = direction?.energy ?? null;
+  const pace = direction?.pace ?? null;
+
+  // 0.7 to 1.2 is the whole range the vendor allows; outside it the call fails.
+  const speed = clamp(
+    (request.rate ?? 1) * (pace === 'fast' ? 1.06 : pace === 'slow' ? 0.94 : 1),
+    0.7,
+    1.2,
+  );
+  // Lower stability is a freer read. An energetic brief wants room to move.
+  const stability = energy === 'high' ? 0.35 : energy === 'low' ? 0.65 : 0.5;
+  const style = energy === 'high' ? 0.45 : energy === 'low' ? 0.1 : 0.3;
+  return { speed, stability, style, useSpeakerBoost: true };
+}
+
+function clamp(value: number, low: number, high: number): number {
+  return Math.min(high, Math.max(low, value));
+}
+
 const Task = z.object({
   id: z.string(),
   status: z.enum(['PENDING', 'THROTTLED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED']),
@@ -157,6 +201,32 @@ export class RunwayAudioProvider implements SpeechProvider, SoundEffectEngine {
     }
     const model = request.quality === 'preview' ? VOICE_MODEL.preview : VOICE_MODEL.final;
 
+    if (!PRESET_VOICES.includes(voiceId)) {
+      throw new AppError(
+        'provider_unavailable',
+        `"${voiceId}" is not one of this vendor's preset voices. Pick one of: ${PRESET_VOICES.join(', ')}.`,
+      );
+    }
+
+    /*
+     * THIS ENGINE IS NOT DIRECTED IN PROSE, and it took the endpoint's own
+     * schema to establish that.
+     *
+     * The first version of this call sent `promptInstruction` with the
+     * performance brief `voiceDirection()` writes for OpenAI. There is no such
+     * field. The vendor accepts unknown keys silently, so the brief was being
+     * dropped on every read and the voice was reading everything in its
+     * factory register — which looks exactly like an engine that simply is not
+     * very directable.
+     *
+     * What it actually takes is numbers: `speed` for pace, `stability` for how
+     * far the read is allowed to move emotionally (LOWER is freer), and
+     * `style` for how much of the speaker's own manner to exaggerate. So the
+     * direction is translated into those rather than handed over as words, and
+     * the words are kept only for the tags below.
+     */
+    const performance = performanceOf(request);
+
     const created = await this.api(
       z.object({ id: z.string() }),
       'POST',
@@ -164,10 +234,10 @@ export class RunwayAudioProvider implements SpeechProvider, SoundEffectEngine {
       {
         model,
         promptText: request.text,
-        voice: { id: voiceId },
-        // The performance brief the rest of the system already writes, handed
-        // over unchanged so two engines can be given the same direction.
-        ...(voiceDirection(request) ? { promptInstruction: voiceDirection(request) } : {}),
+        // A discriminated union, not a string, and not `{ id }` either.
+        voice: { type: 'runway-preset', presetId: voiceId },
+        ...(model === VOICE_MODEL.final ? performance : {}),
+        ...(request.language ? { languageCode: request.language } : {}),
         ...(request.seed === null || request.seed === undefined ? {} : { seed: request.seed }),
       },
       context.signal,

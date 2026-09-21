@@ -66,6 +66,24 @@ const ENDPOINT: Record<RunwayCapability, string> = {
 };
 
 /**
+ * The preset voices this vendor will read in, as it enumerates them.
+ *
+ * Listed here rather than fetched because `GET /v1/voices` returns the
+ * account's OWN voices — an empty list until somebody creates one — and has
+ * nothing to do with the presets. The presets only appear in a validation
+ * error, so this is a transcription of that error and will need updating when
+ * the vendor's catalogue moves. `generateSpeech` checks against it so a bad
+ * name fails here with the list in hand rather than as a 400 from a job.
+ */
+export const RUNWAY_PRESET_VOICES: readonly string[] = [
+  'Maya', 'Arjun', 'Serene', 'Bernard', 'Billy', 'Mark', 'Clint', 'Mabel', 'Chad', 'Leslie',
+  'Eleanor', 'Elias', 'Elliot', 'Grungle', 'Brodie', 'Sandra', 'Kirk', 'Kylie', 'Lara', 'Lisa',
+  'Malachi', 'Marlene', 'Martin', 'Miriam', 'Monster', 'Paula', 'Pip', 'Rusty', 'Ragnar', 'Xylar',
+  'Maggie', 'Jack', 'Katie', 'Noah', 'James', 'Rina', 'Ella', 'Mariah', 'Frank', 'Claudia',
+  'Niki', 'Vincent', 'Kendrick', 'Myrna', 'Tom', 'Wanda', 'Benjamin', 'Kiana', 'Rachel',
+];
+
+/**
  * How a model name is sorted into a capability, and how good it is.
  *
  * Matched on the account's own model identifiers. `rank` orders within a
@@ -399,6 +417,80 @@ export class RunwayProvider implements GenerativeMediaProvider {
   }
 
   /**
+   * A narrator, reachable without an ElevenLabs key of our own.
+   *
+   * WHY THIS EXISTS. Every reference film this system is asked to match is
+   * narrated, and a voice is not a garnish on a launch film — it carries the
+   * detail so the screen can carry a label, it sets the pace, and it is why
+   * those films can hold a shot for five seconds without it reading as a
+   * slide. Ours had no voice, so its copy had to shrink until the screen was
+   * doing a narrator's job badly.
+   *
+   * Our own ElevenLabs credential is dead and OpenAI's speech endpoint
+   * answers 429, so the only working path to a studio-grade voice is this
+   * vendor, which proxies the ElevenLabs models. The endpoint and the model
+   * classifiers for it were already here; nothing called them.
+   *
+   * `voiceId` is required by the vendor and is not ours to invent. A caller
+   * that has not chosen one gets a clear refusal rather than a default voice
+   * nobody picked — a film narrated by whoever happened to be first in a list
+   * is a brand decision made by an accident.
+   *
+   * It must be one of `RUNWAY_PRESET_VOICES`. The vendor also has a cloning
+   * branch — `seed_audio` with `voice: { type: 'reference-audio', audioUri }`
+   * — which is deliberately not reachable from here: cloning a voice needs a
+   * recording of a real person and a consent record, and that path belongs
+   * behind `synthesizeWithVoice`, not behind a tier.
+   */
+  async generateSpeech(
+    request: {
+      text: string;
+      voiceId: string;
+      tier?: MediaTier;
+      /** Vendor-specific performance controls, passed through untouched. */
+      settings?: Record<string, unknown>;
+    },
+    context: CallContext,
+  ): Promise<MediaJob> {
+    if (!request.voiceId) {
+      throw new ProviderError(this.name, 'A voice id is required; this vendor has no default voice.', {
+        retryable: false,
+      });
+    }
+    if (!RUNWAY_PRESET_VOICES.includes(request.voiceId)) {
+      throw new ProviderError(
+        this.name,
+        `"${request.voiceId}" is not one of this vendor's preset voices. Pick one of: ${RUNWAY_PRESET_VOICES.join(', ')}.`,
+        { retryable: false },
+      );
+    }
+    const model = await this.modelFor('text_to_speech', request.tier ?? 'cinematic');
+    /*
+     * The wire shape, which took a schema to find rather than a guess.
+     *
+     * `promptText`, not `text`: the speech endpoint uses the same field name
+     * as the video and image endpoints rather than the one the underlying
+     * ElevenLabs API uses. And `voice` is not a string but a discriminated
+     * union on `type`, whose branch for the ElevenLabs models is
+     * `runway-preset` — a value the endpoint will not enumerate, because the
+     * union has several branches and the validator only names the options of
+     * a single-branch union. The catalogue behind `presetId` it does
+     * enumerate, which is where `RUNWAY_PRESET_VOICES` comes from.
+     *
+     * The endpoint's own published schema settled it. When an API answers 400
+     * without saying what it wanted, its OpenAPI document is the next thing to
+     * read, not the next value to try.
+     */
+    const body: Record<string, unknown> = {
+      model,
+      promptText: request.text,
+      voice: { type: 'runway-preset', presetId: request.voiceId },
+      ...(request.settings ?? {}),
+    };
+    return this.submit(ENDPOINT.text_to_speech, body, model, 'speech.tts', context);
+  }
+
+  /**
    * Editing a still is not something this vendor does.
    *
    * It changes footage — Aleph is video in, video out — and pretending a still
@@ -475,7 +567,7 @@ export class RunwayProvider implements GenerativeMediaProvider {
     pathname: string,
     body: Record<string, unknown>,
     model: string,
-    operation: 'media.video' | 'media.image',
+    operation: 'media.video' | 'media.image' | 'speech.tts',
     context: CallContext,
   ): Promise<MediaJob> {
     const created = await this.api(z.object({ id: z.string() }), 'POST', pathname, body, {
