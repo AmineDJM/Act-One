@@ -541,7 +541,7 @@ const caption = (
    */
   {
     kind: 'shape', id: `${id}_band`, shape: 'rect',
-    width: 1.2, height: 0.19,
+    width: 1.3, height: 0.26,
     fill: band, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
     role: 'structure', enterAt: 0.3,
     reason: 'The band the caption is read on, so it never fights the interface underneath it.',
@@ -618,7 +618,7 @@ const stepTravel = (
         reason: 'The real interface as a place the camera moves through, not a card it sits on.',
         transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
       } as SceneObject,
-      ...caption(`${id}_body`, body, { y: 0.93 }, PAPER, INK),
+      ...caption(`${id}_body`, body, { y: 0.87 }, PAPER, INK),
     ],
     audio: [
       { at: 0.04, kind: 'whoosh', intensity: 0.42, causedBy: `${id}_page`, reason: 'The camera enters the interface.' },
@@ -644,7 +644,7 @@ const stepProduct = (
       bloom(`${id}_bloom`, { x: 0.62, y: 0.44 }, '#FFEADC', 0.95),
       card(`${id}_card`, asset, crop, place, tilt, width, 0.0,
         'The real interface at this step, big enough to be the product rather than a picture of it.'),
-      ...caption(`${id}_body`, body, { y: 0.93 }, INK, PAPER),
+      ...caption(`${id}_body`, body, { y: 0.87 }, INK, PAPER),
     ],
     audio: [
       { at: 0.05, kind: 'ui_confirm', intensity: 0.34, causedBy: `${id}_card`, reason: 'The interface arrives.' },
@@ -697,7 +697,7 @@ scenes.push(
          * never showed three things side by side. They snap up in a fifth of
          * a second each, a beat apart, and then the frame is what it says.
          */
-        width: 0.3333,
+        width: 0.35,
         height: { keyframes: [{ t: 0, value: 0 }, { t: 0.14, value: 1.02, curve: 'out_expo' }, { t: 1, value: 1.02 }], curve: 'out_expo' },
         fill, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
         role: 'support', enterAt,
@@ -722,7 +722,7 @@ scenes.push(
     macro: null,
   }),
   // Travelling across the work: the same idea on the other axis.
-  stepTravel('l8', 'Rendered and watched before one is chosen.', 'ast_work',
+  stepTravel('l8', 'Watched before one is chosen.', 'ast_work',
     { x: 0.04, width: 0.52, fromY: 0.36, toY: 0.12 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
 
   stepTitle('l9', '03', 'One afternoon.', 2.0, 1.5, 'ast_pricing'),
