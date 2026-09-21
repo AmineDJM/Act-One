@@ -120,7 +120,15 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
        * number in `composition` is what you actually see.
        */
       maxWidth: (hero ? composition.width : composition.width * 0.9) / ((hero ? composition.heroScale : 1) * 1.07),
-      maxLines: 2,
+      /*
+       * Three lines, because dividing the box by the scale made it narrow
+       * enough that two were not always enough — and a phrase that does not
+       * fit is not wrapped, it is CUT. The film shipped "before you see"
+       * without its "it", and "Nothing about the work gets" without its
+       * "cheaper": the caption stopped matching the voice mid-sentence, which
+       * is the one failure this whole architecture exists to make impossible.
+       */
+      maxLines: 3,
       // Heard, not read: this text is the reading it was generated from.
       spoken: true,
       staggerBy: 'none', staggerSeconds: 0,
@@ -251,7 +259,7 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
     { x: 0.08, top: 0.34, lineGap: 0.13, anchor: 0, width: 0.56, heroScale: 1.3 },
     { x: 0.94, top: 0.58, lineGap: 0.11, anchor: 1, width: 0.5, heroScale: 1 },
     { x: 0.5, top: 0.46, lineGap: 0.14, anchor: 0.5, width: 0.68, heroScale: 1.5 },
-    { x: 0.08, top: 0.62, lineGap: 0.1, anchor: 0, width: 0.44, heroScale: 1.15 },
+    { x: 0.08, top: 0.62, lineGap: 0.1, anchor: 0, width: 0.56, heroScale: 1.15 },
   ];
   const frame = frames[index % frames.length]!;
   return { ...frame, top: frame.top - (lines - 1) * frame.lineGap * 0.5 };
