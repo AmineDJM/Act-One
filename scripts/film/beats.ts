@@ -276,7 +276,25 @@ export const VISUALS: Record<string, BeatVisual> = {
   },
   // The receipt stays on screen: these three directions are what that pinned
   // phrase turned into, and the film has to let the viewer see the link.
-  b7: { kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'], receipt: RECEIPT },
+  /*
+   * Three directions, named and set three different ways.
+   *
+   * These are the real three this system developed while choosing the look of
+   * this very film — paper, depth, field — and each label is set the way its
+   * direction sets things: one quiet and tracked, one large and declarative,
+   * one between. Three colours differ in hue and nothing else; three
+   * typographic registers differ in the thing a creative direction actually
+   * is.
+   */
+  b7: {
+    kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
+    labels: [
+      { text: 'Paper', token: 'mono', scale: 1.0 },
+      { text: 'Depth', token: 'display', scale: 0.62 },
+      { text: 'Field', token: 'statement', scale: 0.8 },
+    ],
+    receipt: RECEIPT,
+  },
   // The three real renders this system made, at the beat that says they are
   // rendered and scored. The claim becomes literal instead of illustrated.
   /*

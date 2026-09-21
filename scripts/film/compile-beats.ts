@@ -29,7 +29,30 @@ export type BeatVisual = { receipt?: Receipt } & (
   | { kind: 'mark' }
   | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; holdIndex?: number }
   | { kind: 'clip'; assetId: string; sourceInSeconds?: number; crop?: { x: number; y: number; width: number; height: number } }
-  | { kind: 'fields'; colours: readonly string[]; assetIds?: readonly string[] }
+  | {
+      kind: 'fields';
+      colours: readonly string[];
+      assetIds?: readonly string[];
+      /**
+       * What each field IS, set in that direction's own typographic register.
+       *
+       * Four directors of five called this beat critical in the same words: a
+       * film that says "three creative directions" and shows three coloured
+       * rectangles has "replaced promised proof with abstract representation",
+       * "a placeholder presented as an idea". They are right, and the single
+       * craft reading that keeps calling this the best moment in the film is
+       * judging it relatively — it breaks the dark monotony, which is not the
+       * same as being an idea.
+       *
+       * A thumbnail cannot fix it: three dense renders at a third of the frame
+       * are illegible, which is the lesson from the beat after this one. What
+       * CAN be shown at panel size is the thing that actually differs between
+       * three creative directions — how each one sets type. So each field
+       * carries its own name in its own treatment, and the difference between
+       * the three is the difference between the three.
+       */
+      labels?: readonly { text: string; token: 'display' | 'statement' | 'mono'; scale: number }[];
+    }
   | {
       kind: 'films';
       assetIds: readonly string[];
@@ -1016,7 +1039,7 @@ function visualObjects(
   }
 
   if (visual.kind === 'fields') {
-    return visual.colours.map((fill, i) => ({
+    const fields = visual.colours.map((fill, i) => ({
       kind: 'shape', id: `${beat.id}_field_${i}`, shape: 'rect',
       width: 1 / visual.colours.length + 0.02,
       height: { keyframes: [{ t: 0, value: 0 }, { t: 0.12 + i * 0.05, value: 1.6, curve: 'out_expo' }, { t: 1, value: 1.6 }], curve: 'out_expo' },
@@ -1027,6 +1050,38 @@ function visualObjects(
         x: (i + 0.5) / visual.colours.length, y: 0.5, z: 0.6, anchor: { x: 0.5, y: 0.5 },
       }),
     }) as SceneObject);
+
+    /*
+     * Each direction's name, in its own register, arriving after its field.
+     *
+     * Three different tokens and three different scales, because that IS the
+     * difference between three art directions — one sets a word huge, one sets
+     * it as a quiet label, one sits between. Three colours differ in hue and
+     * nothing else, which is why they read as a placeholder.
+     */
+    for (const [i, label] of (visual.labels ?? []).entries()) {
+      if (i >= visual.colours.length) break;
+      fields.push({
+        kind: 'text', id: `${beat.id}_label_${i}`, content: label.text,
+        token: label.token, color: palette.paper,
+        align: 'center', maxWidth: (1 / visual.colours.length) * 0.84 / label.scale, maxLines: 1,
+        staggerBy: 'none', staggerSeconds: 0,
+        role: 'support', enterAt: 0,
+        reason: `What direction ${i + 1} is, set the way that direction sets things.`,
+        transform: Transform.parse({
+          x: (i + 0.5) / visual.colours.length, y: 0.82, z: 0.5,
+          anchor: { x: 0.5, y: 0.5 }, scale: label.scale,
+          opacity: { keyframes: [
+            { t: 0, value: 0 },
+            { t: 0.2 + i * 0.06, value: 0, curve: 'linear' },
+            { t: 0.32 + i * 0.06, value: 0.92, curve: 'out_quint' },
+            { t: 1, value: 0.92 },
+          ], curve: 'out_quint' },
+        }),
+      } as SceneObject);
+    }
+
+    return fields;
   }
 
   if (visual.kind === 'films') {
