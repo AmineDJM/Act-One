@@ -21,3 +21,7 @@ export * from './director/territories.ts';
 export * from './director/understanding.ts';
 export * from './director/hero.ts';
 export * from './reference/grammar.ts';
+export * from './council/directors.ts';
+export * from './council/types.ts';
+export * from './council/room.ts';
+export * from './council/journal.ts';
