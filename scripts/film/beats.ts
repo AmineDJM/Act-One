@@ -168,9 +168,28 @@ export const VISUALS: Record<string, BeatVisual> = {
     ],
   },
   b2: { kind: 'statement', field: null },
-  // Ember was nearly black on a near-black field: the loudest event in the
-  // frame was a colour change nobody could see. Amber reads.
-  b3: { kind: 'statement', field: '#FFB03A' },
+  /*
+   * A WHITE FRAME FOR THE COST, not a yellow one.
+   *
+   * Ember was nearly black on a near-black field — the loudest event in the
+   * frame was a colour change nobody could see — so this became amber, and
+   * amber read. Then the film got darker and more consistent around it: two
+   * beats are now locked plates on ink, and against that a full yellow frame
+   * was named the worst moment in the film, "visually harsh", abruptly
+   * breaking the established palette.
+   *
+   * The rupture is not the problem; the same reading praised the tricolour
+   * split for exactly that. The problem is that amber belongs to nothing else
+   * here. Paper does: it is the film's own second colour, it is the hardest
+   * possible cut from ink, and a white frame under "Six weeks before a single
+   * frame exists" is the cost arriving as a blank — which is what six weeks of
+   * calendar with no film in it actually is.
+   *
+   * It also gives the film a colour argument rather than a set of accents:
+   * dark, white for the cost, tricolour for the three directions, accent for
+   * the turn. The accent stays spent on one beat, which is what keeps it loud.
+   */
+  b3: { kind: 'statement', field: '#F4F2EC' },
   b4: { kind: 'mark' },
   b5: { kind: 'statement', field: null },
   b6: { kind: 'product', assetId: 'ast_home', window: { x: 0.03, width: 0.58, fromY: 0.02, toY: 0.34 }, holdIndex: 0 },

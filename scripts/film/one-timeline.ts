@@ -250,12 +250,43 @@ let plan = buildMix({ design, resolvedPaths: resolved, durationSeconds: seconds,
  * second reading is the one that proves it, because the first only says what
  * was wrong.
  */
+/**
+ * The WORST line, not the average of all of them.
+ *
+ * One integrated reading over the union of every voice window is the number a
+ * dubbing stage would not accept. A film can lead by 4.5 LU overall while one
+ * line sits under a loud passage and is genuinely hard to hear — the average
+ * is carried by the quiet stretches, and the buried line is exactly the moment
+ * a listener notices. The audio critic reported "the music briefly overpowers
+ * the voice" on a mix that had already passed the integrated floor, twice, and
+ * it was right both times: BRIEFLY is what an integrated measurement cannot
+ * see.
+ *
+ * So every line is metered against the bed underneath it and the quietest one
+ * decides. Correcting to the worst line costs a decibel of music and buys the
+ * one thing the measurement exists for.
+ */
+type LineLead = { leadLu: number; voiceLufs: number; musicLufs: number };
+
+async function worstLine(
+  built: typeof plan,
+  windows: typeof voiceTracks,
+): Promise<{ lead: LineLead; at: number } | null> {
+  let worst: { lead: LineLead; at: number } | null = null;
+  for (const window of windows) {
+    const read = await readDialogueLead(built, [window]);
+    if (!('leadLu' in read)) continue;
+    if (!worst || read.leadLu < worst.lead.leadLu) worst = { lead: read, at: window.atSeconds };
+  }
+  return worst;
+}
+
 if (voiceTracks.length > 0 && design.music) {
-  let read = await readDialogueLead(plan, voiceTracks);
-  let lead = 'leadLu' in read ? read : null;
+  let worst = await worstLine(plan, voiceTracks);
+  let lead = worst?.lead ?? null;
   if (lead) {
     const reduction = bedReductionDb(lead);
-    console.log(`  voice leads music by ${lead.leadLu.toFixed(1)} LU (voice ${lead.voiceLufs.toFixed(1)}, bed ${lead.musicLufs.toFixed(1)} LUFS)`);
+    console.log(`  quietest line leads music by ${lead.leadLu.toFixed(1)} LU at ${worst!.at.toFixed(1)}s (voice ${lead.voiceLufs.toFixed(1)}, bed ${lead.musicLufs.toFixed(1)} LUFS)`);
     if (reduction > 0) {
       plan = buildMix({
         design: { ...design, music: { ...design.music, baseGainDb: design.music.baseGainDb - reduction } },
@@ -263,9 +294,9 @@ if (voiceTracks.length > 0 && design.music) {
         durationSeconds: seconds,
         voiceTracks,
       });
-      read = await readDialogueLead(plan, voiceTracks);
-      lead = 'leadLu' in read ? read : null;
-      console.log(`  bed taken down ${reduction} dB -> voice now leads by ${lead ? lead.leadLu.toFixed(1) : '?'} LU`);
+      worst = await worstLine(plan, voiceTracks);
+      lead = worst?.lead ?? null;
+      console.log(`  bed taken down ${reduction} dB -> quietest line now leads by ${lead ? lead.leadLu.toFixed(1) : '?'} LU`);
     }
     // Said out loud rather than swallowed: one correction is not guaranteed to
     // be enough, and a mix that still fails the floor must not look like a pass.
@@ -278,7 +309,7 @@ if (voiceTracks.length > 0 && design.music) {
      * music bus, no voice bus, or ffmpeg/the meter did not produce two
      * readings. Reporting them as one line was how this stayed unexplained.
      */
-    console.log(`  dialogue lead could not be measured [${(read as { reason: string }).reason}]: ${(read as { detail: string }).detail}`);
+    console.log('  dialogue lead could not be measured on any voice window.');
   }
 }
 
