@@ -540,7 +540,23 @@ export class GeminiVideoAnalyst implements VideoAnalyst {
       }
     }
 
-    const object = keepReportedWords((raw ?? {}) as Record<string, unknown>);
+    /*
+     * A reading wrapped in an array is still a reading.
+     *
+     * Asked for one JSON object, the model sometimes returns `[{...}]` — the
+     * same analysis inside a list of one. The schema then rejects the ROOT,
+     * which throws away a complete, valid reading of a whole film over its
+     * packaging, and costs a full upload and several minutes to discover. Seen
+     * three times across this project's evaluations.
+     *
+     * Only a single-element array is unwrapped. A list of several objects is
+     * not a packaging mistake — it is a different answer to a different
+     * question, and quietly taking the first one would be a guess.
+     */
+    const unwrapped = Array.isArray(raw) && raw.length === 1 && raw[0] !== null && typeof raw[0] === 'object'
+      ? (raw[0] as Record<string, unknown>)
+      : raw;
+    const object = keepReportedWords((unwrapped ?? {}) as Record<string, unknown>);
     const limitations = asStringArray(object['limitations']);
     if (meta.request.fps) {
       limitations.push(
