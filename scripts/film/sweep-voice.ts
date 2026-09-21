@@ -25,16 +25,17 @@ import { httpRequest } from '@act-one/providers';
 
 const run = promisify(execFile);
 
-type Candidate = { id: string; voiceId: string; voice: string; model: string; energy: string };
+type Candidate = { id: string; voiceId: string; voice: string; model: string; energy: string; stability: string };
 
 /** Named so a row in the output says what was actually varied. */
 const CANDIDATES: Candidate[] = [
-  { id: 'mv2-eric-med', voiceId: 'cjVigY5qzO86Huf0OWal', voice: 'Eric', model: 'eleven_multilingual_v2', energy: 'medium' },
-  { id: 'mv2-eric-hi', voiceId: 'cjVigY5qzO86Huf0OWal', voice: 'Eric', model: 'eleven_multilingual_v2', energy: 'medium-high' },
-  { id: 'mv2-brian-med', voiceId: 'nPczCjzI2devNBz1zQrb', voice: 'Brian', model: 'eleven_multilingual_v2', energy: 'medium' },
-  { id: 'mv2-roger-med', voiceId: 'CwhRBWXzGAHq8TQ4Fs17', voice: 'Roger', model: 'eleven_multilingual_v2', energy: 'medium' },
-  { id: 'mv2-chris-hi', voiceId: 'iP95p4xoKVk53GoZ742B', voice: 'Chris', model: 'eleven_multilingual_v2', energy: 'medium-high' },
-  { id: 'v3-eric-med', voiceId: 'cjVigY5qzO86Huf0OWal', voice: 'Eric', model: 'eleven_v3', energy: 'medium' },
+  // Stability is the axis nothing had varied, and the vendor documents it as
+  // the one that governs how mechanical a read sounds. Lower is freer.
+  { id: 'roger-creative', voiceId: 'CwhRBWXzGAHq8TQ4Fs17', voice: 'Roger', model: 'eleven_multilingual_v2', energy: 'medium', stability: 'creative' },
+  { id: 'roger-natural', voiceId: 'CwhRBWXzGAHq8TQ4Fs17', voice: 'Roger', model: 'eleven_multilingual_v2', energy: 'medium', stability: 'natural' },
+  { id: 'eric-creative-hi', voiceId: 'cjVigY5qzO86Huf0OWal', voice: 'Eric', model: 'eleven_multilingual_v2', energy: 'medium-high', stability: 'creative' },
+  { id: 'chris-creative-hi', voiceId: 'iP95p4xoKVk53GoZ742B', voice: 'Chris', model: 'eleven_multilingual_v2', energy: 'medium-high', stability: 'creative' },
+  { id: 'v3-eric-creative', voiceId: 'cjVigY5qzO86Huf0OWal', voice: 'Eric', model: 'eleven_v3', energy: 'medium', stability: 'creative' },
 ];
 
 const CRITERIA = [
@@ -61,6 +62,7 @@ async function mix(c: Candidate): Promise<string> {
     env: {
       ...process.env,
       ACT_ONE_VOICE: c.voiceId, ACT_ONE_VOICE_MODEL: c.model, ACT_ONE_VOICE_ENERGY: c.energy,
+      ACT_ONE_VOICE_STABILITY: c.stability,
       ACT_ONE_AUDITION: c.id, NODE_USE_ENV_PROXY: '1',
     },
     timeout: 25 * 60_000,
@@ -108,18 +110,23 @@ async function openai(file: string): Promise<unknown> {
           { type: 'input_audio', input_audio: { data: readFileSync(wav).toString('base64'), format: 'mp3' } },
         ],
       }],
-      response_format: { type: 'json_object' },
     },
     timeoutMs: 300_000, attempts: 3,
   });
-  return JSON.parse(r?.choices?.[0]?.message?.content ?? '{}');
+  // This model rejects response_format, so the JSON arrives inside prose and
+  // has to be found rather than assumed.
+  const text = String(r?.choices?.[0]?.message?.content ?? '');
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error(`no JSON in reply: ${text.slice(0, 160)}`);
+  return JSON.parse(text.slice(start, end + 1));
 }
 
 const only = (process.env['ACT_ONE_SWEEP'] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const chosen = only.length ? CANDIDATES.filter((c) => only.includes(c.id)) : CANDIDATES;
 
 console.log(`=== sweeping ${chosen.length} candidates ===`);
-for (const c of chosen) console.log(`  ${c.id.padEnd(16)} ${c.voice.padEnd(7)} ${c.model.padEnd(24)} energy=${c.energy}`);
+for (const c of chosen) console.log(`  ${c.id.padEnd(18)} ${c.voice.padEnd(7)} ${c.model.padEnd(24)} energy=${c.energy} stability=${c.stability}`);
 
 /*
  * Two at a time, not six.
@@ -152,7 +159,7 @@ const judged = await Promise.allSettled(
   ready.map(async ({ c, file }) => {
     const [g, o] = await Promise.allSettled([gemini(file), openai(file)]);
     return {
-      id: c.id, voice: c.voice, model: c.model, energy: c.energy,
+      id: c.id, voice: c.voice, model: c.model, energy: c.energy, stability: c.stability,
       gemini: g.status === 'fulfilled' ? g.value : { error: String(g.reason).slice(0, 200) },
       openai: o.status === 'fulfilled' ? o.value : { error: String(o.reason).slice(0, 200) },
     };
@@ -182,7 +189,7 @@ for (const r of results as any[]) {
 
 console.log('\n=== what each critic said ===');
 for (const r of results as any[]) {
-  console.log(`\n${r.id}  (${r.voice}, ${r.model}, ${r.energy})`);
+  console.log(`\n${r.id}  (${r.voice}, ${r.model}, ${r.energy}, stability ${r.stability})`);
   for (const [who, v] of [['gemini', r.gemini], ['openai', r.openai]] as const) {
     if (v?.error) { console.log(`  ${who}: FAILED ${v.error}`); continue; }
     console.log(`  ${who}: ${v.verdict ?? '(no verdict)'}`);

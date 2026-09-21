@@ -1210,6 +1210,7 @@ const takes = await narrate({
   voiceId: castVoice,
   ...(process.env['ACT_ONE_VOICE_MODEL'] ? { model: process.env['ACT_ONE_VOICE_MODEL'] } : {}),
   ...(process.env['ACT_ONE_VOICE_ENERGY'] ? { energy: process.env['ACT_ONE_VOICE_ENERGY'] as never } : {}),
+  ...(process.env['ACT_ONE_VOICE_STABILITY'] ? { stability: process.env['ACT_ONE_VOICE_STABILITY'] as never } : {}),
 });
 const firstPass = place(takes, scenes);
 const retimed = retimeForNarration(scenes, firstPass);

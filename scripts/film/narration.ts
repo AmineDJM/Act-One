@@ -125,6 +125,8 @@ export async function narrate(options: {
   model?: string;
   /** Overrides the directed energy, for auditioning the axis itself. */
   energy?: 'low' | 'medium-low' | 'medium' | 'medium-high' | 'high';
+  /** Lower is a freer read. 'creative' 0.35, 'natural' 0.5, 'robust' 0.7. */
+  stability?: 'creative' | 'natural' | 'robust';
   signal?: AbortSignal;
 }): Promise<NarrationTake[]> {
   const voiceId = options.voiceId ?? NARRATOR;
@@ -155,6 +157,17 @@ export async function narrate(options: {
     profile: 'neutral',
     gender: 'male',
     language: 'en',
+    /*
+     * STABILITY WAS NEVER SET, which means it was never chosen.
+     *
+     * The provider reads `direction.stability` and this object did not have
+     * the field, so it resolved to undefined and the vendor used its own
+     * default. Every reading of this film has called the narration robotic,
+     * and the one dial the vendor documents as controlling exactly that had
+     * never been touched — LOWER stability is a freer, more varied read, and
+     * higher is a flatter, more consistent one.
+     */
+    stability: options.stability ?? 'creative',
   };
 
   const takes: NarrationTake[] = [];
@@ -176,7 +189,7 @@ export async function narrate(options: {
     const previousText = index > 0 ? NARRATION[index - 1]!.text : null;
     const nextText = index < NARRATION.length - 1 ? NARRATION[index + 1]!.text : null;
     const key = createHash('sha256')
-      .update(JSON.stringify({ text: line.text, previousText, nextText, voiceId, direction, model, v: 4 }))
+      .update(JSON.stringify({ text: line.text, previousText, nextText, voiceId, direction, model, v: 5 }))
       .digest('hex')
       .slice(0, 16);
     const wav = path.join(options.directory, `${line.sceneId}-${key}.wav`);
