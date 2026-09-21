@@ -307,7 +307,24 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
            */
           perspective: tokens.frame.width * (num(scene.camera.focalLengthMm, sceneT) / 36),
           perspectiveOrigin: '50% 50%',
-          transformStyle: 'preserve-3d',
+          /*
+           * NO `preserve-3d`, and that is the whole decision.
+           *
+           * With it, layers stop being stacked and start being SOLIDS in a
+           * shared space: a full-frame light plane at z = 0 physically
+           * intersects a card tilted at z = 0.4, and the browser draws the
+           * intersection — half the card in front of the light, half behind,
+           * with a hard diagonal seam where the two planes cross. That is
+           * geometrically correct and completely wrong for this language,
+           * which says it is 2.5D and sorts its objects in painter's order by
+           * `z`. The first scene to put a warm bloom behind four angled cards
+           * came out with a white wedge slicing through them.
+           *
+           * Perspective without `preserve-3d` still applies to every direct
+           * child, so a rotated card still foreshortens — it just cannot cut
+           * its neighbours. Depth decides what is in front; it does not decide
+           * what is inside what.
+           */
           willChange: 'transform',
         }}
       >

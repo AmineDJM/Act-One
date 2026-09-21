@@ -117,7 +117,10 @@ const lamp = (
     radius,
     role: 'atmosphere',
     reason: 'The source the scene is lit by. Nothing here sits on a flat field.',
-    transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+    // z = 1 puts the light at the back of the painter's sort. At the default
+    // of 0 it landed in the middle of the cards and painted over the ones
+    // behind it.
+    transform: Transform.parse({ x: 0.5, y: 0.5, z: 1, anchor: { x: 0.5, y: 0.5 } }),
   }) as SceneObject;
 
 /** The same, on paper: a warm bloom rather than a lamp in the dark. */
@@ -130,7 +133,7 @@ const bloom = (id: string, at: { x: number; y: number }, colour: string, radius:
     radius,
     role: 'atmosphere',
     reason: 'Warmth in the paper, so the page is lit rather than printed.',
-    transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+    transform: Transform.parse({ x: 0.5, y: 0.5, z: 1, anchor: { x: 0.5, y: 0.5 } }),
   }) as SceneObject;
 
 /** A capture held at an angle in real space. */
@@ -201,7 +204,7 @@ const chapterWord = (id: string, content: string, colour: string): SceneObject =
     token: 'display', color: colour, maxWidth: 0.42, maxLines: 1, align: 'center',
     role: 'atmosphere',
   }, {
-    x: 0.5, y: 0.42, anchor: { x: 0.5, y: 0.5 },
+    x: 0.5, y: 0.42, z: 0.95, anchor: { x: 0.5, y: 0.5 },
     scale: { from: 1.9, to: 2.15, curve: 'in_out_cubic' },
     opacity: { from: 0, to: 1, curve: 'out_cubic' },
   });
