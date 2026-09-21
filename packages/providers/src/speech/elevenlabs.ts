@@ -111,8 +111,29 @@ export function wordsFrom(alignment: CharacterAlignment | null): SpokenWord[] | 
   const words: SpokenWord[] = [];
   let text = '';
   let startSeconds = 0;
+  /*
+   * Skipped at the CHARACTER level, not filtered afterwards.
+   *
+   * A tag can contain a space — `[short pause]` — so by the time the scanner
+   * has assembled words it has already produced `[short` and `pause]`, and a
+   * filter has to guess which fragments belong to a tag. Tracking the bracket
+   * while scanning needs no guessing and works for any tag the engine ever
+   * gains.
+   */
+  let inTag = false;
   for (let i = 0; i < characters.length; i += 1) {
     const character = characters[i] ?? '';
+    if (inTag) {
+      if (character === ']') inTag = false;
+      continue;
+    }
+    if (character === '[') {
+      // Whatever was being assembled ends here; the tag itself is not a word.
+      if (text) words.push({ word: text, startSeconds, endSeconds: ends[i - 1] ?? startSeconds });
+      text = '';
+      inTag = true;
+      continue;
+    }
     if (/\s/.test(character)) {
       if (text) words.push({ word: text, startSeconds, endSeconds: ends[i - 1] ?? startSeconds });
       text = '';
@@ -122,6 +143,25 @@ export function wordsFrom(alignment: CharacterAlignment | null): SpokenWord[] | 
     text += character;
   }
   if (text) words.push({ word: text, startSeconds, endSeconds: ends[ends.length - 1] ?? startSeconds });
+
+  /*
+   * CONTROL TOKENS ARE NOT WORDS, and letting them through was visible in the
+   * finished film.
+   *
+   * `withAudioTags` writes `[slowly]`, `[short pause]` and the rest into the
+   * text on the way to v3, because that is how the engine is directed. The
+   * engine does not SAY them — but it does return them in the character
+   * alignment, with timings, indistinguishable from speech. Anything built
+   * from that alignment therefore treats them as spoken words, and this
+   * project builds its subtitles from exactly there: the film shipped with
+   * "[slowly]" and "[short pause]" set on screen in the same type as the
+   * script. A model watching it called that "an unresolved editing error"
+   * and named it the worst moment in the film, which is generous.
+   *
+   * Stripped here rather than at the caller, because the tags are this
+   * module's own doing. A consumer cannot be expected to know that a word it
+   * was handed is something we inserted.
+   */
   return words;
 }
 
