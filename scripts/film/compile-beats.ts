@@ -147,13 +147,17 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
      */
     objects.push({
       kind: 'shape', id: `${beat.id}_ground`, shape: 'rect',
-      width: 1.4, height: 0.3,
+      width: 1.4, height: 0.36,
       fill: palette.ink, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'structure', enterAt: 0,
       reason: 'The words sit on this rather than on the interface behind them.',
       // Bottom edge off-frame, top edge high enough that the words on it sit
       // inside the title-safe area — a player's chrome lives in that last 5%.
-      transform: Transform.parse({ x: 0.5, y: 1.06, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
+      // Centred at y 1.0 so the band spans 0.82 to 1.18: its top edge is above
+      // the caption at 0.88, and its bottom runs off the frame. Sized to the
+      // words rather than guessed — the first attempt left the band entirely
+      // below the line it was supposed to be carrying.
+      transform: Transform.parse({ x: 0.5, y: 1.0, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
     } as SceneObject);
   }
 
@@ -277,7 +281,18 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
 
   if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
-    return { x: 0.07, top: 0.88, lineGap: 0.1, anchor: 0, width: 0.6, heroScale: 1.05 };
+    /*
+     * Centred on the band rather than left-anchored.
+     *
+     * A left-anchored caption kept losing its first letter: the camera scales
+     * about the centre, so the box's left edge walks outward as the shot
+     * pushes in, and chasing it with the x margin fixed one render and broke
+     * the next. Centring is invariant under that scale — the box grows
+     * symmetrically and the first letter stays on screen — and on a full-width
+     * band it reads as a deliberate lower third rather than a margin somebody
+     * guessed.
+     */
+    return { x: 0.5, top: 0.88, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 };
   }
   if (visual.kind === 'mark') {
     return { x: 0.09, top: 0.48, lineGap: 0.12, anchor: 0, width: 0.54, heroScale: 1.3 };
@@ -340,6 +355,18 @@ function cameraFor(beat: TimedBeat, visual: BeatVisual): Record<string, unknown>
   const travel = Math.min(0.3, 0.05 * beat.durationSeconds);
   const curve = 'linear' as const;
   if (visual.kind === 'product') {
+    /*
+     * The full push, kept.
+     *
+     * This shot lost its caption's first letters — the film shipped "ast,
+     * loudness, timing." — and the scale was the mechanism: it magnifies
+     * about the centre, so a LEFT-anchored box walks its left edge outward
+     * until the line's own bearing clears the frame. The cause was the anchor,
+     * not the push, and the caption is centred now: at this travel its edges
+     * reach 0.063 and 0.937, both comfortably inside. Slowing the camera as
+     * well would have been a second fix for a problem that already has one,
+     * paid for in the only movement these shots have.
+     */
     return { focalLengthMm: 60, scale: { from: 1.0, to: 1.0 + travel * 0.4, curve } };
   }
   if (visual.kind === 'mark') {
