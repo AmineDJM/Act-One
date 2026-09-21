@@ -63,7 +63,7 @@ import {
   runFfmpeg,
   soundForScenes,
 } from '@act-one/sound';
-import { NARRATOR, narrate, place, retimeForNarration, wordsPerMinute } from './narration.ts';
+import { NARRATOR, NARRATOR_NAME, alignToTypography, narrate, place, retimeForNarration, wordsLandAt, wordsPerMinute } from './narration.ts';
 
 type Graph = ReturnType<typeof SceneGraph.parse>;
 
@@ -1212,17 +1212,39 @@ const takes = await narrate({
   ...(process.env['ACT_ONE_VOICE_ENERGY'] ? { energy: process.env['ACT_ONE_VOICE_ENERGY'] as never } : {}),
   ...(process.env['ACT_ONE_VOICE_STABILITY'] ? { stability: process.env['ACT_ONE_VOICE_STABILITY'] as never } : {}),
 });
-const firstPass = place(takes, scenes);
+/*
+ * THE READ IS TIMED TO THE TYPOGRAPHY.
+ *
+ * Both critics — one watching the film, one hearing only the mix — scored
+ * `emphasisMatchesTypography` as the weakest thing about this narration, from
+ * different evidence and three points apart on everything else. That agreement
+ * is the strongest signal this film has produced, and it is not a casting
+ * fault: five voices, two models and the stability dial all left it where it
+ * was. Each line simply started at a delay somebody typed once, against a cut
+ * that has changed many times since.
+ *
+ * Now a line waits for its shot to finish saying its piece — the LAST word of
+ * a staggered line, not the first — and comes in a beat later.
+ */
+const shotWords = scenes.map((scene) => ({
+  id: scene.id,
+  durationSeconds: scene.durationSeconds,
+  wordsAtSeconds: wordsLandAt(scene.objects as never),
+}));
+const { takes: aligned, moved } = alignToTypography(takes, shotWords);
+
+const firstPass = place(aligned, scenes);
 const retimed = retimeForNarration(scenes, firstPass);
 for (const scene of scenes) {
   const held = retimed.durations.get(scene.id);
   if (held !== undefined) scene.durationSeconds = held;
 }
-const placed = place(takes, scenes);
+const placed = place(aligned, scenes);
 
 const seconds = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
 console.log(`=== the launch film: ${seconds.toFixed(1)}s, ${scenes.length} shots ===`);
-console.log(`  VOICE ${castVoice} via eleven_v3: ${placed.length} lines, ${wordsPerMinute(takes).toFixed(0)} wpm`);
+console.log(`  VOICE ${NARRATOR_NAME}: ${placed.length} lines, ${wordsPerMinute(takes).toFixed(0)} wpm`);
+if (moved.length) console.log(`  TIMED to the typography: ${moved.join(', ')}`);
 if (retimed.held.length) {
   console.log(`  HELD for the read (+${retimed.addedSeconds.toFixed(2)}s total): ${retimed.held.join(', ')}`);
 }

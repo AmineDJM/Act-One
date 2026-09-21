@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { ElevenLabsProvider } from '@act-one/providers';
 import { analyseVoice, runFfmpeg } from '@act-one/sound';
-import { place, retimeForNarration } from '@act-one/creative';
+import { alignToTypography, place, retimeForNarration, wordsLandAt } from '@act-one/creative';
 
 /**
  * The voice, and what it is for.
@@ -74,10 +74,18 @@ export const NARRATION: NarrationLine[] = [
  * the part of a read that cannot be fixed downstream — the others would have
  * had to be slowed, and a slowed read sounds slowed.
  */
-export const NARRATOR = 'cjVigY5qzO86Huf0OWal';
+export const NARRATOR = 'iP95p4xoKVk53GoZ742B';
 
 /** The same voice by the name a person would use when talking about it. */
-export const NARRATOR_NAME = 'Eric — Smooth, Trustworthy';
+/**
+ * Chris — Charming, Down-to-Earth.
+ *
+ * Both critics put this voice first, from different evidence: the one watching
+ * the film and the one hearing only the mix. They disagreed by three points on
+ * every criterion and still agreed on the order, which is a better reason to
+ * cast it than either score on its own.
+ */
+export const NARRATOR_NAME = 'Chris — Charming, Down-to-Earth';
 
 /**
  * The model that reads the film.
@@ -260,4 +268,4 @@ export function wordsPerMinute(takes: readonly NarrationTake[]): number {
 }
 
 
-export { place, retimeForNarration };
+export { alignToTypography, place, retimeForNarration, wordsLandAt };
