@@ -977,21 +977,26 @@ scenes.push(
          * Big enough to survive the camera.
          *
          * At 1.04 this had visible dark margins down both sides and across the
-         * top for most of the shot, which reads as a rectangle somebody failed
-         * to size rather than as a field. The camera on this shot pulls back to
-         * 0.86, and a pull-back shows MORE than the frame: everything has to be
-         * at least 1/0.86 = 1.17 wide to still bleed at the widest point. 1.4
-         * carries that with room, and nothing is lost by overshooting a field
-         * that has no edge worth seeing.
+         * top. Sizing it to 1.4 fixed those and left the FOURTH edge, which is
+         * the one this note exists for: the field is anchored to the bottom of
+         * the content, and a pull-back lifts that edge into frame. Measured on
+         * the render, the bottom strip went from 122 to 44 brightness across
+         * the shot — the dark creeping up underneath it.
+         *
+         * So size is not enough; the edges have to be OFF-FRAME. This camera
+         * reaches 0.86, at which the visible content runs from -0.081 to 1.081
+         * on both axes. A field 1.4 wide centred at 0.5 spans -0.2 to 1.2, and
+         * one 1.5 tall hung from y = 1.2 spans -0.3 to 1.2. Every edge clears,
+         * with room, at the widest the camera ever goes.
          */
         width: 1.4,
-        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.18, value: 1.4, curve: 'out_expo' }, { t: 1, value: 1.4 }], curve: 'out_expo' },
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.18, value: 1.5, curve: 'out_expo' }, { t: 1, value: 1.5 }], curve: 'out_expo' },
         fill: ACCENT, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
         role: 'support', enterAt: 0,
         reason: 'The brand colour arrives and takes the whole frame.',
         // Anchored at the bottom so growing height reads as rising, not as
         // opening out from the middle.
-        transform: Transform.parse({ x: 0.5, y: 1, z: 0.6, anchor: { x: 0.5, y: 1 } }),
+        transform: Transform.parse({ x: 0.5, y: 1.2, z: 0.6, anchor: { x: 0.5, y: 1 } }),
       } as SceneObject),
       line('l14_year', '2026', {
         align: 'center', maxWidth: 0.5, maxLines: 1, color: INK,
