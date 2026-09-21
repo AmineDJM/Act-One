@@ -346,3 +346,76 @@ From a native read of the narrated master, and more important than any metric:
 3. **UI cards clipped at frame edges** at 0:07, 0:17 and 0:31 — which our own
    inspector also reports, as `object_outside_frame` soft-fails on l3, l5, l9
    and l10.
+
+---
+
+## Loop: casting, and what auditioning against the picture found
+
+**The mechanism.** Voice was a constant in a provider file, so `VoiceDirection`
+— which already carries gender, age impression, register, energy, pace and an
+emotional arc — decided nothing. Casting now closes that chain: direction →
+target on measured scales → ranked candidates → a shortlist of *materially
+different* voices → performance settings in the vendor's units.
+
+The catalogue had to be built by listening, because the vendor publishes
+nothing about its 49 presets. 28 cards were collected before the account hit
+its daily task limit.
+
+**The finding that justifies the whole approach.** Auditioned against the
+picture rather than as a WAV, the voice currently in the film scores **3.88 out
+of 10**:
+
+| criterion | score |
+| --- | --- |
+| semanticAuthority | 3 |
+| naturalness | 3 |
+| emotionalFit | 4 |
+| rhythmAgainstEdit | 4 |
+| intelligibilityOverMusic | 6 |
+| pausesMatchEdit | 4 |
+| emphasisMatchesTypography | 4 |
+| soundsLikeAdvertising (0 is best) | 7 |
+
+> "The voiceover is aggressively robotic and completely undermines the modern
+> visual style. It lacks human nuance, pacing, and appropriate inflection,
+> resulting in a cheap, disjointed final product."
+
+**The catalogue said the opposite.** Judged as an isolated clip, this voice
+scored `soundsLikeTts: 1` — the most human in the catalogue. Judged against the
+cut it scores 3 for naturalness. Isolated-clip characterisation is useful for
+building a shortlist and is NOT predictive of a read, which is the entire
+argument for auditioning against picture.
+
+**My own error, and it is a directing error rather than a casting one.** The
+weakest moment is named precisely: at 32 seconds, *"the sudden burst of
+artificial enthusiasm feels entirely disconnected from the sleek, restrained
+visual aesthetic."* I directed `energy: high`, which drives style exaggeration
+to 0.45–0.5, because the REFERENCE read is high-energy at 160 wpm. But the
+reference's picture is fast, saturated and aggressive; ours is dark, editorial
+and restrained. I cast the voice for somebody else's film.
+
+Two corrections follow, and both need vendor quota that is currently exhausted:
+
+1. **Re-direct**: lower energy and style, raise intimacy. The film wants a
+   confiding read, not a pitch.
+2. **Re-cast**: the current voice scores 2/10 for intimacy — the lowest useful
+   value for a film that should feel close. `Grungle` (authority 9, intimacy 6,
+   energy 5, *"measured, confident, slightly gravelly, experienced"*) fits this
+   picture far better on the scales; `Chad` and `Billy` are the other two
+   materially different candidates.
+
+Nothing has been changed in the read yet, deliberately: the cached takes are
+keyed on the direction, so revising it invalidates all fourteen and the next
+render would fail on quota rather than produce a worse film.
+
+## Standing blockers
+
+1. **Runway daily task limit reached.** Blocks the four-voice audition (56
+   reads) and the re-read under a corrected direction. Resets on the vendor's
+   schedule. *User action: none required beyond waiting, unless the account's
+   daily limit can be raised.*
+2. **OpenAI critic returns 429 "no credits remaining"**, every attempt, for
+   several loops. Two-pass confirmation with a *second* model is an acceptance
+   criterion and cannot be met — Gemini agreeing with Gemini is one opinion
+   twice. *User action: top up the OpenAI account, or name another vision model
+   to use as the second critic.*

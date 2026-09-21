@@ -110,7 +110,18 @@ async function watch(voiceId: string, file: string): Promise<unknown> {
 if (!existsSync(CATALOGUE)) throw new Error(`No casting catalogue yet. Run: npm run cast:voices`);
 const cards: VoiceCard[] = JSON.parse(readFileSync(CATALOGUE, 'utf8')).voices;
 const target = castingTarget(DIRECTION as never);
-const picked = shortlist(cards, target, Number(process.env['ACT_ONE_SHORTLIST'] ?? 4));
+/*
+ * An explicit cast list overrides the shortlist.
+ *
+ * Two reasons. The vendor has a daily task limit and a four-voice audition is
+ * 56 reads, so when the quota is gone the pipeline still has to be runnable
+ * against a voice whose takes are already cached. And a director who has
+ * already heard the candidates should be able to name them.
+ */
+const named = (process.env['ACT_ONE_AUDITION_VOICES'] ?? '').split(',').map((v) => v.trim()).filter(Boolean);
+const picked = named.length
+  ? named.map((id) => cards.find((c) => c.voiceId === id) ?? ({ voiceId: id, texture: 'not in the catalogue' } as VoiceCard))
+  : shortlist(cards, target, Number(process.env['ACT_ONE_SHORTLIST'] ?? 4));
 
 console.log(`=== shortlist for "${DIRECTION.voiceProfile}" ===`);
 for (const card of picked) {

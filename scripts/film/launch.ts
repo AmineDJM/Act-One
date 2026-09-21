@@ -958,20 +958,43 @@ scenes.push(
     camera: camera({ scale: [1.06, 0.86], focal: 85, curve: 'linear' }),
     objects: [
       lamp('l14_light', { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.46 }, EMBER, 0.6),
+      /*
+       * THE COLOUR TAKES THE FRAME. This is the film's turn, and it was three
+       * consecutive still pictures of white type on near-black — the exact
+       * grammar a model watching this film called "generic dark-background SaaS
+       * tropes". The references punctuate with saturation: the strongest of them
+       * hard-cuts to a full orange field to land two words.
+       *
+       * It floods up rather than fades: a wipe is an EVENT, and this shot had no
+       * event in it. The year is knocked out of the field rather than drawn on
+       * it, which is why the outline and glow below are gone — an accent stroke
+       * on an accent field is invisible, and a hollow year was always the timid
+       * version of this idea.
+       */
+      ({
+        kind: 'shape', id: 'l14_field', shape: 'rect',
+        width: 1.04,
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.18, value: 1.04, curve: 'out_expo' }, { t: 1, value: 1.04 }], curve: 'out_expo' },
+        fill: ACCENT, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: 'support', enterAt: 0,
+        reason: 'The brand colour arrives and takes the whole frame.',
+        // Anchored at the bottom so growing height reads as rising, not as
+        // opening out from the middle.
+        transform: Transform.parse({ x: 0.5, y: 1, z: 0.6, anchor: { x: 0.5, y: 1 } }),
+      } as SceneObject),
       line('l14_year', '2026', {
-        align: 'center', maxWidth: 0.5, maxLines: 1, color: 'transparent',
-        treatment: {
-          gradient: null,
-          stroke: { color: ACCENT, widthPx: 2.5, hollow: true },
-          glow: { color: ACCENT, radiusPx: { from: 3, to: 36, curve: 'out_expo' }, strength: 1 },
-        },
+        align: 'center', maxWidth: 0.5, maxLines: 1, color: INK,
+        treatment: { gradient: null, stroke: null, glow: null },
       }, {
         x: 0.5, y: 0.46, anchor: { x: 0.5, y: 0.5 },
         scale: { from: 1.42, to: 1.62, curve: 'out_expo' },
         opacity: ARRIVES,
       }),
       line('l14_sub', 'It stops taking weeks.', {
-        token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 2, enterAt: 0.55,
+        // Ink on the field, not the muted token: 'onCanvas.muted' is resolved
+        // against the scene's BACKGROUND, which is still ink, so it would be
+        // picked for legibility against a field this shot no longer shows.
+        token: 'statement', align: 'center', color: EMBER, maxWidth: 0.44, maxLines: 2, enterAt: 0.55,
       }, { x: 0.5, y: 0.68, anchor: { x: 0.5, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
