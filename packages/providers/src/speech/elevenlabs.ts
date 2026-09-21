@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AppError, languageName, type VoiceDirection, type VoiceGender } from '@act-one/core';
 import { httpRequest } from '../http.ts';
+import { canAuthenticate } from '../managed-credentials.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import { estimateNarrationSeconds } from './openai.ts';
 import {
@@ -309,7 +310,22 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
   }
 
   isConfigured(): boolean {
-    return this.apiKey.length > 0;
+    /*
+     * An absent key in the environment does not mean an absent credential.
+     *
+     * This asked `this.apiKey.length > 0`, and under managed credentials that
+     * is always false: the secret is injected into the request by the egress
+     * proxy and never lands in `process.env`. So the provider reported
+     * "ElevenLabs API key not configured" while a perfectly good key was being
+     * attached to every call — and, worse, `call()` refused to even try. The
+     * one thing that check could not tell you was whether the credential
+     * works.
+     *
+     * `canAuthenticate` answers the real question: is there a key here, or is
+     * one being injected for us. Anything beyond that is the vendor's to say,
+     * and it says it in the response.
+     */
+    return canAuthenticate('elevenlabs', this.apiKey);
   }
 
   /** Reads the voice library: proves the key, and says how many voices it can choose from. */
