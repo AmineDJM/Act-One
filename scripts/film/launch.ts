@@ -978,9 +978,19 @@ scenes.push(
       {
         kind: 'clip', id: 'l13b_film', assetId: 'ast_output',
         crop: { x: 0, y: 0, width: 1, height: 1 },
-        // Wider than frame so the camera has somewhere to travel without
-        // finding an edge, the same reason the colour field is oversized.
-        width: 1.25, sourceInSeconds: 0.1, playbackRate: 0.9, generated: true,
+        /*
+         * 1.12, and no wider, because the footage came back at 1280x720 against
+         * a 1920x1080 film. Every extra tenth of width is more upscale on the
+         * one shot in the picture that is supposed to look photographed. The
+         * camera on this shot reaches 0.96, which shows 1.04 of content, so
+         * 1.12 already has travel room to spare — 1.25 was buying margin nobody
+         * needed at the cost of the thing the shot is for.
+         *
+         * Played straight from 0.3s: the light crossing the desk IS the shot,
+         * and the earlier window ended before the wood was fully lit, which
+         * threw away the resolution the whole four seconds builds to.
+         */
+        width: 1.12, sourceInSeconds: 0.3, playbackRate: 1, generated: true,
         role: 'payload',
         reason: 'The delivered film. Photographed rather than composed, which is what marks it as the output.',
         transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
