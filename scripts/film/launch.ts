@@ -294,14 +294,14 @@ const scenes: Graph[] = [
     },
     objects: [
       bloom('l3_bloom', { x: 0.5, y: 0.45 }, '#FFE8D8', 0.9),
-      chapterWord('l3_chapter', 'SIX WEEKS', '#E6E0D4'),
-      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.27, y: 0.4, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.30, 0.1, 'The brief, as one of too many pages.'),
-      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.63, y: 0.32, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.32, 0.45, 'The references, as another.'),
-      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.44, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.28, 0.8, 'The terms, as a third.'),
-      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.78, y: 0.72, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.26, 1.15, 'The schedule, as a fourth.'),
+      chapterWord('l3_chapter', 'SIX WEEKS', '#DCD3C4'),
+      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.26, y: 0.36, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.38, 0.1, 'The brief, as one of too many pages.'),
+      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.68, y: 0.34, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.40, 0.45, 'The references, as another.'),
+      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.42, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.36, 0.8, 'The terms, as a third.'),
+      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.76, y: 0.74, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.34, 1.15, 'The schedule, as a fourth.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
         token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 2.2,
-      }, { x: 0.1, y: 0.9, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.07, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [
       { at: 0.15, kind: 'ui_click', intensity: 0.3, causedBy: 'l3_c1', reason: 'Each page sets down.' },
@@ -373,7 +373,7 @@ const step = (
       x: { from: 0.008, to: -0.008, curve: 'in_out_cubic' },
     },
     objects: [
-      bloom(`${id}_bloom`, { x: 0.72, y: 0.4 }, '#FFEADC', 0.95),
+      bloom(`${id}_bloom`, { x: 0.7, y: 0.42 }, '#FFEADC', 0.95),
       line(`${id}_index`, index, {
         token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
       }, { x: 0.09, y: 0.26, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
@@ -387,12 +387,12 @@ const step = (
         * given less width than it needs does not get smaller, it gets taller.
         */
       line(`${id}_title`, title, {
-        maxWidth: 0.38, maxLines: 2,
-      }, { x: 0.09, y: 0.4, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } }),
+        maxWidth: 0.3, maxLines: 3,
+      }, { x: 0.07, y: 0.4, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } }),
       line(`${id}_body`, body, {
-        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.32, maxLines: 3, enterAt: 0.55,
-      }, { x: 0.09, y: 0.62, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
-      card(`${id}_card`, asset, crop, { x: 0.7, y: 0.5, z: -0.08 }, { rx: 2, ry: -7, rz: 1 }, 0.46, 0.3,
+        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.26, maxLines: 4, enterAt: 0.55,
+      }, { x: 0.07, y: 0.66, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      card(`${id}_card`, asset, crop, { x: 0.68, y: 0.5, z: -0.08 }, { rx: 2, ry: -6, rz: 1 }, 0.56, 0.3,
         'The real interface at this step, held where a hand would hold it.'),
     ],
     audio: [{ at: 0.12, kind: 'ui_click', intensity: 0.35, causedBy: `${id}_card`, reason: 'The step lands.' }],

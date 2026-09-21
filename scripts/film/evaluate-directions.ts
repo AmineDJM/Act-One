@@ -43,6 +43,7 @@ const FFPROBE = 'node_modules/@remotion/compositor-linux-x64-gnu/ffprobe';
 const CONTEXT = { organizationId: 'org_quality_sprint' };
 
 const FILMS = [
+  { slug: 'launch', file: '.renders/launch.mp4' },
   { slug: 'final', file: '.renders/final.mp4' },
   { slug: 'a-paper', file: '.renders/dir-a-paper.mp4' },
   { slug: 'b-depth', file: '.renders/dir-b-depth.mp4' },
