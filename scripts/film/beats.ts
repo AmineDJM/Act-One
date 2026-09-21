@@ -277,38 +277,33 @@ export const VISUALS: Record<string, BeatVisual> = {
   // The receipt stays on screen: these three directions are what that pinned
   // phrase turned into, and the film has to let the viewer see the link.
   /*
-   * Three directions, named and set three different ways.
+   * THREE DIRECTIONS, SHOWN ONE AT A TIME.
    *
-   * These are the real three this system developed while choosing the look of
-   * this very film — paper, depth, field — and each label is set the way its
-   * direction sets things: one quiet and tracked, one large and declarative,
-   * one between. Three colours differ in hue and nothing else; three
-   * typographic registers differ in the thing a creative direction actually
-   * is.
+   * Five directors of five marked this beat critical after two attempts to fix
+   * it with typography: "claim without visual proof", "a total failure of
+   * visual consequence". Three colour columns did not prove three creative
+   * directions, and naming the directions inside the columns made it worse —
+   * "Paper" and "Depth" are OUR words, and they mean nothing to somebody
+   * watching a film. The room did not want a label for the claim; it wanted
+   * to see the claim.
+   *
+   * Three renders side by side are illegible, measured twice. Three renders in
+   * SEQUENCE are full frame and legible, and the count is carried by the
+   * rhythm of three hard cuts rather than by a word. The beat is 2.7 seconds,
+   * which is room for exactly three and nothing else.
    */
   b7: {
-    kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
-    labels: [
-      // Three words, three registers, each filling its own column. The
-      // difference between them is the thing a creative direction actually is.
-      { text: 'Paper', token: 'mono', scale: 2.4 },
-      { text: 'Depth', token: 'display', scale: 1.15 },
-      { text: 'Field', token: 'statement', scale: 1.6 },
-    ],
+    kind: 'films',
+    assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'],
+    colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
+    sequence: true,
     /*
-     * THE SCREEN SAYS NOTHING HERE, and that is the point.
-     *
-     * The voice says "Not one safe idea. Three." and the picture answers it
-     * with three visibly different typographic worlds. Setting the word
-     * "Three." over them as well would be the film reading its own soundtrack
-     * aloud — the exact duplication three directors called critical at the top
-     * of the film. The count is the picture; the line is the voice.
+     * The screen says nothing: the voice says "Not one safe idea. Three." and
+     * the picture answers with three films rather than with the word.
      */
     editorial: '',
     receipt: RECEIPT,
   },
-  // The three real renders this system made, at the beat that says they are
-  // rendered and scored. The claim becomes literal instead of illustrated.
   /*
    * The three real renders, now SCORED rather than merely counted.
    *
@@ -323,18 +318,21 @@ export const VISUALS: Record<string, BeatVisual> = {
    * its work first — not that the work is bad.
    */
   b8: {
-    kind: 'films', assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'],
+    kind: 'films',
+    assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'],
     colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
     verdicts: ['pass', 'fail', 'pass'],
     /*
-     * One shown, three scored. Lane 2 is the field direction, and it is the
-     * one worth inspecting: a craft reading called lane 0's nested cards
-     * "illegible grey text on white, lacking contrast", which is true of that
-     * render rather than of the framing around it. No amount of composition
-     * rescues a weak source — this one sets one bold word on near-black, which
-     * survives being looked at.
+     * THE VERDICT, with no film behind it.
+     *
+     * The beat before this one shows all three renders; showing another here
+     * made the two beats 86% the same picture, and the inspector said so the
+     * moment both carried one. The progression that earns two beats is three
+     * films and then the scoring of them — rendered and watched, then scored.
+     * Three marks down the middle of the frame, the rejected one twice the
+     * width of the others, is that second half, and it needs no picture.
      */
-    focus: 2,
+    verdictOnly: true,
     receipt: RECEIPT,
   },
   /*

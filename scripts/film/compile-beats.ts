@@ -85,6 +85,35 @@ export type BeatVisual = {
        * one you can see.
        */
       focus?: number;
+      /**
+       * Show them ONE AT A TIME, full frame, in the time the beat has.
+       *
+       * Five directors of five marked this beat critical — "claim without
+       * visual proof", "a total failure of visual consequence" — after two
+       * attempts to fix it with type. Three colour columns did not prove three
+       * creative directions; three columns with the directions NAMED in them
+       * did not either, and made it worse, because "Paper" and "Depth" are our
+       * words and mean nothing to somebody watching. The room does not want a
+       * label for the claim, it wants to see the claim.
+       *
+       * Three renders side by side are illegible — that is the lesson from the
+       * beat after this one, measured twice. Three renders in SEQUENCE are
+       * full-frame and legible, and the count is carried by the rhythm of
+       * three cuts rather than by a word. A 2.7-second beat has room for
+       * exactly this and nothing else.
+       */
+      sequence?: boolean;
+      /**
+       * The scoreboard alone, with no render behind it.
+       *
+       * Once the beat before this one shows all three films, showing another
+       * film here is the same picture twice — the inspector said so the moment
+       * both beats carried one. The progression that earns its two beats is
+       * THREE FILMS, then THE VERDICT on them: rendered and watched, then
+       * scored. This beat is the second half of that and needs no picture of
+       * its own.
+       */
+      verdictOnly?: boolean;
     }
   /**
    * THE AUDIT: a real page with the system's own verbs performed on it.
@@ -1177,6 +1206,101 @@ function visualObjects(
      */
     const available = visual.assetIds.filter((id) => options.assets[id]);
     const objects: SceneObject[] = [];
+
+    if (visual.verdictOnly) {
+      const verdicts = visual.verdicts ?? [];
+      const count = Math.max(available.length, verdicts.length) || 3;
+      for (let i = 0; i < count; i += 1) {
+        const failed = (verdicts[i] ?? 'pass') === 'fail';
+        objects.push({
+          kind: 'shape', id: `${beat.id}_verdict_${i}`, shape: 'rect',
+          width: { keyframes: [
+            { t: 0, value: 0 },
+            { t: 0.1 + i * 0.13, value: 0, curve: 'linear' },
+            { t: 0.22 + i * 0.13, value: failed ? 0.3 : 0.14, curve: 'out_quint' },
+            { t: 1, value: failed ? 0.3 : 0.14 },
+          ], curve: 'out_quint' },
+          height: failed ? 0.012 : 0.006,
+          fill: failed ? palette.accent : palette.paper,
+          stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+          role: failed ? 'payload' : 'structure', enterAt: 0,
+          reason: failed
+            ? 'The direction that did not pass, struck at the width of a rejection.'
+            : 'A direction that passed its checks.',
+          // A column, not a row: three verdicts read down the frame the way a
+          // report does, and the struck one is twice as wide as the others.
+          transform: Transform.parse({
+            x: 0.5, y: 0.38 + i * 0.12, z: 0.2,
+            anchor: { x: 0.5, y: 0.5 }, opacity: failed ? 1 : 0.8,
+          }),
+        } as SceneObject);
+        audio.push({
+          at: beat.durationSeconds * (0.22 + i * 0.13),
+          kind: failed ? 'impact' : 'ui_click',
+          intensity: failed ? 0.5 : 0.26,
+          causedBy: `${beat.id}_verdict_${i}`,
+          reason: failed ? 'The system fails its own work before anybody else sees it.' : 'A direction is scored.',
+        });
+      }
+      return objects;
+    }
+
+    if (visual.sequence && available.length > 0) {
+      /*
+       * One cut per film, evenly across the beat. Each is full frame, so each
+       * is legible; each sits on its own direction's colour so the three are
+       * distinguishable at the edges even while they are cutting.
+       */
+      const slice = 1 / available.length;
+      available.forEach((assetId, i) => {
+        const from = i * slice;
+        const to = (i + 1) * slice;
+        // A hard cut, not a fade: opacity is 1 across the slot and 0 outside
+        // it, with a single frame of overlap so the frame is never empty.
+        const visible = {
+          keyframes: [
+            { t: 0, value: i === 0 ? 1 : 0 },
+            ...(i === 0 ? [] : [{ t: Math.max(0, from - 0.004), value: 0, curve: 'linear' as const }]),
+            { t: from, value: 1, curve: 'linear' as const },
+            { t: Math.min(1, to - 0.004), value: 1, curve: 'linear' as const },
+            ...(i === available.length - 1 ? [] : [{ t: Math.min(1, to), value: 0, curve: 'linear' as const }]),
+            { t: 1, value: i === available.length - 1 ? 1 : 0 },
+          ],
+          curve: 'linear' as const,
+        };
+        objects.push({
+          kind: 'shape', id: `${beat.id}_seqfield_${i}`, shape: 'rect',
+          width: 1.5, height: 1.8,
+          fill: visual.colours[i] ?? palette.ember,
+          stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+          role: 'structure', enterAt: 0,
+          reason: `Direction ${i + 1}, as its own colour behind its own film.`,
+          transform: Transform.parse({ x: 0.5, y: 0.5, z: 0.7, anchor: { x: 0.5, y: 0.5 }, opacity: visible }),
+        } as SceneObject);
+        objects.push({
+          kind: 'clip', id: `${beat.id}_seqfilm_${i}`, assetId,
+          crop: { x: 0, y: 0, width: 1, height: 1 },
+          /*
+           * FULL BLEED. Inset on its colour, each render read as a screenshot
+           * laid on a coloured card rather than as a film. The colour survives
+           * as the single-frame flash between cuts, which is punctuation; a
+           * border around the evidence is just a frame nobody asked for.
+           */
+          width: 1.02, sourceInSeconds: 1.4 + i * 1.1, playbackRate: 1, generated: true,
+          role: i === 0 ? 'payload' : 'support', enterAt: 0,
+          reason: 'One of the three directions, whole and legible.',
+          transform: Transform.parse({ x: 0.5, y: 0.5, z: 0.2, anchor: { x: 0.5, y: 0.5 }, opacity: visible }),
+        } as SceneObject);
+        audio.push({
+          at: beat.durationSeconds * from,
+          kind: i === 0 ? 'ui_click' : 'impact',
+          intensity: i === 0 ? 0.3 : 0.4,
+          causedBy: `${beat.id}_seqfilm_${i}`,
+          reason: 'A direction arrives. Three cuts are the three.',
+        });
+      });
+      return objects;
+    }
 
     if (visual.focus !== undefined && available[visual.focus]) {
       const assetId = available[visual.focus]!;
