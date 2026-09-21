@@ -85,6 +85,18 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    */
   const composition = compositionFor(beat, index, visual);
 
+  /*
+   * The accent is not always the loudest thing available.
+   *
+   * On ink it is; on the amber field it is orange on orange, and the word the
+   * whole beat turns on goes quiet exactly when the frame gets loud. So the
+   * emphasis takes whichever of ink or accent stands furthest from what is
+   * behind it, which on a light field is ink.
+   */
+  const fieldColour = visual.kind === 'statement' ? visual.field : null;
+  const heroColour = fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
+  const restColour = fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
+
   beat.phrases.forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
     const place = {
@@ -95,7 +107,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     objects.push({
       kind: 'text', id: `${beat.id}_say_${i}`, content: phrase.text,
       token: hero ? 'display' : 'statement',
-      color: hero ? palette.accent : (onPaper ? palette.ink : palette.paper),
+      color: hero ? heroColour : restColour,
       align: 'left', maxWidth: hero ? 0.62 : 0.52, maxLines: 2,
       // Heard, not read: this text is the reading it was generated from.
       spoken: true,
@@ -188,6 +200,12 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
   }
   if (visual.kind === 'mark') {
     return { x: 0.09, top: 0.44 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0 };
+  }
+  if (visual.kind === 'fields') {
+    // Centred in the FIRST field rather than left-margined, which put the line
+    // across the seam between two colours — the one place on that frame where
+    // no text can be legible.
+    return { x: 0.5 / visual.colours.length, top: 0.5 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0.5 };
   }
   // A typographic beat gets the frame. Alternating the margin stops a run of
   // them reading as one long slide.
@@ -299,4 +317,11 @@ function visualObjects(
   }
 
   return [];
+}
+
+/** Rough perceived brightness of a hex colour, 0 to 1. */
+function luminance(hex: string): number {
+  const value = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16) / 255);
+  return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
 }
