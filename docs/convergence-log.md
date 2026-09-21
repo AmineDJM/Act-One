@@ -244,3 +244,105 @@ on one another, sharing a shallow angle the way a real stack does.
 **My own error in the same pass:** the design-printout run rendered at preview
 quality and overwrote the master, so pass B read a 960x540 file. Re-rendered
 at 1920x1080.
+
+---
+
+## Loop: the voice, and what the film sounds like
+
+**The change.** The film had no narration because the ElevenLabs credential is
+rejected. It is reachable through Runway, which has a working one, so the
+script is read by `eleven_v3` and the mix ducks the bed under it with the
+sidechain that was already in the graph.
+
+The blocker was never the credential. It was three wrong guesses about the
+request shape, all of which the vendor's published OpenAPI document settled in
+one request after twenty-eight probes had found nothing:
+
+| sent | wanted |
+| --- | --- |
+| `voice: { id }` | `voice: { type: 'runway-preset', presetId }` |
+| `promptInstruction: "<brief>"` | no such field — `speed`, `stability`, `style` |
+| any name | one of 49 presets, listed only inside a 400 |
+
+The second mattered most. The performance brief this system writes was being
+dropped silently on every read, so the engine looked undirectable. Measured
+after the fix: the same line runs 3.55s undirected and 2.77s at speed 1.06.
+
+**What it did to the numbers.** Every audio metric moved inside the benchmark
+band, and none was inside it before:
+
+| metric | before | after | benchmark band |
+| --- | --- | --- | --- |
+| audio.meanRms | 0.19 | **0.294** | 0.192 – 0.426 |
+| audio.accents | 66 | **110** | 44 – 168 |
+| audio.dynamicRange | 0.65 | **0.556** | 0.277 – 0.804 |
+| audio.silentShare | — | **0.180** | 0.027 – 0.222 |
+
+The read measures 158 wpm against the reference's ~160. The narrator was
+auditioned rather than picked: six preset voices read the opening line, and the
+other five came back between 208 and 238 wpm.
+
+**What the references actually do with sound**, now that all three have been
+read rather than assumed. They do not agree about narration — target1 is
+carried by a French voice for its whole 87s, target2 has none at all, target3
+has 8.5s of internal monologue and then music. They agree completely about
+effects: **every single one is attached to a visible event.** Coins clinking on
+falling coins, fire sizzling on burning text, a toggle click on a toggle, ticking
+on a rolling counter, a chime on a completed scan. Ours are attached to cuts and
+entrances, which is the same idea held more loosely.
+
+## Loop: nine of fifteen shots were frozen pictures
+
+**The measurement that found it.** Whole-film `staticShare` sat at 0.303 against
+a 0.132–0.254 band and would not move. Measuring it per shot showed it was not
+spread across the film at all:
+
+| frozen (>85% of frames static) | moving |
+| --- | --- |
+| l1 91.6%, l2 99.3%, l4 99.0%, l7 87.0%, l11 83.9%, l12 89.5%, l13 99.2%, l14 98.9%, l15 99.1% | l3 49.7%, l5 29.9%, l6 43.1%, l8 55.5%, l9 27.1%, l10 10.9% |
+
+The film opened frozen and ended frozen, on three consecutive still pictures.
+
+**The root cause, which is one line of the camera helper.** Every frozen shot
+used `curve: 'out_expo'`. That curve spends about 95% of its travel in the first
+fifth of the shot and then holds — so the camera arrives and the picture stops.
+Every moving shot used a curve that travels the whole span. The second cause sat
+on top of it: the amplitudes were small enough that even the moving part fell
+below the threshold at which anything reads as motion, and every camera scale in
+the film sat between 1.0 and 1.34, which is the `scaleVariation` gap in the same
+numbers.
+
+**What the guard caught.** Widening the scale range refused to render: four
+shots' text boxes went off-frame, then two more from the *pan* rather than the
+zoom, then l7 whose line is anchored left at x=0.09, so scaling about the centre
+walks its left edge outward and a negative camera x finishes the job. A camera
+scale magnifies the type with the picture. So the scale arc now reaches for its
+range by pulling BACK — 0.86 at the widest — where a line only gets safer.
+
+**Not yet verified.** The previous claim of this kind was wrong: I predicted an
+entrance fix would move `staticShare` and it did not move at all, while
+`scaleVariation` regressed. The render measuring this one is still running, and
+nothing here is settled until it lands.
+
+## Standing blocker
+
+The independent OpenAI critic has returned HTTP 429 "no credits remaining" on
+every attempt for several loops. Two-pass confirmation with a *second* model is
+part of the acceptance criteria and cannot currently be met — Gemini agreeing
+with Gemini is one opinion twice. **User action required: top up the OpenAI
+account, or name another vision model to use as the second critic.**
+
+## What the film itself is still doing wrong
+
+From a native read of the narrated master, and more important than any metric:
+
+1. **It never shows its own output.** *"Viewer never sees the actual output (the
+   generated film), only the ordering interface."* A film about making films
+   that only ever shows the order form. Hero moments: 0.
+2. **The named failure mode, named back to us.** *"Visuals lean heavily on
+   generic dark-background SaaS tropes (floating UI, centered text), saved
+   primarily by pacing and audio sync."* That is close to verbatim the grammar
+   the brief said not to collapse into.
+3. **UI cards clipped at frame edges** at 0:07, 0:17 and 0:31 — which our own
+   inspector also reports, as `object_outside_frame` soft-fails on l3, l5, l9
+   and l10.

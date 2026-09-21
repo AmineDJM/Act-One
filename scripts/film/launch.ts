@@ -376,7 +376,7 @@ const scenes: Graph[] = [
     id: 'l1', durationSeconds: 3.6,
     intent: 'HOOK: a real room at the end of a long day. The camera is already moving when the film starts.',
     background: INK,
-    camera: camera({ scale: [1.22, 1.0], focal: 40, curve: 'out_expo' }),
+    camera: camera({ scale: [0.92, 1.12], x: [0.05, -0.05], focal: 40, curve: 'linear' }),
     objects: [
       {
         kind: 'clip', id: 'l1_room', assetId: 'ast_before',
@@ -399,7 +399,7 @@ const scenes: Graph[] = [
     id: 'l2', durationSeconds: 4.8,
     intent: 'PAIN NAMED: the sentence arrives word by word while the camera drifts across it.',
     background: INK,
-    camera: camera({ x: [0.07, -0.07], scale: [1.14, 1.0], focal: 55 }),
+    camera: camera({ x: [0.06, -0.06], scale: [1.00, 1.16], focal: 55, curve: 'linear' }),
     objects: [
       lamp('l2_light', { x: 0.18, y: 0.3 }, { x: 0.42, y: 0.5 }, EMBER, 0.85),
       line('l2_line', 'Your problem is not the film.', {
@@ -429,7 +429,7 @@ const scenes: Graph[] = [
     id: 'l3', durationSeconds: 5.2,
     intent: 'PAIN SHOWN: four pages fly in from off-frame while the camera cranes across the desk.',
     background: PAPER,
-    camera: camera({ x: [0.06, -0.05], y: [-0.03, 0.03], scale: [1.3, 1.06], focal: [95, 82], dolly: [0, 0.3] }),
+    camera: camera({ x: [0.09, -0.08], y: [-0.05, 0.05], scale: [1.26, 0.98], focal: [95, 82], dolly: [0, 0.3] }),
     objects: [
       bloom('l3_bloom', { x: 0.5, y: 0.45 }, '#FFE8D8', 0.9),
       chapterWord('l3_chapter', 'SIX WEEKS', '#DCD3C4'),
@@ -474,7 +474,7 @@ const scenes: Graph[] = [
     id: 'l4', durationSeconds: 3.4,
     intent: 'BRAND: the mark arrives lit, in the dark, alone. The shortest shot so far, because it is the most certain.',
     background: INK,
-    camera: camera({ scale: [1.3, 1.0], focal: 70, curve: 'out_expo' }),
+    camera: camera({ scale: [1.46, 1.12], y: [0.03, -0.03], focal: 70, curve: 'linear' }),
     objects: [
       lamp('l4_light', { x: 0.5, y: 0.56 }, { x: 0.5, y: 0.46 }, EMBER, 0.72),
       line('l4_mark', 'Act One', {
@@ -740,7 +740,7 @@ scenes.push(
     id: 'l7', durationSeconds: 2.6,
     intent: 'THREE DIRECTIONS: three colour fields arrive side by side, and the line names them.',
     background: PAPER,
-    camera: camera({ scale: [1.1, 1.0], x: [0.04, -0.02], focal: 60, curve: 'out_expo' }),
+    camera: camera({ scale: [1.00, 1.16], x: [0.07, 0.005], focal: 60, curve: 'linear' }),
     objects: [
       ...([
         ['#1F6F4A', 0.1667, 0.0],
@@ -869,7 +869,7 @@ scenes.push(
     id: 'l11', durationSeconds: 5.2,
     intent: 'THE MEASURE: thirty days drawn across the page, then gathered into one afternoon.',
     background: PAPER,
-    camera: camera({ x: [-0.06, 0.06], scale: [1.0, 1.1], focal: 70, curve: 'in_out_quart' }),
+    camera: camera({ x: [-0.11, 0.11], scale: [0.88, 1.08], focal: 70, curve: 'linear' }),
     objects: [
       bloom('l11_bloom', { x: 0.4, y: 0.5 }, '#FFEADC', 0.95),
       ...Array.from({ length: TICKS }, (_, i) => tick(i, false)),
@@ -902,7 +902,7 @@ scenes.push(
     id: 'l12', durationSeconds: 3.2,
     intent: 'THE TURN: the same marks, gathered, and the line finally agrees with the picture.',
     background: PAPER,
-    camera: camera({ scale: [1.1, 1.18], x: [0.06, 0.02], focal: 70 }),
+    camera: camera({ scale: [0.94, 1.14], x: [0.10, -0.04], focal: 70, curve: 'linear' }),
     objects: [
       bloom('l12_bloom', { x: 0.26, y: 0.52 }, '#FFE2CE', 0.85),
       measureRule(true),
@@ -928,7 +928,7 @@ scenes.push(
     id: 'l13', durationSeconds: 4.4,
     intent: 'BENEFIT: the number, filled with light, arriving from the left as the camera pulls back.',
     background: INK,
-    camera: camera({ x: [-0.06, 0.03], scale: [1.26, 1.0], focal: 60, curve: 'out_expo' }),
+    camera: camera({ x: [-0.10, 0.06], scale: [1.10, 0.88], focal: 60, curve: 'linear' }),
     objects: [
       lamp('l13_light', { x: 0.24, y: 0.6 }, { x: 0.44, y: 0.46 }, EMBER, 0.82),
       line('l13_stat', '6 weeks to 1 day', {
@@ -955,7 +955,7 @@ scenes.push(
     id: 'l14', durationSeconds: 3.2,
     intent: 'THE YEAR: a hollow outline that blooms. Short, because it is a punctuation mark.',
     background: INK,
-    camera: camera({ scale: [1.34, 1.02], focal: 85, curve: 'out_expo' }),
+    camera: camera({ scale: [1.06, 0.86], focal: 85, curve: 'linear' }),
     objects: [
       lamp('l14_light', { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.46 }, EMBER, 0.6),
       line('l14_year', '2026', {
@@ -986,7 +986,7 @@ scenes.push(
     id: 'l15', durationSeconds: 3.8,
     intent: 'CALL: the mark, the invitation, and the rule the film has used throughout, closing it.',
     background: INK,
-    camera: camera({ x: [0.05, 0], scale: [1.08, 1.0], focal: 85, curve: 'out_expo' }),
+    camera: camera({ x: [0.07, -0.05], scale: [0.90, 1.06], focal: 85, curve: 'linear' }),
     objects: [
       lamp('l15_light', { x: 0.24, y: 0.52 }, { x: 0.3, y: 0.5 }, EMBER, 0.75),
       line('l15_mark', 'Act One', {
