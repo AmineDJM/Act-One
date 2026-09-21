@@ -13,7 +13,7 @@
  * present.
  */
 import { SceneGraph, Transform, type SceneObject } from '@act-one/core';
-import type { TimedBeat } from '@act-one/creative';
+import { performanceFor, type TimedBeat } from '@act-one/creative';
 
 export type Palette = {
   ink: string;
@@ -147,7 +147,23 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
   // --- the light every frame stands on -------------------------------------
   objects.push({
     kind: 'gradient', id: `${beat.id}_light`, shape: 'radial',
-    from: onPaper ? '#FFEADC' : palette.ember, to: background,
+    /*
+     * NEUTRAL, NOT BROWN.
+     *
+     * This was the ember — a warm near-black — and two separate readings went
+     * for it in the same words: the orange type "vibrates against the dark
+     * reddish-brown vignette", and then the field itself was the worst moment
+     * in the film, "murky", "muddy", "entirely devoid of art direction", with
+     * the instruction to "replace all muddy gradient backgrounds with absolute
+     * black to force stark, decisive typographic contrast".
+     *
+     * A warm glow behind cold white type is the muddiness: neither colour is
+     * doing anything and together they grey each other out. A neutral lift off
+     * black gives the frame depth without giving it a hue, and it is what lets
+     * the accent mean something when it does arrive — on a field, a strike or
+     * a rejected lane, and nowhere else.
+     */
+    from: onPaper ? '#FFEADC' : '#15171E', to: background,
     centre: { x: { from: 0.42, to: 0.58, curve: 'in_out_cubic' }, y: 0.5 },
     radius: 0.9, role: 'atmosphere',
     reason: 'The source the frame is lit by. Nothing here sits on a flat field.',
@@ -194,7 +210,31 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * emphasis lands. Paper reads on all three.
    */
   const onPanels = visual.kind === 'films' || visual.kind === 'fields' || visual.kind === 'product' || visual.kind === 'audit';
-  const heroColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
+  /*
+   * THE HERO PHRASE IS NOT ORANGE, and it should never have been.
+   *
+   * Three sources, independently. The art director said it in the creative
+   * room and it was never implemented: "no orange emphasis words in running
+   * sentences — accent is reserved for evidence marks and the split, not
+   * rhetoric." A craft reading said the same from the other end: "vary
+   * typographic scale and weight to emphasise key phrases, rather than just
+   * changing their text colour to orange." And then it became a legible
+   * defect rather than a preference — "the bright orange text 'Only the
+   * calendar.' vibrates uncomfortably and lacks sufficient contrast against
+   * the dark reddish-brown vignette", which is exactly what a saturated orange
+   * does over an ember glow.
+   *
+   * So the emphasis is carried by what it always should have been: size,
+   * weight and the beat it lands on. The display token is two modular steps
+   * above the statement token and a heavier cut of the same family, the box
+   * settles as it arrives, and the words stagger in. That is more emphasis
+   * than a colour change, not less.
+   *
+   * The accent now appears only where something HAPPENS: the strike on a page,
+   * the field that takes the frame on the turn, the mark on a rejected lane.
+   * Spending it on every stressed phrase is what made it ordinary.
+   */
+  const heroColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.paper;
   const restColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
 
   /*
@@ -303,7 +343,14 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
        * at 0.05s a five-word line completes in a fifth of a second, which is
        * an arrival, not a performance.
        */
-      staggerBy: 'word', staggerSeconds: hero ? 0.05 : 0.032,
+      /*
+       * And the words assemble at the beat's own speed. A confided line puts
+       * them up one at a time; a pressed one lands them almost together. This
+       * is the same number that set the camera's travel and the engine's pace,
+       * so the three dimensions are not three opinions about the same beat.
+       */
+      staggerBy: 'word',
+      staggerSeconds: performanceFor(beat.intent).staggerSeconds * (hero ? 1 : 0.7),
       role: hero ? 'payload' : 'support',
       enterAt: phrase.atSeconds,
       exitAt,
@@ -494,7 +541,15 @@ function cameraFor(beat: TimedBeat, visual: BeatVisual): Record<string, unknown>
    * variable duration is what makes some shots feel hurried and others dead,
    * and beat lengths now vary with the reading rather than being chosen.
    */
-  const travel = Math.min(0.3, 0.05 * beat.durationSeconds);
+  /*
+   * THE CAMERA ANSWERS TO THE SAME INTENT AS THE VOICE.
+   *
+   * A line that is confided over a frame that travels like any other line is a
+   * performance with nothing behind it. The beat's register scales the travel:
+   * a confided beat barely moves, a pressed one moves half again as far, and
+   * the turn slows down because the voice does.
+   */
+  const travel = Math.min(0.3, 0.05 * beat.durationSeconds) * performanceFor(beat.intent).cameraEnergy;
   /*
    * NOT LINEAR, which every camera move in this film was.
    *

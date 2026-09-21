@@ -23,6 +23,8 @@ import type { SpokenWord } from './spoken-word.ts';
  * is allowed — a film needs moments that are only picture — but it has to say
  * why it exists, and `reason` is not optional anywhere.
  */
+import type { BeatIntent } from './intent.ts';
+
 export type AvBeat = {
   id: string;
   /** The idea, spoken. Empty for a beat that is deliberately wordless. */
@@ -41,6 +43,15 @@ export type AvBeat = {
   tailSeconds?: number;
   /** Held before the first word, when the picture needs to arrive first. */
   leadSeconds?: number;
+  /**
+   * What this beat is DOING, which decides how it is read AND how it moves.
+   *
+   * Not a voice setting. A film where the narrator leans in and the picture
+   * does not is worse than one where neither does, because the performance
+   * then has nothing to be a performance of. One intent reaches the engine,
+   * the camera and the typography, so all three mean the same thing.
+   */
+  intent?: BeatIntent;
 };
 
 /** A beat once the voice has been read and measured. */

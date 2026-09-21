@@ -15,76 +15,118 @@ import type { BeatVisual } from './compile-beats.ts';
  * attached. Every beat carries a `reason`, including the wordless ones, so
  * there is no visual event in this film without a narrative cause.
  */
+/*
+ * BREATH IS WRITTEN INTO THE SCRIPT, because the engine will not invent it.
+ *
+ * "Lacks human breath" is the note every craft reading has landed on, and no
+ * voice setting produces it: stability and expressiveness change how a line is
+ * coloured, not where the narrator stops to think. An ellipsis does — the
+ * engine reads it as a real pause, and on v3 it is converted to an explicit
+ * one.
+ *
+ * Placed where a person would actually stop, not evenly: after "a film" in the
+ * hook, because that is the thought arriving; before "Six weeks", because a
+ * number lands harder after a gap; nowhere in b4 or b11, which are the two
+ * beats that are meant to be flat and certain.
+ *
+ * The subtitles do not need updating and could not drift if they did: they are
+ * generated from the word timings of the performance itself, so a line that is
+ * read with a pause is captioned with that pause already in it.
+ */
 export const BEATS: AvBeat[] = [
   {
-    id: 'b1', line: 'Every company has a film it has not made yet.',
+    id: 'b1', line: 'Every company has a film... it has not made yet.',
     emphasis: 'not made yet.',
+    // The hook is told to one person, not announced. It is the quietest thing in the film and it has to earn the next forty seconds.
+    intent: 'confide',
     reason: 'HOOK: name the thing the viewer already knows about themselves.',
     leadSeconds: 0.4, tailSeconds: 0.5,
   },
   {
-    id: 'b2', line: 'You know what it should say. You have said it a hundred times.',
+    id: 'b2', line: 'You know what it should say. You have said it... a hundred times.',
     emphasis: 'a hundred times.',
+    // Still close: this is the viewer being recognised, not informed.
+    intent: 'confide',
     reason: 'RECOGNITION: the idea is not the missing part, so the film cannot be about having ideas.',
     tailSeconds: 0.4,
   },
   {
-    id: 'b3', line: 'Then it becomes a project. Six weeks before a single frame exists.',
+    id: 'b3', line: 'Then it becomes a project... Six weeks before a single frame exists.',
     emphasis: 'Six weeks',
+    // The cost, said plainly. A number oversold is a number disbelieved.
+    intent: 'state',
     reason: 'THE COST, named. This is the number the whole film argues with.',
     tailSeconds: 0.5,
   },
   {
     id: 'b4', line: 'This is Act One.',
     emphasis: 'Act One.',
+    // The film naming itself. Flat and certain on purpose — this is where monotone is the RIGHT choice.
+    intent: 'land',
     reason: 'BRAND: the shortest beat so far, because it is the most certain.',
     tailSeconds: 0.6,
   },
   {
     id: 'b5', line: 'No brief. No kickoff call.',
     emphasis: 'No brief.',
+    // The mechanism starts. The film gets faster here and stays faster for the middle.
+    intent: 'press',
     reason: 'STEP ONE, by what it removes rather than what it adds.',
     tailSeconds: 0.3,
   },
   {
     id: 'b6', line: 'It opens your site like a customer would, and takes what is actually there.',
     emphasis: 'actually there.',
+    // Still pressing: what it does, in order, without pausing to admire it.
+    intent: 'press',
     reason: 'STEP ONE SHOWN: the real interface, travelled through.',
     tailSeconds: 0.4,
   },
   {
     id: 'b7', line: 'Not one safe idea. Three.',
     emphasis: 'Three.',
+    // The count. Fast, because the three is the point rather than the counting.
+    intent: 'press',
     reason: 'STEP TWO: three directions, and the frame divides on the word.',
     tailSeconds: 0.5,
   },
   {
     id: 'b8', line: 'Each one rendered, watched, and scored before you see it.',
     emphasis: 'before you see it.',
+    // Back to plain speech for the claim that has to be believed.
+    intent: 'state',
     reason: 'STEP TWO SHOWN: the work is judged by the system before the customer judges it.',
     tailSeconds: 0.4,
   },
   {
     id: 'b9', line: 'Contrast, loudness, timing. It fails itself first.',
     emphasis: 'fails itself first.',
+    // The checks, named. Specific enough that colouring them would sound like selling.
+    intent: 'state',
     reason: 'STEP THREE: the checks, named specifically enough to be believed.',
     tailSeconds: 0.5,
   },
   {
-    id: 'b10', line: 'Six weeks is thirty working days, and most of them are waiting.',
+    id: 'b10', line: 'Six weeks is thirty working days — and most of them are waiting.',
     emphasis: 'waiting.',
+    // The argument, pushed: thirty days and most of them are nothing.
+    intent: 'press',
     reason: 'THE ARGUMENT: the six weeks are not work, which is why they can go.',
     tailSeconds: 0.5,
   },
   {
     id: 'b11', line: 'Take the waiting out.',
     emphasis: 'Take the waiting out.',
+    // THE TURN. The shortest line in the film and the one it is about. Everything slows.
+    intent: 'land',
     reason: 'THE TURN. The shortest line in the film, and the one it is about.',
     tailSeconds: 0.7,
   },
   {
     id: 'b12', line: 'Nothing about the work gets cheaper. Only the calendar.',
     emphasis: 'Only the calendar.',
+    // The benefit and the objection in one breath, unhurried.
+    intent: 'state',
     reason: 'THE BENEFIT, and the objection answered in the same breath.',
     // Carries the beat of silence that the cut output shot used to hold, so
     // the film still breathes before it asks for something.
@@ -112,8 +154,10 @@ export const BEATS: AvBeat[] = [
    * that was wasting it.
    */
   {
-    id: 'b14', line: 'Send us a link. Watch your film tonight.',
+    id: 'b14', line: 'Send us a link... Watch your film tonight.',
     emphasis: 'tonight.',
+    // The ask. The only place the film addresses you directly, and the only warm one.
+    intent: 'invite',
     reason: 'CALL: the smallest possible ask, and the shortest possible wait.',
     tailSeconds: 1.2,
   },

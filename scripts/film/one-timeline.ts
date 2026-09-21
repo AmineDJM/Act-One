@@ -19,7 +19,7 @@ import path from 'node:path';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { BrandSystem, DIALOGUE_LEAD_MIN, inspectScenes } from '@act-one/core';
-import { layout, type SpokenWord } from '@act-one/creative';
+import { layout, performanceFor, type BeatIntent, type SpokenWord } from '@act-one/creative';
 import { neutralRamp } from '@act-one/design';
 import { EASINGS, renderScenes } from '@act-one/motion';
 import {
@@ -67,14 +67,43 @@ const brand = BrandSystem.parse({
 
 const VOICE = process.env['ACT_ONE_VOICE'] ?? 'iP95p4xoKVk53GoZ742B';
 const MODEL = process.env['ACT_ONE_VOICE_MODEL'] ?? 'eleven_multilingual_v2';
-const DIRECTION = {
+/**
+ * THE VOICE IS DIRECTED PER BEAT, not once for the whole film.
+ *
+ * This was a single object — one stability, one expressiveness, one pace, from
+ * the hook to the sign-off — and it produced exactly what that describes. Four
+ * consecutive craft readings named the narration as the strongest tell that a
+ * machine made the film ("lacks any human inflection", "entirely synthetic and
+ * robotic"), and the note from the person who commissioned it was the same:
+ * monotone from A to Z. Not that it should never be flat. b4 and b11 SHOULD be
+ * flat — a film naming itself and a film turning are both moments to be
+ * certain rather than expressive. The fault was that every other line was flat
+ * too, and emphasis is a difference: with nothing to differ from, there is no
+ * emphasis anywhere.
+ *
+ * The register comes from the beat's own intent, so the same decision that
+ * tells the engine to confide also tells the camera to hold and the words to
+ * assemble slowly. A voice leaning into a picture that is not leaning is worse
+ * than neither moving.
+ */
+const BASE_DIRECTION = {
   language: 'en', locale: 'en-US', gender: 'male' as const,
   voiceProfile: 'assured male, 30-45, founder rather than announcer',
-  profile: 'premium' as const, tone: 'Direct, certain.',
-  energy: 'medium-high' as const, pace: 'natural' as const,
+  tone: 'Direct, certain.',
   style: 'professional' as const, context: 'launch_film' as const,
-  emotionCurve: [], avoid: [], stability: 'creative' as const,
+  emotionCurve: [], avoid: [],
 };
+
+function directionFor(beat: { intent?: BeatIntent }) {
+  const performance = performanceFor(beat.intent);
+  return {
+    ...BASE_DIRECTION,
+    profile: performance.profile,
+    energy: performance.energy,
+    pace: performance.pace,
+    stability: performance.stability,
+  };
+}
 
 mkdirSync(VO, { recursive: true });
 const provider = new ElevenLabsProvider({ models: { final: MODEL, preview: MODEL } });
@@ -87,7 +116,8 @@ for (const [index, beat] of BEATS.entries()) {
   const previousText = BEATS.slice(0, index).reverse().find((b) => b.line)?.line ?? null;
   const nextText = BEATS.slice(index + 1).find((b) => b.line)?.line ?? null;
   const key = createHash('sha256')
-    .update(JSON.stringify({ line: beat.line, previousText, nextText, VOICE, MODEL, DIRECTION, v: 1 }))
+    // The direction is in the key: changing a beat's register must re-read it.
+    .update(JSON.stringify({ line: beat.line, previousText, nextText, VOICE, MODEL, direction: directionFor(beat), v: 2 }))
     .digest('hex').slice(0, 16);
   const mp3 = path.join(VO, `${beat.id}-${key}.mp3`);
   const json = `${mp3}.json`;
@@ -96,7 +126,7 @@ for (const [index, beat] of BEATS.entries()) {
     const result = await provider.synthesize(
       {
         text: beat.line, voiceId: VOICE, persona: 'narrator_low', language: 'en', quality: 'final',
-        direction: DIRECTION as never, wantWordTimings: true,
+        direction: directionFor(beat) as never, wantWordTimings: true,
         continuity: { previousText, nextText, previousRequestIds: spoken.slice(-3) },
       },
       { organizationId: 'org_launch', projectId: 'prj_launch' } as never,
@@ -223,7 +253,7 @@ const voiceTracks = timed
       line: beat.line,
       previousText: BEATS.slice(0, BEATS.findIndex((b) => b.id === beat.id)).reverse().find((b) => b.line)?.line ?? null,
       nextText: BEATS.slice(BEATS.findIndex((b) => b.id === beat.id) + 1).find((b) => b.line)?.line ?? null,
-      VOICE, MODEL, DIRECTION, v: 1,
+      VOICE, MODEL, direction: directionFor(beat), v: 2,
     })).digest('hex').slice(0, 16)}.mp3`),
     atSeconds: beat.atSeconds + beat.voiceAtSeconds,
     durationSeconds: readings.get(beat.id)!.durationSeconds,
