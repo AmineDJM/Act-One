@@ -99,7 +99,7 @@ async function openai(file: string): Promise<unknown> {
   const r = await httpRequest<any>('openai', 'https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     body: {
-      model: 'gpt-4o-audio-preview',
+      model: 'gpt-audio-1.5',
       modalities: ['text'],
       messages: [{
         role: 'user',
@@ -121,12 +121,32 @@ const chosen = only.length ? CANDIDATES.filter((c) => only.includes(c.id)) : CAN
 console.log(`=== sweeping ${chosen.length} candidates ===`);
 for (const c of chosen) console.log(`  ${c.id.padEnd(16)} ${c.voice.padEnd(7)} ${c.model.padEnd(24)} energy=${c.energy}`);
 
-// Mixes run concurrently; each one is a separate process reading its own lines.
-const mixed = await Promise.allSettled(chosen.map(async (c) => ({ c, file: await mix(c) })));
-const ready = mixed.flatMap((m) => (m.status === 'fulfilled' ? [m.value] : []));
-for (const m of mixed) {
-  if (m.status === 'rejected') console.log(`  MIX FAILED: ${String(m.reason).slice(0, 300)}`);
-}
+/*
+ * Two at a time, not six.
+ *
+ * Every mix is a separate process that starts a headless browser, and six of
+ * those at once exhausted the box: three of six died, and the error they
+ * surfaced — "Command failed" — says nothing about why. Run alone, each one of
+ * them succeeds. A parallel sweep that silently loses half its candidates to
+ * its own parallelism is worse than a slower one, because the survivors look
+ * like a result.
+ */
+const LANES = Number(process.env['ACT_ONE_SWEEP_LANES'] ?? 2);
+const ready: { c: Candidate; file: string }[] = [];
+const queue = [...chosen];
+await Promise.all(
+  Array.from({ length: Math.min(LANES, queue.length) }, async () => {
+    for (let next = queue.shift(); next; next = queue.shift()) {
+      const c = next;
+      try {
+        ready.push({ c, file: await mix(c) });
+        console.log(`  mixed ${c.id}`);
+      } catch (error) {
+        console.log(`  MIX FAILED ${c.id}: ${String(error).slice(0, 220)}`);
+      }
+    }
+  }),
+);
 
 const judged = await Promise.allSettled(
   ready.map(async ({ c, file }) => {
