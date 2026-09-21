@@ -104,9 +104,19 @@ export const BEATS: AvBeat[] = [
 
 /** What each beat looks like. The line says what it means; this says what it is. */
 export const VISUALS: Record<string, BeatVisual> = {
-  b1: { kind: 'clip', assetId: 'ast_before', sourceInSeconds: 0.15 },
+  /*
+   * Cropped, because the generated hand in the left of frame is deformed —
+   * merged fingers, no separation — and it is the first thing in the film. A
+   * model watching it named that before anything else: "the mangled hand
+   * instantly ruins any suspension of disbelief". No metric would have found
+   * it. Losing the left fifth costs some resolution and keeps the lamp, the
+   * cup and the scattered paper, which is the shot anyway.
+   */
+  b1: { kind: 'clip', assetId: 'ast_before', sourceInSeconds: 0.15, crop: { x: 0.2, y: 0, width: 0.8, height: 1 } },
   b2: { kind: 'statement', field: null },
-  b3: { kind: 'statement', field: '#2A1006' },
+  // Ember was nearly black on a near-black field: the loudest event in the
+  // frame was a colour change nobody could see. Amber reads.
+  b3: { kind: 'statement', field: '#FFB03A' },
   b4: { kind: 'mark' },
   b5: { kind: 'statement', field: null },
   b6: { kind: 'product', assetId: 'ast_home', window: { x: 0.03, width: 0.58, fromY: 0.02, toY: 0.34 } },

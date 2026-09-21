@@ -28,7 +28,7 @@ export type BeatVisual =
   | { kind: 'statement'; field: string | null }
   | { kind: 'mark' }
   | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number } }
-  | { kind: 'clip'; assetId: string; sourceInSeconds?: number }
+  | { kind: 'clip'; assetId: string; sourceInSeconds?: number; crop?: { x: number; y: number; width: number; height: number } }
   | { kind: 'fields'; colours: readonly string[]; assetIds?: readonly string[] };
 
 export type CompileOptions = {
@@ -74,8 +74,24 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * viewer who cannot see which word that is gets a field arriving for no
    * visible reason.
    */
+  /*
+   * Where the type sits, and it is not the same place every time.
+   *
+   * Every beat laid its phrases down the same left margin at the same
+   * spacing, which is a template rather than a composition — "overuse of
+   * centre-weighted text on static backgrounds", as the second critic put it.
+   * The block shifts with the beat, and a beat over footage sits low so the
+   * picture keeps its light.
+   */
+  const composition = compositionFor(beat, index, visual);
+
   beat.phrases.forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
+    const place = {
+      x: composition.x,
+      y: composition.top + i * composition.lineGap,
+      anchor: composition.anchor,
+    };
     objects.push({
       kind: 'text', id: `${beat.id}_say_${i}`, content: phrase.text,
       token: hero ? 'display' : 'statement',
@@ -89,11 +105,31 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       reason: hero
         ? `The word the beat turns on, on screen as it is said: "${phrase.text}".`
         : `Spoken at ${phrase.atSeconds.toFixed(2)}s, so it is on screen at ${phrase.atSeconds.toFixed(2)}s.`,
+      /*
+       * TYPE THAT ARRIVES, rather than type that fades up.
+       *
+       * Both critics, from different evidence, gave the same single note:
+       * "animate the typography with spatial intent and scaling, rather than
+       * relying entirely on default opacity fades over static backgrounds",
+       * and "animate type and graphic transitions to build continuity". They
+       * were describing this exact transform, which did nothing but ramp
+       * opacity. Motion design scored 4 out of 10 from both.
+       *
+       * So a phrase rises into place, and the one carrying the emphasis rises
+       * further and scales as it lands — it is the event of the beat and it
+       * should arrive like one. The distances are small: this is a film about
+       * certainty, and type that flies is type that is unsure.
+       */
       transform: Transform.parse({
-        x: 0.09, y: 0.5 + (i - (beat.phrases.length - 1) / 2) * 0.13,
-        anchor: { x: 0, y: 0.5 },
-        scale: hero ? { from: 0.94, to: 1, curve: 'out_expo' } : 1,
-        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.1, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
+        x: place.x,
+        y: {
+          from: place.y + (hero ? 0.05 : 0.03),
+          to: place.y,
+          curve: 'out_expo',
+        },
+        anchor: { x: place.anchor, y: 0.5 },
+        scale: hero ? { from: 0.9, to: 1, curve: 'out_expo' } : { from: 0.98, to: 1, curve: 'out_expo' },
+        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.08, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
       }),
     } as SceneObject);
 
@@ -131,6 +167,32 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     },
     macro: null,
   });
+}
+
+/**
+ * Where a beat's words sit on the frame.
+ *
+ * Three places rather than one, chosen by what the beat is doing: type over
+ * footage drops low and left so the picture keeps its own light; a beat that
+ * is only type can take the middle of the frame; and the block alternates its
+ * margin so consecutive beats do not stack identically.
+ */
+function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
+  x: number; top: number; lineGap: number; anchor: number;
+} {
+  const lines = Math.max(1, beat.phrases.length);
+  const lineGap = 0.115;
+  if (visual.kind === 'clip' || visual.kind === 'product') {
+    // Low and left: the footage is the subject and the words are under it.
+    return { x: 0.07, top: 0.62 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0 };
+  }
+  if (visual.kind === 'mark') {
+    return { x: 0.09, top: 0.44 - (lines - 1) * lineGap * 0.5, lineGap, anchor: 0 };
+  }
+  // A typographic beat gets the frame. Alternating the margin stops a run of
+  // them reading as one long slide.
+  const left = index % 2 === 0;
+  return { x: left ? 0.08 : 0.5, top: 0.5 - (lines - 1) * lineGap * 0.5, lineGap, anchor: left ? 0 : 0.5 };
 }
 
 /** The camera, scaled to how long the beat actually runs. */
@@ -203,7 +265,7 @@ function visualObjects(
   if (visual.kind === 'clip' && options.assets[visual.assetId]) {
     return [{
       kind: 'clip', id: `${beat.id}_clip`, assetId: visual.assetId,
-      crop: { x: 0, y: 0, width: 1, height: 1 },
+      crop: visual.crop ?? { x: 0, y: 0, width: 1, height: 1 },
       width: 1.12, sourceInSeconds: visual.sourceInSeconds ?? 0, playbackRate: 1, generated: true,
       role: 'payload',
       reason: beat.reason,
