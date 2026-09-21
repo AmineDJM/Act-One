@@ -481,3 +481,60 @@ frame with two lines of type, and optical flow needs texture to find. So
 SaaS tropes" are one problem wearing three faces — five or six shots are nearly
 empty dark frames with type on them. Camera work cannot fix that. Only content
 can, which is what `l13b` and the colour field are.
+
+---
+
+## Reading after the output shot and the three direction films
+
+A deep reading finally landed after four 502s and one malformed-JSON answer
+from the broad-pass fallback. What it says:
+
+| | before the output shot | now |
+| --- | --- | --- |
+| hero moments | 0 | **1** (the timeline compressing, 37–45s) |
+| beats | 3 | 4 |
+| comprehension clear by | 45s | 15s |
+
+**Two attempts at the output note, and NEITHER closed it.** First a
+commissioned cinematic shot (`l13b`, the opening desk at dawn). Then the three
+real direction films this system made, playing at the "Three directions" beat.
+The note survives both:
+
+> at 60s — "The film lacks examples of the actual output films, which a
+> benchmark launch film would include."
+
+Worth reading carefully rather than as a repeat. It is anchored at **60s**, the
+end of the film, and the reading's own limitations call the direction films "UI
+mockups" — it cannot read their small text, so it does not see them as films at
+all. They are 26% of frame, for 2.6 seconds, as support under a title. And
+`l13b` reads as cinematic live-action rather than as an output.
+
+So the lesson is about placement and scale, not about whether real footage
+exists: a benchmark launch film shows what you GET, large, at the end, as the
+payoff. This film shows it small, in the middle, as evidence.
+
+**The most persistent note in the whole project has not moved.** It is now
+inside the understood proposition rather than beside it, which is worse:
+
+> "A service that creates product launch films in 1 day instead of 6 weeks.
+> Visually, it relies heavily on generic dark-mode SaaS motion graphics
+> (floating UI, subtle zooms) rather than a unique style."
+
+It has survived the colour flood, the output shot, the direction films, and the
+camera rebuild. The thing it names is structural: five of sixteen shots show
+product as a tilted capture floating on a plane with a shadow. That IS floating
+UI. The references do not do this — they show interfaces full-bleed and being
+used: "UI dashboard slides into view", a phone scrolling, notifications
+arriving.
+
+**New, and cheap to fix:** at 5s, "the opening text is slow and slightly
+abstract, making for a weak start."
+
+## Instrument note
+
+The semantic channel failed five times before this reading: four HTTP 502s from
+the deep model's gateway (the retry count was already raised to four earlier in
+this project for the same reason), and one malformed JSON from the faster model,
+which gets through the gateway but cannot hold this schema. A sixth failure was
+a valid, complete reading wrapped in a single-element array and rejected at the
+root — fixed, and it had silently cost three earlier retries.
