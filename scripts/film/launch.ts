@@ -136,6 +136,30 @@ const bloom = (id: string, at: { x: number; y: number }, colour: string, radius:
     transform: Transform.parse({ x: 0.5, y: 0.5, z: 1, anchor: { x: 0.5, y: 0.5 } }),
   }) as SceneObject;
 
+/*
+ * CARDS ARE CROPPED OUT OF THE FULL PAGES, not out of the strips.
+ *
+ * Two things went wrong before this and they compounded. A crop is a fraction
+ * of its SOURCE, so the resulting card is `(crop.width x sourceAspect) /
+ * crop.height` — and these sources are not the same shape. The stage strip is
+ * 3.00:1, the films and terms strips are 3.68:1, the steps panel is 1.21:1.
+ * One crop applied to all four produced two letterboxes and a tall column.
+ *
+ * Choosing the crop per source fixed the shapes and exposed the real problem:
+ * a card-shaped region of a 3.68:1 strip is a third of a strip, and it cuts
+ * every sentence in it in half. The strips were never card material.
+ *
+ * So the cards come out of the full page captures, which are 1.60:1 and
+ * contain whole panels with their own margins. A region of a page is a piece
+ * of the product; a slice of a strip is a mistake.
+ */
+const CARD_CROP: Record<string, { x: number; y: number; width: number; height: number }> = {
+  ast_home: { x: 0.04, y: 0.08, width: 0.5, height: 0.52 },
+  ast_how: { x: 0.08, y: 0.36, width: 0.5, height: 0.52 },
+  ast_work: { x: 0.04, y: 0.28, width: 0.5, height: 0.52 },
+  ast_pricing: { x: 0.04, y: 0.23, width: 0.5, height: 0.52 },
+};
+
 /** A capture held at an angle in real space. */
 const card = (
   id: string, asset: string, crop: Record<string, unknown>,
@@ -271,10 +295,10 @@ const scenes: Graph[] = [
     objects: [
       bloom('l3_bloom', { x: 0.5, y: 0.45 }, '#FFE8D8', 0.9),
       chapterWord('l3_chapter', 'SIX WEEKS', '#E6E0D4'),
-      card('l3_c1', 'ast_how_stages', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.27, y: 0.4, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.30, 0.1, 'The brief, as one of too many pages.'),
-      card('l3_c2', 'ast_work_films', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.63, y: 0.32, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.32, 0.45, 'The references, as another.'),
-      card('l3_c3', 'ast_pricing_terms', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.44, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.28, 0.8, 'The terms, as a third.'),
-      card('l3_c4', 'ast_home_steps', { x: 0, y: 0, width: 0.6, height: 0.95 }, { x: 0.78, y: 0.72, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.26, 1.15, 'The schedule, as a fourth.'),
+      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.27, y: 0.4, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.30, 0.1, 'The brief, as one of too many pages.'),
+      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.63, y: 0.32, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.32, 0.45, 'The references, as another.'),
+      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.44, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.28, 0.8, 'The terms, as a third.'),
+      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.78, y: 0.72, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.26, 1.15, 'The schedule, as a fourth.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
         token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 2.2,
       }, { x: 0.1, y: 0.9, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
@@ -386,13 +410,13 @@ scenes.push(
     */
   step('l5', '01', 'We read your product.',
     'A real capture, never a drawing of one.',
-    'ast_home_hero', { x: 0, y: 0, width: 0.8, height: 1 }, 6.2),
+    'ast_home', CARD_CROP['ast_home']!, 6.2),
   step('l6', '02', 'Three directions.',
     'Rendered and watched before one is chosen.',
-    'ast_work_films', { x: 0, y: 0, width: 0.62, height: 1 }, 6.2),
+    'ast_work', CARD_CROP['ast_work']!, 6.2),
   step('l7', '03', 'One afternoon.',
     'The engine checks its own frames, then hands you a master.',
-    'ast_how_stages', { x: 0, y: 0, width: 0.62, height: 1 }, 6.2),
+    'ast_how', CARD_CROP['ast_how']!, 6.2),
 );
 
 // --- 4. THE BENEFIT -------------------------------------------------------
