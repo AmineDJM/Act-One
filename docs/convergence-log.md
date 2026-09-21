@@ -538,3 +538,56 @@ this project for the same reason), and one malformed JSON from the faster model,
 which gets through the gateway but cannot hold this schema. A sixth failure was
 a valid, complete reading wrapped in a single-element array and rejected at the
 root — fixed, and it had silently cost three earlier retries.
+
+---
+
+## Two critics, and the disagreement that told us what to fix
+
+The second critic finally answered, after three distinct failures: a credential
+sent under the wrong header, a model this account does not have, and a
+parameter that model rejects. It was worth the trouble.
+
+They were deliberately given DIFFERENT evidence. Gemini watches the film;
+OpenAI hears the mixed audio alone. Two models handed the identical file
+agreeing tells you very little.
+
+**They rank identically and score three points apart.**
+
+| rank | Gemini (watches) | OpenAI (hears only) |
+| --- | --- | --- |
+| 1 | chris-creative-hi 5.50 | chris-creative-hi 8.25 |
+| 2 | eric-creative-hi 5.38 | eric-creative-hi 8.00 |
+| 3 | roger-natural 5.12 | roger-creative 7.62 |
+
+| criterion | Gemini | OpenAI | gap |
+| --- | --- | --- | --- |
+| semanticAuthority | 4.60 | 9.00 | 4.40 |
+| naturalness | 3.60 | 8.00 | 4.40 |
+| rhythmAgainstEdit | 5.20 | 8.40 | 3.20 |
+| emphasisMatchesTypography | 4.60 | 7.00 | 2.40 |
+| intelligibilityOverMusic | 6.80 | 8.40 | 1.60 |
+
+**What the gap means.** The read sounds fine on its own and wrong against the
+picture. The smallest gap is on intelligibility over music — the one criterion
+both can judge from audio alone. The largest are on naturalness and authority,
+where the audio-only critic hears a competent read and the critic watching the
+cut hears a machine talking over somebody else's film. Averaging these two
+numbers would have produced a middling score and destroyed the finding.
+
+**What they agree on.** `emphasisMatchesTypography` is OpenAI's lowest
+criterion and Gemini's joint-lowest. Two critics, different evidence, same
+weakest point. That is the strongest signal this project has produced about
+where to work next, and it is not a casting problem: no voice, model or dial
+has moved it, because the narration is placed at a hand-typed delay after each
+cut and left to fall where it falls.
+
+**Other things settled.** `eleven_multilingual_v2` beats `eleven_v3` on both
+critics — v3 is last on Gemini and fourth on OpenAI — which confirms the
+continuity trade: expressiveness in isolation loses to a script read as one
+piece. And `stability` had never been set at all, so the dial the vendor
+documents as governing how mechanical a read sounds was not chosen badly, it
+was not chosen.
+
+**A caution that still stands.** mv2-eric-hi scored 5.25 and then 5.00 on a
+byte-identical cached file. Within one critic, 0.25 is noise. Gaps smaller
+than that are not results.
