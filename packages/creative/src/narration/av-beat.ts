@@ -211,7 +211,22 @@ export function phrasesOf(
     // Inside the emphasis nothing breaks it: it is one phrase however it
     // breathes and however long it runs.
     if (inSpan.has(word) && word !== last) continue;
-    if (word === last || gap >= breath || current.length >= maxWords) close();
+    /*
+     * A word limit is a last resort, not a rule.
+     *
+     * Breaking strictly at five words split "Nothing about the work gets" from
+     * "cheaper." — mid-clause, at no boundary a reader or a listener would
+     * make, and the two halves then landed as separate captions and collided.
+     * A caption that breaks where the sentence does not is worse than a long
+     * one: the viewer reads a fragment and waits for the rest.
+     *
+     * So the limit only fires where the sentence allows it — after
+     * punctuation, or once the line has run well past its budget and there is
+     * nowhere graceful left to break.
+     */
+    const ends = /[.,;:—]$/.test(word.word);
+    const overrun = current.length >= maxWords && (ends || current.length >= maxWords + 3);
+    if (word === last || gap >= breath || overrun) close();
   }
   close();
   return phrases;

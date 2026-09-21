@@ -534,19 +534,55 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
                * shot can start partway into a take and run slower than life,
                * which is most of what makes four generated seconds usable.
                */
+              /*
+               * THE CROP WAS BEING THROWN AWAY.
+               *
+               * A clip declares one, the schema accepts it, and this branch
+               * read only `width` and `objectFit: cover` — so a film that
+               * cropped a clip got the whole frame anyway, silently. It cost a
+               * render and a wrong report: the generated hand this crop existed
+               * to remove was still in the opening shot, and I had said it was
+               * gone.
+               *
+               * Cropped the same way an image is: a box that hides its
+               * overflow, and the source scaled up by 1/width and pulled left
+               * and up by the origin. A full crop is the identity, so nothing
+               * that did not ask for one changes.
+               */
+              // Crop fields are animatable, like everything else in the
+              // language, so they resolve at this instant rather than being
+              // read as numbers.
+              const clipCrop = {
+                x: num(object.crop.x, t),
+                y: num(object.crop.y, t),
+                width: num(object.crop.width, t),
+                height: num(object.crop.height, t),
+              };
+              const boxWidth = num(object.width, t) * tokens.frame.width;
               return wrapped(
-                <OffthreadVideo
-                  src={url}
-                  muted
-                  pauseWhenBuffering
-                  startFrom={Math.round(object.sourceInSeconds * fps)}
-                  playbackRate={object.playbackRate}
+                <div
                   style={{
-                    width: num(object.width, t) * tokens.frame.width,
+                    width: boxWidth,
+                    aspectRatio: `${(clipCrop.width / clipCrop.height) * (16 / 9)}`,
+                    overflow: 'hidden',
                     display: 'block',
-                    objectFit: 'cover',
                   }}
-                />,
+                >
+                  <OffthreadVideo
+                    src={url}
+                    muted
+                    pauseWhenBuffering
+                    startFrom={Math.round(object.sourceInSeconds * fps)}
+                    playbackRate={object.playbackRate}
+                    style={{
+                      width: `${100 / clipCrop.width}%`,
+                      marginLeft: `${(-clipCrop.x * 100) / clipCrop.width}%`,
+                      marginTop: `${(-clipCrop.y * 100) / clipCrop.height}%`,
+                      display: 'block',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>,
               );
             }
 

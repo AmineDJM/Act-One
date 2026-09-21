@@ -55,9 +55,23 @@ describe('breaking a reading into what goes on screen', () => {
     expect(phrases[0]!.carriesEmphasis).toBe(false);
   });
 
-  it('will not run more than a few words together however fast the voice is', () => {
-    const words = read('a@0-0.1  b@0.1-0.2  c@0.2-0.3  d@0.3-0.4  e@0.4-0.5  f@0.5-0.6');
-    expect(phrasesOf(words, null, { breathSeconds: 1, maxWords: 3 }).map((p) => p.text)).toEqual(['a b c', 'd e f']);
+  it('breaks on the word limit only where the sentence allows it', () => {
+    // Five words then "cheaper." — breaking at five would split the clause and
+    // leave the viewer reading a fragment while the voice finishes it.
+    const words = read(
+      'Nothing@0-0.2  about@0.21-0.3  the@0.31-0.4  work@0.41-0.5  gets@0.51-0.6  cheaper.@0.61-0.9',
+    );
+    expect(phrasesOf(words, null, { breathSeconds: 1, maxWords: 5 }).map((p) => p.text)).toEqual([
+      'Nothing about the work gets cheaper.',
+    ]);
+  });
+
+  it('still gives way once a line has run far past its budget', () => {
+    const words = read(
+      'a@0-0.1  b@0.1-0.2  c@0.2-0.3  d@0.3-0.4  e@0.4-0.5  f@0.5-0.6  g@0.6-0.7  h@0.7-0.8  i@0.8-0.9',
+    );
+    const phrases = phrasesOf(words, null, { breathSeconds: 1, maxWords: 3 });
+    expect(phrases.length).toBeGreaterThan(1);
   });
 
   it('has nothing to show for a wordless beat', () => {
