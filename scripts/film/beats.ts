@@ -163,6 +163,19 @@ export const BEATS: AvBeat[] = [
   },
 ];
 
+/**
+ * The claim the film pins and then rejects.
+ *
+ * VERBATIM from the hero copy on the real page — "develop three creative
+ * directions" — because a receipt the film invented would be the one thing
+ * this system must never do. It is pinned at b6 when the film says it takes
+ * what is actually there, carried through the three directions and the
+ * scoring, and struck at b9 on "fails itself first".
+ *
+ * That is the whole audit in one object: read, kept, tested, rejected.
+ */
+const RECEIPT = { text: 'develop three creative directions' } as const;
+
 /** What each beat looks like. The line says what it means; this says what it is. */
 export const VISUALS: Record<string, BeatVisual> = {
   /*
@@ -236,8 +249,34 @@ export const VISUALS: Record<string, BeatVisual> = {
   b3: { kind: 'statement', field: '#F4F2EC' },
   b4: { kind: 'mark' },
   b5: { kind: 'statement', field: null },
-  b6: { kind: 'product', assetId: 'ast_home', window: { x: 0.03, width: 0.58, fromY: 0.02, toY: 0.34 }, holdIndex: 0 },
-  b7: { kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'] },
+  /*
+   * WHERE THE RECEIPT IS TAKEN.
+   *
+   * The line is "It opens your site like a customer would, and takes what is
+   * actually there," and this was a marketing page drifting past underneath
+   * it — two directors called it "asserts the product reads an actual site,
+   * but shows an abstraction". Taking something is a visible act: the film
+   * underlines one real phrase on the real page and pins it, and that phrase
+   * does not leave for the next fifteen seconds.
+   *
+   * Same hero plate as the opening, at the close scale, so the geometry is the
+   * arithmetic already established: y = 0.057 + fy * 0.765 at plate width 1.0.
+   * The paragraph's second line, which is where the phrase lives, sits at
+   * 0.734.
+   */
+  b6: {
+    kind: 'audit', assetId: 'ast_home_hero',
+    plate: { width: 1.0, centreY: 0.44 },
+    marks: [
+      // Underlined, then pinned: read, and kept.
+      { kind: 'rule', x: 0.153, y: 0.752, width: 0.637, at: 0.34 },
+      { kind: 'tag', x: 0.128, y: 0.734, at: 0.62 },
+    ],
+    receipt: RECEIPT,
+  },
+  // The receipt stays on screen: these three directions are what that pinned
+  // phrase turned into, and the film has to let the viewer see the link.
+  b7: { kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'], receipt: RECEIPT },
   // The three real renders this system made, at the beat that says they are
   // rendered and scored. The claim becomes literal instead of illustrated.
   /*
@@ -257,6 +296,16 @@ export const VISUALS: Record<string, BeatVisual> = {
     kind: 'films', assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'],
     colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
     verdicts: ['pass', 'fail', 'pass'],
+    /*
+     * One shown, three scored. Lane 2 is the field direction, and it is the
+     * one worth inspecting: a craft reading called lane 0's nested cards
+     * "illegible grey text on white, lacking contrast", which is true of that
+     * render rather than of the framing around it. No amount of composition
+     * rescues a weak source — this one sets one bold word on near-black, which
+     * survives being looked at.
+     */
+    focus: 2,
+    receipt: RECEIPT,
   },
   /*
    * THE CHECKS, PERFORMED — because naming them was the problem.
@@ -301,9 +350,18 @@ export const VISUALS: Record<string, BeatVisual> = {
       { kind: 'rule', x: 0.059, y: 0.412, width: 0.671, at: 0.08 },
       { kind: 'rule', x: 0.059, y: 0.535, width: 0.588, at: 0.20 },
       { kind: 'rule', x: 0.059, y: 0.650, width: 0.882, at: 0.32 },
-      // "It fails itself first." The system rejects its own page.
-      { kind: 'strike', x: 0.059, y: 0.709, width: 0.864, at: 0.58 },
     ],
+    /*
+     * THE STRIKE MOVED TO THE RECEIPT, and that is the point of the whole
+     * sequence. It used to cross a line of copy on this page — a rejection of
+     * something the film had never asked the viewer to care about. "It fails
+     * itself first" means the system rejects ITS OWN pinned claim, so the
+     * thing struck is the phrase it took at b6 and carried ever since.
+     *
+     * Three rules for three checks, and then the claim they were applied to
+     * goes. Read, kept, tested, rejected — one object, four beats.
+     */
+    receipt: { ...RECEIPT, struck: true },
   },
   b10: { kind: 'statement', field: null },
   b11: { kind: 'statement', field: '#FF4D1F' },

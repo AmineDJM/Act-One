@@ -74,15 +74,29 @@ export const INTENTS: Record<BeatIntent, IntentPerformance> = {
     cameraEnergy: 1.5, staggerSeconds: 0.026,
     note: 'Leaning in. The frame travels further and the words arrive almost together.',
   },
+  /*
+   * `land` and `invite` DO NOT STAGGER, and that is a decision about what
+   * staggering means.
+   *
+   * A word-by-word entrance is an arrival: the line assembling in front of
+   * you. These two registers are the opposite — the film naming itself, the
+   * film turning, the film asking — and a thing that is certain should not be
+   * seen to assemble. A reading put it exactly: "the staggered fade-in of
+   * 'Watch your film tonight' destroys the punchline's momentum; hard cut the
+   * entire phrase on immediately."
+   *
+   * It also gives the stagger somewhere to be absent. If every line assembled,
+   * assembling would carry no meaning.
+   */
   land: {
     stability: 'robust', profile: 'premium', pace: 'slow', energy: 'medium-low',
-    cameraEnergy: 0.5, staggerSeconds: 0.09,
-    note: 'The turn. Flat on purpose and given room — this is where monotone is the right choice.',
+    cameraEnergy: 0.5, staggerSeconds: 0,
+    note: 'The turn. Flat on purpose, given room, and whole the moment it appears.',
   },
   invite: {
     stability: 'creative', profile: 'warm', pace: 'natural', energy: 'medium',
-    cameraEnergy: 0.8, staggerSeconds: 0.05,
-    note: 'Addressed to one person. Warm without selling.',
+    cameraEnergy: 0.8, staggerSeconds: 0,
+    note: 'Addressed to one person. Warm without selling, and it lands rather than assembles.',
   },
 };
 

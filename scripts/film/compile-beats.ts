@@ -24,13 +24,37 @@ export type Palette = {
 };
 
 /** What a beat looks like. The narration says what it MEANS; this says what it IS. */
-export type BeatVisual =
+export type BeatVisual = { receipt?: Receipt } & (
   | { kind: 'statement'; field: string | null }
   | { kind: 'mark' }
   | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; holdIndex?: number }
   | { kind: 'clip'; assetId: string; sourceInSeconds?: number; crop?: { x: number; y: number; width: number; height: number } }
   | { kind: 'fields'; colours: readonly string[]; assetIds?: readonly string[] }
-  | { kind: 'films'; assetIds: readonly string[]; colours: readonly string[]; verdicts?: readonly ('pass' | 'fail')[] }
+  | {
+      kind: 'films';
+      assetIds: readonly string[];
+      colours: readonly string[];
+      verdicts?: readonly ('pass' | 'fail')[];
+      /**
+       * Show ONE of them, at a size a person can actually judge.
+       *
+       * Three dense interface renders side by side are three grey rectangles
+       * at any frame size that fits three — "illegibly small", "too small to
+       * read or appreciate", said by four directors and then again by a craft
+       * reading after they had already been enlarged once. The arithmetic does
+       * not work: a third of the frame is six hundred pixels for a picture
+       * that was 960 wide and full of interface.
+       *
+       * The three directions are already established by the beat before this
+       * one, which every reading names as the best moment in the film. This
+       * beat's line is "each one rendered, watched, and scored" — so it shows
+       * one render at a size that can be inspected, and a row of three marks
+       * underneath saying that three were judged and one did not pass. The
+       * count is carried by the scoreboard; the evidence is carried by the
+       * one you can see.
+       */
+      focus?: number;
+    }
   /**
    * THE AUDIT: a real page with the system's own verbs performed on it.
    *
@@ -77,7 +101,7 @@ export type BeatVisual =
        * rules; a beat that names one needs one.
        */
       marks: readonly AuditMark[];
-    };
+    });
 
 /**
  * One mark the system makes on a page.
@@ -96,6 +120,33 @@ export type AuditMark = {
   width?: number;
   /** When it lands, as a fraction of the beat rather than in seconds. */
   at: number;
+};
+
+/**
+ * ONE CLAIM, CARRIED THROUGH THE WHOLE MIDDLE OF THE FILM.
+ *
+ * The Screening Room converged on this twice, four directors of five each
+ * time, and the diagnosis was not about any single shot: "the cut treats whole
+ * screens and panels as evidence. No single receipt is selected and carried
+ * forward, so each thesis beat restarts as a new small graphic instead of
+ * showing the same claim being read, rendered, judged, failed and repaired."
+ *
+ * That is the difference between a film that ASSERTS an audit and one that
+ * performs it. A viewer cannot follow proof that changes subject every four
+ * seconds. So a real phrase is lifted off the real page, pinned, and then it
+ * stays on screen — through the three directions, through the scoring, and
+ * into the beat where the system rejects it. Muted, you can track one claim
+ * from the site to the render that failed it.
+ *
+ * It is deliberately small and in the same place every time. A receipt that
+ * moved or grew would be another graphic; one that sits still is a fact the
+ * film is holding onto.
+ */
+export type Receipt = {
+  /** Verbatim from the page. Inventing this would be inventing product truth. */
+  text: string;
+  /** The beat where the system rejects its own pinned claim. */
+  struck?: boolean;
 };
 
 export type CompileOptions = {
@@ -172,6 +223,83 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
 
   // --- the visual consequence of the idea ----------------------------------
   objects.push(...visualObjects(beat, visual, options, audio, variant));
+
+  /*
+   * THE RECEIPT, in the same corner of the frame on every beat that holds it.
+   *
+   * An amber tag and the claim itself, small, in mono — the register the rest
+   * of this film uses for machine output rather than for speech. It does not
+   * animate in beyond a fade, because a receipt that performed an entrance
+   * every four seconds would be a fifth graphic rather than a constant.
+   *
+   * On the beat where it is struck, the accent goes through it. That is the
+   * film rejecting the claim it pinned: "it fails itself first" is not a thing
+   * said over a page, it is this.
+   */
+  if (visual.receipt) {
+    /*
+     * Bottom left, not top left.
+     *
+     * At the top it sat in the same band as the caption on every audit beat
+     * that puts its line above the plate, and two small things competing in
+     * one corner read as clutter rather than as a constant. A receipt is a
+     * footnote: it belongs at the foot, where nothing else in this film lives.
+     */
+    /*
+     * 0.93, and no lower. At 0.955 the inspector refused the film outright:
+     * that is inside the last five percent, where a player's chrome sits. The
+     * crowding it was nudged away from was never a real overlap — the caption
+     * is centred and this is at the left margin — so the nudge bought nothing
+     * and cost the render.
+     */
+    const y = 0.93;
+    objects.push({
+      kind: 'shape', id: `${beat.id}_receipt_tag`, shape: 'rect',
+      width: 0.009, height: 0.026,
+      fill: palette.amber, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 1,
+      role: 'structure', enterAt: 0,
+      reason: 'The pinned claim, still pinned.',
+      transform: Transform.parse({ x: 0.055, y, anchor: { x: 0, y: 0.5 }, opacity: 0.95 }),
+    } as SceneObject);
+    objects.push({
+      kind: 'text', id: `${beat.id}_receipt_text`, content: visual.receipt.text,
+      // Mono rather than caption: caption is the smallest step in the scale and
+      // it rendered as a grey smudge. This has to be readable or it is decoration.
+      token: 'mono', color: palette.paper,
+      align: 'left', maxWidth: 0.5, maxLines: 1,
+      staggerBy: 'none', staggerSeconds: 0,
+      role: 'structure', enterAt: 0,
+      reason: 'The verbatim excerpt the film is holding onto.',
+      transform: Transform.parse({
+        x: 0.072, y, anchor: { x: 0, y: 0.5 },
+        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.06, value: 0.85, curve: 'out_cubic' }, { t: 1, value: 0.85 }], curve: 'out_cubic' },
+      }),
+    } as SceneObject);
+
+    if (visual.receipt.struck) {
+      const at = beat.emphasisAtSeconds ?? beat.voiceAtSeconds;
+      const lands = Math.min(0.92, at / Math.max(0.01, beat.durationSeconds));
+      objects.push({
+        kind: 'shape', id: `${beat.id}_receipt_struck`, shape: 'rect',
+        width: { keyframes: [
+          { t: 0, value: 0 },
+          { t: lands, value: 0, curve: 'linear' },
+          { t: Math.min(0.97, lands + 0.06), value: 0.3, curve: 'out_quint' },
+          { t: 1, value: 0.3 },
+        ], curve: 'out_quint' },
+        height: 0.0068,
+        fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: 'payload', enterAt: 0,
+        reason: 'The system rejects the claim it pinned. This is "it fails itself first".',
+        transform: Transform.parse({ x: 0.055, y, anchor: { x: 0, y: 0.5 } }),
+      } as SceneObject);
+      audio.push({
+        at, kind: 'impact', intensity: 0.5,
+        causedBy: `${beat.id}_receipt_struck`,
+        reason: 'The pinned claim is struck, on the word that says so.',
+      });
+    }
+  }
 
   /*
    * --- the words, exactly as they are said ---------------------------------
@@ -297,11 +425,52 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
 
   beat.phrases.forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
+    /*
+     * A HERO PHRASE THAT IS ONE WORD EARNS IMAGE SCALE.
+     *
+     * "Three." is a word the whole beat exists for, and it was set at the same
+     * size as a nine-word sentence. A craft reading asked for exactly this —
+     * "synchronise the typography scale and weight to the spoken emphasis,
+     * specifically enlarging the word 'Three'" — and it is the move the
+     * references keep making: one word taken to the size of an image.
+     *
+     * Only when it is genuinely short. Scaling a long phrase this way would
+     * wrap it to three lines and lose the very thing that makes it land.
+     */
+    const words = phrase.text.trim().split(/\s+/).filter(Boolean).length;
+    const heroScale = hero && words <= 2
+      ? composition.heroScale * 1.9
+      : composition.heroScale;
     const next = beat.phrases[i + 1];
     // Out as the next one arrives, with a breath of overlap so the frame is
     // never empty between two things being said.
-    const exitAt = next ? next.atSeconds + 0.06 : beat.durationSeconds;
-    const place = { x: composition.x, y: composition.top, anchor: composition.anchor };
+    /*
+     * A BREATH OF OVERLAP, EXCEPT INTO A WORD THIS BIG.
+     *
+     * Phrases normally hand over with 60ms of overlap so the frame is never
+     * empty between two things being said. At image scale that stops being a
+     * breath and becomes a collision: "Three." at nearly twice the size landed
+     * on top of "Not one safe idea." and both were unreadable for a sixth of a
+     * second. When the next phrase is the big one, this one is gone before it
+     * arrives.
+     */
+    const nextWords = next ? next.text.trim().split(/\s+/).filter(Boolean).length : 0;
+    const nextIsImageScale = next ? next.carriesEmphasis && nextWords <= 2 : false;
+    const exitAt = next ? next.atSeconds + (nextIsImageScale ? -0.04 : 0.06) : beat.durationSeconds;
+    /*
+     * A single word at image scale is not inside one panel, it is across them.
+     *
+     * The fields composition sets its line inside the FIRST colour field,
+     * which is right for a sentence. At image scale the word is wider than any
+     * one field and crossed the seam into the next — so it reads as
+     * mis-positioned rather than as a decision. Centred, it spans all three,
+     * which is the stronger frame anyway: the word the whole picture just
+     * divided itself for should sit over the division rather than beside it.
+     */
+    const spansFrame = hero && words <= 2 && visual.kind === 'fields';
+    const place = spansFrame
+      ? { x: 0.5, y: composition.top, anchor: 0.5 }
+      : { x: composition.x, y: composition.top, anchor: composition.anchor };
     objects.push({
       kind: 'text', id: `${beat.id}_say_${i}`, content: phrase.text,
       token: hero ? 'display' : 'statement',
@@ -316,7 +485,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
        * times. Dividing by the scale and by the camera's own reach means the
        * number in `composition` is what you actually see.
        */
-      maxWidth: (hero ? composition.width : composition.width * 0.9) / ((hero ? composition.heroScale : 1) * 1.07),
+      maxWidth: ((hero ? (spansFrame ? 0.92 : composition.width) : composition.width * 0.9)) / ((hero ? heroScale : 1) * 1.07),
       /*
        * Three lines, because dividing the box by the scale made it narrow
        * enough that two were not always enough — and a phrase that does not
@@ -385,7 +554,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
         y: place.y,
         anchor: { x: place.anchor, y: 0.5 },
         scale: hero
-          ? { from: composition.heroScale * 0.965, to: composition.heroScale, curve: 'out_quint' }
+          ? { from: heroScale * 0.965, to: heroScale, curve: 'out_quint' }
           : composition.heroScale === 1 ? 1 : composition.heroScale,
       }),
     } as SceneObject);
@@ -501,6 +670,15 @@ function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
      * nowhere to go. A caption that spans three colour panels also needs the
      * room to sit ON one of them rather than across a seam.
      */
+    /*
+     * A focused render is 16:9 in a 16:9 frame, so its height fraction equals
+     * its width fraction: at 0.62 it reaches from 0.13 to 0.75, and a caption
+     * at 0.78 lands on its bottom edge along with the scoreboard. The line
+     * goes under all of it.
+     */
+    if (visual.focus !== undefined) {
+      return { x: 0.5, top: 0.90, lineGap: 0.08, anchor: 0.5, width: 0.82, heroScale: 1 };
+    }
     return { x: 0.5, top: 0.78, lineGap: 0.085, anchor: 0.5, width: 0.9, heroScale: 1 };
   }
   if (visual.kind === 'fields') {
@@ -868,6 +1046,80 @@ function visualObjects(
      */
     const available = visual.assetIds.filter((id) => options.assets[id]);
     const objects: SceneObject[] = [];
+
+    if (visual.focus !== undefined && available[visual.focus]) {
+      const assetId = available[visual.focus]!;
+      const verdicts = visual.verdicts ?? [];
+      // The field behind it, in that direction's own colour.
+      objects.push({
+        kind: 'shape', id: `${beat.id}_focus_field`, shape: 'rect',
+        width: 1.5,
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.1, value: 1.6, curve: 'out_expo' }, { t: 1, value: 1.6 }], curve: 'out_expo' },
+        /*
+         * INK, not the direction's colour.
+         *
+         * Two reasons and both matter. The lane worth inspecting happens to be
+         * the one whose colour is the accent, and a full accent field here
+         * would spend on a scoring beat what the film needs at its turn — the
+         * accent is loud precisely because it appears once. And the direction
+         * identities were established by the beat before this one, which every
+         * reading calls the best moment; this beat's subject is the VERDICT,
+         * not which of the three it was. A dark plate lets the render be the
+         * brightest thing in frame, which is what makes it evidence.
+         */
+        fill: palette.ink,
+        stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: 'structure', enterAt: 0,
+        reason: 'A dark plate, so the render is the brightest thing in the frame.',
+        transform: Transform.parse({ x: 0.5, y: 0.5, z: 0.7, anchor: { x: 0.5, y: 0.5 } }),
+      } as SceneObject);
+      // The render itself, big enough to be evidence.
+      objects.push({
+        kind: 'clip', id: `${beat.id}_focus_film`, assetId,
+        crop: { x: 0, y: 0, width: 1, height: 1 },
+        width: 0.62, sourceInSeconds: 1.6, playbackRate: 1, generated: true,
+        role: 'payload', enterAt: 0.08,
+        reason: 'One of the three directions, at a size a person can judge.',
+        transform: Transform.parse({
+          x: 0.5, y: 0.44, z: 0.2, anchor: { x: 0.5, y: 0.5 },
+          scale: { from: 0.97, to: 1, curve: 'out_quint' },
+          opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.16, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
+        }),
+      } as SceneObject);
+      /*
+       * THE SCOREBOARD: three marks for three judgements, one of them struck.
+       * This is what carries "each one" now that only one is shown — and it is
+       * legible in a way three thumbnails never were.
+       */
+      available.forEach((_, i) => {
+        const failed = (verdicts[i] ?? 'pass') === 'fail';
+        objects.push({
+          kind: 'shape', id: `${beat.id}_score_${i}`, shape: 'rect',
+          width: { keyframes: [
+            { t: 0, value: 0 },
+            { t: 0.42 + i * 0.09, value: 0, curve: 'linear' },
+            { t: 0.52 + i * 0.09, value: failed ? 0.11 : 0.05, curve: 'out_quint' },
+            { t: 1, value: failed ? 0.11 : 0.05 },
+          ], curve: 'out_quint' },
+          height: failed ? 0.0072 : 0.0038,
+          fill: failed ? palette.accent : palette.paper,
+          stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+          role: 'structure', enterAt: 0,
+          reason: failed ? 'The direction that did not pass.' : 'A direction that passed its checks.',
+          // Under the render, above the line: a scoreboard reads as a row.
+          transform: Transform.parse({ x: 0.5 + (i - 1) * 0.14, y: 0.815, z: 0.15, anchor: { x: 0.5, y: 0.5 }, opacity: failed ? 1 : 0.82 }),
+        } as SceneObject);
+        if (failed) {
+          audio.push({
+            at: beat.durationSeconds * (0.52 + i * 0.09), kind: 'impact', intensity: 0.45,
+            causedBy: `${beat.id}_score_${i}`,
+            reason: 'The system fails its own work, audibly, before anybody else sees it.',
+          });
+        }
+      });
+      return objects;
+    }
+
     available.forEach((assetId, i) => {
       const share = 1 / available.length;
       objects.push({
