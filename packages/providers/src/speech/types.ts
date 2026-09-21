@@ -40,6 +40,14 @@ export type SpeechRequest = {
   seed?: number | null;
   /** Which take this is, when several are asked for. */
   take?: TakeVariant;
+  /**
+   * Ask the engine when each word is spoken, not just for the audio.
+   *
+   * Off by default: it costs a JSON envelope and a base64 round-trip, and
+   * only a caller that intends to put words on screen at the frame they are
+   * said has any use for it.
+   */
+  wantWordTimings?: boolean;
 };
 
 /** Who reads when the customer did not say: the register decides. */
@@ -130,7 +138,18 @@ export type SpeechResult = {
   characters?: number;
   /** The vendor's id for this generation, when it can be conditioned on later. */
   requestId?: string | null;
+  /**
+   * When each word is actually spoken, from the engine rather than estimated.
+   *
+   * This is what lets a film put a word on screen at the frame it is said,
+   * instead of at a delay somebody typed. Present only when the caller asked
+   * for timings and the engine returns them.
+   */
+  words?: SpokenWord[];
 };
+
+/** One word, and the moment it is spoken, in seconds from the start of the take. */
+export type SpokenWord = { word: string; startSeconds: number; endSeconds: number };
 
 /**
  * Consent is a hard precondition, not a checkbox.

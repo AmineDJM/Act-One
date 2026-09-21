@@ -39,6 +39,7 @@ export {
   ElevenLabsProvider,
   ELEVENLABS_MODELS,
   pcmToWav,
+  wordsFrom,
   withAudioTags,
   isV3,
   type ElevenLabsConfig,

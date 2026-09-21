@@ -19,6 +19,7 @@ import {
   type SpeechProvider,
   type SpeechRecognizer,
   type SpeechRequest,
+  type SpokenWord,
   type SpeechResult,
   type TranscribeRequest,
   type Transcript,
@@ -79,6 +80,50 @@ const Voice = z.object({
     .optional(),
 });
 type Voice = z.infer<typeof Voice>;
+
+/** What `/with-timestamps` answers: the take, plus where every character falls. */
+type CharacterAlignment = {
+  characters?: string[];
+  character_start_times_seconds?: number[];
+  character_end_times_seconds?: number[];
+};
+type WithTimestamps = {
+  audio_base64?: string;
+  alignment?: CharacterAlignment | null;
+  normalized_alignment?: CharacterAlignment | null;
+};
+
+/**
+ * Words, from an alignment given per character.
+ *
+ * The engine times every character including the spaces between words, so a
+ * word starts at its first character and ends at its last, and a run of
+ * whitespace closes whatever was open. Punctuation stays attached to the word
+ * it follows — "Three." is one spoken thing, and splitting it would invent a
+ * boundary the voice does not make.
+ */
+export function wordsFrom(alignment: CharacterAlignment | null): SpokenWord[] | undefined {
+  const characters = alignment?.characters;
+  const starts = alignment?.character_start_times_seconds;
+  const ends = alignment?.character_end_times_seconds;
+  if (!characters?.length || !starts?.length || !ends?.length) return undefined;
+
+  const words: SpokenWord[] = [];
+  let text = '';
+  let startSeconds = 0;
+  for (let i = 0; i < characters.length; i += 1) {
+    const character = characters[i] ?? '';
+    if (/\s/.test(character)) {
+      if (text) words.push({ word: text, startSeconds, endSeconds: ends[i - 1] ?? startSeconds });
+      text = '';
+      continue;
+    }
+    if (!text) startSeconds = starts[i] ?? 0;
+    text += character;
+  }
+  if (text) words.push({ word: text, startSeconds, endSeconds: ends[ends.length - 1] ?? startSeconds });
+  return words;
+}
 
 const VoiceList = z.object({
   voices: z.array(Voice),
@@ -589,60 +634,79 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
     const text = v3 ? withAudioTags(source, request.direction) : source;
     const rate = Math.min(1.2, Math.max(0.7, request.rate ?? 1));
 
+    /*
+     * The body is the same either way; only where it is posted differs.
+     *
+     * `/with-timestamps` answers JSON — the take plus a character-by-character
+     * alignment — rather than audio bytes. That alignment is the only way to
+     * know when a word is actually SAID rather than when somebody guessed it
+     * would be, and a film that puts a word on screen at the frame it is
+     * spoken cannot be built without it. It costs a JSON envelope and a base64
+     * round-trip, so it is asked for rather than assumed.
+     */
+    const body = {
+        text,
+        model_id: model,
+        voice_settings: this.settingsFor(request, v3, rate),
+        // The v3 and multilingual models read the language off the text and
+        // refuse to be told; the flash and turbo models take a hint.
+        ...(language && /flash|turbo/.test(model) ? { language_code: language } : {}),
+        /*
+         * CONTINUITY IS NOT AVAILABLE ON v3. Any of it.
+         *
+         * The vendor refuses `previous_text`/`next_text` and
+         * `previous_request_ids` alike on `eleven_v3`, each with its own
+         * hard 400 — "not yet supported with the 'eleven_v3' model" — so
+         * sending them costs the read rather than being ignored.
+         *
+         * This is a real choice and not a detail to paper over. v3 is the
+         * expressive model and reads every line as a cold start; the
+         * multilingual model is steadier and will read a script as one
+         * performance, conditioned on the lines around each take and on
+         * the takes themselves. For a long piece cut into many short
+         * lines, which is what a film narration is, the second is often
+         * the better film even though the first is the better demo.
+         */
+        ...(v3
+          ? {}
+          : {
+              ...(request.continuity?.previousText ? { previous_text: request.continuity.previousText } : {}),
+              ...(request.continuity?.nextText ? { next_text: request.continuity.nextText } : {}),
+              ...(request.continuity?.previousRequestIds?.length
+                ? { previous_request_ids: request.continuity.previousRequestIds.slice(-3) }
+                : {}),
+            }),
+        ...(typeof request.seed === 'number' ? { seed: Math.abs(Math.floor(request.seed)) % 4_294_967_295 } : {}),
+      };
+
+    const headers = {
+      'xi-api-key': this.apiKey,
+      accept: format === 'wav' ? 'application/octet-stream' : 'audio/mpeg',
+    };
     let requestId: string | null = null;
+    const onResponse = (response: Response) => {
+      requestId = response.headers.get('request-id');
+    };
     let audio: Uint8Array;
+    let words: SpokenWord[] | undefined;
+    const wantsWords = request.wantWordTimings === true;
+    const endpoint = `${this.baseUrl}/v1/text-to-speech/${encodeURIComponent(voiceId)}`;
     try {
-      audio = await httpRequest<Uint8Array>(
-        this.name,
-        `${this.baseUrl}/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=${output}`,
-        {
-          method: 'POST',
-          headers: {
-            'xi-api-key': this.apiKey,
-            accept: format === 'wav' ? 'application/octet-stream' : 'audio/mpeg',
-          },
-          body: {
-            text,
-            model_id: model,
-            voice_settings: this.settingsFor(request, v3, rate),
-            // The v3 and multilingual models read the language off the text and
-            // refuse to be told; the flash and turbo models take a hint.
-            ...(language && /flash|turbo/.test(model) ? { language_code: language } : {}),
-            /*
-             * CONTINUITY IS NOT AVAILABLE ON v3. Any of it.
-             *
-             * The vendor refuses `previous_text`/`next_text` and
-             * `previous_request_ids` alike on `eleven_v3`, each with its own
-             * hard 400 — "not yet supported with the 'eleven_v3' model" — so
-             * sending them costs the read rather than being ignored.
-             *
-             * This is a real choice and not a detail to paper over. v3 is the
-             * expressive model and reads every line as a cold start; the
-             * multilingual model is steadier and will read a script as one
-             * performance, conditioned on the lines around each take and on
-             * the takes themselves. For a long piece cut into many short
-             * lines, which is what a film narration is, the second is often
-             * the better film even though the first is the better demo.
-             */
-            ...(v3
-              ? {}
-              : {
-                  ...(request.continuity?.previousText ? { previous_text: request.continuity.previousText } : {}),
-                  ...(request.continuity?.nextText ? { next_text: request.continuity.nextText } : {}),
-                  ...(request.continuity?.previousRequestIds?.length
-                    ? { previous_request_ids: request.continuity.previousRequestIds.slice(-3) }
-                    : {}),
-                }),
-            ...(typeof request.seed === 'number' ? { seed: Math.abs(Math.floor(request.seed)) % 4_294_967_295 } : {}),
-          },
-          expect: 'buffer',
-          timeoutMs: 120_000,
-          signal: context.signal,
-          onResponse: (response) => {
-            requestId = response.headers.get('request-id');
-          },
-        },
-      );
+      if (wantsWords) {
+        const spoken = await httpRequest<WithTimestamps>(
+          this.name,
+          `${endpoint}/with-timestamps?output_format=${output}`,
+          { method: 'POST', headers: { ...headers, accept: 'application/json' }, body, timeoutMs: 120_000, signal: context.signal, onResponse },
+        );
+        audio = Buffer.from(spoken?.audio_base64 ?? '', 'base64');
+        words = wordsFrom(spoken?.alignment ?? spoken?.normalized_alignment ?? null);
+      } else {
+        audio = await httpRequest<Uint8Array>(
+          this.name,
+          `${endpoint}?output_format=${output}`,
+          { method: 'POST', headers, body, expect: 'buffer', timeoutMs: 120_000, signal: context.signal, onResponse },
+        );
+      }
     } catch (error) {
       throw this.describe(error);
     }
@@ -668,6 +732,7 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
     });
 
     return {
+      ...(words ? { words } : {}),
       audio: format === 'wav' ? pcmToWav(audio, 24_000) : audio,
       contentType: format === 'wav' ? 'audio/wav' : format === 'opus' ? 'audio/ogg' : 'audio/mpeg',
       durationSecondsEstimate: estimateNarrationSeconds(source, rate),
