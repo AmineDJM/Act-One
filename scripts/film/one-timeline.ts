@@ -42,7 +42,7 @@ for (const name of ['home', 'how', 'work', 'pricing'] as const) {
   if (existsSync(path.join(PUBLIC, `${name}.png`))) ASSETS[`ast_${name}`] = `${BASE}/${name}.png`;
 }
 for (const [key, file] of [
-  ['ast_before', 'before.mp4'], ['ast_output', 'output.mp4'],
+  ['ast_opening', 'opening.mp4'], ['ast_before', 'before.mp4'],
   ['ast_dir_a', 'dir-a-paper.mp4'], ['ast_dir_b', 'dir-b-depth.mp4'], ['ast_dir_c', 'dir-c-field.mp4'],
 ] as const) {
   if (existsSync(path.join(PUBLIC, file))) ASSETS[key] = `${BASE}/${file}`;

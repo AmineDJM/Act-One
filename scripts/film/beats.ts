@@ -86,14 +86,31 @@ export const BEATS: AvBeat[] = [
     id: 'b12', line: 'Nothing about the work gets cheaper. Only the calendar.',
     emphasis: 'Only the calendar.',
     reason: 'THE BENEFIT, and the objection answered in the same breath.',
-    tailSeconds: 0.5,
+    // Carries the beat of silence that the cut output shot used to hold, so
+    // the film still breathes before it asks for something.
+    tailSeconds: 1.5,
   },
-  {
-    id: 'b13', line: '',
-    emphasis: null,
-    reason: 'THE OUTPUT: the film that came back, wordless, because a hero moment that has to be labelled is not one.',
-    tailSeconds: 3.4,
-  },
+  /*
+   * b13 WAS HERE, and it was cut.
+   *
+   * It was commissioned to answer one note — that the film never shows its
+   * output — and it never answered it. What came back from the video model
+   * was an empty table with a closed laptop on it, shot from the side: a
+   * hero moment with no hero in it. Four readings in a row went for it, the
+   * last of them "remove the empty desk shot entirely, it stalls the visual
+   * pacing right before the final call to action", and looking at the frame
+   * they are plainly right.
+   *
+   * The note that put it there is answered elsewhere now. b8 shows the three
+   * real renders this system made, at the beat that says they are rendered
+   * and scored — the output, shown where the film is actually talking about
+   * it, rather than a table where the output is implied to be.
+   *
+   * The PAUSE it was providing was real, though, and the film should not go
+   * straight from "Only the calendar." into the ask. So b12 keeps it as
+   * silence: the tail below is the old beat's breath without the dead shot
+   * that was wasting it.
+   */
   {
     id: 'b14', line: 'Send us a link. Watch your film tonight.',
     emphasis: 'tonight.',
@@ -105,22 +122,42 @@ export const BEATS: AvBeat[] = [
 /** What each beat looks like. The line says what it means; this says what it is. */
 export const VISUALS: Record<string, BeatVisual> = {
   /*
-   * Cropped, because the generated hand in the left of frame is deformed —
-   * merged fingers, no separation — and it is the first thing in the film. A
-   * model watching it named that before anything else: "the mangled hand
-   * instantly ruins any suspension of disbelief". No metric would have found
-   * it. Losing the left fifth costs some resolution and keeps the lamp, the
-   * cup and the scattered paper, which is the shot anyway.
+   * A blank screen with the projector running, which is what the line means.
+   *
+   * The shot here was a cluttered desk at dusk with a cold coffee and a lamp,
+   * and a model watching the film went for it first: "entirely generic,
+   * establishing a dreary tone disconnected from a software product". It was
+   * also the shot with the deformed hand in it, which cost a crop and a fifth
+   * of the frame — hands are what these models get wrong, and the fix for a
+   * bad hand had been to throw away part of the composition.
+   *
+   * The line is "Every company has a film it has not made yet," and the idea
+   * in it is absence. So the shot is absence: a lit screen with nothing on it.
+   *
+   * IT MEASURED WORSE AND IT IS NOT IN THE FILM. The shot came back exactly as
+   * briefed — dust in the beam, the empty seats, the screen border landing on
+   * our own accent — and the reading of the film with it in dropped a point on
+   * every criterion at once: invention 4 to 3, motion 4 to 3, type 5 to 4,
+   * colour 5 to 4, would-a-client-approve 4 to 3. The verdict on the shot
+   * itself was harder than the one it replaced: "an incredibly generic stock
+   * projection screen that completely undercuts the messaging about bespoke,
+   * rapid filmmaking".
+   *
+   * So the brief was not the problem and neither was the vendor. Both shots
+   * are stock ideas of a feeling, and swapping one for another was never going
+   * to fix that. The asset is kept — `ACT_ONE_SHOT=opening` rebuilds it — and
+   * the question of what this film should open on goes to the Creative Council,
+   * because "what is the strongest opening" is a creative decision and this
+   * was the third time it had been answered by picking a different stock image.
+   *
+   * Cropped, because the generated hand in the left of frame is deformed and it
+   * is the first thing in the film: "the mangled hand instantly ruins any
+   * suspension of disbelief". width and height match so the source keeps its
+   * own 16:9 — cropping the width alone made the box taller than the frame and
+   * the renderer filled it from a narrower picture, losing the lamp.
    */
   b1: {
     kind: 'clip', assetId: 'ast_before', sourceInSeconds: 0.15,
-    /*
-     * width and height match, which keeps the source's own 16:9.
-     * Cropping only the width made the box taller than the frame, and the
-     * renderer then filled the frame from a narrower picture — a close-up of
-     * the cup with the lamp pushed out of shot. The crop is meant to lose the
-     * hand, not the composition.
-     */
     crop: { x: 0.22, y: 0, width: 0.78, height: 0.78 },
   },
   b2: { kind: 'statement', field: null },
@@ -138,6 +175,5 @@ export const VISUALS: Record<string, BeatVisual> = {
   b10: { kind: 'statement', field: null },
   b11: { kind: 'statement', field: '#FF4D1F' },
   b12: { kind: 'statement', field: null },
-  b13: { kind: 'clip', assetId: 'ast_output', sourceInSeconds: 0.3 },
   b14: { kind: 'mark' },
 };

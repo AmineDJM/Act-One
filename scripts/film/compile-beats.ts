@@ -47,6 +47,22 @@ export function compileBeats(beats: readonly TimedBeat[], options: CompileOption
 function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], options: CompileOptions): Graph {
   const visual = options.visuals[beat.id] ?? { kind: 'statement' as const, field: null };
   const { palette } = options;
+  /*
+   * HOW MANY OF THIS KIND HAVE ALREADY BEEN SEEN.
+   *
+   * The frame rotation was `frames[index % 4]` over the BEAT number, and the
+   * statement beats in this film are 1, 4, 9 and 11 — so b2 and b10 both
+   * landed on frame 1 and the inspector reported them 97% the same picture.
+   * Four frames were written to stop exactly that and the modulo handed two
+   * of them to the same layout anyway, because it was counting the wrong
+   * thing: the eye does not see beat nine, it sees the third time the film
+   * has done this.
+   *
+   * Counting beats of the SAME KIND is what the rotation always meant. The
+   * mark beats are the same fault with no modulo at all — b4 and b14 returned
+   * one hard-coded frame, and came back 96% identical.
+   */
+  const variant = all.slice(0, index).filter((b) => (options.visuals[b.id]?.kind ?? 'statement') === visual.kind).length;
   const onPaper = visual.kind === 'product';
   const background = onPaper ? palette.paper : palette.ink;
 
@@ -64,7 +80,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
   } as SceneObject);
 
   // --- the visual consequence of the idea ----------------------------------
-  objects.push(...visualObjects(beat, visual, options, audio));
+  objects.push(...visualObjects(beat, visual, options, audio, variant));
 
   /*
    * --- the words, exactly as they are said ---------------------------------
@@ -84,7 +100,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * The block shifts with the beat, and a beat over footage sits low so the
    * picture keeps its light.
    */
-  const composition = compositionFor(beat, index, visual);
+  const composition = compositionFor(beat, variant, visual);
 
   /*
    * The accent is not always the loudest thing available.
@@ -275,7 +291,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
  * is only type can take the middle of the frame; and the block alternates its
  * margin so consecutive beats do not stack identically.
  */
-function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
+function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
   x: number; top: number; lineGap: number; anchor: number; width: number; heroScale: number;
 } {
 
@@ -295,7 +311,21 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
     return { x: 0.5, top: 0.88, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 };
   }
   if (visual.kind === 'mark') {
-    return { x: 0.09, top: 0.48, lineGap: 0.12, anchor: 0, width: 0.54, heroScale: 1.3 };
+    /*
+     * The two mark beats are not the same beat.
+     *
+     * b4 is "This is Act One." — the film naming itself, and the shortest
+     * line in it. b14 is the sign-off. They were returning one frame between
+     * them and came back 96% the same picture, which made the last shot in
+     * the film look like a reprise of the title card rather than an ask.
+     *
+     * So the title takes the middle of the frame at its largest, and the
+     * sign-off sits low and left where every other closing line in this film
+     * sits. Same vocabulary, opposite weight.
+     */
+    return variant === 0
+      ? { x: 0.5, top: 0.44, lineGap: 0.12, anchor: 0.5, width: 0.62, heroScale: 1.45 }
+      : { x: 0.09, top: 0.56, lineGap: 0.11, anchor: 0, width: 0.56, heroScale: 1.1 };
   }
   if (visual.kind === 'films') {
     /*
@@ -341,7 +371,7 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
     { x: 0.5, top: 0.46, lineGap: 0.14, anchor: 0.5, width: 0.68, heroScale: 1.5 },
     { x: 0.08, top: 0.62, lineGap: 0.1, anchor: 0, width: 0.56, heroScale: 1.15 },
   ];
-  return frames[index % frames.length]!;
+  return frames[variant % frames.length]!;
 }
 
 /** The camera, scaled to how long the beat actually runs. */
@@ -384,6 +414,7 @@ function visualObjects(
   visual: BeatVisual,
   options: CompileOptions,
   audio: Record<string, unknown>[],
+  variant: number,
 ): SceneObject[] {
   const { palette } = options;
 
@@ -512,13 +543,21 @@ function visualObjects(
   }
 
   if (visual.kind === 'mark') {
+    // The rule sits under the words, so it goes where the words went: centred
+    // under the title, left under the sign-off. A rule anchored at 0.09 while
+    // the type it underlines is centred is not a rule, it is a stray line.
+    const centred = variant === 0;
     return [{
       kind: 'shape', id: `${beat.id}_rule`, shape: 'rect',
-      width: { from: 0, to: 0.22, curve: 'out_expo' }, height: 0.004,
+      width: { from: 0, to: centred ? 0.16 : 0.22, curve: 'out_expo' }, height: 0.004,
       fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'structure', enterAt: Math.max(0.2, beat.voiceSeconds * 0.6),
       reason: 'The rule the film has used throughout.',
-      transform: Transform.parse({ x: 0.09, y: 0.66, anchor: { x: 0, y: 0.5 } }),
+      transform: Transform.parse(
+        centred
+          ? { x: 0.5, y: 0.62, anchor: { x: 0.5, y: 0.5 } }
+          : { x: 0.09, y: 0.72, anchor: { x: 0, y: 0.5 } },
+      ),
     } as SceneObject];
   }
 

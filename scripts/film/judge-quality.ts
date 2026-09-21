@@ -31,34 +31,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { httpRequest } from '@act-one/providers';
+// Lives in @act-one/qa so it can be tested: it was wrong twice while it was
+// in here, and a parser that loses a critic's judgement cannot be untested.
+import { readModelJson as readJson } from '@act-one/qa';
 
 const run = promisify(execFile);
 
-/**
- * JSON out of a model that was asked for JSON and nearly obliged.
- *
- * The audio critic returned a valid object with one spurious brace in the
- * middle — `..."tell":"..."},"oneChange":"..."}` — and a strict parse threw,
- * which killed the whole run and took the OTHER critic's answer with it. A
- * judgement that is unreadable is a judgement lost; a judgement that is
- * readable after removing a brace nobody meant to type is not.
- *
- * Two repairs, both narrow: a closing brace immediately before a new key, and
- * a trailing comma. Anything else still throws, because silently accepting
- * arbitrary malformed output is how a critic starts agreeing with you.
- */
-function readJson(text: string): Record<string, unknown> {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error(`no JSON in reply: ${text.slice(0, 200)}`);
-  const body = text.slice(start, end + 1);
-  try {
-    return JSON.parse(body);
-  } catch {
-    const repaired = body.replace(/\}\s*,\s*"/g, ',"').replace(/,\s*([}\]])/g, '$1');
-    return JSON.parse(repaired);
-  }
-}
 const file = process.env['ACT_ONE_JUDGE'] ?? '.renders/one-timeline.mp4';
 
 const CRAFT = [
@@ -92,19 +70,39 @@ const BRIEF =
  * one threw before the first one's judgement was ever printed — a full render
  * judged, and nothing to show for it. They are independent opinions and they
  * should fail independently.
+ *
+ * That was only half done: `readJson` was made forgiving, but the REQUEST was
+ * still bare. A 502 from one vendor — a gateway, nothing to do with the film —
+ * threw out of the top level and took the other critic with it, and the other
+ * critic listens to the audio and had no opinion about the thing that failed.
+ * `settle` is what the comment above always claimed: each critic returns its
+ * judgement or its reason, and the run prints whatever came back.
  */
+async function settle<T>(who: string, work: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; why: string }> {
+  try {
+    return { ok: true, value: await work() };
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error);
+    return { ok: false, why };
+  }
+}
 const video = readFileSync(file).toString('base64');
-const gem = await httpRequest<any>(
-  'gemini',
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent',
-  {
-    method: 'POST',
-    body: { contents: [{ parts: [{ text: BRIEF }, { inlineData: { mimeType: 'video/mp4', data: video } }] }],
-      generationConfig: { responseMimeType: 'application/json' } },
-    timeoutMs: 300_000, attempts: 3,
-  },
-);
-const g: any = readJson(gem?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') ?? '{}');
+const watched = await settle('gemini', async () => {
+  const gem = await httpRequest<any>(
+    'gemini',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent',
+    {
+      method: 'POST',
+      body: { contents: [{ parts: [{ text: BRIEF }, { inlineData: { mimeType: 'video/mp4', data: video } }] }],
+        generationConfig: { responseMimeType: 'application/json' } },
+      timeoutMs: 300_000, attempts: 3,
+    },
+  );
+  const said = gem?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') ?? '{}';
+  writeFileSync('.renders/quality-gemini.txt', said);
+  return readJson(said);
+});
+const g: any = watched.ok ? watched.value : {};
 
 /*
  * A second EAR, not a second pair of eyes on stills.
@@ -136,6 +134,7 @@ BANNED WORDS: premium, polished, professional, elevated, sleek, modern, clean, d
 const mp3 = `/tmp/claude-0/-home-user-Act-One/98b63347-0537-52c4-b822-8136998c416b/scratchpad/judge-audio.mp3`;
 await run('node_modules/@remotion/compositor-linux-x64-gnu/ffmpeg',
   ['-y', '-v', 'error', '-i', file, '-vn', '-b:a', '96k', mp3], { maxBuffer: 32e6 });
+const heard = await settle('openai', async () => {
 const oai = await httpRequest<any>('openai', 'https://api.openai.com/v1/chat/completions', {
   method: 'POST',
   body: {
@@ -148,9 +147,19 @@ const oai = await httpRequest<any>('openai', 'https://api.openai.com/v1/chat/com
   },
   timeoutMs: 300_000, attempts: 3,
 });
-const o: any = readJson(String(oai?.choices?.[0]?.message?.content ?? ''));
+  /*
+   * Written down BEFORE it is parsed. A parse failure used to report only the
+   * position it gave up at, and the text that caused it was gone — so the
+   * repair was guessed at twice against evidence nobody had.
+   */
+  const said = String(oai?.choices?.[0]?.message?.content ?? '');
+  writeFileSync('.renders/quality-openai.txt', said);
+  return readJson(said);
+});
+const o: any = heard.ok ? heard.value : {};
 
 console.log('\n=== GEMINI — watched the film, with its sound ===');
+if (!watched.ok) console.log(`  DID NOT ANSWER: ${watched.why}`);
 for (const c of CRAFT) {
   const k = c.split(':')[0]!;
   console.log(`  ${k.padEnd(20)} ${g.scores?.[k] ?? '—'}`);
@@ -162,6 +171,7 @@ if (g.looksGenerated) console.log(`  TELL  ${g.looksGenerated}`);
 if (g.oneChange) console.log(`  DO    ${g.oneChange}`);
 
 console.log('\n=== OPENAI — heard the mix (sound and tone only) ===');
+if (!heard.ok) console.log(`  DID NOT ANSWER: ${heard.why}`);
 for (const c of SOUND) {
   const k = c.split(':')[0]!;
   console.log(`  ${k.padEnd(22)} ${o.scores?.[k] ?? '—'}`);
@@ -170,4 +180,16 @@ if (o.worstMoment) console.log(`  WORST @${o.worstMoment.at}s  ${o.worstMoment.w
 if (o.tell) console.log(`  TELL  ${o.tell}`);
 if (o.oneChange) console.log(`  DO    ${o.oneChange}`);
 
-writeFileSync('.renders/quality-judgement.json', JSON.stringify({ film: g, sound: o }, null, 2));
+/*
+ * What failed is written down too. A judgement file with an empty `film` in it
+ * reads exactly like a film that scored nothing, and the next loop would have
+ * had no way to tell "the critic did not answer" from "the critic was damning".
+ */
+writeFileSync('.renders/quality-judgement.json', JSON.stringify({
+  film: g, sound: o,
+  ...(watched.ok ? {} : { filmUnanswered: watched.why }),
+  ...(heard.ok ? {} : { soundUnanswered: heard.why }),
+}, null, 2));
+
+// A run where neither critic spoke is not a pass.
+if (!watched.ok && !heard.ok) process.exitCode = 1;
