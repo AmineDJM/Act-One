@@ -1,5 +1,6 @@
 import { estimateNarrationSeconds, type VoiceDirection } from '@act-one/core';
 import { httpRequest } from '../http.ts';
+import { pcmToWav } from './elevenlabs.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import {
   defaultGender,
@@ -38,7 +39,6 @@ const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 /** What the vendor returns: signed 16-bit little-endian mono at this rate. */
 const SAMPLE_RATE = 24_000;
 const CHANNELS = 1;
-const BITS_PER_SAMPLE = 16;
 
 /**
  * The prebuilt voices, chosen by who reads and in what register.
@@ -159,7 +159,7 @@ export class GeminiSpeechProvider implements SpeechProvider {
     }
 
     const pcm = Buffer.from(inline.data, 'base64');
-    const audio = wavFromPcm(pcm, rateFromMimeType(inline.mimeType) ?? SAMPLE_RATE);
+    const audio = pcmToWav(pcm, rateFromMimeType(inline.mimeType) ?? SAMPLE_RATE, CHANNELS);
     const costUsd = (text.length / 1_000_000) * COST_PER_MILLION_CHARS;
 
     await this.costSink?.record({
@@ -209,32 +209,6 @@ type GeminiSpeechResponse = {
 function rateFromMimeType(mimeType: string | undefined): number | null {
   const match = /rate=(\d+)/.exec(mimeType ?? '');
   return match ? Number(match[1]) : null;
-}
-
-/**
- * A RIFF header around raw samples.
- *
- * Written by hand rather than by FFmpeg because this package does not shell
- * out — and because a 44-byte header is not worth a subprocess.
- */
-export function wavFromPcm(pcm: Uint8Array, sampleRate = SAMPLE_RATE): Uint8Array {
-  const byteRate = (sampleRate * CHANNELS * BITS_PER_SAMPLE) / 8;
-  const blockAlign = (CHANNELS * BITS_PER_SAMPLE) / 8;
-  const header = Buffer.alloc(44);
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + pcm.byteLength, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16); // PCM subchunk size
-  header.writeUInt16LE(1, 20); // format: PCM
-  header.writeUInt16LE(CHANNELS, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(byteRate, 28);
-  header.writeUInt16LE(blockAlign, 32);
-  header.writeUInt16LE(BITS_PER_SAMPLE, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(pcm.byteLength, 40);
-  return Buffer.concat([header, Buffer.from(pcm)]);
 }
 
 /** The register of a structured direction, in the terms of the six voices above. */

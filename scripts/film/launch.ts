@@ -26,12 +26,18 @@
  *   Type is lit. Gradient fills on the numbers, hollow glowing outlines on the
  *   years, light coming off the words.
  *
- * WHAT IS DELIBERATELY NOT COPIED. The references are narrated, with burned-in
- * captions, and the voice carries their pace. This one has no voice — the
- * ElevenLabs credential is dead and a synthetic read would be worse than
- * silence — so it is cut to hold its lines long enough to be read, and it says
- * less. A film that copies the pacing of a narration it does not have is a
- * film with gaps in it.
+ * THE VOICE. The references are narrated and the voice carries their pace: a
+ * male read at about 160 words a minute, close, compressed, with the music
+ * ducked under it. This film had none, because the ElevenLabs credential is
+ * rejected — and it was cut for that absence, holding its lines long enough to
+ * be READ rather than heard.
+ *
+ * It has one now. The same models are reachable through Runway, which does
+ * have a working credential, so `narration.ts` reads the script through
+ * `eleven_v3` and the mix ducks the bed under it with the sidechain that was
+ * already there. The lines are written to counterpoint the screen rather than
+ * repeat it: the frame states the claim, the voice supplies the cost and the
+ * mechanism. One shot is deliberately left silent.
  *
  *   ACT_ONE_MANAGED_CREDENTIALS=all npm run launch
  */
@@ -57,6 +63,7 @@ import {
   runFfmpeg,
   soundForScenes,
 } from '@act-one/sound';
+import { NARRATOR, narrate, wordsPerMinute } from './narration.ts';
 
 type Graph = ReturnType<typeof SceneGraph.parse>;
 
@@ -1075,6 +1082,7 @@ const design = soundForScenes(scenes, {
    */
   behaviour: { musicCharacter: 'percussive', openOnMusic: false, uiSoundDensity: 'rhythmic', impactsOnCuts: true, endWithSting: true },
   channel: 'web',
+  hasVoiceOver: true,
 });
 const resolved = Object.fromEntries(
   [...DEFAULT_LIBRARY.music, ...DEFAULT_LIBRARY.sfx]
@@ -1086,7 +1094,27 @@ console.log(`  ENDING ${design.ending.strategy}; silence ${design.silenceSeconds
 for (const note of design.notes) console.log(`  NOTE ${note}`);
 const byGain = [...design.cues].sort((a, b) => b.gainDb - a.gainDb).slice(0, 6);
 console.log('  LOUDEST CUES', byGain.map((c) => `${c.type}@${c.atSeconds}s ${c.gainDb}dB`).join(' | '));
-const plan = buildMix({ design, resolvedPaths: resolved, durationSeconds: seconds });
+/*
+ * The read, before the mix.
+ *
+ * Every take is measured against the shot it belongs to and an overrun is
+ * printed rather than swallowed: a line that runs past its cut lands its last
+ * words on the next picture, which is the one narration fault an audience
+ * always hears and a waveform never shows.
+ */
+const takes = await narrate({ directory: path.resolve('.renders/vo'), voiceId: NARRATOR });
+const overruns = takes.filter((take) => take.overrunSeconds > 0.15);
+console.log(`  VOICE ${NARRATOR} via eleven_v3: ${takes.length} lines, ${wordsPerMinute(takes).toFixed(0)} wpm`);
+for (const take of overruns) {
+  console.log(`  OVERRUN ${take.sceneId} runs ${take.overrunSeconds.toFixed(2)}s past its shot`);
+}
+
+const plan = buildMix({
+  design,
+  resolvedPaths: resolved,
+  durationSeconds: seconds,
+  voiceTracks: takes.map(({ path: file, atSeconds, durationSeconds }) => ({ path: file, atSeconds, durationSeconds })),
+});
 const premix = path.resolve('.renders/launch.premix.wav');
 const mixed = await runFfmpeg(mixArgs(plan, premix), { timeoutMs: 8 * 60_000 });
 if (!mixed.ok) throw new Error(`mix failed: ${mixed.stderr.slice(-300)}`);
