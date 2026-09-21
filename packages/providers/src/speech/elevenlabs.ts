@@ -51,13 +51,29 @@ const Voice = z.object({
   description: z.string().nullable().optional(),
   preview_url: z.string().nullable().optional(),
   labels: z.record(z.string(), z.string().nullable()).optional(),
+  /*
+   * NULLABLE, not merely optional, and the difference cost nine voices.
+   *
+   * `optional()` permits the key to be ABSENT. This vendor sends it present
+   * and null — `"locale": null` — which is a different thing, and zod rejects
+   * it. Nine of the twenty-one voices on a live account have at least one
+   * verified language with a null locale, so nine were silently dropped from
+   * the catalogue.
+   *
+   * What made it expensive is where it surfaced. `isCastable` looks a voice up
+   * in this catalogue and treats absence as "this is a cloned voice", so four
+   * ordinary premade voices were refused with "That voice is a clone and needs
+   * a consent record" — a security-shaped error, for a null in a locale field.
+   * A parser that drops data quietly will always be read as a fact about the
+   * data.
+   */
   verified_languages: z
     .array(
       z.object({
-        language: z.string().optional(),
-        model_id: z.string().optional(),
-        accent: z.string().optional(),
-        locale: z.string().optional(),
+        language: z.string().nullable().optional(),
+        model_id: z.string().nullable().optional(),
+        accent: z.string().nullable().optional(),
+        locale: z.string().nullable().optional(),
       }),
     )
     .optional(),
@@ -400,7 +416,19 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
     if (request.voiceId) {
       // A brand voice from the library needs no consent; a cloned person does,
       // and only synthesizeWithVoice carries one. Unknown means refuse.
-      if (!(await this.isCastable(request.voiceId))) {
+      /*
+       * Say which of the two it is. "Unknown" and "is a clone" are different
+       * problems with different fixes, and calling both of them consent
+       * failures sent this project looking for a permissions bug when the
+       * actual fault was a null in a locale field.
+       */
+      const known = await this.findVoice(request.voiceId);
+      if (!known) {
+        throw new AppError('not_found', `No voice ${request.voiceId} in this account's library.`, {
+          publicMessage: 'That voice is not in the library for this account.',
+        });
+      }
+      if (isClone(known)) {
         throw new AppError('forbidden', 'That voice is a clone and needs a consent record to be used.', {
           publicMessage: 'We need recorded consent before using that voice.',
         });
@@ -488,6 +516,15 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
    * in this account carries the consent it was made under in its labels, and
    * is reached only through synthesizeWithVoice. Unknown fails closed.
    */
+  /** The catalogue entry for a voice, or null when the account does not have it. */
+  private async findVoice(voiceId: string): Promise<Voice | null> {
+    try {
+      return (await this.loadCatalogue()).find((entry) => entry.voice_id === voiceId) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   private async isCastable(voiceId: string): Promise<boolean> {
     try {
       const voice = (await this.loadCatalogue()).find((entry) => entry.voice_id === voiceId);
