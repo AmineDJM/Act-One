@@ -591,3 +591,53 @@ was not chosen.
 **A caution that still stands.** mv2-eric-hi scored 5.25 and then 5.00 on a
 byte-identical cached file. Within one critic, 0.25 is noise. Gaps smaller
 than that are not results.
+
+## The alignment did not work, and the A/B says so
+
+Both critics had converged on `emphasisMatchesTypography` as the weakest thing
+about the narration, so the read was timed to the picture: a line waits for its
+shot to finish saying its piece and comes in a beat later. Nine of fourteen
+lines moved.
+
+It made the film slightly worse. Same voice, model, energy and stability, the
+alignment the only difference:
+
+| criterion | Gemini on | Gemini off | OpenAI on | OpenAI off |
+| --- | --- | --- | --- | --- |
+| emphasisMatchesTypography | **4** | **5** | 8 | 8 |
+| pausesMatchEdit | 5 | 6 | 8 | 8 |
+| emotionalFit | 6 | 7 | 8 | 8 |
+| naturalness | 5 | 4 | 8 | 9 |
+| **overall** | **5.38** | **5.75** | 8.38 | 8.38 |
+
+The critic that can see the picture rates it worse on the criterion it was
+built to fix. The critic that only hears the mix cannot tell the two apart.
+
+**Why, and it is obvious in hindsight.** Waiting for the words to land and then
+coming in a beat later puts the voice permanently BEHIND the typography,
+explaining something the viewer has already read. The hand-typed delays it
+replaced — 0.25s, 0.3s, 0.4s — had the voice arriving nearly WITH the reveal.
+Line-level timing was the wrong lever, and pointing it the other way is not a
+tuning problem: the critics are asking which WORD carries the stress, not when
+the sentence starts.
+
+**Caveat on the size of it.** The overall gap is 0.375 against measured critic
+noise of 0.25 on byte-identical files. That is weak evidence of harm and strong
+evidence of no benefit. The change is reverted for not having earned its
+complexity rather than for being proven harmful — which is the right standard
+either way.
+
+The module and its nine tests stay, off by default behind `ACT_ONE_ALIGN`. The
+measurement is sound and the tool will be wanted for landing a line ON a reveal
+rather than after one.
+
+## What did work
+
+| change | effect |
+| --- | --- |
+| `stability` set at all (was `undefined`) | Gemini naturalness 3.60 → 6, authority 4.60 → 6 |
+| `eleven_multilingual_v2` over `eleven_v3` | v3 last on one critic, fourth on the other |
+| casting by audition rather than by ear | both critics ranked the same voice first |
+
+The robotic complaint survived five voices and two models, and moved when one
+dial that had never been set was set.

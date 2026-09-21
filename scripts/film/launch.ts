@@ -1231,11 +1231,28 @@ const shotWords = scenes.map((scene) => ({
   durationSeconds: scene.durationSeconds,
   wordsAtSeconds: wordsLandAt(scene.objects as never),
 }));
-// A/B switch: the only honest way to attribute a change to the alignment is
-// to run the same voice, energy and stability with it on and off.
-const { takes: aligned, moved } = process.env['ACT_ONE_NO_ALIGN']
-  ? { takes, moved: [] as string[] }
-  : alignToTypography(takes, shotWords);
+/*
+ * ALIGNMENT IS OFF, and the A/B is why.
+ *
+ * Same voice, model, energy and stability, with only the alignment differing.
+ * The critic that can see the picture rated it WORSE — emphasisMatchesTypography
+ * 4 against 5, pausesMatchEdit 5 against 6, overall 5.38 against 5.75 — on the
+ * very criterion this was built to fix. The critic that only hears the mix
+ * scored the two identically, 8.38 either way.
+ *
+ * The reason is legible in hindsight. Waiting for a shot's words to land and
+ * then coming in a beat later puts the voice permanently BEHIND the
+ * typography, explaining something the viewer has already read. The
+ * hand-typed delays it replaced — 0.25s, 0.3s, 0.4s — had the voice arriving
+ * nearly WITH the reveal, which is tighter, and the numbers say so.
+ *
+ * The module and its tests stay: the measurement is sound and the tool will be
+ * wanted for aligning a line to a reveal rather than after one. It is off by
+ * default because it has not earned being on. ACT_ONE_ALIGN=1 runs it.
+ */
+const { takes: aligned, moved } = process.env['ACT_ONE_ALIGN']
+  ? alignToTypography(takes, shotWords)
+  : { takes, moved: [] as string[] };
 
 const firstPass = place(aligned, scenes);
 const retimed = retimeForNarration(scenes, firstPass);
