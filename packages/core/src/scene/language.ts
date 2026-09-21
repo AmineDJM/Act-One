@@ -399,6 +399,31 @@ export const GradientObject = z.object({
   from: AnimatableColor,
   to: AnimatableColor,
   angleDeg: Animatable.default(180),
+  /**
+   * Linear across the frame, or light coming from a point.
+   *
+   * NOT A STYLE OPTION. None of the three reference films has a flat field
+   * behind anything: one is lit from a moving orange source, one sits on a
+   * faint grid, one on a warm gradient with a mosaic in it. Every frame this
+   * system made sat on a solid colour, and the difference between those two
+   * is most of why one looks shot and the other looks exported.
+   *
+   * `radial` is the one that was missing. A linear sweep is a background; a
+   * radial falloff is a LIGHT, and a word standing in front of one reads as
+   * lit by it.
+   */
+  shape: z.enum(['linear', 'radial']).default('linear'),
+  /** Where the light is, as fractions of the frame. Animatable: a source can drift. */
+  centre: z
+    .object({ x: Animatable.default(0.5), y: Animatable.default(0.5) })
+    .default(() => ({ x: 0.5, y: 0.5 })),
+  /**
+   * How far the falloff reaches, as a fraction of the frame's diagonal.
+   *
+   * Above 1 the far colour never fully arrives, which is what a large soft
+   * source in a small room looks like and is usually what is wanted.
+   */
+  radius: Animatable.default(0.7),
 });
 
 /**

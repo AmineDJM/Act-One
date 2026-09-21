@@ -458,16 +458,26 @@ export const SceneGraphRenderer: React.FC<SceneGraphRendererProps> = ({
               );
             }
 
-            case 'gradient':
+            case 'gradient': {
+              const from = animColor(object.from, t, tokens);
+              const to = animColor(object.to, t, tokens);
+              /*
+               * A radial gradient is a light, not a background.
+               *
+               * Sized in percent of the element rather than pixels so the same
+               * scene lights identically at preview and at master resolution —
+               * a source measured in pixels moves relative to the frame the
+               * moment the frame changes size.
+               */
+              const background =
+                object.shape === 'radial'
+                  ? `radial-gradient(circle at ${(num(object.centre.x, t) * 100).toFixed(2)}% ${(num(object.centre.y, t) * 100).toFixed(2)}%, ` +
+                    `${from} 0%, ${to} ${(num(object.radius, t) * 100).toFixed(1)}%)`
+                  : `linear-gradient(${num(object.angleDeg, t)}deg, ${from}, ${to})`;
               return wrapped(
-                <div
-                  style={{
-                    width: tokens.frame.width,
-                    height: tokens.frame.height,
-                    background: `linear-gradient(${num(object.angleDeg, t)}deg, ${animColor(object.from, t, tokens)}, ${animColor(object.to, t, tokens)})`,
-                  }}
-                />,
+                <div style={{ width: tokens.frame.width, height: tokens.frame.height, background }} />,
               );
+            }
 
             case 'field':
               // The field owns its own layout and clock; the graph gives it its

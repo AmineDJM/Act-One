@@ -39,6 +39,7 @@
     "commission:shot": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/commission-shot.ts",
     "read:targets": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/read-targets.ts",
     "probe": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/probe.ts",
+    "launch": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/launch.ts",
     "final": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/final.ts",
     "directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/directions.ts",
     "watch:film": "vite-node scripts/watch-film.ts"
