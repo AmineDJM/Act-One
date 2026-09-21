@@ -5,3 +5,5 @@ export * from './edition.ts';
 export * from './casting.ts';
 export * from './hold.ts';
 export * from './align.ts';
+export * from './spoken-word.ts';
+export * from './av-beat.ts';
