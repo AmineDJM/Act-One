@@ -115,6 +115,18 @@ class FakeVendors {
               verified_languages: [{ language: 'en', model_id: 'eleven_multilingual_v2', locale: 'en-US' }],
             },
             {
+              // Exactly what a live account sends: a premade voice with a null
+              // locale on one of its verified languages.
+              voice_id: 'v_null_locale',
+              name: 'Brian',
+              category: 'premade',
+              labels: { gender: 'male', accent: 'american', language: 'en', use_case: 'narration' },
+              verified_languages: [
+                { language: 'en', model_id: 'eleven_multilingual_v2', locale: 'en-US' },
+                { language: 'en', model_id: 'eleven_v3', locale: null },
+              ],
+            },
+            {
               voice_id: 'v_fr_m',
               name: 'Louis',
               category: 'premade',
@@ -409,7 +421,20 @@ describe('ElevenLabs voices', () => {
     expect(await speech.voiceFor({ text: 'x', persona: 'narrator_neutral', language: 'de' })).toBe('v_de_f');
   });
 
-  it('reads finals on v3 as a performance: a stability tier, continuity, a seed, and no dials', async () => {
+  /*
+ * This test used to assert that v3 carries continuity. It does not, and the
+ * vendor says so twice, in two separate hard 400s against a live account:
+ *
+ *   "Providing previous_text or next_text is not yet supported with the
+ *    'eleven_v3' model."
+ *   "Providing previous_request_ids or next_request_ids is not yet supported
+ *    with the 'eleven_v3' model."
+ *
+ * Sending them does not get them ignored; it costs the read. So the contract
+ * is the other way round from what this asserted, and the companion test
+ * below pins the model that DOES carry them.
+ */
+  it('reads finals on v3 as a performance: a stability tier, a seed, and no continuity', async () => {
     const sink = new NullCostSink();
     const speech = new ElevenLabsProvider({ apiKey: 'el_test_key', baseUrl: vendors.url, costSink: sink });
     const direction = directVoice({ context: 'executive_update', language: 'fr', gender: 'female', style: 'calm' });
@@ -430,9 +455,6 @@ describe('ElevenLabs voices', () => {
       text: '[softly] Le matin [short pause] tout est déjà rapproché.',
       model_id: 'eleven_v3',
       voice_settings: { stability: 1, similarity_boost: 0.75, use_speaker_boost: true },
-      previous_text: 'Bonjour.',
-      next_text: 'Merci.',
-      previous_request_ids: ['req_1', 'req_2'],
       seed: 42,
     });
     expect(result.model).toBe('eleven_v3');
@@ -450,6 +472,57 @@ describe('ElevenLabs voices', () => {
       operation: 'speech.tts',
       metadata: { voiceId: 'v_fr_f', language: 'fr', quality: 'final', take: 'as_directed' },
     });
+  });
+
+  it('carries continuity on the model that accepts it, so a script reads as one performance', async () => {
+    // The same request, on eleven_multilingual_v2. Everything v3 refuses is
+    // exactly what this model is for: the lines either side of a take, and the
+    // takes themselves, so fourteen short lines are read as a piece rather
+    // than as fourteen cold starts.
+    const speech = new ElevenLabsProvider({
+      apiKey: 'el_test_key',
+      baseUrl: vendors.url,
+      models: { final: 'eleven_multilingual_v2', preview: 'eleven_flash_v2_5' },
+    });
+    await speech.synthesize(
+      {
+        text: 'Le matin, tout est deja rapproche.',
+        persona: 'narrator_neutral',
+        direction: directVoice({ context: 'executive_update', language: 'fr', gender: 'female', style: 'calm' }),
+        continuity: { previousText: 'Bonjour.', nextText: 'Merci.', previousRequestIds: ['req_1', 'req_2'] },
+      },
+      call,
+    );
+    const body = tts()?.body as Record<string, unknown>;
+    expect(body['model_id']).toBe('eleven_multilingual_v2');
+    expect(body['previous_text']).toBe('Bonjour.');
+    expect(body['next_text']).toBe('Merci.');
+    expect(body['previous_request_ids']).toEqual(['req_1', 'req_2']);
+  });
+
+  it('keeps a null locale from costing a voice its place in the library', async () => {
+    /*
+     * A live account returns `"locale": null` inside verified_languages. The
+     * field was typed optional, which permits the key to be ABSENT and not to
+     * be null, so nine of twenty-one voices failed to parse and vanished from
+     * the catalogue — and `isCastable` reads absence as "this is a clone", so
+     * ordinary premade voices were refused for want of a consent record. Two
+     * of four auditions died on it, with a security-shaped error, for a null
+     * in a locale field.
+     */
+    const speech = new ElevenLabsProvider({ apiKey: 'el_test_key', baseUrl: vendors.url });
+    await expect(
+      speech.synthesize({ text: 'Hello.', persona: 'narrator_neutral', voiceId: 'v_null_locale' }, call),
+    ).resolves.toBeTruthy();
+  });
+
+  it('says a voice is unknown rather than implying it is a clone', async () => {
+    // Different problems, different fixes. They shared a message, and it sent
+    // this project looking for a permissions bug.
+    const speech = new ElevenLabsProvider({ apiKey: 'el_test_key', baseUrl: vendors.url });
+    await expect(
+      speech.synthesize({ text: 'Hello.', persona: 'narrator_neutral', voiceId: 'v_does_not_exist' }, call),
+    ).rejects.toThrow(/No voice v_does_not_exist/);
   });
 
   it('reads previews on the flash model with the language enforced, at half the cost', async () => {
@@ -578,7 +651,7 @@ describe('ElevenLabs voices', () => {
   it('reports the library on a good key, and a rejected key in words without it', async () => {
     const good = await new ElevenLabsProvider({ apiKey: 'el_test_key', baseUrl: vendors.url }).health();
     expect(good.healthy).toBe(true);
-    expect(good.message).toBe('5 voices across 3 languages; eleven_v3 for finals, eleven_flash_v2_5 for previews.');
+    expect(good.message).toBe('6 voices across 3 languages; eleven_v3 for finals, eleven_flash_v2_5 for previews.');
 
     const bad = await new ElevenLabsProvider({ apiKey: 'el_wrong_key', baseUrl: vendors.url }).health();
     expect(bad.healthy).toBe(false);
