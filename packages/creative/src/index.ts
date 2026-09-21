@@ -26,3 +26,5 @@ export * from './council/types.ts';
 export * from './council/room.ts';
 export * from './council/journal.ts';
 export * from './council/outcomes.ts';
+export * from './council/screening.ts';
+export * from './council/revision.ts';

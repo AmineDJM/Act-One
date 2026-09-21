@@ -50,7 +50,8 @@
     "sweep:voice": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/sweep-voice.ts",
     "film": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/one-timeline.ts",
     "judge": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/judge-quality.ts",
-    "council": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/council.ts"
+    "council": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/council.ts",
+    "screen": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/screen.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

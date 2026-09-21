@@ -122,43 +122,40 @@ export const BEATS: AvBeat[] = [
 /** What each beat looks like. The line says what it means; this says what it is. */
 export const VISUALS: Record<string, BeatVisual> = {
   /*
-   * A blank screen with the projector running, which is what the line means.
+   * THE AUDIT, replacing two atmosphere shots that both failed.
    *
-   * The shot here was a cluttered desk at dusk with a cold coffee and a lamp,
-   * and a model watching the film went for it first: "entirely generic,
-   * establishing a dreary tone disconnected from a software product". It was
-   * also the shot with the deformed hand in it, which cost a crop and a fifth
-   * of the frame — hands are what these models get wrong, and the fix for a
-   * bad hand had been to throw away part of the composition.
+   * Five directors watched the film independently and all five went for this
+   * shot, converging on one diagnosis from five different lenses: the film
+   * describes its mechanism instead of showing it operate. The opener was
+   * using an ambient clip language, so "it opens your site" later arrived as a
+   * claim over a mood, and the audit premise was never visible before the copy
+   * explained it.
    *
-   * The line is "Every company has a film it has not made yet," and the idea
-   * in it is absence. So the shot is absence: a lit screen with nothing on it.
+   * A lamplit desk was tried and called "entirely generic". A blank cinema
+   * screen was commissioned to a written brief specifically to fix that, and
+   * came back "an incredibly generic stock projection screen". The outcome
+   * memory has both on file, which is what stopped the revision room
+   * proposing a third: "this is not another atmosphere shot; it performs the
+   * audit verb."
    *
-   * IT MEASURED WORSE AND IT IS NOT IN THE FILM. The shot came back exactly as
-   * briefed — dust in the beam, the empty seats, the screen border landing on
-   * our own accent — and the reading of the film with it in dropped a point on
-   * every criterion at once: invention 4 to 3, motion 4 to 3, type 5 to 4,
-   * colour 5 to 4, would-a-client-approve 4 to 3. The verdict on the shot
-   * itself was harder than the one it replaced: "an incredibly generic stock
-   * projection screen that completely undercuts the messaging about bespoke,
-   * rapid filmmaking".
-   *
-   * So the brief was not the problem and neither was the vendor. Both shots
-   * are stock ideas of a feeling, and swapping one for another was never going
-   * to fix that. The asset is kept — `ACT_ONE_SHOT=opening` rebuilds it — and
-   * the question of what this film should open on goes to the Creative Council,
-   * because "what is the strongest opening" is a creative decision and this
-   * was the third time it had been answered by picking a different stock image.
-   *
-   * Cropped, because the generated hand in the left of frame is deformed and it
-   * is the first thing in the film: "the mangled hand instantly ruins any
-   * suspension of disbelief". width and height match so the source keeps its
-   * own 16:9 — cropping the width alone made the box taller than the frame and
-   * the renderer filled it from a narrower picture, losing the lamp.
+   * So the film opens on the page, square-on, and does to it what the system
+   * does: underline what is there, pin it as evidence, strike what cannot be
+   * proved. The line is unchanged — "Every company has a film it has not made
+   * yet" — and the strike lands on "not made yet", so the picture performs the
+   * absence the line names instead of illustrating a mood around it.
    */
   b1: {
-    kind: 'clip', assetId: 'ast_before', sourceInSeconds: 0.15,
-    crop: { x: 0.22, y: 0, width: 0.78, height: 0.78 },
+    kind: 'audit', assetId: 'ast_home',
+    /*
+     * Almost still. An audit is a held inspection, not a camera move — and a
+     * mark cannot land on a specific line of a page that is sliding under it.
+     * The cinematography director asked for exactly this in the room: "one
+     * held inspection vantage, no push-ins, no parallax, no camera drift".
+     */
+    window: { x: 0.04, width: 0.62, fromY: 0.075, toY: 0.055 },
+    // Fractions of the beat, not seconds: the beat is as long as its reading,
+    // and a mark fixed at 1.2s drifts off its word the moment the voice does.
+    marks: { underlineAt: 0.22, pinAt: 0.44, strikeAt: 0.62 },
   },
   b2: { kind: 'statement', field: null },
   // Ember was nearly black on a near-black field: the loudest event in the
@@ -170,7 +167,24 @@ export const VISUALS: Record<string, BeatVisual> = {
   b7: { kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'] },
   // The three real renders this system made, at the beat that says they are
   // rendered and scored. The claim becomes literal instead of illustrated.
-  b8: { kind: 'films', assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'], colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'] },
+  /*
+   * The three real renders, now SCORED rather than merely counted.
+   *
+   * "It counts to three, and counting is not proving" — three directors said
+   * versions of that independently, and one put it exactly: the panels "could
+   * belong to any company with three brand colours". The beat's line is "Each
+   * one rendered, watched, and scored before you see it", and nothing on
+   * screen was doing the scoring.
+   *
+   * Lane two fails. One lane, not all three: a system that rejected everything
+   * is not one anybody would buy, and the film's own claim is that it fails
+   * its work first — not that the work is bad.
+   */
+  b8: {
+    kind: 'films', assetIds: ['ast_dir_a', 'ast_dir_b', 'ast_dir_c'],
+    colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
+    verdicts: ['pass', 'fail', 'pass'],
+  },
   b9: { kind: 'product', assetId: 'ast_how', window: { x: 0.06, width: 0.58, fromY: 0.30, toY: 0.06 }, holdIndex: 2 },
   b10: { kind: 'statement', field: null },
   b11: { kind: 'statement', field: '#FF4D1F' },

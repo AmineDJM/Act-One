@@ -30,7 +30,25 @@ export type BeatVisual =
   | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; holdIndex?: number }
   | { kind: 'clip'; assetId: string; sourceInSeconds?: number; crop?: { x: number; y: number; width: number; height: number } }
   | { kind: 'fields'; colours: readonly string[]; assetIds?: readonly string[] }
-  | { kind: 'films'; assetIds: readonly string[]; colours: readonly string[] };
+  | { kind: 'films'; assetIds: readonly string[]; colours: readonly string[]; verdicts?: readonly ('pass' | 'fail')[] }
+  /**
+   * THE AUDIT: a real page with the system's own verbs performed on it.
+   *
+   * Every director in the screening room went for the opening, and the
+   * diagnosis they converged on from five different lenses was one sentence:
+   * the film describes its mechanism instead of showing it operate. The opener
+   * was an atmosphere clip, so "it opens your site" arrived as a claim over a
+   * mood, and the audit premise was never visible before the copy explained it.
+   *
+   * Two atmosphere shots have now been tried there and both were called generic
+   * stock — the second one commissioned to a written brief specifically to
+   * avoid that. A third would be the same experiment. This is not another
+   * atmosphere shot: it is the page, and the marks the system actually makes on
+   * a page. Underline what is there, pin it as evidence, strike what cannot be
+   * proved. The same three verbs recur later in the film, which is what makes
+   * them a grammar rather than an effect.
+   */
+  | { kind: 'audit'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; marks: { underlineAt: number; pinAt: number; strikeAt: number } };
 
 export type CompileOptions = {
   palette: Palette;
@@ -63,7 +81,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * one hard-coded frame, and came back 96% identical.
    */
   const variant = all.slice(0, index).filter((b) => (options.visuals[b.id]?.kind ?? 'statement') === visual.kind).length;
-  const onPaper = visual.kind === 'product';
+  const onPaper = visual.kind === 'product' || visual.kind === 'audit';
   const background = onPaper ? palette.paper : palette.ink;
 
   const objects: SceneObject[] = [];
@@ -118,7 +136,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * third it would have been orange on orange, invisible exactly where the
    * emphasis lands. Paper reads on all three.
    */
-  const onPanels = visual.kind === 'films' || visual.kind === 'fields' || visual.kind === 'product';
+  const onPanels = visual.kind === 'films' || visual.kind === 'fields' || visual.kind === 'product' || visual.kind === 'audit';
   const heroColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
   const restColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
 
@@ -148,7 +166,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    *
    * A soft band, only where the picture underneath has type in it.
    */
-  if (visual.kind === 'product' && beat.phrases.length) {
+  if ((visual.kind === 'product' || visual.kind === 'audit') && beat.phrases.length) {
     /*
      * IN FRONT of the page, not behind it.
      *
@@ -295,7 +313,7 @@ function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
   x: number; top: number; lineGap: number; anchor: number; width: number; heroScale: number;
 } {
 
-  if (visual.kind === 'clip' || visual.kind === 'product') {
+  if (visual.kind === 'clip' || visual.kind === 'product' || visual.kind === 'audit') {
     // Low and left: the footage is the subject and the words are under it.
     /*
      * Centred on the band rather than left-anchored.
@@ -384,7 +402,7 @@ function cameraFor(beat: TimedBeat, visual: BeatVisual): Record<string, unknown>
    */
   const travel = Math.min(0.3, 0.05 * beat.durationSeconds);
   const curve = 'linear' as const;
-  if (visual.kind === 'product') {
+  if (visual.kind === 'product' || visual.kind === 'audit') {
     /*
      * The full push, kept.
      *
@@ -438,6 +456,119 @@ function visualObjects(
       reason: `The frame reacts to "${beat.emphasis ?? beat.line}".`,
       transform: Transform.parse({ x: 0.5, y: 1.2, z: 0.7, anchor: { x: 0.5, y: 1 } }),
     } as SceneObject];
+  }
+
+  if (visual.kind === 'audit' && options.assets[visual.assetId]) {
+    /*
+     * The page, and three marks made ON it, in the order the system works.
+     *
+     * The marks are placed as fractions of the beat rather than at fixed
+     * seconds, because the beat's length is the length of the reading and the
+     * reading changes whenever the line does. A mark at 1.2s would drift off
+     * its word the first time the voice came back a little faster.
+     */
+    const at = (fraction: number) => Math.max(0, Math.min(0.96, fraction));
+    const objects: SceneObject[] = [{
+      kind: 'ui_layer', id: `${beat.id}_page`, assetId: visual.assetId, semantic: 'page',
+      crop: {
+        x: visual.window.x, width: visual.window.width, height: visual.window.width / 1.111,
+        y: { from: visual.window.fromY, to: visual.window.toY, curve: 'in_out_cubic' },
+      },
+      width: 1.04, cornerRadiusPx: 0, shadow: false,
+      /*
+       * SUPPORT, not payload — and that is a statement about the beat, not a
+       * way past the inspector.
+       *
+       * Marking it payload put three things on screen asking to be read at
+       * once (the page, the caption, the marks) and the inspector said so. It
+       * was right, and the fix is the honest one: the payload of this beat is
+       * the ACT OF MARKING, not the page. The page is what the marking happens
+       * to — the ground. A beat whose payload is a wall of somebody else's
+       * body copy is the "screenshot with a camera move" the whole revision
+       * was meant to get away from.
+       */
+      role: 'support', enterAt: 0,
+      reason: 'The real page, square-on: the ground the marks are made on.',
+      transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+    } as SceneObject];
+
+    // UNDERLINE: drawn left to right, the way a person reads.
+    objects.push({
+      kind: 'shape', id: `${beat.id}_underline`, shape: 'rect',
+      width: { keyframes: [
+        { t: 0, value: 0 },
+        { t: at(visual.marks.underlineAt), value: 0, curve: 'linear' },
+        { t: at(visual.marks.underlineAt + 0.14), value: 0.34, curve: 'out_expo' },
+        { t: 1, value: 0.34 },
+      ], curve: 'out_expo' },
+      height: 0.006,
+      fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+      role: 'structure', enterAt: 0,
+      reason: 'One line on the page, underlined: the system reading what is actually there.',
+      transform: Transform.parse({ x: 0.13, y: 0.54, anchor: { x: 0, y: 0.5 } }),
+    } as SceneObject);
+    audio.push({
+      at: beat.durationSeconds * at(visual.marks.underlineAt), kind: 'ui_click', intensity: 0.28,
+      causedBy: `${beat.id}_underline`, reason: 'The underline is drawn.',
+    });
+
+    // PIN: the evidence kept, as a small solid mark at the end of the line.
+    objects.push({
+      kind: 'shape', id: `${beat.id}_pin`, shape: 'rect',
+      /*
+       * IN THE MARGIN, beside the line it refers to.
+       *
+       * It was at x 0.49 in the middle of the text column, where it landed
+       * inside a sentence — "what ▪ does" — and read as a redaction block or a
+       * rendering fault rather than as a mark somebody made. A pin belongs
+       * where a person would put one: in the margin, level with the line it
+       * points at, touching nothing.
+       */
+      width: 0.016, height: 0.03,
+      fill: palette.amber, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 2,
+      role: 'structure', enterAt: beat.durationSeconds * at(visual.marks.pinAt),
+      reason: 'Pinned as evidence, in the margin: the verbatim excerpt kept behind the fact.',
+      transform: Transform.parse({ x: 0.082, y: 0.54, anchor: { x: 0, y: 0.5 }, opacity: 0.95 }),
+    } as SceneObject);
+    audio.push({
+      at: beat.durationSeconds * at(visual.marks.pinAt), kind: 'ui_click', intensity: 0.34,
+      causedBy: `${beat.id}_pin`, reason: 'The excerpt is pinned.',
+    });
+
+    /*
+     * STRIKE: the verb that makes this film different from a screenshot tour.
+     * Something on the page is crossed out, because the system reports what it
+     * cannot trace rather than repeating it.
+     */
+    objects.push({
+      kind: 'shape', id: `${beat.id}_strike`, shape: 'rect',
+      width: { keyframes: [
+        { t: 0, value: 0 },
+        { t: at(visual.marks.strikeAt), value: 0, curve: 'linear' },
+        { t: at(visual.marks.strikeAt + 0.08), value: 0.4, curve: 'out_expo' },
+        { t: 1, value: 0.4 },
+      ], curve: 'out_expo' },
+      /*
+       * Thicker than the underline, and ON the words rather than beneath them.
+       *
+       * At the same weight and the same offset, the strike read as a second
+       * underline — the frame had two orange rules under two lines of text and
+       * no sense that anything had been rejected. A strike has to cross the
+       * thing it cancels, and it has to be heavier than the mark that means
+       * "kept", or the film's two most important verbs look identical.
+       */
+      height: 0.014,
+      fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+      role: 'payload', enterAt: 0,
+      reason: 'Struck out: a claim the system could not trace to the page.',
+      transform: Transform.parse({ x: 0.13, y: 0.617, anchor: { x: 0, y: 0.5 }, opacity: 0.92 }),
+    } as SceneObject);
+    audio.push({
+      at: beat.durationSeconds * at(visual.marks.strikeAt), kind: 'impact', intensity: 0.5,
+      causedBy: `${beat.id}_strike`, reason: 'The claim is struck out. This is the film performing its own thesis.',
+    });
+
+    return objects;
   }
 
   if (visual.kind === 'product' && options.assets[visual.assetId]) {
@@ -533,11 +664,83 @@ function visualObjects(
         sourceInSeconds: 1.2 + i * 2.4, playbackRate: 1, generated: true,
         role: 'support', enterAt: 0.12 + i * 0.05,
         reason: 'One of the three directions, as the film it actually is.',
+        /*
+         * A rejected direction loses its confidence.
+         *
+         * A mark alone says "scored"; the picture going quiet under it says
+         * "and this one did not pass". The other two hold, so the beat reads
+         * as a judgement between three things rather than as an effect applied
+         * to all of them.
+         */
         transform: Transform.parse({
           x: (i + 0.5) * share, y: 0.44, z: 0.2, anchor: { x: 0.5, y: 0.5 },
-          opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.14, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
+          opacity: (visual.verdicts?.[i] ?? 'pass') === 'fail'
+            ? { keyframes: [
+                { t: 0, value: 0 },
+                { t: 0.14, value: 1, curve: 'out_cubic' },
+                { t: 0.6 + i * 0.07, value: 1, curve: 'linear' },
+                { t: 0.72 + i * 0.07, value: 0.42, curve: 'out_cubic' },
+                { t: 1, value: 0.42 },
+              ], curve: 'out_cubic' }
+            : { keyframes: [{ t: 0, value: 0 }, { t: 0.14, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
         }),
       } as SceneObject);
+
+      /*
+       * THE VERDICT, which is what makes this a scoring beat rather than a
+       * gallery.
+       *
+       * Three directors watching the film independently said the same thing
+       * about this passage: it counts to three, and counting is not proving.
+       * "Not one safe idea. Three." was answered by three coloured panels,
+       * which — as one of them put it — could belong to any company with three
+       * brand colours. A mark per panel, and one of them struck, is the
+       * difference between enumerating options and showing them judged.
+       *
+       * The struck lane is the film's own claim about itself: it fails its
+       * work before the customer sees it. Deliberately ONE lane, because a
+       * system that rejected everything would not be a system anybody would
+       * buy.
+       */
+      const verdict = visual.verdicts?.[i] ?? 'pass';
+      const failed = verdict === 'fail';
+      objects.push({
+        kind: 'shape', id: `${beat.id}_verdict_${i}`, shape: 'rect',
+        width: { keyframes: [
+          { t: 0, value: 0 },
+          { t: 0.52 + i * 0.07, value: 0, curve: 'linear' },
+          { t: 0.6 + i * 0.07, value: failed ? share * 0.62 : share * 0.16, curve: 'out_expo' },
+          { t: 1, value: failed ? share * 0.62 : share * 0.16 },
+        ], curve: 'out_expo' },
+        height: failed ? 0.01 : 0.008,
+        fill: failed ? palette.accent : palette.paper,
+        stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: failed ? 'payload' : 'structure', enterAt: 0,
+        reason: failed
+          ? 'This direction was scored and rejected, struck across its own frame.'
+          : 'This direction passed its checks.',
+        /*
+         * ALL THREE ON ONE LINE, which is what makes them a verdict row.
+         *
+         * The failed mark was struck across the middle of its own panel, and
+         * at that position it read as part of that film's graphics rather than
+         * as a judgement passed on it — the two passing lanes had their marks
+         * in a row below, and the third was somewhere else entirely. Three
+         * marks on one line, two short and pale, one long and accent, is a
+         * scoreboard. One mark in the middle of a picture is a lower third.
+         */
+        transform: Transform.parse({
+          x: (i + 0.5) * share, y: 0.7,
+          z: 0.2, anchor: { x: 0.5, y: 0.5 }, opacity: failed ? 1 : 0.8,
+        }),
+      } as SceneObject);
+      if (failed) {
+        audio.push({
+          at: beat.durationSeconds * (0.6 + i * 0.07), kind: 'impact', intensity: 0.45,
+          causedBy: `${beat.id}_verdict_${i}`,
+          reason: 'The system fails its own work, audibly, before anybody else sees it.',
+        });
+      }
     });
     return objects;
   }
