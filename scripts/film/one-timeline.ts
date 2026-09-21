@@ -66,7 +66,40 @@ const brand = BrandSystem.parse({
 // ---------------------------------------------------------------------------
 
 const VOICE = process.env['ACT_ONE_VOICE'] ?? 'iP95p4xoKVk53GoZ742B';
-const MODEL = process.env['ACT_ONE_VOICE_MODEL'] ?? 'eleven_multilingual_v2';
+/*
+ * eleven_v3, AND THE REASON IT IS NOW RIGHT IS THE REASON IT WAS ONCE WRONG.
+ *
+ * This film ran on eleven_multilingual_v2 for a long time, chosen deliberately:
+ * v3 accepts no continuity at all — previous_text, next_text and
+ * previous_request_ids each hard-400 — so it reads every line as a cold start,
+ * and "rigid" and "disjointed" was what a critic said about the result. v2's
+ * continuity was worth more than v3's expressiveness.
+ *
+ * That was true of a film where every line was read with one direction. It is
+ * not true of this one. Each beat now carries its own register and its own
+ * written breath, so the continuity v2 was supplying is being supplied by the
+ * script instead — and what is left to compare is expressiveness, which is
+ * what v3 has.
+ *
+ * Measured rather than assumed, three readings of each finished mix by the ear
+ * that hears the whole thing:
+ *
+ *   soundsHuman            6.7 [6,7,7]  ->  8.0 [8,8,8]
+ *   toneMatchesClaim       8.0 [8,8,8]  ->  9.0 [9,9,9]
+ *   authoredTogether       7.7 [7,8,8]  ->  8.7 [9,8,9]
+ *   wouldYouKeepListening  7.3 [7,7,8]  ->  9.0 [9,9,9]
+ *
+ * Three of the four spreads do not overlap, which is what makes this a result
+ * rather than a coin toss on a critic with a one-point noise floor. The tells
+ * changed character too: v2's readings all said flat, mechanical, lacking
+ * natural pauses; one of v3's said the pacing and intonation "vary naturally,
+ * with subtle emphasis and pauses that mimic human thought".
+ *
+ * It also sits better in the mix unaided — the quietest line arrives 3.9 LU
+ * above the bed rather than 0.4, so the correction takes 0.6 dB of music out
+ * instead of 4.1.
+ */
+const MODEL = process.env['ACT_ONE_VOICE_MODEL'] ?? 'eleven_v3';
 /**
  * THE VOICE IS DIRECTED PER BEAT, not once for the whole film.
  *
