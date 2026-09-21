@@ -33,8 +33,15 @@ SHOTS = [
     ('l13', 46.4, 50.8), ('l14', 50.8, 54.0), ('l15', 54.0, 57.8),
 ]
 
-# Below this mean flow magnitude a frame counts as static. Same value as profile.py.
-STATIC_BELOW = 0.35
+# Below this mean flow magnitude a frame counts as static.
+#
+# 0.08, which is profile.py's value, and getting that wrong is what made this
+# tool lie. It first shipped with 0.35 and a comment claiming the two matched.
+# They did not, and at four times the threshold every shot in the film looked
+# frozen — including the ones a whole-film measurement showed had started
+# moving. A per-shot tool whose job is to explain a whole-film number has to
+# measure the same thing that number measures, or it explains something else.
+STATIC_BELOW = 0.08
 
 
 def measure(path: str) -> None:
@@ -60,7 +67,8 @@ def measure(path: str) -> None:
         for i in range(first + 1, last):
             grey_before = cv2.cvtColor(frames[i - 1], cv2.COLOR_BGR2GRAY)
             grey_now = cv2.cvtColor(frames[i], cv2.COLOR_BGR2GRAY)
-            flow = cv2.calcOpticalFlowFarneback(grey_before, grey_now, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            # The same Farneback parameters as profile.py, for the same reason.
+            flow = cv2.calcOpticalFlowFarneback(grey_before, grey_now, None, 0.5, 2, 13, 2, 5, 1.1, 0)
             mags.append(float(np.mean(np.linalg.norm(flow, axis=2))))
 
             # Hue only counts where there is enough saturation and light to see
