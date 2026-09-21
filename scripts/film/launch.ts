@@ -394,7 +394,7 @@ const scenes: Graph[] = [
       card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.42, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.36, 0.7, 'The terms, as a third.'),
       card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.76, y: 0.74, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.34, 1.0, 'The schedule, as a fourth.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 1.8,
+        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.42, maxLines: 2, enterAt: 1.8,
       }, { x: 0.18, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [
@@ -534,7 +534,7 @@ const stepTitle = (
  */
 const stepTravel = (
   id: string, body: string, asset: string,
-  window: { x: number; fromY: number; toY: number },
+  window: { x: number; width: number; fromY: number; toY: number },
   seconds: number, travel: Travel,
 ): Graph =>
   SceneGraph.parse({
@@ -545,8 +545,20 @@ const stepTravel = (
     objects: [
       {
         kind: 'ui_layer', id: `${id}_page`, assetId: asset, semantic: 'page',
+        /*
+         * The window is the page's own left column, and it was chosen by
+         * rendering candidates and looking at them.
+         *
+         * A 16:9 window on a 1.60:1 page needs `cropWidth / cropHeight` of
+         * 1.111 — that part is arithmetic. Where to put it is not. The first
+         * attempt centred a half-page window and every frame of the move cut
+         * the content column at both edges: "Fo..." and "Non..." hanging off
+         * the sides, a headline sliced down the middle. A page has a layout
+         * and a camera inside it has to respect that layout, the same way a
+         * camera in a room does not frame half a doorway.
+         */
         crop: {
-          x: window.x, width: 0.5, height: 0.45,
+          x: window.x, width: window.width, height: window.width / 1.111,
           y: { from: window.fromY, to: window.toY, curve: 'in_out_cubic' },
         },
         width: 1.08, cornerRadiusPx: 0, shadow: false,
@@ -599,12 +611,12 @@ scenes.push(
   stepTitle('l5', '01', 'We read your product.', 2.6, 2.0, 'ast_home'),
   // Travelling down the homepage: the camera is inside it.
   stepTravel('l6', 'A real capture, never a drawing of one.', 'ast_home',
-    { x: 0.05, fromY: 0.04, toY: 0.46 }, 4.6, { scale: [1.06, 1.0], focal: 70 }),
+    { x: 0.04, width: 0.44, fromY: 0.02, toY: 0.30 }, 4.6, { scale: [1.06, 1.0], focal: 70 }),
 
   stepTitle('l7', '02', 'Three directions.', 2.0, 1.5, 'ast_work'),
   // Travelling across the work: the same idea on the other axis.
   stepTravel('l8', 'Rendered and watched before one is chosen.', 'ast_work',
-    { x: 0.3, fromY: 0.5, toY: 0.12 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
+    { x: 0.04, width: 0.52, fromY: 0.34, toY: 0.08 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
 
   stepTitle('l9', '03', 'One afternoon.', 2.0, 1.5, 'ast_pricing'),
   /*
@@ -635,20 +647,29 @@ scenes.push(
  * the same time.
  */
 const TICKS = 30;
-const SPREAD_FROM = 0.16;
-const SPREAD_TO = 0.84;
-const GATHERED_AT = 0.18;
-const GATHERED_WIDTH = 0.05;
-const RULE_Y = 0.6;
+const SPREAD_FROM = 0.12;
+const SPREAD_TO = 0.88;
+const GATHERED_AT = 0.14;
+const GATHERED_WIDTH = 0.07;
+const RULE_Y = 0.68;
 
 const tick = (index: number, gathered: boolean): SceneObject => {
   const t = index / (TICKS - 1);
   const spread = SPREAD_FROM + t * (SPREAD_TO - SPREAD_FROM);
   const gather = GATHERED_AT + t * GATHERED_WIDTH;
-  const height = index % 5 === 0 ? 0.08 : 0.045;
+  /*
+   * Big enough to be the thing the film is about.
+   *
+   * The measure is the one image here that is neither type nor screenshot,
+   * a model watching an earlier cut called it the strongest moment in the
+   * film, and it was drawn at two thousandths of a frame wide and four
+   * hundredths tall — a row of hairlines occupying about two per cent of the
+   * picture. A hero device has to be able to carry a frame on its own.
+   */
+  const height = index % 5 === 0 ? 0.17 : 0.1;
   return {
     kind: 'shape', id: `tick_${index}`, shape: 'rect',
-    width: 0.0024, height,
+    width: 0.0045, height,
     fill: index % 5 === 0 ? 'accent' : 'onCanvas.primary',
     stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
     role: 'structure',
@@ -669,7 +690,7 @@ const measureRule = (drawn: boolean): SceneObject =>
   ({
     kind: 'shape', id: 'measure_rule', shape: 'rect',
     width: drawn ? SPREAD_TO - SPREAD_FROM + 0.02 : { from: 0, to: SPREAD_TO - SPREAD_FROM + 0.02, curve: 'out_expo' },
-    height: 0.0024,
+    height: 0.0045,
     fill: 'onCanvas.primary', stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
     role: 'structure',
     reason: 'The rule the measure is drawn on. It never moves, so the collapse is visible against it.',
@@ -690,7 +711,7 @@ scenes.push(
         maxWidth: 0.4, maxLines: 1,
       }, arrive({ x: 0.18 }, { x: 0.14, y: 0.28 }, { anchor: { x: 0, y: 0.5 } })),
       line('l11_sub', 'to make one launch film.', {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 1, enterAt: 0.7,
+        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.44, maxLines: 1, enterAt: 0.7,
       }, { x: 0.14, y: 0.375, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [
