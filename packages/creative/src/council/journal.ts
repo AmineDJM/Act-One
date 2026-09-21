@@ -66,8 +66,22 @@ export class CreativeJournal {
     return this.entries;
   }
 
+  /**
+   * Never throws on content, only on a programming mistake.
+   *
+   * A too-long `why` used to fail the parse and take the whole run down —
+   * after a five-director screening and a revision plan had already been paid
+   * for and printed. A journal is a memory aid. It recording less than it was
+   * asked to is a small loss; it destroying the work it was asked to remember
+   * is an absurd one, so an over-long field is trimmed with a marker rather
+   * than refused.
+   */
   record(kind: JournalKind, what: string, why = '', refs: readonly string[] = []): void {
-    this.entries.push(JournalEntry.parse({ at: new Date().toISOString(), kind, what, why, refs: [...refs] }));
+    const trim = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
+    this.entries.push(JournalEntry.parse({
+      at: new Date().toISOString(), kind,
+      what: trim(what, 400), why: trim(why, 400), refs: refs.slice(0, 6).map((r) => trim(r, 160)),
+    }));
     mkdirSync(path.dirname(this.file), { recursive: true });
     writeFileSync(this.file, JSON.stringify(this.entries, null, 2));
   }

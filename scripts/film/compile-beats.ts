@@ -845,9 +845,17 @@ function visualObjects(
       objects.push({
         kind: 'clip', id: `${beat.id}_film_${i}`, assetId,
         crop: { x: 0, y: 0, width: 1, height: 1 },
-        // Inset inside its own colour field, so the panel reads as a frame
-        // around the film rather than the film reaching for the seam.
-        width: share * 0.82,
+        /*
+         * BIGGER, because four of five directors could not read them.
+         *
+         * "Visual evidence is too small to read or appreciate." "The claim of
+         * rendering, scoring and failing is not proven." At a quarter of the
+         * frame each, three dense interface renders are three grey rectangles,
+         * and a beat whose entire job is to be EVIDENCE cannot be evidence at
+         * a size nobody can inspect. The inset is now the thinnest margin that
+         * still reads as a frame rather than a seam.
+         */
+        width: share * 0.94,
         // Each starts at a different second so three films at once do not cut
         // in step and read as one image in three panels.
         sourceInSeconds: 1.2 + i * 2.4, playbackRate: 1, generated: true,
@@ -893,6 +901,33 @@ function visualObjects(
        */
       const verdict = visual.verdicts?.[i] ?? 'pass';
       const failed = verdict === 'fail';
+
+      /*
+       * A REJECTION HAS TO BE VISIBLE AT A GLANCE.
+       *
+       * A thin rule in a verdict row and a dimmed panel were not enough: the
+       * room still reported the failure as unproven. So the struck lane also
+       * gets the accent through the film ITSELF, at the weight of the strike
+       * in the audit beats — the same verb, in the same colour, doing the same
+       * thing to a render that it does to a page. That is what makes it a
+       * grammar rather than two unrelated effects.
+       */
+      if (failed) {
+        objects.push({
+          kind: 'shape', id: `${beat.id}_struck_${i}`, shape: 'rect',
+          width: { keyframes: [
+            { t: 0, value: 0 },
+            { t: 0.6 + i * 0.07, value: 0, curve: 'linear' },
+            { t: 0.7 + i * 0.07, value: share * 0.94, curve: 'out_quint' },
+            { t: 1, value: share * 0.94 },
+          ], curve: 'out_quint' },
+          height: 0.0072,
+          fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+          role: 'payload', enterAt: 0,
+          reason: 'The rejected direction, struck through the render itself.',
+          transform: Transform.parse({ x: (i + 0.5) * share, y: 0.44, z: 0.1, anchor: { x: 0.5, y: 0.5 } }),
+        } as SceneObject);
+      }
       objects.push({
         kind: 'shape', id: `${beat.id}_verdict_${i}`, shape: 'rect',
         width: { keyframes: [
@@ -904,9 +939,15 @@ function visualObjects(
         height: failed ? 0.01 : 0.008,
         fill: failed ? palette.accent : palette.paper,
         stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
-        role: failed ? 'payload' : 'structure', enterAt: 0,
+        /*
+         * The row is STRUCTURE, even for the failed lane. The payload of this
+         * beat is the strike through the render; a second payload in the
+         * verdict row put three things on screen asking to be read at once and
+         * the inspector said so. A scoreboard is a scoreboard, not a headline.
+         */
+        role: 'structure', enterAt: 0,
         reason: failed
-          ? 'This direction was scored and rejected, struck across its own frame.'
+          ? 'The mark on a lane that did not pass.'
           : 'This direction passed its checks.',
         /*
          * ALL THREE ON ONE LINE, which is what makes them a verdict row.
