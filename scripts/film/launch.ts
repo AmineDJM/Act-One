@@ -826,14 +826,22 @@ scenes.push(
            */
           role: 'support',
           reason: 'One of the three directions, as the film it actually is.',
-          transform: Transform.parse({ x, y: 0.5, z: 0.2, anchor: { x: 0.5, y: 0.5 }, opacity: ARRIVES }),
+          transform: Transform.parse({ x, y: 0.6, z: 0.2, anchor: { x: 0.5, y: 0.5 }, opacity: ARRIVES }),
         }) as SceneObject),
       line('l7_index', '02', {
         token: 'mono', color: PAPER, maxWidth: 0.1, maxLines: 1, role: 'structure', enterAt: 0.7,
-      }, { x: 0.09, y: 0.3, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
+      }, { x: 0.09, y: 0.13, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
+      /*
+       * The line sits ABOVE the films, not across them.
+       *
+       * At y 0.44 with the films centred at 0.5 it was drawn straight over the
+       * first one — the title illegible, the film illegible, and the frame
+       * reading as a mistake rather than as a layout. The films are in the
+       * lower half now and the line has the top of the fields to itself.
+       */
       line('l7_title', 'Three directions.', {
         maxWidth: 0.46, maxLines: 2, color: PAPER, stagger: 0.07, enterAt: 0.75,
-      }, { x: 0.09, y: 0.44, anchor: { x: 0, y: 0.5 } }),
+      }, { x: 0.09, y: 0.26, anchor: { x: 0, y: 0.5 } }),
     ],
     audio: [
       { at: 0.02, kind: 'impact', intensity: 0.5, causedBy: 'l7_field_0', reason: 'The first field lands.' },
