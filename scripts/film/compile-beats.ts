@@ -24,7 +24,15 @@ export type Palette = {
 };
 
 /** What a beat looks like. The narration says what it MEANS; this says what it IS. */
-export type BeatVisual = { receipt?: Receipt } & (
+export type BeatVisual = {
+  receipt?: Receipt;
+  /**
+   * What the SCREEN says, when the turn of the beat is not the best thing to
+   * show. Editorial copy, free to differ from the spoken line — never a
+   * subtitle, and never labelled as one.
+   */
+  editorial?: string;
+} & (
   | { kind: 'statement'; field: string | null }
   | { kind: 'mark' }
   | { kind: 'product'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; holdIndex?: number }
@@ -415,7 +423,10 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * A soft band, only where the picture underneath has type in it.
    */
   const bandAtTop = visual.kind === 'audit' && variant > 0;
-  if ((visual.kind === 'product' || visual.kind === 'audit') && beat.phrases.length) {
+  const shownCount = visual.editorial === ''
+    ? 0
+    : beat.phrases.filter((phrase) => phrase.carriesEmphasis).length || (beat.phrases.length > 0 ? 1 : 0);
+  if ((visual.kind === 'product' || visual.kind === 'audit') && shownCount > 0) {
     /*
      * IN FRONT of the page, not behind it.
      *
@@ -456,7 +467,47 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     } as SceneObject);
   }
 
-  beat.phrases.forEach((phrase, i) => {
+  /*
+   * THE SCREEN IS NOT THE SUBTITLE TRACK.
+   *
+   * Three directors of five called this critical, from three different
+   * lenses, at the very first second: "the film acts as a subtitle track to
+   * the voiceover rather than utilising the visual medium", "the visuals
+   * duplicate the audio rather than complementing it". They are right, and
+   * the fault is mine rather than the architecture's.
+   *
+   * Building the typography from the measured performance was the correct fix
+   * for a real problem — captions used to drift from what was said, and they
+   * cannot now. But the brief that asked for it also asked for three separate
+   * things: NARRATION, SUBTITLES, and ON-SCREEN EDITORIAL COPY, with the
+   * editorial layer free to say something the voice does not. I built the
+   * first two and never built the third, so every word on screen was the
+   * sentence being spoken, at the second it was spoken. A film that shows you
+   * what you are already hearing has spent its typography on nothing.
+   *
+   * So the screen carries the TURN of the beat and the voice carries the
+   * sentence. It is the reference grammar — one phrase large while the read
+   * does the rest — and it costs nothing structurally: the phrase that
+   * remains is still the one the performance measured, so it still lands on
+   * the word it lands on. The redundancy goes; the coupling stays.
+   *
+   * `editorial` overrides it where the turn is not the best thing to show.
+   */
+  const editorial = visual.editorial;
+  /*
+   * An EMPTY editorial string means the screen says nothing on this beat, and
+   * that is a decision rather than an omission. Where the picture already IS
+   * the answer to the line, repeating the line is the duplication the whole
+   * editorial layer exists to stop.
+   */
+  const hero = beat.phrases.filter((phrase) => phrase.carriesEmphasis);
+  const shown = editorial === ''
+    ? []
+    : editorial
+      ? hero.map((phrase) => ({ ...phrase, text: editorial }))
+      : hero;
+
+  (shown.length > 0 || editorial === '' ? shown : beat.phrases.slice(-1)).forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
     /*
      * A HERO PHRASE THAT IS ONE WORD EARNS IMAGE SCALE.
@@ -474,7 +525,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     const heroScale = hero && words <= 2
       ? composition.heroScale * 1.9
       : composition.heroScale;
-    const next = beat.phrases[i + 1];
+    const next = shown[i + 1];
     // Out as the next one arrives, with a breath of overlap so the frame is
     // never empty between two things being said.
     /*
@@ -1078,20 +1129,29 @@ function visualObjects(
         staggerBy: 'none', staggerSeconds: 0,
         role: 'support', enterAt: 0,
         reason: `What direction ${i + 1} is, set the way that direction sets things.`,
+        /*
+         * CENTRED IN THEIR COLUMN AND LARGE, because they are the subject.
+         *
+         * Set small at the foot they were captions under three colour blocks,
+         * and four directors of five reported exactly that twice running:
+         * "claims three creative directions but displays flat color blocks".
+         * The label is not a caption for the field — it IS the direction, and
+         * three columns each setting one word its own way is the only thing
+         * that can be shown at this size that actually differs between three
+         * art directions.
+         *
+         * They arrive almost immediately. At a third of the way in, the first
+         * second of a 2.7-second beat was three empty blocks, which is what
+         * the room was looking at when it said so.
+         */
         transform: Transform.parse({
-          x: (i + 0.5) / visual.colours.length, y: 0.82, z: 0.5,
+          x: (i + 0.5) / visual.colours.length, y: 0.5, z: 0.5,
           anchor: { x: 0.5, y: 0.5 }, scale: label.scale,
           opacity: { keyframes: [
             { t: 0, value: 0 },
-            /*
-             * Earlier. They arrived a third of the way in, so for the first
-             * second of the beat the frame was three flat blocks — which is
-             * precisely what the room reported seeing. A direction has to be
-             * on screen while the line that promises three of them is said.
-             */
-            { t: 0.06 + i * 0.05, value: 0, curve: 'linear' },
-            { t: 0.16 + i * 0.05, value: 0.92, curve: 'out_quint' },
-            { t: 1, value: 0.92 },
+            { t: 0.03 + i * 0.045, value: 0, curve: 'linear' },
+            { t: 0.13 + i * 0.045, value: 0.94, curve: 'out_quint' },
+            { t: 1, value: 0.94 },
           ], curve: 'out_quint' },
         }),
       } as SceneObject);

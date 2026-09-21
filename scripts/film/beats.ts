@@ -289,12 +289,22 @@ export const VISUALS: Record<string, BeatVisual> = {
   b7: {
     kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
     labels: [
-      // Bigger across the board: at the previous scales these read as captions
-      // rather than as the directions themselves.
-      { text: 'Paper', token: 'mono', scale: 1.5 },
-      { text: 'Depth', token: 'display', scale: 0.8 },
-      { text: 'Field', token: 'statement', scale: 1.05 },
+      // Three words, three registers, each filling its own column. The
+      // difference between them is the thing a creative direction actually is.
+      { text: 'Paper', token: 'mono', scale: 2.4 },
+      { text: 'Depth', token: 'display', scale: 1.15 },
+      { text: 'Field', token: 'statement', scale: 1.6 },
     ],
+    /*
+     * THE SCREEN SAYS NOTHING HERE, and that is the point.
+     *
+     * The voice says "Not one safe idea. Three." and the picture answers it
+     * with three visibly different typographic worlds. Setting the word
+     * "Three." over them as well would be the film reading its own soundtrack
+     * aloud — the exact duplication three directors called critical at the top
+     * of the film. The count is the picture; the line is the voice.
+     */
+    editorial: '',
     receipt: RECEIPT,
   },
   // The three real renders this system made, at the beat that says they are
