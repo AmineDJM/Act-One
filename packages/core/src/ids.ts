@@ -57,7 +57,9 @@ export type IdPrefix =
   | 'ddn'
   | 'cev'
   | 'cpf'
-  | 'sig';
+  | 'sig'
+  /* A reference film in the permanent benchmark corpus. */
+  | 'bmf';
 
 /**
  * Prefixed, sortable-ish ids. The timestamp prefix keeps ids roughly ordered by

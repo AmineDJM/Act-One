@@ -210,6 +210,39 @@ export function loadBenchmarkLab(directory = '.renders/ref', cacheFile = '.rende
 }
 
 /**
+ * The corpus as it lives in the database, rather than on one machine's disk.
+ *
+ * The file-backed loader above reads `.renders/ref`, which is where the first
+ * three references were analysed and where they only ever existed — on whatever
+ * machine last ran the script. This takes the same profiles from the permanent
+ * corpus, so a film uploaded in the console is retrievable immediately and from
+ * anywhere. Both produce the same shape and feed the same retrieval; there is
+ * no second code path for "real" references.
+ */
+export function labFromCorpus(
+  rows: readonly { id: string; title: string; durationSeconds: number; measured: Record<string, unknown> | null; reading: Record<string, unknown> | null }[],
+): BenchmarkLab {
+  const films: ReferenceFilmProfile[] = rows.map((row) => {
+    const measured = row.measured ?? {};
+    const times = measured['cutTimes'] ?? measured['boundaries'];
+    const cuts = Array.isArray(times) ? (times as number[]).filter((t) => typeof t === 'number') : null;
+    const mechanisms = mechanismsFrom(row.title || row.id, row.reading ?? {}, cuts);
+    return {
+      id: row.title || row.id,
+      durationSeconds: row.durationSeconds,
+      measured,
+      read: row.reading ?? {},
+      mechanisms,
+      character: String((row.reading?.['narrative'] as Record<string, unknown> | undefined)?.['thesis'] ?? '') || `${row.title}: ${mechanisms.length} mechanisms read.`,
+    };
+  });
+  const empty = films
+    .filter((f) => f.mechanisms.length === 0)
+    .map((f) => ({ id: f.id, why: 'Present in the corpus, but its reading describes no moments.' }));
+  return { films, empty };
+}
+
+/**
  * The most relevant mechanisms for ONE creative problem.
  *
  * Deliberately narrow. The caller states the problem it actually has — "the

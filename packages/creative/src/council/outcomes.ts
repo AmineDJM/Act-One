@@ -75,7 +75,17 @@ export const InterventionOutcome = z.object({
   result: z.enum(['improved', 'regressed', 'unclear', 'reverted']).default('unclear'),
   /** True when other changes shipped in the same render. */
   confounded: z.boolean().default(false),
-  note: z.string().max(400).default(''),
+  /*
+   * Room for the lesson, not just the label.
+   *
+   * This was 400 and the first genuinely clean A/B in the dataset would not
+   * fit in it. The note is where the transferable part lives — why the result
+   * was what it was, what the experiment accidentally measured about the
+   * instrument, what a later reader must not conclude — and truncating that
+   * leaves a row that records an event without recording what was learned
+   * from it, which is the only reason the row exists.
+   */
+  note: z.string().max(1200).default(''),
 });
 export type InterventionOutcome = z.infer<typeof InterventionOutcome>;
 

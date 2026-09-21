@@ -56,6 +56,7 @@ export * from './domain/caption.ts';
 export * from './domain/localization.ts';
 export * from './domain/direction.ts';
 export * from './domain/collections.ts';
+export * from './domain/benchmark.ts';
 export * from './domain/referral.ts';
 export * from './domain/editorial.ts';
 export * from './domain/speech-usage.ts';

@@ -34,6 +34,7 @@ import type {
   BetaApplication,
   BetaApplicationStatus,
   CollectionEntry,
+  BenchmarkFilm,
   Referral,
   Article,
   ArticleTopic,
@@ -78,7 +79,8 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
+import type {
+  BenchmarkFilmQuery, ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -115,6 +117,7 @@ export class MemoryStore implements Store {
     applications: new Map<string, BetaApplication>(),
     collections: new Map<string, CollectionEntry>(),
     referrals: new Map<string, Referral>(),
+    benchmarkFilms: new Map<string, BenchmarkFilm>(),
     articles: new Map<string, Article>(),
     topics: new Map<string, ArticleTopic>(),
     renders: new Map<string, Render>(),
@@ -241,6 +244,38 @@ export class MemoryStore implements Store {
       const counts: Record<string, number> = {};
       for (const entry of this.tables.collections.values()) counts[entry.status] = (counts[entry.status] ?? 0) + 1;
       return counts;
+    },
+  };
+
+  readonly benchmarkFilms = {
+    create: async (film: BenchmarkFilm) => {
+      // The same file twice is the same reference, and re-analysing it teaches
+      // nothing. The unique index says so in Postgres; this says so here.
+      for (const existing of this.tables.benchmarkFilms.values()) {
+        if (existing.storageKey === film.storageKey) throw new AppError('conflict', 'That reference film is already in the corpus.');
+      }
+      this.tables.benchmarkFilms.set(film.id, film);
+      return film;
+    },
+    get: async (id: string) => this.tables.benchmarkFilms.get(id) ?? null,
+    list: async (query: BenchmarkFilmQuery = {}) =>
+      [...this.tables.benchmarkFilms.values()]
+        .filter((film) => !query.status || film.status === query.status)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, query.limit ?? 500),
+    usable: async () =>
+      [...this.tables.benchmarkFilms.values()]
+        .filter((film) => film.status === 'analysed' || film.status === 'partial')
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    update: async (id: string, patch: Partial<BenchmarkFilm>) => {
+      const current = this.tables.benchmarkFilms.get(id);
+      if (!current) throw new AppError('not_found', 'No such reference film.');
+      const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+      this.tables.benchmarkFilms.set(id, next);
+      return next;
+    },
+    remove: async (id: string) => {
+      this.tables.benchmarkFilms.delete(id);
     },
   };
 

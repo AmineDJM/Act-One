@@ -9,6 +9,8 @@ import type {
   CollectionCategory,
   CollectionEntry,
   CollectionStatus,
+  BenchmarkFilm,
+  BenchmarkStatus,
   Referral,
   ReferralStage,
   Article,
@@ -112,6 +114,7 @@ export interface Store {
   readonly applications: BetaApplicationRepo;
   readonly collections: CollectionRepo;
   readonly referrals: ReferralRepo;
+  readonly benchmarkFilms: BenchmarkFilmRepo;
   readonly articles: ArticleRepo;
   readonly topics: ArticleTopicRepo;
   readonly brandVoices: BrandVoiceRepo;
@@ -727,6 +730,27 @@ export interface ReferralRepo {
   /** How many of this person's referrals have ever been rewarded. */
   countRewardedFor(inviterUserId: string): Promise<number>;
   countByStage(): Promise<Record<string, number>>;
+}
+
+/**
+ * The permanent reference corpus.
+ *
+ * `list` returns everything including disabled and failed films, because the
+ * console's job is to show the corpus honestly. `usable` is the narrower set
+ * retrieval is allowed to draw on, and the split exists so that no caller can
+ * accidentally treat a failed analysis as taste calibration.
+ */
+export type BenchmarkFilmQuery = { status?: BenchmarkStatus; limit?: number };
+
+export interface BenchmarkFilmRepo {
+  create(film: BenchmarkFilm): Promise<BenchmarkFilm>;
+  get(id: string): Promise<BenchmarkFilm | null>;
+  list(query?: BenchmarkFilmQuery): Promise<BenchmarkFilm[]>;
+  /** Analysed or partial, never disabled or failed: what retrieval may use. */
+  usable(): Promise<BenchmarkFilm[]>;
+  update(id: string, patch: Partial<BenchmarkFilm>): Promise<BenchmarkFilm>;
+  /** Removes the row. The stored original is the caller's to delete. */
+  remove(id: string): Promise<void>;
 }
 
 /** The journal: articles, and the topics waiting to become one. */

@@ -5,7 +5,7 @@ import {
   CriticReview,
   DirectorDecision,
 } from '@act-one/core';
-import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, Referral as ReferralSchema } from '@act-one/core';
+import { BenchmarkFilm as BenchmarkFilmSchema, Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
   AppError,
@@ -36,6 +36,7 @@ import type {
   BetaApplication,
   BetaApplicationStatus,
   CollectionEntry,
+  BenchmarkFilm,
   Referral,
   Article,
   ArticleTopic,
@@ -81,7 +82,8 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
+import type {
+  BenchmarkFilmQuery, ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -2944,6 +2946,83 @@ export class PgStore implements Store {
       this.asPlatform(async (c) => {
         const r = await c.query<{ status: string; count: number }>('SELECT status, COUNT(*)::int AS count FROM collection_entries GROUP BY status');
         return Object.fromEntries(r.rows.map((row) => [row.status, num(row.count)]));
+      }),
+  };
+
+  readonly benchmarkFilms = {
+    create: async (film: BenchmarkFilm) =>
+      this.asPlatform(async (c) => {
+        try {
+          await c.query(
+            `INSERT INTO benchmark_films
+               (id, title, storage_key, original_filename, byte_size, duration_seconds,
+                status, note, data, mechanism_count, analysed_at, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [
+              film.id, film.title, film.storageKey, film.originalFilename, film.byteSize, film.durationSeconds,
+              film.status, film.note, film, film.mechanismCount, film.analysedAt, film.createdAt, film.updatedAt,
+            ],
+          );
+        } catch (error) {
+          // The same file twice is the same reference; re-analysing it teaches nothing.
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That reference film is already in the corpus.');
+          throw error;
+        }
+        return film;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM benchmark_films WHERE id = $1', [id]);
+        return r.rows[0] ? BenchmarkFilmSchema.parse(r.rows[0]['data']) : null;
+      }),
+
+    list: async (query: BenchmarkFilmQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const where = query.status ? 'WHERE status = $1' : '';
+        const params = query.status ? [query.status, query.limit ?? 500] : [query.limit ?? 500];
+        const r = await c.query(
+          `SELECT data FROM benchmark_films ${where} ORDER BY created_at DESC LIMIT $${params.length}`,
+          params,
+        );
+        return r.rows.map((row) => BenchmarkFilmSchema.parse(row['data']));
+      }),
+
+    /*
+     * Analysed or partial only. Failed and disabled films are deliberately
+     * unreachable from here: a reference that contributes nothing while
+     * looking like taste calibration is worse than one that is absent.
+     */
+    usable: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query(
+          `SELECT data FROM benchmark_films WHERE status IN ('analysed','partial') ORDER BY created_at ASC`,
+        );
+        return r.rows.map((row) => BenchmarkFilmSchema.parse(row['data']));
+      }),
+
+    update: async (id: string, patch: Partial<BenchmarkFilm>) =>
+      this.asPlatform(async (c) => {
+        const current = await c.query('SELECT data FROM benchmark_films WHERE id = $1 FOR UPDATE', [id]);
+        if (!current.rows[0]) throw new AppError('not_found', 'No such reference film.');
+        const next = BenchmarkFilmSchema.parse({
+          ...(current.rows[0]['data'] as object),
+          ...patch,
+          updatedAt: new Date().toISOString(),
+        });
+        await c.query(
+          `UPDATE benchmark_films
+              SET title = $2, status = $3, note = $4, data = $5, mechanism_count = $6,
+                  duration_seconds = $7, analysed_at = $8, updated_at = $9
+            WHERE id = $1`,
+          [id, next.title, next.status, next.note, next, next.mechanismCount, next.durationSeconds, next.analysedAt, next.updatedAt],
+        );
+        return next;
+      }),
+
+    remove: async (id: string) =>
+      this.asPlatform(async (c) => {
+        await c.query('DELETE FROM benchmark_films WHERE id = $1', [id]);
       }),
   };
 

@@ -16,3 +16,4 @@ export * from './film-measure.ts';
 export * from './film-reading.ts';
 export * from './model-json.ts';
 export * from './benchmark-lab.ts';
+export * from './benchmark-analysis.ts';
