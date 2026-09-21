@@ -385,14 +385,30 @@ const scenes: Graph[] = [
     id: 'l3', durationSeconds: 5.2,
     intent: 'PAIN SHOWN: four pages fly in from off-frame while the camera cranes across the desk.',
     background: PAPER,
-    camera: camera({ x: [0.13, -0.13], y: [-0.05, 0.05], scale: [1.16, 1.02], focal: [88, 76], dolly: [0, 0.45] }),
+    camera: camera({ x: [0.06, -0.05], y: [-0.03, 0.03], scale: [1.3, 1.06], focal: [95, 82], dolly: [0, 0.3] }),
     objects: [
       bloom('l3_bloom', { x: 0.5, y: 0.45 }, '#FFE8D8', 0.9),
       chapterWord('l3_chapter', 'SIX WEEKS', '#DCD3C4'),
-      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.26, y: 0.36, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.38, 0.05, 'The brief, as one of too many pages.'),
-      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.68, y: 0.34, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.40, 0.35, 'The references, as another.'),
-      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.42, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.36, 0.7, 'The terms, as a third.'),
-      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.76, y: 0.74, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.34, 1.0, 'The schedule, as a fourth.'),
+      /*
+       * A PILE, NOT A CONSTELLATION.
+       *
+       * These four sat spread across the frame at even intervals, each one
+       * turned a different way — and a model watching the cut called exactly
+       * this moment "generic SaaS tropes (floating UI)... a template". It was
+       * right. Four screenshots hovering in tidy isolation is the single most
+       * recognisable gesture in automated software video, and it is also
+       * nothing like what the shot is about: pages accumulating on the desk
+       * the film just opened on.
+       *
+       * So they overlap, they land heavily on top of one another, and they
+       * share a shallow angle the way a real stack does instead of each
+       * pointing somewhere different. The physical world of the first shot
+       * carries into the second rather than being abandoned for a grid.
+       */
+      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.40, y: 0.46, z: 0.30 }, { rx: 4, ry: 7, rz: -7 }, 0.46, 0.05, 'The brief, first onto the pile.'),
+      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.52, y: 0.42, z: 0.10 }, { rx: 3, ry: 5, rz: 4 }, 0.46, 0.32, 'The references, dropped on top of it.'),
+      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.46, y: 0.56, z: -0.08 }, { rx: 5, ry: 8, rz: -2 }, 0.46, 0.62, 'The terms, on top of those.'),
+      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.58, y: 0.52, z: -0.26 }, { rx: 3, ry: 4, rz: 8 }, 0.46, 0.92, 'The schedule, last onto the heap.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
         token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.42, maxLines: 2, enterAt: 1.8,
       }, { x: 0.18, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),

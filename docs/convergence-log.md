@@ -187,3 +187,60 @@ references by this instrument.
    where colour is the subject, which is what lets the restraint everywhere
    else read as a choice.
 3. The window's end position, moved to land on whole content.
+
+---
+
+## Iterations 5–7 — the audio, and a pile instead of a constellation
+
+**Three instruments produced confident wrong numbers in this stretch**, and
+each would have sent somebody to fix something that was not broken. They are
+recorded here because the pattern matters more than any one of them.
+
+1. `sync_check` reported the master at **+0.37 dBFS — apparently clipping**.
+   It folds to mono for onset detection, which SUMS the channels. The file
+   peaks at −1.98 and was never near the ceiling.
+2. The profiler reported the film **58% silent**. `silentShare` normalises by
+   the film's own loudest second, so one hard impact drags every other second
+   below the threshold.
+3. `bedRms` said the music bed was three times quieter than the references
+   even after the mix was demonstrably balanced. Printing the design settled
+   it: cues at −11 dB under a −8 dB bed, three decibels BELOW it. The metric
+   was reporting the music's character — a 124bpm percussive track has space
+   between its hits, so its median at a tenth of a second falls in the gaps.
+
+**One real audio finding survived all that.** The bed sat at −13 dB, which is
+where a bed goes when a voice has to be heard over it, applied to a film with
+no voice. A first fix made the level depend on `hasVoiceOver` and a test
+caught it — the bed used to drop to −18 for the whole film the moment there
+was narration, and the sidechain is what makes room dynamically. The test was
+right. Raising the single unconditional level to −8 dB respects it.
+
+Audio now: meanRms 0.19 against reference 1's 0.1916, 66 accents against
+44–168, dynamic range 0.65 against 0.28–0.80.
+
+### Confirmation passes A and B disagreed
+
+| | pass A | pass B |
+|---|---|---|
+| boundaries | 11 | 12 |
+| beats | 10 | 3 |
+| hero moments | 1 | **2** |
+| confusions | **none** | one, at 10s |
+
+Pass B added the opening desk shot as a second hero — *"Strongest moment.
+Establishes a premium, unexpected mood for a B2B software film"* — and also
+returned the criticism that had been absent from pass A: *"relies on generic
+SaaS tropes (floating UI, subtle zooms)... making it feel like a template"*,
+pointed at ten seconds.
+
+**Two passes that disagree are not two clean passes, so this is not
+convergence.** The note is also correct: at ten seconds four screenshots were
+hovering across the frame at even intervals, each turned a different way,
+which is the single most recognisable gesture in automated software video. It
+is also nothing like what that shot is about — pages accumulating on the desk
+the film has just opened on. They are a pile now: overlapping, landing heavily
+on one another, sharing a shallow angle the way a real stack does.
+
+**My own error in the same pass:** the design-printout run rendered at preview
+quality and overwrote the master, so pass B read a 960x540 file. Re-rendered
+at 1920x1080.
