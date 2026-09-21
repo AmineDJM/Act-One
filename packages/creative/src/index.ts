@@ -25,3 +25,4 @@ export * from './council/directors.ts';
 export * from './council/types.ts';
 export * from './council/room.ts';
 export * from './council/journal.ts';
+export * from './council/outcomes.ts';
