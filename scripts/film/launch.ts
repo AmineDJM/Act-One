@@ -524,8 +524,8 @@ const scenes: Graph[] = [
  */
 const stepTitle = (
   id: string, index: string, title: string, seconds: number, at: number,
-  /** The page the next shot lands in, already sliding into this one. */
-  incoming: string,
+  /** The colour this step is filed under. Carries through to its product shot. */
+  colour: string,
 ): Graph =>
   SceneGraph.parse({
     id, durationSeconds: seconds,
@@ -535,37 +535,41 @@ const stepTitle = (
     objects: [
       bloom(`${id}_bloom`, { x: 0.3, y: 0.44 }, '#FFEADC', 0.9),
       /*
-       * THE FRAME WAS THREE-QUARTERS EMPTY, which is what a title beat looks
-       * like when it contains nothing but a title. A model watching the cut
-       * pointed at these shots and called them the weakest moments; looking at
-       * the frames, they are not clipped or badly composed, they are BLANK —
-       * one short line on the left and two-thirds of a cream field doing
-       * nothing.
+       * A FIELD OF COLOUR, NOT A SCREENSHOT.
        *
-       * So the page the next shot lands inside is already entering this one,
-       * from the edge, at an angle, still on its way. That fills the right of
-       * the frame, it gives the camera something to travel towards, and it
-       * makes the cut into the product shot a continuation rather than a
-       * surprise — the thing you were watching arrive is the thing you are
-       * now inside.
+       * This frame used to be three-quarters empty, and the fix for that was to
+       * slide in the page the next shot lands inside — tilted, rounded,
+       * shadowed, 62% of the frame. It filled the space and it created a worse
+       * problem: the same capture floated here and then played full-bleed one
+       * second later, so the landing page appeared twice in seven seconds for
+       * no reason either time.
+       *
+       * Both a model and the person who commissioned this film said the same
+       * thing about it. The model: "relies heavily on generic dark-mode SaaS
+       * motion graphics (floating UI, subtle zooms) rather than a unique
+       * style". The brief: showing the landing page in the middle of the frame
+       * over and over, without a reason each time, is not interesting and does
+       * not look professional.
+       *
+       * So a title beat is typographic now. The colour is the one its step is
+       * filed under and it carries into the product shot that follows, which
+       * is what the sliding capture was really for — making the cut a
+       * continuation rather than a surprise. A field does that without
+       * spending the product's only appearance on a decoration.
        */
-      {
-        kind: 'ui_layer', id: `${id}_incoming`, assetId: incoming, semantic: 'incoming',
-        crop: { x: 0.04, y: 0.06, width: 0.5, height: 0.52 },
-        width: 0.62, cornerRadiusPx: 10, shadow: true,
-        role: 'support', enterAt: 0.12,
-        reason: 'The interface the next shot is inside, still arriving.',
+      ({
+        kind: 'shape', id: `${id}_field`, shape: 'rect',
+        // Oversized on both axes so no camera move can find an edge.
+        width: 0.58,
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.16, value: 1.6, curve: 'out_expo' }, { t: 1, value: 1.6 }], curve: 'out_expo' },
+        fill: colour, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: 'support', enterAt: 0.1,
+        reason: 'The colour this step is filed under, arriving from the right.',
         transform: Transform.parse({
-          x: { from: 1.25, to: 0.86, curve: 'out_expo' },
-          y: 0.52,
-          z: -0.2,
-          anchor: { x: 0.5, y: 0.5 },
-          rotationX: 3,
-          rotationY: { from: -22, to: -14, curve: 'out_expo' },
-          rotationZ: 1.5,
-          opacity: ARRIVES,
+          x: { from: 1.15, to: 0.78, curve: 'out_expo' },
+          y: 0.5, z: 0.5, anchor: { x: 0.5, y: 0.5 },
         }),
-      } as SceneObject,
+      } as SceneObject),
       line(`${id}_index`, index, {
         token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
       }, arrive({ x: 0.02 }, { x: 0.09, y: 0.36 }, { anchor: { x: 0, y: 0.5 }, opacity: ARRIVES })),
@@ -578,7 +582,7 @@ const stepTitle = (
       { at: 0.3, kind: 'ui_click', intensity: 0.2, causedBy: `${id}_title`, reason: 'A word.' },
       { at: at, kind: 'whoosh', intensity: 0.38, causedBy: `${id}_index`, reason: 'Into the product.' },
     ],
-    handover: { mechanism: 'camera_carry', carries: [`${id}_incoming`], durationSeconds: 0.4, reason: 'The camera keeps travelling into the interface that has just arrived.' },
+    handover: { mechanism: 'camera_carry', carries: [`${id}_field`], durationSeconds: 0.4, reason: 'The colour carries across the cut into the work it files.' },
     macro: null,
   });
 
@@ -729,7 +733,7 @@ const stepProduct = (
   });
 
 scenes.push(
-  stepTitle('l5', '01', 'We read your product.', 2.6, 2.0, 'ast_home'),
+  stepTitle('l5', '01', 'We read your product.', 2.6, 2.0, '#1F6F4A'),
   // Travelling down the homepage: the camera is inside it.
   stepTravel('l6', 'A real capture, never a drawing of one.', 'ast_home',
     { x: 0.04, width: 0.44, fromY: 0.02, toY: 0.30 }, 4.6, { scale: [1.06, 1.0], focal: 70 }),
@@ -857,16 +861,25 @@ scenes.push(
   stepTravel('l8', 'Watched before one is chosen.', 'ast_work',
     { x: 0.04, width: 0.52, fromY: 0.36, toY: 0.12 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
 
-  stepTitle('l9', '03', 'One afternoon.', 2.0, 1.5, 'ast_pricing'),
+  stepTitle('l9', '03', 'One afternoon.', 2.0, 1.5, ACCENT),
   /*
-   * The one held card in the film, and it is here on purpose.
+   * The one held card in the film, and now the only one.
    *
    * Three travelling shots in a row is the same shot three times, which is the
-   * repetition this act was split up to avoid in the first place. The last
-   * step pulls back out of the page and shows the thing as an object again,
-   * which also lets the act end wider than it began.
+   * repetition this act was split up to avoid. The last step pulls back out of
+   * the page and shows the thing as an object again, which also lets the act
+   * end wider than it began. That argument still holds for ONE shot; it is
+   * exactly the argument that does not survive being made five times.
+   *
+   * The page changed with it. This shot's line is "It checks its own frames",
+   * and it was showing the PRICING page — a capture chosen because it was
+   * there rather than because it said anything, which is the habit that made
+   * the landing page appear in five shots out of sixteen. Each capture is used
+   * once now and each one is the page its line is about: the home page where
+   * the film says it reads a real capture, the work page where it says the
+   * films are watched, the how page here.
    */
-  stepProduct('l10', 'It checks its own frames.', 'ast_pricing', CARD_CROP['ast_pricing']!, 4.6,
+  stepProduct('l10', 'It checks its own frames.', 'ast_how', CARD_CROP['ast_how']!, 4.6,
     { x: [0.09, -0.09], scale: [1.24, 1.0], focal: [105, 88], dolly: [0, 0.4] }, { x: 0.6, y: 0.45, z: -0.16 }, { rx: 4, ry: -10, rz: 2 }, 0.64),
 );
 
