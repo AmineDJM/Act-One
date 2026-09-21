@@ -1,20 +1,31 @@
 /**
- * Judges the film as a film: look, invention, motion.
+ * Judges the film as a film: look, invention, motion, sound, tone.
  *
- * WHY THIS REPLACES THE BAND. The measured profile — cuts per minute, static
- * share, distinct hues — was built to FIND faults, and it found real ones: nine
+ * WHY THE MEASURED BAND IS NOT THE JUDGE. The profile — cuts per minute, static
+ * share, distinct hues — was built to FIND faults and it found real ones: nine
  * frozen shots, a palette that never changed, a voice that was not there. It
- * cannot say whether a film is any good. Matching a reference's cutting rate
- * proves nothing; a film can sit inside every band and still be lifeless, and
- * the references themselves disagree wildly with each other (2.5, 7.7 and 16.3
- * cuts per minute), which is the clearest possible evidence that the number was
- * never the thing.
+ * cannot say whether a film is any good. The references run at 2.5, 7.7 and
+ * 16.3 cuts per minute; there is no target rate, and matching one proves
+ * nothing.
  *
- * So this asks about craft instead, and asks for specifics: what is the single
- * best frame and why, what would a director cut, where does the motion look
- * generated rather than designed. Vague praise is explicitly refused — a
- * critique that says "make it more premium" has told you nothing you can act
- * on, and this project has wasted loops on exactly that.
+ * WHY STILLS ARE NOT THE JUDGE EITHER, which is the harder lesson. A second
+ * critic was scoring this film from eight frames, and its numbers were being
+ * reported beside the one that watched it — including scores for MOTION
+ * DESIGN, which a still cannot show, and SOUND AND PICTURE, which it cannot
+ * hear. A film is pictures and sound and a narrative and a tone unfolding over
+ * time. Asking what a frame looks like is a different question, and a useful
+ * one, but it is not this question.
+ *
+ * So the film is judged by the model that can actually watch it, with its
+ * audio, end to end. The second opinion listens to the MIX — a real
+ * independent ear on one dimension it can genuinely assess — and is scoped to
+ * sound and tone rather than dressed up as a verdict on the whole. Stills stay
+ * in the toolkit for what they are good at: confirming a specific defect in a
+ * specific frame, which is how the deformed hand and the colliding captions
+ * were found.
+ *
+ * Vague praise is refused: "make it more premium" has told you nothing you can
+ * act on, and this project has wasted loops on exactly that.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
@@ -61,38 +72,69 @@ const gem = await httpRequest<any>(
 );
 const g = JSON.parse(gem?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') ?? '{}');
 
-/* A second eye, on stills rather than on the video: a different kind of look. */
-const stills: string[] = [];
-for (const at of [2, 9, 13, 21, 27, 34, 41, 47]) {
-  const png = `/tmp/claude-0/-home-user-Act-One/98b63347-0537-52c4-b822-8136998c416b/scratchpad/q${at}.png`;
-  await run('node_modules/@remotion/compositor-linux-x64-gnu/ffmpeg',
-    ['-y', '-v', 'error', '-ss', String(at), '-i', file, '-frames:v', '1', '-vf', 'scale=760:-1', png], { maxBuffer: 32e6 });
-  stills.push(png);
-}
+/*
+ * A second EAR, not a second pair of eyes on stills.
+ *
+ * This asked a vision model to score eight frames on motion design and on how
+ * sound sits with picture. It can see neither. Those scores were noise wearing
+ * the shape of a second opinion, and averaging them against a model that had
+ * actually watched the film would have been worse than having one critic.
+ *
+ * It hears the finished mix now — narration, music, effects, the master — and
+ * is asked only about what is audible: whether the read sounds like a person,
+ * whether the tone matches what the film is claiming, whether the sound feels
+ * authored with the picture or laid over it. That is a genuine independent
+ * judgement on one dimension, which is worth more than a synthetic one on six.
+ */
+const SOUND = [
+  'soundsHuman: does the narration sound like a person, or like a machine reading',
+  'toneMatchesClaim: does the delivery suit a film claiming craft and speed, or does it oversell',
+  'authoredTogether: do music, effects and voice feel composed as one thing',
+  'wouldYouKeepListening: would you still be listening at fifty seconds',
+];
+const SOUND_SCHEMA = `Return ONLY JSON:
+{"scores":{${SOUND.map((c) => `"${c.split(':')[0]}":0-10`).join(',')}},
+ "worstMoment":{"at":<seconds>,"why":"<15-25 words, specific>"},
+ "tell":"<the strongest sign this audio was generated, 15-25 words>",
+ "oneChange":"<the one change that would most improve the SOUND, concrete>"}
+BANNED WORDS: premium, polished, professional, elevated, sleek, modern, clean, dynamic, engaging.`;
+
+const mp3 = `/tmp/claude-0/-home-user-Act-One/98b63347-0537-52c4-b822-8136998c416b/scratchpad/judge-audio.mp3`;
+await run('node_modules/@remotion/compositor-linux-x64-gnu/ffmpeg',
+  ['-y', '-v', 'error', '-i', file, '-vn', '-b:a', '96k', mp3], { maxBuffer: 32e6 });
 const oai = await httpRequest<any>('openai', 'https://api.openai.com/v1/chat/completions', {
   method: 'POST',
   body: {
-    model: 'gpt-4.1',
+    model: 'gpt-audio-1.5',
+    modalities: ['text'],
     messages: [{ role: 'user', content: [
-      { type: 'text', text: `Eight frames from a 50-second product launch film, in order.\nJudge the CRAFT as a creative director would.\n\n${SCHEMA}` },
-      ...stills.map((p) => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${readFileSync(p).toString('base64')}` } })),
+      { type: 'text', text: `The finished audio of a ${Math.round(50)}-second product launch film: narration over music and effects.\nJudge only what you can HEAR.\n\n${SOUND.map((c) => `- ${c}`).join('\n')}\n\n${SOUND_SCHEMA}` },
+      { type: 'input_audio', input_audio: { data: readFileSync(mp3).toString('base64'), format: 'mp3' } },
     ] }],
-    response_format: { type: 'json_object' },
   },
   timeoutMs: 300_000, attempts: 3,
 });
-const o = JSON.parse(oai?.choices?.[0]?.message?.content ?? '{}');
+const oaiText = String(oai?.choices?.[0]?.message?.content ?? '');
+const o = JSON.parse(oaiText.slice(oaiText.indexOf('{'), oaiText.lastIndexOf('}') + 1) || '{}');
 
-for (const [who, v] of [['GEMINI — watched the film', g], ['OPENAI — read eight frames', o]] as const) {
-  console.log(`\n=== ${who} ===`);
-  for (const c of CRAFT) {
-    const k = c.split(':')[0]!;
-    console.log(`  ${k.padEnd(20)} ${v.scores?.[k] ?? '—'}`);
-  }
-  if (v.bestFrame) console.log(`  BEST  @${v.bestFrame.at}s  ${v.bestFrame.why}`);
-  if (v.worstFrame) console.log(`  WORST @${v.worstFrame.at}s  ${v.worstFrame.why}`);
-  if (v.cutThis) console.log(`  CUT   @${v.cutThis.at}s  ${v.cutThis.what}`);
-  if (v.looksGenerated) console.log(`  TELL  ${v.looksGenerated}`);
-  if (v.oneChange) console.log(`  DO    ${v.oneChange}`);
+console.log('\n=== GEMINI — watched the film, with its sound ===');
+for (const c of CRAFT) {
+  const k = c.split(':')[0]!;
+  console.log(`  ${k.padEnd(20)} ${g.scores?.[k] ?? '—'}`);
 }
-writeFileSync('.renders/quality-judgement.json', JSON.stringify({ gemini: g, openai: o }, null, 2));
+if (g.bestFrame) console.log(`  BEST  @${g.bestFrame.at}s  ${g.bestFrame.why}`);
+if (g.worstFrame) console.log(`  WORST @${g.worstFrame.at}s  ${g.worstFrame.why}`);
+if (g.cutThis) console.log(`  CUT   @${g.cutThis.at}s  ${g.cutThis.what}`);
+if (g.looksGenerated) console.log(`  TELL  ${g.looksGenerated}`);
+if (g.oneChange) console.log(`  DO    ${g.oneChange}`);
+
+console.log('\n=== OPENAI — heard the mix (sound and tone only) ===');
+for (const c of SOUND) {
+  const k = c.split(':')[0]!;
+  console.log(`  ${k.padEnd(22)} ${o.scores?.[k] ?? '—'}`);
+}
+if (o.worstMoment) console.log(`  WORST @${o.worstMoment.at}s  ${o.worstMoment.why}`);
+if (o.tell) console.log(`  TELL  ${o.tell}`);
+if (o.oneChange) console.log(`  DO    ${o.oneChange}`);
+
+writeFileSync('.renders/quality-judgement.json', JSON.stringify({ film: g, sound: o }, null, 2));
