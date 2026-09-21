@@ -529,6 +529,16 @@ const stepTitle = (
 const caption = (
   id: string, content: string, at: { y: number }, colour: string, band: string,
 ): SceneObject[] => [
+  /*
+   * OPAQUE, because a translucent scrim over a dark interface is nothing.
+   *
+   * The first version used 78% black, which is a sensible scrim over a
+   * photograph and completely invisible over a near-black product page — the
+   * band was rendering, and the interface's own white type was reading
+   * straight through the remaining 22% and colliding with the caption. A
+   * lower third is not a veil over the picture; it is a piece of the layout
+   * that the picture stops at.
+   */
   {
     kind: 'shape', id: `${id}_band`, shape: 'rect',
     width: 1.2, height: 0.155,
@@ -608,7 +618,7 @@ const stepTravel = (
         reason: 'The real interface as a place the camera moves through, not a card it sits on.',
         transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
       } as SceneObject,
-      ...caption(`${id}_body`, body, { y: 0.9 }, PAPER, 'rgba(8,8,12,0.78)'),
+      ...caption(`${id}_body`, body, { y: 0.9 }, PAPER, INK),
     ],
     audio: [
       { at: 0.04, kind: 'whoosh', intensity: 0.42, causedBy: `${id}_page`, reason: 'The camera enters the interface.' },
@@ -634,7 +644,7 @@ const stepProduct = (
       bloom(`${id}_bloom`, { x: 0.62, y: 0.44 }, '#FFEADC', 0.95),
       card(`${id}_card`, asset, crop, place, tilt, width, 0.0,
         'The real interface at this step, big enough to be the product rather than a picture of it.'),
-      ...caption(`${id}_body`, body, { y: 0.9 }, INK, 'rgba(244,242,236,0.82)'),
+      ...caption(`${id}_body`, body, { y: 0.9 }, INK, PAPER),
     ],
     audio: [
       { at: 0.05, kind: 'ui_confirm', intensity: 0.34, causedBy: `${id}_card`, reason: 'The interface arrives.' },
@@ -674,21 +684,31 @@ scenes.push(
     objects: [
       ...([
         ['#1F6F4A', 0.1667, 0.0],
-        ['#2B4B9B', 0.5, 0.12],
-        [ACCENT, 0.8333, 0.24],
+        ['#2B4B9B', 0.5, 0.16],
+        [ACCENT, 0.8333, 0.32],
       ] as const).map(([fill, x, enterAt], i) => ({
         kind: 'shape', id: `l7_field_${i}`, shape: 'rect',
-        width: 0.3333, height: { from: 0, to: 1.02, curve: 'out_expo' },
+        /*
+         * Each field arrives fast and then HOLDS at full height.
+         *
+         * Growing them on a long stagger meant they were never all standing
+         * at once: at any given frame one was half-built and another had not
+         * started, so a beat whose whole point is three things side by side
+         * never showed three things side by side. They snap up in a fifth of
+         * a second each, a beat apart, and then the frame is what it says.
+         */
+        width: 0.3333,
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.14, value: 1.02, curve: 'out_expo' }, { t: 1, value: 1.02 }], curve: 'out_expo' },
         fill, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
         role: 'support', enterAt,
         reason: 'One of the three directions, as a field of its own colour.',
         transform: Transform.parse({ x, y: 0.5, z: 0.4, anchor: { x: 0.5, y: 0.5 } }),
       }) as SceneObject),
       line('l7_index', '02', {
-        token: 'mono', color: PAPER, maxWidth: 0.1, maxLines: 1, role: 'structure', enterAt: 0.5,
+        token: 'mono', color: PAPER, maxWidth: 0.1, maxLines: 1, role: 'structure', enterAt: 0.7,
       }, { x: 0.09, y: 0.3, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
       line('l7_title', 'Three directions.', {
-        maxWidth: 0.46, maxLines: 2, color: PAPER, stagger: 0.07, enterAt: 0.5,
+        maxWidth: 0.46, maxLines: 2, color: PAPER, stagger: 0.07, enterAt: 0.75,
       }, { x: 0.09, y: 0.44, anchor: { x: 0, y: 0.5 } }),
     ],
     audio: [
