@@ -289,9 +289,11 @@ export const VISUALS: Record<string, BeatVisual> = {
   b7: {
     kind: 'fields', colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
     labels: [
-      { text: 'Paper', token: 'mono', scale: 1.0 },
-      { text: 'Depth', token: 'display', scale: 0.62 },
-      { text: 'Field', token: 'statement', scale: 0.8 },
+      // Bigger across the board: at the previous scales these read as captions
+      // rather than as the directions themselves.
+      { text: 'Paper', token: 'mono', scale: 1.5 },
+      { text: 'Depth', token: 'display', scale: 0.8 },
+      { text: 'Field', token: 'statement', scale: 1.05 },
     ],
     receipt: RECEIPT,
   },

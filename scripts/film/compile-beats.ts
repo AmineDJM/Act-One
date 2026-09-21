@@ -442,7 +442,17 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       // below the line it was supposed to be carrying.
       // Follows the words. A band at the bottom under a caption at the top is
       // not a ground, it is a stripe.
-      transform: Transform.parse({ x: 0.5, y: bandAtTop ? 0.0 : 1.0, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
+      /*
+       * OPAQUE AT THE TOP, translucent at the bottom.
+       *
+       * Three directors reported the caption on the audit close as "obscuring
+       * the website text in a way that looks accidental". A band at 0.88 over
+       * a page's own headline is exactly that: you can see the type
+       * underneath, so it reads as two things colliding rather than as one
+       * lying over the other. At the foot the page has already run out and the
+       * translucency is a grace note; at the head it has to be a decision.
+       */
+      transform: Transform.parse({ x: 0.5, y: bandAtTop ? 0.0 : 1.0, anchor: { x: 0.5, y: 0.5 }, opacity: bandAtTop ? 1 : 0.88 }),
     } as SceneObject);
   }
 
@@ -1073,8 +1083,14 @@ function visualObjects(
           anchor: { x: 0.5, y: 0.5 }, scale: label.scale,
           opacity: { keyframes: [
             { t: 0, value: 0 },
-            { t: 0.2 + i * 0.06, value: 0, curve: 'linear' },
-            { t: 0.32 + i * 0.06, value: 0.92, curve: 'out_quint' },
+            /*
+             * Earlier. They arrived a third of the way in, so for the first
+             * second of the beat the frame was three flat blocks — which is
+             * precisely what the room reported seeing. A direction has to be
+             * on screen while the line that promises three of them is said.
+             */
+            { t: 0.06 + i * 0.05, value: 0, curve: 'linear' },
+            { t: 0.16 + i * 0.05, value: 0.92, curve: 'out_quint' },
             { t: 1, value: 0.92 },
           ], curve: 'out_quint' },
         }),
