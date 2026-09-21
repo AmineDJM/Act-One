@@ -641,14 +641,51 @@ function visualObjects(
      */
     const at = beat.emphasisAtSeconds ?? beat.voiceAtSeconds;
     audio.push({ at, kind: 'sub_drop', intensity: 0.5, causedBy: `${beat.id}_field`, reason: 'The colour takes the frame on the word.' });
+
+    /*
+     * IT GROWS FROM A POINT, rather than wiping up from the bottom.
+     *
+     * This came out of the reference corpus rather than out of my head, and it
+     * is the first thing retrieval has found that I would not have. Asked what
+     * excellent films do for premium motion, five of the seven independently
+     * reach for the same move: an element expands until it IS the next scene.
+     * target1 scales a text block up from centre until it replaces everything;
+     * target3 expands a button's colour from its own centre to fill the frame;
+     * target7 grows a glowing line vertically until the screen is that colour;
+     * target4 flies cards past the lens so the thing you were looking at
+     * becomes the thing you are now in.
+     *
+     * At seven films that is worth noticing rather than calling typical — but
+     * what they share is not a shape, it is a principle: the transition is
+     * CAUSED by something already in the frame, so the cut has an author. A
+     * field that wipes up from off-screen arrives from nowhere; one that opens
+     * from the middle of the frame, where the word just landed, is the word
+     * doing it.
+     *
+     * The execution is ours. No reference's element, timing or composition is
+     * reproduced — only the move.
+     */
+    const opens = Math.min(0.9, (at + 0.16) / beat.durationSeconds);
+    const filled = Math.min(0.95, (at + 0.42) / beat.durationSeconds);
+    const grow = (to: number) => ({
+      keyframes: [
+        { t: 0, value: 0 },
+        { t: opens, value: 0, curve: 'linear' as const },
+        { t: filled, value: to, curve: 'out_expo' as const },
+        { t: 1, value: to },
+      ],
+      curve: 'out_expo' as const,
+    });
+
     return [{
       kind: 'shape', id: `${beat.id}_field`, shape: 'rect',
-      width: 1.5,
-      height: { keyframes: [{ t: 0, value: 0 }, { t: Math.min(0.9, (at + 0.16) / beat.durationSeconds), value: 0, curve: 'linear' }, { t: Math.min(0.95, (at + 0.3) / beat.durationSeconds), value: 1.6, curve: 'out_expo' }, { t: 1, value: 1.6 }], curve: 'out_expo' },
+      // Both axes, from nothing, about the centre: the frame opens rather than
+      // being covered.
+      width: grow(1.6), height: grow(1.8),
       fill: visual.field, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'support', enterAt: 0,
-      reason: `The frame reacts to "${beat.emphasis ?? beat.line}".`,
-      transform: Transform.parse({ x: 0.5, y: 1.2, z: 0.7, anchor: { x: 0.5, y: 1 } }),
+      reason: `The frame opens on "${beat.emphasis ?? beat.line}" — the word is what causes it.`,
+      transform: Transform.parse({ x: 0.5, y: 0.5, z: 0.7, anchor: { x: 0.5, y: 0.5 } }),
     } as SceneObject];
   }
 
