@@ -63,7 +63,7 @@ import {
   runFfmpeg,
   soundForScenes,
 } from '@act-one/sound';
-import { NARRATOR, narrate, wordsPerMinute } from './narration.ts';
+import { NARRATOR, narrate, place, retimeForNarration, wordsPerMinute } from './narration.ts';
 
 type Graph = ReturnType<typeof SceneGraph.parse>;
 
@@ -1015,8 +1015,37 @@ scenes.push(
 
 // ---------------------------------------------------------------------------
 
+/*
+ * THE READ COMES FIRST, AND THE CUT IS MADE AROUND IT.
+ *
+ * This used to run after the picture was rendered, which quietly settled an
+ * argument nobody had: if a line did not fit its shot, the line was wrong. That
+ * is backwards for a narrated film. The voice carries the meaning and the
+ * picture is what it is carried over, so where the two disagree about three
+ * tenths of a second it is cheaper to hold the picture.
+ *
+ * Reading before rendering is what makes that possible at all — a shot cannot be
+ * held longer once its frames exist.
+ */
+const castVoice = process.env['ACT_ONE_VOICE'] ?? NARRATOR;
+const takes = await narrate({ directory: path.resolve('.renders/vo'), voiceId: castVoice });
+const firstPass = place(takes, scenes);
+const retimed = retimeForNarration(scenes, firstPass);
+for (const scene of scenes) {
+  const held = retimed.durations.get(scene.id);
+  if (held !== undefined) scene.durationSeconds = held;
+}
+const placed = place(takes, scenes);
+
 const seconds = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
 console.log(`=== the launch film: ${seconds.toFixed(1)}s, ${scenes.length} shots ===`);
+console.log(`  VOICE ${castVoice} via eleven_v3: ${placed.length} lines, ${wordsPerMinute(takes).toFixed(0)} wpm`);
+if (retimed.held.length) {
+  console.log(`  HELD for the read (+${retimed.addedSeconds.toFixed(2)}s total): ${retimed.held.join(', ')}`);
+}
+for (const take of placed.filter((t) => t.overrunSeconds > 0.12)) {
+  console.log(`  OVERRUN ${take.sceneId} still runs ${take.overrunSeconds.toFixed(2)}s past its shot`);
+}
 
 /* The shot table, on demand: what each shot is, when it starts, and what it
  * says on screen. Narration is written against this — a voice that reads the
@@ -1054,15 +1083,27 @@ if (problems > 0 || findings.some((f) => f.severity === 'hard_fail')) {
 if (process.env['ACT_ONE_INSPECT_ONLY']) process.exit(0);
 
 const silent = path.resolve('.renders/launch.silent.mp4');
-const out = path.resolve('.renders/launch.mp4');
+/*
+ * An audition changes the READ, not the picture.
+ *
+ * Casting is decided by watching several voices against the same cut, and
+ * re-rendering 1734 identical frames for each candidate would cost four
+ * minutes apiece to produce four byte-identical pictures. So a named audition
+ * writes beside the master and reuses the silent render — which also means
+ * every candidate is judged against exactly the same frames, rather than
+ * against four renders that might differ.
+ */
+const audition = process.env['ACT_ONE_AUDITION'] ?? '';
+const out = path.resolve(audition ? `.renders/audition-${audition}.mp4` : '.renders/launch.mp4');
+const reusePicture = audition !== '' && existsSync(silent);
 const started = Date.now();
-const result = await renderScenes({
+const result = reusePicture ? { undecodable: [] as string[] } : await renderScenes({
   scenes, brand, assetUrls: ASSETS,
   aspect: '16:9',
   quality: (process.env['ACT_ONE_QUALITY'] as 'preview' | 'hd' | undefined) ?? 'hd',
   outputPath: silent, concurrency: 3, theme: 'light',
 });
-console.log(`  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+console.log(reusePicture ? '  reusing the rendered picture; only the read changes' : `  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 if (result.undecodable.length) console.log('  undecodable:', result.undecodable);
 
 const design = soundForScenes(scenes, {
@@ -1094,26 +1135,11 @@ console.log(`  ENDING ${design.ending.strategy}; silence ${design.silenceSeconds
 for (const note of design.notes) console.log(`  NOTE ${note}`);
 const byGain = [...design.cues].sort((a, b) => b.gainDb - a.gainDb).slice(0, 6);
 console.log('  LOUDEST CUES', byGain.map((c) => `${c.type}@${c.atSeconds}s ${c.gainDb}dB`).join(' | '));
-/*
- * The read, before the mix.
- *
- * Every take is measured against the shot it belongs to and an overrun is
- * printed rather than swallowed: a line that runs past its cut lands its last
- * words on the next picture, which is the one narration fault an audience
- * always hears and a waveform never shows.
- */
-const takes = await narrate({ directory: path.resolve('.renders/vo'), voiceId: NARRATOR });
-const overruns = takes.filter((take) => take.overrunSeconds > 0.15);
-console.log(`  VOICE ${NARRATOR} via eleven_v3: ${takes.length} lines, ${wordsPerMinute(takes).toFixed(0)} wpm`);
-for (const take of overruns) {
-  console.log(`  OVERRUN ${take.sceneId} runs ${take.overrunSeconds.toFixed(2)}s past its shot`);
-}
-
 const plan = buildMix({
   design,
   resolvedPaths: resolved,
   durationSeconds: seconds,
-  voiceTracks: takes.map(({ path: file, atSeconds, durationSeconds }) => ({ path: file, atSeconds, durationSeconds })),
+  voiceTracks: placed.map(({ path: file, atSeconds, durationSeconds }) => ({ path: file, atSeconds, durationSeconds })),
 });
 const premix = path.resolve('.renders/launch.premix.wav');
 const mixed = await runFfmpeg(mixArgs(plan, premix), { timeoutMs: 8 * 60_000 });

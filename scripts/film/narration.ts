@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { RunwayAudioProvider } from '@act-one/providers';
 import { analyseVoice, runFfmpeg } from '@act-one/sound';
+import { place, retimeForNarration } from '@act-one/creative';
 
 /**
  * The voice, and what it is for.
@@ -27,10 +28,15 @@ import { analyseVoice, runFfmpeg } from '@act-one/sound';
  */
 export type NarrationLine = {
   sceneId: string;
-  /** Film time the read starts, seconds. */
-  atSeconds: number;
-  /** The shot's own length, so an overrun can be named. */
-  windowSeconds: number;
+  /**
+   * How far into its own shot the line starts.
+   *
+   * RELATIVE, not absolute. Absolute times were typed against one cut, so any
+   * change to a shot's length silently slid every line after it onto the wrong
+   * picture — and the Director cannot retime a shot to fit a read if the read's
+   * position is a constant that does not know where its shot is.
+   */
+  delaySeconds: number;
   text: string;
 };
 
@@ -42,21 +48,21 @@ export type NarrationLine = {
  * two events on the same frame.
  */
 export const NARRATION: NarrationLine[] = [
-  { sceneId: 'l1', atSeconds: 0.25, windowSeconds: 3.35, text: "Every company has a film it hasn't made yet." },
-  { sceneId: 'l2', atSeconds: 3.9, windowSeconds: 4.5, text: "You know what it should say. You've said it a hundred times." },
-  { sceneId: 'l3', atSeconds: 8.8, windowSeconds: 4.8, text: 'Then it becomes a project. Two months before a single frame exists.' },
-  { sceneId: 'l4', atSeconds: 14.1, windowSeconds: 2.9, text: 'This is Act One.' },
-  { sceneId: 'l5', atSeconds: 17.2, windowSeconds: 2.4, text: 'No brief. No kickoff call.' },
-  { sceneId: 'l6', atSeconds: 19.9, windowSeconds: 4.3, text: "It opens your site like a customer would, and takes what's actually there." },
-  { sceneId: 'l7', atSeconds: 24.4, windowSeconds: 2.4, text: 'Not one safe idea. Three.' },
-  { sceneId: 'l8', atSeconds: 27.0, windowSeconds: 4.4, text: 'Each one rendered, watched, and scored before you see it.' },
-  { sceneId: 'l9', atSeconds: 31.6, windowSeconds: 1.8, text: 'It finishes today.' },
-  { sceneId: 'l10', atSeconds: 33.7, windowSeconds: 4.3, text: 'Contrast, loudness, timing — it fails itself first.' },
-  { sceneId: 'l11', atSeconds: 38.3, windowSeconds: 4.9, text: 'Six weeks is thirty working days, and most of them are waiting.' },
-  { sceneId: 'l12', atSeconds: 43.5, windowSeconds: 2.9, text: 'Take the waiting out.' },
-  { sceneId: 'l13', atSeconds: 46.7, windowSeconds: 4.1, text: 'Nothing about the work gets cheaper. Only the calendar.' },
+  { sceneId: 'l1', delaySeconds: 0.25, text: "Every company has a film it hasn't made yet." },
+  { sceneId: 'l2', delaySeconds: 0.3, text: "You know what it should say. You've said it a hundred times." },
+  { sceneId: 'l3', delaySeconds: 0.4, text: 'Then it becomes a project. Two months before a single frame exists.' },
+  { sceneId: 'l4', delaySeconds: 0.5, text: 'This is Act One.' },
+  { sceneId: 'l5', delaySeconds: 0.2, text: 'No brief. No kickoff call.' },
+  { sceneId: 'l6', delaySeconds: 0.3, text: "It opens your site like a customer would, and takes what's actually there." },
+  { sceneId: 'l7', delaySeconds: 0.2, text: 'Not one safe idea. Three.' },
+  { sceneId: 'l8', delaySeconds: 0.2, text: 'Each one rendered, watched, and scored before you see it.' },
+  { sceneId: 'l9', delaySeconds: 0.2, text: 'It finishes today.' },
+  { sceneId: 'l10', delaySeconds: 0.3, text: 'Contrast, loudness, timing — it fails itself first.' },
+  { sceneId: 'l11', delaySeconds: 0.3, text: 'Six weeks is thirty working days, and most of them are waiting.' },
+  { sceneId: 'l12', delaySeconds: 0.3, text: 'Take the waiting out.' },
+  { sceneId: 'l13', delaySeconds: 0.3, text: 'Nothing about the work gets cheaper. Only the calendar.' },
   // l14 is silent on purpose: the year blooms, and the film breathes once.
-  { sceneId: 'l15', atSeconds: 54.3, windowSeconds: 3.5, text: 'Send us a link. Watch your film tonight.' },
+  { sceneId: 'l15', delaySeconds: 0.3, text: 'Send us a link. Watch your film tonight.' },
 ];
 
 /**
@@ -72,12 +78,21 @@ export const NARRATOR = 'Mark';
 
 export type NarrationTake = {
   sceneId: string;
+  /** The trimmed read, as the mix takes it. */
   path: string;
-  atSeconds: number;
+  /**
+   * The vendor's own file, untouched.
+   *
+   * Kept because everything downstream — the trim, the mix, the master — is a
+   * DECISION, and a decision you cannot go back behind is a decision you cannot
+   * revise. Re-reading a line costs a job; re-trimming one costs nothing if the
+   * clean take is still there.
+   */
+  rawPath: string;
+  delaySeconds: number;
   durationSeconds: number;
-  /** How far past its shot the read runs. Zero is what we want. */
-  overrunSeconds: number;
 };
+
 
 /**
  * Reads every line, and says what it heard back.
@@ -151,21 +166,24 @@ export async function narrate(options: {
     }
 
     const measured = await analyseVoice(wav, { loudness: false });
-    const durationSeconds = measured?.durationSeconds ?? 0;
     takes.push({
       sceneId: line.sceneId,
       path: wav,
-      atSeconds: line.atSeconds,
-      durationSeconds,
-      overrunSeconds: Math.max(0, durationSeconds - line.windowSeconds),
+      rawPath: `${wav}.mp3`,
+      delaySeconds: line.delaySeconds,
+      durationSeconds: measured?.durationSeconds ?? 0,
     });
   }
   return takes;
 }
 
+
 /** Words a minute, across the read rather than across the film. */
-export function wordsPerMinute(takes: NarrationTake[]): number {
+export function wordsPerMinute(takes: readonly NarrationTake[]): number {
   const spoken = takes.reduce((sum, take) => sum + take.durationSeconds, 0);
   const words = NARRATION.reduce((sum, line) => sum + line.text.split(/\s+/).filter(Boolean).length, 0);
   return spoken > 0 ? (words / spoken) * 60 : 0;
 }
+
+
+export { place, retimeForNarration };

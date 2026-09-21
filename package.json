@@ -2,7 +2,7 @@
   "name": "act-one",
   "private": true,
   "version": "0.1.0",
-  "description": "Act One \u2014 give us your product, get a launch film.",
+  "description": "Act One — give us your product, get a launch film.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -43,7 +43,9 @@
     "launch": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/launch.ts",
     "final": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/final.ts",
     "directions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/directions.ts",
-    "watch:film": "vite-node scripts/watch-film.ts"
+    "watch:film": "vite-node scripts/watch-film.ts",
+    "cast:voices": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/cast-voices.ts",
+    "audition": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/audition.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
