@@ -278,12 +278,21 @@ const chapterWord = (id: string, content: string, colour: string): SceneObject =
  * something quite different from what it looks like: a card entering at half a
  * second into a five-second scene fades up over four and a half seconds.
  *
- * The film had nineteen of these. The consequence was visible and I had been
- * reading it as three separate problems: a stack of pages you could see
- * THROUGH to the pages underneath, because none of them was ever opaque; a
- * high static share, because a frame full of things slowly arriving produces
- * almost no optical flow; and a critic's note about "subtle zooms", because
- * everything in the picture was perpetually still on its way in.
+ * The film had nineteen of these, and the visible consequence was a stack of
+ * pages you could see THROUGH to the pages underneath — a pile of glass
+ * rather than of paper, because nothing in the film was ever fully opaque.
+ *
+ * WHAT THIS DID NOT FIX, recorded because the guess was wrong and the wrong
+ * guess is the useful part. I expected it to explain two other things: a
+ * static share stuck outside the reference band, on the theory that a frame
+ * full of slowly arriving objects produces little optical flow, and a
+ * critic's note about "subtle zooms". Measured after the change, static share
+ * did not move by a thousandth — 0.3033 before and after — and scale
+ * variation got WORSE, from 0.656 to 0.536, because opaque cards make edge
+ * density more uniform frame to frame. One correct prediction out of three.
+ *
+ * The change stands on what it actually does: paper is opaque. Those other
+ * two numbers have a different cause and still need one.
  *
  * Keyframes say what a from/to cannot: arrive, then stop arriving.
  */
