@@ -419,3 +419,65 @@ render would fail on quota rather than produce a worse film.
    criterion and cannot be met — Gemini agreeing with Gemini is one opinion
    twice. *User action: top up the OpenAI account, or name another vision model
    to use as the second critic.*
+
+---
+
+## Loop: the film shows its output
+
+**The note this answers.** A model watching the finished film put one thing
+above every metric: *"the viewer never sees the actual output (the generated
+film), only the ordering interface."* Hero moments: 0. A film about making
+films that only ever showed the order form.
+
+**What was commissioned.** The opening shot twelve hours later. The film begins
+on a desk at dusk, cluttered, somebody pushing back from it after too long a
+day; `l13b` is the same desk at dawn, cleared, low sun crossing the grain, the
+camera pulling back where the opening pushed in. The opening is the six weeks
+and this is the afternoon.
+
+Wordless and full-bleed on purpose. Everything around it is composed — type on
+a field, captures on a plane — and this is the only thing in the film that
+looks photographed. A hero moment that has to be labelled is not one.
+
+The product rule is why it is a room and not a timeline: `checkBrief` rejects a
+brief that commissions an interface, and the negative prompt forbade one
+explicitly. A model may build the world the product lives in. The output of
+this product is a piece of film, so a piece of film is what was commissioned.
+Higgsfield, Seedance 2.5, $1.849, estimate printed before anything was spent.
+
+**Two corrections the brief could not anticipate**, both found by looking at
+the file rather than by measuring it. It came back at 1280x720 against a 1080p
+film, so the clip was narrowed from 1.25 to 1.12 — every extra tenth of width
+is more upscale on the one shot meant to look photographed, and the camera only
+ever shows 1.04 of content. And the source window ended before the wood was
+fully lit, throwing away the resolution the whole four seconds builds to.
+
+**Where the film stands**, 61.4s, 16 shots, 5 of 11 metrics inside the band:
+
+| metric | ours | band | |
+| --- | --- | --- | --- |
+| audio.meanRms | 0.296 | 0.192 – 0.426 | in |
+| audio.dynamicRange | 0.533 | 0.277 – 0.804 | in |
+| audio.accents | 112 | 44 – 168 | in |
+| audio.silentShare | 0.160 | 0.027 – 0.222 | in |
+| motion.p90 | 2.206 | 1.706 – 2.657 | in |
+| motion.mean | 0.929 | 0.833 – 0.919 | over by 1% |
+| motion.staticShare | 0.124 | 0.132 – 0.254 | under by 6% |
+| luma.range | 0.863 | 0.120 – 0.859 | over by 0.5% |
+| novelty | 0.314 | 0.093 – 0.272 | over |
+| distinctHues | 5 | 6 – 8 | **short** |
+| scaleVariation | 0.563 | 0.657 – 0.908 | **short** |
+
+Four of the six misses are OVERSHOOTS — the film is now marginally more
+dynamic than the references rather than failing to reach them, which is a
+different fault and a smaller one. Only `distinctHues` and `scaleVariation`
+are genuine shortfalls.
+
+**What the remaining static shots actually are.** `l15` has a real camera move
+and still measures 98% static, while `l1` with a comparable move measures 0%.
+The difference is not the camera: `l1` holds footage and `l15` is a near-black
+frame with two lines of type, and optical flow needs texture to find. So
+`staticShare` on those shots, `distinctHues`, and the critic's "dark-background
+SaaS tropes" are one problem wearing three faces — five or six shots are nearly
+empty dark frames with type on them. Camera work cannot fix that. Only content
+can, which is what `l13b` and the colour field are.
