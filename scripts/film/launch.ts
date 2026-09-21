@@ -178,7 +178,7 @@ const card = (
       rotationY: { from: tilt.ry - 7, to: tilt.ry, curve: 'out_expo' },
       rotationZ: tilt.rz,
       scale: { from: 0.94, to: 1, curve: 'out_expo' },
-      opacity: { from: 0, to: 1, curve: 'out_cubic' },
+      opacity: ARRIVES,
     }),
   }) as SceneObject;
 
@@ -230,7 +230,7 @@ const chapterWord = (id: string, content: string, colour: string): SceneObject =
   }, {
     x: 0.5, y: 0.42, z: 0.95, anchor: { x: 0.5, y: 0.5 },
     scale: { from: 1.9, to: 2.15, curve: 'in_out_cubic' },
-    opacity: { from: 0, to: 1, curve: 'out_cubic' },
+    opacity: ARRIVES,
   });
 
 // ---------------------------------------------------------------------------
@@ -267,6 +267,34 @@ const chapterWord = (id: string, content: string, colour: string): SceneObject =
  * below is a camera following something, an object arriving because it is its
  * turn, or a frame leaving because the next one is more interesting.
  */
+
+/**
+ * An entrance that finishes, rather than one that lasts the whole shot.
+ *
+ * THE FOOTGUN THIS EXISTS FOR. A property's `t` is normalised across the
+ * OBJECT'S OWN SPAN — from when it enters to when the scene ends — which is
+ * documented, predictable, and exactly what you want for a move that should
+ * take the whole shot. Written as `opacity: { from: 0, to: 1 }` it means
+ * something quite different from what it looks like: a card entering at half a
+ * second into a five-second scene fades up over four and a half seconds.
+ *
+ * The film had nineteen of these. The consequence was visible and I had been
+ * reading it as three separate problems: a stack of pages you could see
+ * THROUGH to the pages underneath, because none of them was ever opaque; a
+ * high static share, because a frame full of things slowly arriving produces
+ * almost no optical flow; and a critic's note about "subtle zooms", because
+ * everything in the picture was perpetually still on its way in.
+ *
+ * Keyframes say what a from/to cannot: arrive, then stop arriving.
+ */
+const ARRIVES = {
+  keyframes: [
+    { t: 0, value: 0 },
+    { t: 0.14, value: 1, curve: 'out_cubic' as const },
+    { t: 1, value: 1 },
+  ],
+  curve: 'out_cubic' as const,
+};
 
 type Travel = {
   /** Fractions of the frame the camera crosses. */
@@ -368,7 +396,7 @@ const scenes: Graph[] = [
       }, arrive({ x: 0.2 }, { x: 0.12, y: 0.42 }, { anchor: { x: 0, y: 0.5 } })),
       line('l2_sub', 'It is the six weeks before it.', {
         token: 'statement', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 2, enterAt: 1.2,
-      }, { x: 0.12, y: 0.56, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.12, y: 0.56, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
       { at: 0.05, kind: 'impact', intensity: 0.5, causedBy: 'l2_line', reason: 'The first word lands.' },
@@ -411,7 +439,7 @@ const scenes: Graph[] = [
       card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.58, y: 0.52, z: -0.26 }, { rx: 3, ry: 4, rz: 8 }, 0.46, 0.92, 'The schedule, last onto the heap.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
         token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.42, maxLines: 2, enterAt: 1.8,
-      }, { x: 0.18, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.18, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
       { at: 0.1, kind: 'whoosh', intensity: 0.4, causedBy: 'l3_c1', reason: 'A page arrives.' },
@@ -439,11 +467,11 @@ const scenes: Graph[] = [
       }, {
         x: 0.5, y: 0.46, anchor: { x: 0.5, y: 0.5 },
         scale: { from: 0.9, to: 1, curve: 'out_expo' },
-        opacity: { from: 0, to: 1, curve: 'out_expo' },
+        opacity: ARRIVES,
       }),
       line('l4_sub', 'Launch films, directed.', {
         token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.4, maxLines: 1, enterAt: 0.8,
-      }, { x: 0.5, y: 0.58, anchor: { x: 0.5, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.5, y: 0.58, anchor: { x: 0.5, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
       { at: 0.12, kind: 'sub_drop', intensity: 0.66, causedBy: 'l4_mark', reason: 'The mark lands in the silence the riser left.' },
@@ -506,12 +534,12 @@ const stepTitle = (
           rotationX: 3,
           rotationY: { from: -22, to: -14, curve: 'out_expo' },
           rotationZ: 1.5,
-          opacity: { from: 0, to: 1, curve: 'out_cubic' },
+          opacity: ARRIVES,
         }),
       } as SceneObject,
       line(`${id}_index`, index, {
         token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
-      }, arrive({ x: 0.02 }, { x: 0.09, y: 0.36 }, { anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } })),
+      }, arrive({ x: 0.02 }, { x: 0.09, y: 0.36 }, { anchor: { x: 0, y: 0.5 }, opacity: ARRIVES })),
       line(`${id}_title`, title, {
         maxWidth: 0.4, maxLines: 2, stagger: 0.06,
       }, arrive({ x: 0.15 }, { x: 0.09, y: 0.5 }, { anchor: { x: 0, y: 0.5 } })),
@@ -563,7 +591,7 @@ const caption = (
     reason: 'The band the caption is read on, so it never fights the interface underneath it.',
     transform: Transform.parse({
       x: 0.5, y: at.y, z: -0.9, anchor: { x: 0.5, y: 0.5 },
-      opacity: { from: 0, to: 1, curve: 'out_cubic' },
+      opacity: ARRIVES,
     }),
   } as SceneObject,
   line(id, content, {
@@ -573,7 +601,7 @@ const caption = (
     // during these shots and a caption pinned to the margin travels with it.
     x: 0.16, y: at.y, anchor: { x: 0, y: 0.5 },
     z: -0.95,
-    opacity: { from: 0, to: 1, curve: 'out_cubic' },
+    opacity: ARRIVES,
   }),
 ];
 
@@ -722,7 +750,7 @@ scenes.push(
       }) as SceneObject),
       line('l7_index', '02', {
         token: 'mono', color: PAPER, maxWidth: 0.1, maxLines: 1, role: 'structure', enterAt: 0.7,
-      }, { x: 0.09, y: 0.3, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.09, y: 0.3, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
       line('l7_title', 'Three directions.', {
         maxWidth: 0.46, maxLines: 2, color: PAPER, stagger: 0.07, enterAt: 0.75,
       }, { x: 0.09, y: 0.44, anchor: { x: 0, y: 0.5 } }),
@@ -835,7 +863,7 @@ scenes.push(
       }, arrive({ x: 0.18 }, { x: 0.14, y: 0.28 }, { anchor: { x: 0, y: 0.5 } })),
       line('l11_sub', 'to make one launch film.', {
         token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.44, maxLines: 1, enterAt: 0.7,
-      }, { x: 0.14, y: 0.375, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.14, y: 0.375, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
       { at: 0.06, kind: 'ui_click', intensity: 0.3, causedBy: 'measure_rule', reason: 'The rule is drawn.' },
@@ -867,7 +895,7 @@ scenes.push(
         color: 'accent', maxWidth: 0.46, maxLines: 1,
       }, {
         x: 0.14, y: 0.28, anchor: { x: 0, y: 0.5 },
-        opacity: { from: 0, to: 1, curve: 'out_expo' },
+        opacity: ARRIVES,
         scale: { from: 0.96, to: 1, curve: 'out_expo' },
       }),
     ],
@@ -893,11 +921,11 @@ scenes.push(
       }, {
         ...arrive({ x: 0.16 }, { x: 0.28, y: 0.42 }, { anchor: { x: 0, y: 0.5 } }),
         scale: { from: 1.0, to: 1.08, curve: 'out_expo' },
-        opacity: { from: 0, to: 1, curve: 'out_expo' },
+        opacity: ARRIVES,
       }),
       line('l13_sub', 'Same craft. Same checks.', {
         token: 'statement', color: 'onCanvas.muted', maxWidth: 0.36, maxLines: 2, enterAt: 0.9,
-      }, { x: 0.28, y: 0.7, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.28, y: 0.7, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
       { at: 0.06, kind: 'sub_drop', intensity: 0.68, causedBy: 'l13_stat', reason: 'The number lands.' },
@@ -924,11 +952,11 @@ scenes.push(
       }, {
         x: 0.5, y: 0.46, anchor: { x: 0.5, y: 0.5 },
         scale: { from: 1.42, to: 1.62, curve: 'out_expo' },
-        opacity: { from: 0, to: 1, curve: 'out_expo' },
+        opacity: ARRIVES,
       }),
       line('l14_sub', 'It stops taking weeks.', {
         token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 2, enterAt: 0.55,
-      }, { x: 0.5, y: 0.68, anchor: { x: 0.5, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.5, y: 0.68, anchor: { x: 0.5, y: 0.5 }, opacity: ARRIVES }),
     ],
     audio: [
       { at: 0.04, kind: 'impact', intensity: 0.6, causedBy: 'l14_year', reason: 'The year arrives.' },
@@ -948,10 +976,10 @@ scenes.push(
       line('l15_mark', 'Act One', {
         maxWidth: 0.4, maxLines: 1, color: PAPER,
         treatment: { gradient: null, stroke: null, glow: { color: '#FF6A33', radiusPx: { from: 8, to: 24, curve: 'out_expo' }, strength: 0.6 } },
-      }, arrive({ x: 0.16 }, { x: 0.1, y: 0.44 }, { anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } })),
+      }, arrive({ x: 0.16 }, { x: 0.1, y: 0.44 }, { anchor: { x: 0, y: 0.5 }, opacity: ARRIVES })),
       line('l15_call', 'Give us your product.', {
         token: 'statement', color: 'onCanvas.muted', maxWidth: 0.38, maxLines: 1, enterAt: 0.7,
-      }, { x: 0.1, y: 0.58, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      }, { x: 0.1, y: 0.58, anchor: { x: 0, y: 0.5 }, opacity: ARRIVES }),
       {
         kind: 'shape', id: 'l15_rule', shape: 'rect',
         width: { from: 0, to: 0.16, curve: 'out_expo' }, height: 0.004,
