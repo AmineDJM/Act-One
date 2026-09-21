@@ -973,8 +973,19 @@ scenes.push(
        */
       ({
         kind: 'shape', id: 'l14_field', shape: 'rect',
-        width: 1.04,
-        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.18, value: 1.04, curve: 'out_expo' }, { t: 1, value: 1.04 }], curve: 'out_expo' },
+        /*
+         * Big enough to survive the camera.
+         *
+         * At 1.04 this had visible dark margins down both sides and across the
+         * top for most of the shot, which reads as a rectangle somebody failed
+         * to size rather than as a field. The camera on this shot pulls back to
+         * 0.86, and a pull-back shows MORE than the frame: everything has to be
+         * at least 1/0.86 = 1.17 wide to still bleed at the widest point. 1.4
+         * carries that with room, and nothing is lost by overshooting a field
+         * that has no edge worth seeing.
+         */
+        width: 1.4,
+        height: { keyframes: [{ t: 0, value: 0 }, { t: 0.18, value: 1.4, curve: 'out_expo' }, { t: 1, value: 1.4 }], curve: 'out_expo' },
         fill: ACCENT, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
         role: 'support', enterAt: 0,
         reason: 'The brand colour arrives and takes the whole frame.',
