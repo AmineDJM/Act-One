@@ -1231,7 +1231,11 @@ const shotWords = scenes.map((scene) => ({
   durationSeconds: scene.durationSeconds,
   wordsAtSeconds: wordsLandAt(scene.objects as never),
 }));
-const { takes: aligned, moved } = alignToTypography(takes, shotWords);
+// A/B switch: the only honest way to attribute a change to the alignment is
+// to run the same voice, energy and stability with it on and off.
+const { takes: aligned, moved } = process.env['ACT_ONE_NO_ALIGN']
+  ? { takes, moved: [] as string[] }
+  : alignToTypography(takes, shotWords);
 
 const firstPass = place(aligned, scenes);
 const retimed = retimeForNarration(scenes, firstPass);
