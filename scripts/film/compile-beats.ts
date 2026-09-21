@@ -151,7 +151,9 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       fill: palette.ink, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'structure', enterAt: 0,
       reason: 'The words sit on this rather than on the interface behind them.',
-      transform: Transform.parse({ x: 0.5, y: 1.02, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
+      // Bottom edge off-frame, top edge high enough that the words on it sit
+      // inside the title-safe area — a player's chrome lives in that last 5%.
+      transform: Transform.parse({ x: 0.5, y: 1.06, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
     } as SceneObject);
   }
 
@@ -275,7 +277,7 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
 
   if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
-    return { x: 0.07, top: 0.9, lineGap: 0.1, anchor: 0, width: 0.6, heroScale: 1.05 };
+    return { x: 0.07, top: 0.88, lineGap: 0.1, anchor: 0, width: 0.6, heroScale: 1.05 };
   }
   if (visual.kind === 'mark') {
     return { x: 0.09, top: 0.48, lineGap: 0.12, anchor: 0, width: 0.54, heroScale: 1.3 };

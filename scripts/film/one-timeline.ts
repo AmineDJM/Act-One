@@ -16,7 +16,7 @@
  *   ACT_ONE_MANAGED_CREDENTIALS=all npm run film
  */
 import path from 'node:path';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { BrandSystem, inspectScenes } from '@act-one/core';
 import { layout, type SpokenWord } from '@act-one/creative';
@@ -161,6 +161,20 @@ if (process.env['ACT_ONE_INSPECT_ONLY']) process.exit(0);
 
 const silent = path.resolve('.renders/one-timeline.silent.mp4');
 const out = path.resolve('.renders/one-timeline.mp4');
+/*
+ * A refused render must not leave the last one lying there.
+ *
+ * Three times now I have changed something, had the inspector refuse the
+ * render, extracted a frame from the file still on disk from the PREVIOUS
+ * run, and concluded the change did not work. Twice I started debugging code
+ * that was never executed. The stale file is the whole problem: it is
+ * indistinguishable from a fresh one, and it is the thing you reach for when
+ * you want to know whether the fix landed.
+ *
+ * So the output goes before the render begins. If this run refuses, there is
+ * nothing to misread.
+ */
+if (existsSync(out)) rmSync(out);
 const started = Date.now();
 await renderScenes({
   scenes, brand, assetUrls: ASSETS, aspect: '16:9',
