@@ -158,7 +158,18 @@ def profile(path):
             # relative figure between renders of the SAME film — comparing it
             # across films with different dynamics says nothing.
             "silentShare": round(float(np.mean(norm < 0.08)), 4),
-            # What the bed actually sits at, which is the number that compares.
+            # The median level between transients, and how far the loudest
+            # moment sits above it.
+            #
+            # READ THESE AS THE MUSIC'S CHARACTER, not as mix balance. A
+            # percussive bed at 124bpm has space between its hits, so its
+            # median at a tenth of a second falls in the gaps and its ratio is
+            # high — while a sustained pad with identical cue levels measures
+            # the opposite. Establishing that cost a render: a film whose cues
+            # sit 3 dB BELOW its bed by design still reported a ratio near ten.
+            # The balance question is answered by the cue gains against the bed
+            # gain, which are known exactly and do not need inferring from a
+            # waveform.
             "bedRms": round(float(np.median(rms)), 4),
             "accentRatio": round(float(np.max(rms) / max(float(np.median(rms)), 1e-6)), 2),
             "accents": int(np.sum((norm[1:] - norm[:-1]) > 0.18)),

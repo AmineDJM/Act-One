@@ -1011,6 +1011,11 @@ const resolved = Object.fromEntries(
     .map((item) => [item.storageKey, path.join(STORAGE, item.storageKey)] as const)
     .filter(([, file]) => existsSync(file)),
 );
+console.log(`  MUSIC ${design.music?.trackId} enter ${design.music?.enterAtSeconds}s exit ${design.music?.exitAtSeconds}s gain ${design.music?.baseGainDb}dB`);
+console.log(`  ENDING ${design.ending.strategy}; silence ${design.silenceSeconds}s`);
+for (const note of design.notes) console.log(`  NOTE ${note}`);
+const byGain = [...design.cues].sort((a, b) => b.gainDb - a.gainDb).slice(0, 6);
+console.log('  LOUDEST CUES', byGain.map((c) => `${c.type}@${c.atSeconds}s ${c.gainDb}dB`).join(' | '));
 const plan = buildMix({ design, resolvedPaths: resolved, durationSeconds: seconds });
 const premix = path.resolve('.renders/launch.premix.wav');
 const mixed = await runFfmpeg(mixArgs(plan, premix), { timeoutMs: 8 * 60_000 });
