@@ -195,7 +195,29 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
            * passage with no voice in it at all. The sidechain in the mix is
            * what creates room for the voice, and it releases in the gaps.
            */
-          baseGainDb: -13,
+          /*
+           * -8 dB, and the number was measured rather than chosen.
+           *
+           * The bed sat at -13, which is where a bed goes when a voice has to
+           * be heard over it. Sampled at a tenth of a second — fine enough to
+           * see between transients — three reference films hold their beds at
+           * 0.116, 0.148 and 0.169 RMS with accents 2.3 to 5.7 times above
+           * them. This system's films measured 0.052 with accents 10.6 times
+           * above: a quiet bed punctuated by bangs, which is what an
+           * automated mix sounds like and is audible immediately.
+           *
+           * Still ONE level whether or not anybody is speaking, which is the
+           * part that matters. The bed used to drop to -18 for the whole film
+           * the moment there was narration — the drawn fade that holds music
+           * down through every pause — and the sidechain in the mix is what
+           * makes room for a voice and releases in the gaps. Raising the
+           * resting level does not touch that; making it conditional would.
+           *
+           * A first attempt at this fixed the ratio by making the level
+           * depend on `hasVoiceOver`, and a test caught it. The test was
+           * right.
+           */
+          baseGainDb: -8,
         }
       : null,
     cues: cues.sort((a, b) => a.atSeconds - b.atSeconds),

@@ -151,7 +151,16 @@ def profile(path):
         audio = {
             "meanRms": round(float(np.mean(norm)), 4),
             "dynamicRange": round(float(np.percentile(norm, 95) - np.percentile(norm, 15)), 4),
+            # Normalised by the film's own loudest second, so a single hard
+            # impact drags every other second's ratio down and a perfectly
+            # continuous bed reports as "silent". This is the same failure the
+            # peak reading in sync_check had, and it is kept only as a
+            # relative figure between renders of the SAME film — comparing it
+            # across films with different dynamics says nothing.
             "silentShare": round(float(np.mean(norm < 0.08)), 4),
+            # What the bed actually sits at, which is the number that compares.
+            "bedRms": round(float(np.median(rms)), 4),
+            "accentRatio": round(float(np.max(rms) / max(float(np.median(rms)), 1e-6)), 2),
             "accents": int(np.sum((norm[1:] - norm[:-1]) > 0.18)),
         }
 
