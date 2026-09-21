@@ -541,7 +541,7 @@ const caption = (
    */
   {
     kind: 'shape', id: `${id}_band`, shape: 'rect',
-    width: 1.2, height: 0.155,
+    width: 1.2, height: 0.19,
     fill: band, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
     role: 'structure', enterAt: 0.3,
     reason: 'The band the caption is read on, so it never fights the interface underneath it.',
@@ -618,7 +618,7 @@ const stepTravel = (
         reason: 'The real interface as a place the camera moves through, not a card it sits on.',
         transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
       } as SceneObject,
-      ...caption(`${id}_body`, body, { y: 0.9 }, PAPER, INK),
+      ...caption(`${id}_body`, body, { y: 0.93 }, PAPER, INK),
     ],
     audio: [
       { at: 0.04, kind: 'whoosh', intensity: 0.42, causedBy: `${id}_page`, reason: 'The camera enters the interface.' },
@@ -644,7 +644,7 @@ const stepProduct = (
       bloom(`${id}_bloom`, { x: 0.62, y: 0.44 }, '#FFEADC', 0.95),
       card(`${id}_card`, asset, crop, place, tilt, width, 0.0,
         'The real interface at this step, big enough to be the product rather than a picture of it.'),
-      ...caption(`${id}_body`, body, { y: 0.9 }, INK, PAPER),
+      ...caption(`${id}_body`, body, { y: 0.93 }, INK, PAPER),
     ],
     audio: [
       { at: 0.05, kind: 'ui_confirm', intensity: 0.34, causedBy: `${id}_card`, reason: 'The interface arrives.' },
