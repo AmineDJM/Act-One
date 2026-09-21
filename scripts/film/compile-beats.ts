@@ -102,7 +102,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * third it would have been orange on orange, invisible exactly where the
    * emphasis lands. Paper reads on all three.
    */
-  const onPanels = visual.kind === 'films' || visual.kind === 'fields';
+  const onPanels = visual.kind === 'films' || visual.kind === 'fields' || visual.kind === 'product';
   const heroColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
   const restColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
 
@@ -133,16 +133,25 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * A soft band, only where the picture underneath has type in it.
    */
   if (visual.kind === 'product' && beat.phrases.length) {
+    /*
+     * IN FRONT of the page, not behind it.
+     *
+     * The first attempt put this at z 0.1, which is further back in the
+     * painter's sort, so the screenshot covered the band the words were
+     * supposed to sit on — and the words, coloured ink because a product beat
+     * stands on paper, ended up dark type on a dark interface. Legibly worse
+     * than the clutter it was meant to fix.
+     *
+     * The band is at the same depth as everything else and pushed after the
+     * page, so it paints over it, and the words on it are paper.
+     */
     objects.push({
       kind: 'shape', id: `${beat.id}_ground`, shape: 'rect',
-      width: 1.4, height: 0.42,
+      width: 1.4, height: 0.3,
       fill: palette.ink, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'structure', enterAt: 0,
       reason: 'The words sit on this rather than on the interface behind them.',
-      transform: Transform.parse({
-        x: 0.5, y: 1.06, z: 0.1, anchor: { x: 0.5, y: 0.5 },
-        opacity: 0.82,
-      }),
+      transform: Transform.parse({ x: 0.5, y: 1.02, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
     } as SceneObject);
   }
 
@@ -266,7 +275,7 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
 
   if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
-    return { x: 0.07, top: 0.88, lineGap: 0.1, anchor: 0, width: 0.52, heroScale: 1.05 };
+    return { x: 0.07, top: 0.9, lineGap: 0.1, anchor: 0, width: 0.6, heroScale: 1.05 };
   }
   if (visual.kind === 'mark') {
     return { x: 0.09, top: 0.48, lineGap: 0.12, anchor: 0, width: 0.54, heroScale: 1.3 };
