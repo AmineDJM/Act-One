@@ -158,12 +158,14 @@ export const VISUALS: Record<string, BeatVisual> = {
      * and runs from 0.153 to 0.790.
      */
     plate: { width: 1.0, centreY: 0.44 },
-    // Under "Directed." — the claim the page actually makes.
-    underline: { x: 0.153, y: 0.556, width: 0.34, at: 0.20 },
-    // In the left margin, level with that line.
-    pin: { x: 0.128, y: 0.540, at: 0.42 },
-    // Through the paragraph's second line, on the emphasis.
-    strike: { x: 0.153, y: 0.734, width: 0.637, at: 0.60 },
+    marks: [
+      // Under "Directed." — the claim the page actually makes.
+      { kind: 'rule', x: 0.153, y: 0.556, width: 0.34, at: 0.20 },
+      // In the left margin, level with that line.
+      { kind: 'tag', x: 0.128, y: 0.540, at: 0.42 },
+      // Through the paragraph's second line, on the emphasis.
+      { kind: 'strike', x: 0.153, y: 0.734, width: 0.637, at: 0.60 },
+    ],
   },
   b2: { kind: 'statement', field: null },
   // Ember was nearly black on a near-black field: the loudest event in the
@@ -193,7 +195,53 @@ export const VISUALS: Record<string, BeatVisual> = {
     colours: ['#1F6F4A', '#2B4B9B', '#FF4D1F'],
     verdicts: ['pass', 'fail', 'pass'],
   },
-  b9: { kind: 'product', assetId: 'ast_how', window: { x: 0.06, width: 0.58, fromY: 0.30, toY: 0.06 }, holdIndex: 2 },
+  /*
+   * THE CHECKS, PERFORMED — because naming them was the problem.
+   *
+   * This beat says "Contrast, loudness, timing. It fails itself first," and it
+   * was a screenshot of a marketing page travelling past while the voice
+   * listed three things. Two directors called it "telling instead of showing";
+   * the inspector had it 95% the same picture as b6 and 8% off the right edge
+   * at the same time, which is a beat that was neither saying anything nor
+   * framed.
+   *
+   * So the three checks are three rules, landing one per named check, and then
+   * the film strikes its own page on "fails itself first". This is the same
+   * grammar as the opening, which is the point: the Round 1 thesis asked for
+   * pin, measure and strike to recur across the film rather than be a device
+   * used once.
+   *
+   * AN EVIDENCE-CLOSE, not a second wide read. The opening looks at a whole
+   * page; this one is inside one. The plate is 1.25x the frame and pushed to
+   * x 0.5275 so the TEXT COLUMN is centred rather than the image — a zoomed
+   * plate centred on the picture puts its left margin off the screen.
+   *
+   * The capture is 1876x626, aspect 2.997, so at 1.25 it is 0.742 of frame
+   * height and spans 0.069 to 0.811. A line at image-fraction fy sits at
+   * 0.069 + fy * 0.742, and its x is 0.5275 + (fx - 0.5) * 1.25.
+   */
+  b9: {
+    kind: 'audit', assetId: 'ast_how_stages',
+    plate: { width: 1.25, centreY: 0.44, centreX: 0.5275 },
+    marks: [
+      // Contrast, loudness, timing — one rule per check, each landing as its
+      // check is named.
+      /*
+       * Below the baseline, not on the text's centre.
+       *
+       * These were computed to the line's vertical CENTRE and drew straight
+       * through the words. A rule that crosses what it marks is a strike, and
+       * this film has a strike already; the two must not be the same gesture.
+       * Measured off a locked frame: the headline baselines sit at 0.400 and
+       * 0.523, so the rules clear them at 0.412 and 0.535.
+       */
+      { kind: 'rule', x: 0.059, y: 0.412, width: 0.671, at: 0.08 },
+      { kind: 'rule', x: 0.059, y: 0.535, width: 0.588, at: 0.20 },
+      { kind: 'rule', x: 0.059, y: 0.650, width: 0.882, at: 0.32 },
+      // "It fails itself first." The system rejects its own page.
+      { kind: 'strike', x: 0.059, y: 0.709, width: 0.864, at: 0.58 },
+    ],
+  },
   b10: { kind: 'statement', field: null },
   b11: { kind: 'statement', field: '#FF4D1F' },
   b12: { kind: 'statement', field: null },

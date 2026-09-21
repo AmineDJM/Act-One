@@ -57,13 +57,46 @@ export type BeatVisual =
   | {
       kind: 'audit';
       assetId: string;
-      /** The page as a plate: how wide, and where its centre sits. */
-      plate: { width: number; centreY: number };
-      /** Each mark in FRAME coordinates, computed from the plate's geometry. */
-      underline: { x: number; y: number; width: number; at: number };
-      pin: { x: number; y: number; at: number };
-      strike: { x: number; y: number; width: number; at: number };
+      /**
+       * The page as a plate: how wide, and where its centre sits.
+       *
+       * `width` above 1 is an evidence-close — the plate is wider than the
+       * frame, so the film is reading part of the page rather than looking at
+       * all of it. `centreX` then matters, because a zoomed plate centred on
+       * the image is rarely centred on the text column.
+       */
+      plate: { width: number; centreY: number; centreX?: number };
+      /**
+       * The marks, in FRAME coordinates computed from the plate's geometry.
+       *
+       * A LIST RATHER THAN THREE NAMED FIELDS, because the grammar is supposed
+       * to recur. The first version hard-coded one underline, one pin and one
+       * strike, which made the audit a shot rather than a vocabulary — and the
+       * whole argument for it was that the same verbs come back when the film
+       * talks about checking things. A beat that names three checks needs three
+       * rules; a beat that names one needs one.
+       */
+      marks: readonly AuditMark[];
     };
+
+/**
+ * One mark the system makes on a page.
+ *
+ * Three kinds, three meanings, three colours, and they must never look alike:
+ * a `rule` is what was read and kept, a `tag` is the evidence pinned beside it,
+ * a `strike` is what could not be proved. An earlier version drew the rule and
+ * the strike in the same accent, so the film's two most important verbs were
+ * the same gesture in the same colour.
+ */
+export type AuditMark = {
+  kind: 'rule' | 'tag' | 'strike';
+  x: number;
+  y: number;
+  /** Ignored by `tag`, which is a fixed small mark. */
+  width?: number;
+  /** When it lands, as a fraction of the beat rather than in seconds. */
+  at: number;
+};
 
 export type CompileOptions = {
   palette: Palette;
@@ -96,7 +129,16 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * one hard-coded frame, and came back 96% identical.
    */
   const variant = all.slice(0, index).filter((b) => (options.visuals[b.id]?.kind ?? 'statement') === visual.kind).length;
-  const onPaper = visual.kind === 'product' || visual.kind === 'audit';
+  /*
+   * Product beats stand on paper; audit beats do not.
+   *
+   * The captures in an audit beat are of a dark interface, and a cream field
+   * behind them left a pale strip above and below the plate that reads as a
+   * light leak rather than as a margin. On ink the plate and the frame are one
+   * continuous dark surface, which is also what lets the three marks be the
+   * only bright things in the shot.
+   */
+  const onPaper = visual.kind === 'product';
   const background = onPaper ? palette.paper : palette.ink;
 
   const objects: SceneObject[] = [];
@@ -181,6 +223,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    *
    * A soft band, only where the picture underneath has type in it.
    */
+  const bandAtTop = visual.kind === 'audit' && variant > 0;
   if ((visual.kind === 'product' || visual.kind === 'audit') && beat.phrases.length) {
     /*
      * IN FRONT of the page, not behind it.
@@ -206,7 +249,9 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       // the caption at 0.88, and its bottom runs off the frame. Sized to the
       // words rather than guessed — the first attempt left the band entirely
       // below the line it was supposed to be carrying.
-      transform: Transform.parse({ x: 0.5, y: 1.0, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
+      // Follows the words. A band at the bottom under a caption at the top is
+      // not a ground, it is a stripe.
+      transform: Transform.parse({ x: 0.5, y: bandAtTop ? 0.0 : 1.0, anchor: { x: 0.5, y: 0.5 }, opacity: 0.88 }),
     } as SceneObject);
   }
 
@@ -346,7 +391,23 @@ function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
   x: number; top: number; lineGap: number; anchor: number; width: number; heroScale: number;
 } {
 
-  if (visual.kind === 'clip' || visual.kind === 'product' || visual.kind === 'audit') {
+  if (visual.kind === 'audit') {
+    /*
+     * The two audits are the same GRAMMAR, not the same SHOT.
+     *
+     * With both plates locked off on ink and both captions low, the inspector
+     * put them at 94% the same picture — and it was right: a vocabulary that
+     * recurs is the point, a framing that recurs is a repeat. The opening is a
+     * wide read of a whole page with the line beneath it; the second is an
+     * evidence-close, and its caption goes ABOVE the plate, out of the way of
+     * marks that live in the lower two thirds and into the space a closer
+     * crop opens up at the top.
+     */
+    return variant === 0
+      ? { x: 0.5, top: 0.88, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 }
+      : { x: 0.5, top: 0.115, lineGap: 0.1, anchor: 0.5, width: 0.72, heroScale: 1.1 };
+  }
+  if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
     /*
      * Centred on the band rather than left-anchored.
@@ -445,7 +506,26 @@ function cameraFor(beat: TimedBeat, visual: BeatVisual): Record<string, unknown>
    * driven rather than animated.
    */
   const curve = 'in_out_cubic' as const;
-  if (visual.kind === 'product' || visual.kind === 'audit') {
+  if (visual.kind === 'audit') {
+    /*
+     * LOCKED OFF, and it has to be.
+     *
+     * Every mark in an audit beat is placed by arithmetic off the plate's
+     * geometry, and a camera scale invalidates that arithmetic the instant it
+     * moves: the frame magnifies about its centre, so a rule computed to sit
+     * under a headline drifts upward through it as the shot pushes in. The
+     * first version of this beat drew three rules THROUGH the lines they were
+     * supposed to underline, and the cause was not the coordinates — those
+     * were right — but a camera nobody had accounted for.
+     *
+     * It is also the correct shot. An audit is a held inspection, and the
+     * cinematography director asked for exactly this in the room: "one held
+     * inspection vantage, no push-ins, no parallax, no camera drift". The
+     * motion in these beats is the marks being made. That is enough.
+     */
+    return { focalLengthMm: 50, scale: 1 };
+  }
+  if (visual.kind === 'product') {
     /*
      * The full push, kept.
      *
@@ -459,6 +539,22 @@ function cameraFor(beat: TimedBeat, visual: BeatVisual): Record<string, unknown>
      * paid for in the only movement these shots have.
      */
     return { focalLengthMm: 60, scale: { from: 1.0, to: 1.0 + travel * 0.4, curve } };
+  }
+  if (visual.kind === 'films' || visual.kind === 'fields') {
+    /*
+     * A COMPARISON IS HELD, NOT PANNED.
+     *
+     * These beats put three things side by side and ask the viewer to weigh
+     * them. The default camera pans horizontally — travel*0.18 to -travel*0.12
+     * — which slides the whole triptych sideways, so the three panels are not
+     * presented equally and the outer ones walk off the edge. The inspector
+     * reported the left film 2% past the frame and a model watching it went
+     * straight there: "the UI screenshot is cut off awkwardly on the left
+     * edge, making the composition feel messy and unresolved."
+     *
+     * A small scale keeps the frame alive without moving the comparison.
+     */
+    return { focalLengthMm: 50, scale: { from: 1.0, to: 1.0 + travel * 0.09, curve } };
   }
   if (visual.kind === 'mark') {
     return { focalLengthMm: 85, scale: { from: 1.0 + travel * 0.5, to: 1.0, curve } };
@@ -526,7 +622,7 @@ function visualObjects(
       role: 'support', enterAt: 0,
       reason: 'The real page, square-on: the ground the marks are made on.',
       transform: Transform.parse({
-        x: 0.5, y: visual.plate.centreY, anchor: { x: 0.5, y: 0.5 },
+        x: visual.plate.centreX ?? 0.5, y: visual.plate.centreY, anchor: { x: 0.5, y: 0.5 },
         /*
          * Settles rather than arrives. A two-percent scale on out_quint reads
          * as a plate being set down; anything larger reads as a transition and
@@ -539,71 +635,70 @@ function visualObjects(
     } as SceneObject];
 
     /*
-     * KEPT — a fine white rule under the line, drawn left to right the way a
-     * person reads. Thin on purpose: a heavy bar is a highlighter, and this is
-     * meant to read as a precise instrument rather than an emphasis.
+     * THE MARKS, in the order the system works.
+     *
+     * Each kind is a different verb and reads as one: a fine white rule for
+     * what was read and kept, an amber tag in the margin for the evidence
+     * behind it, the accent through the line for what could not be proved.
+     * The accent appears nowhere else in this beat, so a strike cannot be
+     * mistaken for emphasis.
      */
-    objects.push({
-      kind: 'shape', id: `${beat.id}_underline`, shape: 'rect',
-      width: { keyframes: [
-        { t: 0, value: 0 },
-        { t: at(visual.underline.at), value: 0, curve: 'linear' },
-        { t: at(visual.underline.at + 0.11), value: visual.underline.width, curve: 'out_quint' },
-        { t: 1, value: visual.underline.width },
-      ], curve: 'out_quint' },
-      height: 0.0038,
-      fill: palette.paper, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
-      role: 'structure', enterAt: 0,
-      reason: 'One line on the page, underlined: what the system read and kept.',
-      transform: Transform.parse({ x: visual.underline.x, y: visual.underline.y, anchor: { x: 0, y: 0.5 }, opacity: 0.92 }),
-    } as SceneObject);
-    audio.push({
-      at: beat.durationSeconds * at(visual.underline.at), kind: 'ui_click', intensity: 0.24,
-      causedBy: `${beat.id}_underline`, reason: 'The line is read.',
-    });
+    for (const [index, mark] of visual.marks.entries()) {
+      const lands = at(mark.at);
+      const id = `${beat.id}_${mark.kind}_${index}`;
 
-    // EVIDENCE — an amber tag in the margin, level with the line it points at.
-    // In the margin because a mark inside a sentence reads as a redaction.
-    objects.push({
-      kind: 'shape', id: `${beat.id}_pin`, shape: 'rect',
-      width: 0.008, height: 0.026,
-      fill: palette.amber, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 1,
-      role: 'structure', enterAt: beat.durationSeconds * at(visual.pin.at),
-      reason: 'Pinned as evidence: the verbatim excerpt kept behind the fact.',
-      transform: Transform.parse({
-        x: visual.pin.x, y: visual.pin.y, anchor: { x: 0, y: 0.5 },
-        scale: { from: 0.4, to: 1, curve: 'out_quint' },
-      }),
-    } as SceneObject);
-    audio.push({
-      at: beat.durationSeconds * at(visual.pin.at), kind: 'ui_click', intensity: 0.3,
-      causedBy: `${beat.id}_pin`, reason: 'The excerpt is pinned.',
-    });
+      if (mark.kind === 'tag') {
+        // In the margin: a mark inside a sentence reads as a redaction.
+        objects.push({
+          kind: 'shape', id, shape: 'rect',
+          width: 0.008, height: 0.026,
+          fill: palette.amber, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 1,
+          role: 'structure', enterAt: beat.durationSeconds * lands,
+          reason: 'Pinned as evidence: the verbatim excerpt kept behind the fact.',
+          transform: Transform.parse({
+            x: mark.x, y: mark.y, anchor: { x: 0, y: 0.5 },
+            scale: { from: 0.4, to: 1, curve: 'out_quint' },
+          }),
+        } as SceneObject);
+        audio.push({
+          at: beat.durationSeconds * lands, kind: 'ui_click', intensity: 0.3,
+          causedBy: id, reason: 'The excerpt is pinned.',
+        });
+        continue;
+      }
 
-    /*
-     * REJECTED — the accent, through the line rather than under it, and the
-     * only accent in this beat. This is the verb that makes the film different
-     * from a screenshot tour: the system reports what it cannot trace instead
-     * of repeating it.
-     */
-    objects.push({
-      kind: 'shape', id: `${beat.id}_strike`, shape: 'rect',
-      width: { keyframes: [
-        { t: 0, value: 0 },
-        { t: at(visual.strike.at), value: 0, curve: 'linear' },
-        { t: at(visual.strike.at + 0.07), value: visual.strike.width, curve: 'out_quint' },
-        { t: 1, value: visual.strike.width },
-      ], curve: 'out_quint' },
-      height: 0.0072,
-      fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
-      role: 'payload', enterAt: 0,
-      reason: 'Struck out: a claim the system could not trace to the page.',
-      transform: Transform.parse({ x: visual.strike.x, y: visual.strike.y, anchor: { x: 0, y: 0.5 } }),
-    } as SceneObject);
-    audio.push({
-      at: beat.durationSeconds * at(visual.strike.at), kind: 'impact', intensity: 0.5,
-      causedBy: `${beat.id}_strike`, reason: 'The claim is struck out. This is the film performing its own thesis.',
-    });
+      const struck = mark.kind === 'strike';
+      const width = mark.width ?? 0.3;
+      objects.push({
+        kind: 'shape', id, shape: 'rect',
+        // Drawn left to right, the way a person reads, over a fixed share of
+        // the beat rather than a fixed number of seconds.
+        width: { keyframes: [
+          { t: 0, value: 0 },
+          { t: lands, value: 0, curve: 'linear' },
+          { t: at(mark.at + (struck ? 0.07 : 0.1)), value: width, curve: 'out_quint' },
+          { t: 1, value: width },
+        ], curve: 'out_quint' },
+        height: struck ? 0.0072 : 0.0038,
+        fill: struck ? palette.accent : palette.paper,
+        stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        role: struck ? 'payload' : 'structure',
+        enterAt: 0,
+        reason: struck
+          ? 'Struck out: a claim the system could not trace to the page.'
+          : 'Underlined: what the system read and kept.',
+        transform: Transform.parse({ x: mark.x, y: mark.y, anchor: { x: 0, y: 0.5 }, opacity: struck ? 1 : 0.92 }),
+      } as SceneObject);
+      audio.push({
+        at: beat.durationSeconds * lands,
+        kind: struck ? 'impact' : 'ui_click',
+        intensity: struck ? 0.5 : 0.24,
+        causedBy: id,
+        reason: struck
+          ? 'The claim is struck out. This is the film performing its own thesis.'
+          : 'A line is read.',
+      });
+    }
 
     return objects;
   }
@@ -695,7 +790,9 @@ function visualObjects(
       objects.push({
         kind: 'clip', id: `${beat.id}_film_${i}`, assetId,
         crop: { x: 0, y: 0, width: 1, height: 1 },
-        width: share * 0.86,
+        // Inset inside its own colour field, so the panel reads as a frame
+        // around the film rather than the film reaching for the seam.
+        width: share * 0.82,
         // Each starts at a different second so three films at once do not cut
         // in step and read as one image in three panels.
         sourceInSeconds: 1.2 + i * 2.4, playbackRate: 1, generated: true,

@@ -40,7 +40,7 @@ const PALETTE = { ink: '#0B0C10', paper: '#F4F2EC', accent: '#FF4D1F', amber: '#
 const ASSETS: Record<string, string> = {};
 // The hero crop is a known 1580x680, which is what lets the audit beat place
 // its marks by arithmetic instead of by eye.
-for (const name of ['home', 'how', 'work', 'pricing', 'home_hero'] as const) {
+for (const name of ['home', 'how', 'work', 'pricing', 'home_hero', 'how_stages'] as const) {
   if (existsSync(path.join(PUBLIC, `${name}.png`))) ASSETS[`ast_${name}`] = `${BASE}/${name}.png`;
 }
 for (const [key, file] of [
