@@ -449,19 +449,55 @@ const scenes: Graph[] = [
  * which is both how the references stage this act and why their shot medians
  * are a third of what ours was.
  */
-const stepTitle = (id: string, index: string, title: string, seconds: number, at: number): Graph =>
+const stepTitle = (
+  id: string, index: string, title: string, seconds: number, at: number,
+  /** The page the next shot lands in, already sliding into this one. */
+  incoming: string,
+): Graph =>
   SceneGraph.parse({
     id, durationSeconds: seconds,
-    intent: `STEP TITLE: ${title.toLowerCase()} — one line, held briefly, on the move.`,
+    intent: `STEP TITLE: ${title.toLowerCase()}, with the interface it describes already arriving.`,
     background: PAPER,
     camera: camera({ x: [0.1, -0.04], scale: [1.12, 1.0], focal: 60, curve: 'out_expo' }),
     objects: [
       bloom(`${id}_bloom`, { x: 0.3, y: 0.44 }, '#FFEADC', 0.9),
+      /*
+       * THE FRAME WAS THREE-QUARTERS EMPTY, which is what a title beat looks
+       * like when it contains nothing but a title. A model watching the cut
+       * pointed at these shots and called them the weakest moments; looking at
+       * the frames, they are not clipped or badly composed, they are BLANK —
+       * one short line on the left and two-thirds of a cream field doing
+       * nothing.
+       *
+       * So the page the next shot lands inside is already entering this one,
+       * from the edge, at an angle, still on its way. That fills the right of
+       * the frame, it gives the camera something to travel towards, and it
+       * makes the cut into the product shot a continuation rather than a
+       * surprise — the thing you were watching arrive is the thing you are
+       * now inside.
+       */
+      {
+        kind: 'ui_layer', id: `${id}_incoming`, assetId: incoming, semantic: 'incoming',
+        crop: { x: 0.04, y: 0.06, width: 0.5, height: 0.52 },
+        width: 0.62, cornerRadiusPx: 10, shadow: true,
+        role: 'support', enterAt: 0.12,
+        reason: 'The interface the next shot is inside, still arriving.',
+        transform: Transform.parse({
+          x: { from: 1.25, to: 0.86, curve: 'out_expo' },
+          y: 0.52,
+          z: -0.2,
+          anchor: { x: 0.5, y: 0.5 },
+          rotationX: 3,
+          rotationY: { from: -22, to: -14, curve: 'out_expo' },
+          rotationZ: 1.5,
+          opacity: { from: 0, to: 1, curve: 'out_cubic' },
+        }),
+      } as SceneObject,
       line(`${id}_index`, index, {
         token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
       }, arrive({ x: 0.02 }, { x: 0.09, y: 0.36 }, { anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } })),
       line(`${id}_title`, title, {
-        maxWidth: 0.46, maxLines: 2, stagger: 0.06,
+        maxWidth: 0.4, maxLines: 2, stagger: 0.06,
       }, arrive({ x: 0.15 }, { x: 0.09, y: 0.5 }, { anchor: { x: 0, y: 0.5 } })),
     ],
     audio: [
@@ -469,7 +505,66 @@ const stepTitle = (id: string, index: string, title: string, seconds: number, at
       { at: 0.3, kind: 'ui_click', intensity: 0.2, causedBy: `${id}_title`, reason: 'A word.' },
       { at: at, kind: 'whoosh', intensity: 0.38, causedBy: `${id}_index`, reason: 'Into the product.' },
     ],
-    handover: { mechanism: 'camera_carry', carries: [`${id}_title`], durationSeconds: 0.4, reason: 'The camera keeps travelling into the interface the line describes.' },
+    handover: { mechanism: 'camera_carry', carries: [`${id}_incoming`], durationSeconds: 0.4, reason: 'The camera keeps travelling into the interface that has just arrived.' },
+    macro: null,
+  });
+
+/**
+ * A shot INSIDE the interface, rather than of a card with an interface on it.
+ *
+ * THE NOTE THAT FORCED THIS. A model watching the previous cut said it
+ * "relies heavily on generic SaaS motion graphics (dark backgrounds, floating
+ * UI, subtle zooms)" — which is the exact failure this whole sprint exists to
+ * escape, and it was right. Every appearance of the product was a rectangle
+ * with a screenshot on it, tilted slightly, floating on a field.
+ *
+ * The references do something else entirely. Their boundaries read "camera
+ * pans down to new UI layout", "camera zooms into white space of a message",
+ * "camera pans right to form UI" — the interface is a PLACE and the camera
+ * moves through it. The scene language has been able to express that since it
+ * was written: `crop` is animatable, and a crop that moves is a camera inside
+ * the capture rather than a picture of it sliding about.
+ *
+ * It had never been used. So the crop travels here, the plate is full-bleed,
+ * and the product stops being an object in the frame and becomes the frame.
+ *
+ * The aspect is arithmetic, not taste: a region of a 1.60:1 page fills a 16:9
+ * frame when `cropWidth / cropHeight` is 1.11, so a 0.5 x 0.45 window travels
+ * down the page without ever showing an edge.
+ */
+const stepTravel = (
+  id: string, body: string, asset: string,
+  window: { x: number; fromY: number; toY: number },
+  seconds: number, travel: Travel,
+): Graph =>
+  SceneGraph.parse({
+    id, durationSeconds: seconds,
+    intent: 'STEP PRODUCT: the camera travels down the real interface, full-bleed.',
+    background: PAPER,
+    camera: camera(travel),
+    objects: [
+      {
+        kind: 'ui_layer', id: `${id}_page`, assetId: asset, semantic: 'page',
+        crop: {
+          x: window.x, width: 0.5, height: 0.45,
+          y: { from: window.fromY, to: window.toY, curve: 'in_out_cubic' },
+        },
+        width: 1.08, cornerRadiusPx: 0, shadow: false,
+        role: 'payload',
+        reason: 'The real interface as a place the camera moves through, not a card it sits on.',
+        transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+      } as SceneObject,
+      line(`${id}_body`, body, {
+        token: 'statement', color: PAPER, maxWidth: 0.3, maxLines: 3, enterAt: 0.4,
+      }, { x: 0.08, y: 0.87, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+    ],
+    audio: [
+      { at: 0.04, kind: 'whoosh', intensity: 0.42, causedBy: `${id}_page`, reason: 'The camera enters the interface.' },
+      { at: 0.45, kind: 'ui_click', intensity: 0.24, causedBy: `${id}_body`, reason: 'The caption.' },
+      { at: seconds * 0.55, kind: 'ui_confirm', intensity: 0.3, causedBy: `${id}_page`, reason: 'Passing a control.' },
+      { at: seconds - 0.4, kind: 'whoosh', intensity: 0.38, causedBy: `${id}_page`, reason: 'And out again.' },
+    ],
+    handover: { mechanism: 'camera_carry', carries: [`${id}_page`], durationSeconds: 0.42, reason: 'The move continues into the next step.' },
     macro: null,
   });
 
@@ -501,15 +596,25 @@ const stepProduct = (
   });
 
 scenes.push(
-  stepTitle('l5', '01', 'We read your product.', 2.6, 2.0),
-  stepProduct('l6', 'A real capture, never a drawing of one.', 'ast_home', CARD_CROP['ast_home']!, 4.4,
-    { x: [0.1, -0.08], scale: [1.18, 1.02], focal: [110, 95] }, { x: 0.62, y: 0.44, z: -0.1 }, { rx: 3, ry: -8, rz: 1 }, 0.6),
+  stepTitle('l5', '01', 'We read your product.', 2.6, 2.0, 'ast_home'),
+  // Travelling down the homepage: the camera is inside it.
+  stepTravel('l6', 'A real capture, never a drawing of one.', 'ast_home',
+    { x: 0.05, fromY: 0.04, toY: 0.46 }, 4.6, { scale: [1.06, 1.0], focal: 70 }),
 
-  stepTitle('l7', '02', 'Three directions.', 1.8, 1.35),
-  stepProduct('l8', 'Rendered and watched before one is chosen.', 'ast_work', CARD_CROP['ast_work']!, 4.4,
-    { x: [-0.1, 0.08], y: [0.04, -0.04], scale: [1.02, 1.2], focal: [95, 105] }, { x: 0.58, y: 0.46, z: 0.12 }, { rx: -3, ry: 9, rz: -1.5 }, 0.62),
+  stepTitle('l7', '02', 'Three directions.', 2.0, 1.5, 'ast_work'),
+  // Travelling across the work: the same idea on the other axis.
+  stepTravel('l8', 'Rendered and watched before one is chosen.', 'ast_work',
+    { x: 0.3, fromY: 0.5, toY: 0.12 }, 4.6, { scale: [1.0, 1.07], x: [-0.03, 0.03], focal: 70 }),
 
-  stepTitle('l9', '03', 'One afternoon.', 1.8, 1.35),
+  stepTitle('l9', '03', 'One afternoon.', 2.0, 1.5, 'ast_pricing'),
+  /*
+   * The one held card in the film, and it is here on purpose.
+   *
+   * Three travelling shots in a row is the same shot three times, which is the
+   * repetition this act was split up to avoid in the first place. The last
+   * step pulls back out of the page and shows the thing as an object again,
+   * which also lets the act end wider than it began.
+   */
   stepProduct('l10', 'It checks its own frames.', 'ast_pricing', CARD_CROP['ast_pricing']!, 4.6,
     { x: [0.09, -0.09], scale: [1.24, 1.0], focal: [105, 88], dolly: [0, 0.4] }, { x: 0.6, y: 0.45, z: -0.16 }, { rx: 4, ry: -10, rz: 2 }, 0.64),
 );
@@ -756,7 +861,21 @@ console.log(`  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 if (result.undecodable.length) console.log('  undecodable:', result.undecodable);
 
 const design = soundForScenes(scenes, {
-  behaviour: { musicCharacter: 'restrained', openOnMusic: false, uiSoundDensity: 'rhythmic', impactsOnCuts: true, endWithSting: true },
+  /*
+   * 'percussive', not 'restrained'.
+   *
+   * The references register 44, 126 and 168 audio accents; this film
+   * registered 11. The cues were not the problem — there are thirty of them.
+   * The bed was: `musicCharacter` is matched against a word list, 'restrained'
+   * matches nothing, and the fallback is `sub_tonal`, which selected a 72bpm
+   * ambient pad. A pad has no accents in it, so the only things the meter
+   * could hear were the impacts.
+   *
+   * A pulse under an editorial film is not the same as making it loud. It is
+   * what gives the cuts something to land on, and it is most of the difference
+   * between a film that feels edited and one that feels assembled.
+   */
+  behaviour: { musicCharacter: 'percussive', openOnMusic: false, uiSoundDensity: 'rhythmic', impactsOnCuts: true, endWithSting: true },
   channel: 'web',
 });
 const resolved = Object.fromEntries(

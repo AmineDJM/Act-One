@@ -77,3 +77,63 @@ and their screen carries a label. Ours has no voice, so the lines had to get
 shorter rather than the shots getting longer.
 
 **Evidence from the next render:** below.
+
+---
+
+## Iteration 2 — 56.4s, 15 shots
+
+**Evidence from the render:**
+
+| metric | it 1 | it 2 | bar | verdict |
+|---|---|---|---|---|
+| motion p90 | 0.61 | **1.77** | 1.71–2.66 | **in band** |
+| motion mean | 0.37 | 0.63 | 0.83–0.92 | closer, still low |
+| static share | 0.51 | 0.36 | 0.13–0.25 | improved, still high |
+| audio dynamic range | 0.28 | **0.63** | 0.28–0.80 | **in band** |
+| novelty | 0.22 | **0.29** | 0.09–0.27 | **above all three** |
+| scale variation | 0.69 | 0.75 | 0.66–0.91 | in band |
+| audio accents | 3 | 11 | 44–168 | still 4–15x short |
+| distinct hues | 3 | 3 | 6–8 | unchanged |
+
+Motion was the right call and it worked. What did not move: sound density
+and palette.
+
+**Read (Gemini, on the file):** *"Relies heavily on generic SaaS motion
+graphics (dark backgrounds, floating UI, subtle zooms)."* Hero moment
+confirmed again at the measure collapse. It also reported *"UI elements are
+frequently clipped by frame edges (0:08, 0:19, 0:25, 0:31)"*.
+
+**That claim was checked and it is wrong** — those four timecodes contain no
+UI at all. But they point at the right shots for the wrong reason: they are
+the three step-title beats and the pain line, and what is actually wrong with
+them is that they are **three-quarters empty**. One short line on the left and
+two-thirds of a cream field doing nothing. A critic being inaccurate about a
+detail while being right about which shot is weakest is worth more than a
+critic that says nothing.
+
+**Top three gaps:**
+
+1. **The product is always a floating card.** Every appearance is a rectangle
+   with a screenshot on it, tilted, on a field — which is the exact thing
+   Gemini named. The references treat the interface as a PLACE: "camera pans
+   down to new UI layout", "camera zooms into white space of a message".
+2. **The title beats are empty frames.** Three of fifteen shots are dead
+   space with a caption.
+3. **Audio accents 11 against 44–168.**
+
+**Root causes:**
+
+1. `crop` has been animatable since the scene language was written, and a crop
+   that moves is a camera INSIDE the capture. It had never been used once.
+2. Those scenes contain two objects on a full frame. Nothing else was authored
+   into them.
+3. Not the cues — there are thirty. `musicCharacter: 'restrained'` matches
+   none of the director's word list, falls through to `sub_tonal`, and selects
+   a 72bpm ambient pad. A pad has no accents in it, so the only things the
+   meter could hear were the impacts.
+
+**Changes:** two of the three product shots now travel through the page
+full-bleed via an animated crop, with the third deliberately left as a held
+card so the act does not become the same shot three times; the page each step
+lands inside now slides into its title beat from the frame edge, so the cut is
+a continuation rather than a surprise; the music bed is `percussive`.
