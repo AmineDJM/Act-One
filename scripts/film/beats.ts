@@ -145,17 +145,25 @@ export const VISUALS: Record<string, BeatVisual> = {
    * absence the line names instead of illustrating a mood around it.
    */
   b1: {
-    kind: 'audit', assetId: 'ast_home',
+    kind: 'audit', assetId: 'ast_home_hero',
     /*
-     * Almost still. An audit is a held inspection, not a camera move — and a
-     * mark cannot land on a specific line of a page that is sliding under it.
-     * The cinematography director asked for exactly this in the room: "one
-     * held inspection vantage, no push-ins, no parallax, no camera drift".
+     * The hero capture is 1580x680 — aspect 2.324 — so at full frame width it
+     * occupies 0.765 of the frame's height. Centred at 0.44 it spans 0.057 to
+     * 0.823, which leaves the caption band at 0.88 clear of it.
+     *
+     * Every coordinate below is that arithmetic, not a guess:
+     *   frame y of a line = 0.057 + (its y within the image) * 0.765
+     * "Directed." sits at 0.190 of the image, so 0.540 in frame, and runs from
+     * x 0.153 to 0.493. The paragraph's second line sits at 0.884, so 0.734,
+     * and runs from 0.153 to 0.790.
      */
-    window: { x: 0.04, width: 0.62, fromY: 0.075, toY: 0.055 },
-    // Fractions of the beat, not seconds: the beat is as long as its reading,
-    // and a mark fixed at 1.2s drifts off its word the moment the voice does.
-    marks: { underlineAt: 0.22, pinAt: 0.44, strikeAt: 0.62 },
+    plate: { width: 1.0, centreY: 0.44 },
+    // Under "Directed." — the claim the page actually makes.
+    underline: { x: 0.153, y: 0.556, width: 0.34, at: 0.20 },
+    // In the left margin, level with that line.
+    pin: { x: 0.128, y: 0.540, at: 0.42 },
+    // Through the paragraph's second line, on the emphasis.
+    strike: { x: 0.153, y: 0.734, width: 0.637, at: 0.60 },
   },
   b2: { kind: 'statement', field: null },
   // Ember was nearly black on a near-black field: the loudest event in the

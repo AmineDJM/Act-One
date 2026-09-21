@@ -38,7 +38,9 @@ const VO = path.resolve('.renders/vo-beats');
 const PALETTE = { ink: '#0B0C10', paper: '#F4F2EC', accent: '#FF4D1F', amber: '#FFB03A', ember: '#2A1006' };
 
 const ASSETS: Record<string, string> = {};
-for (const name of ['home', 'how', 'work', 'pricing'] as const) {
+// The hero crop is a known 1580x680, which is what lets the audit beat place
+// its marks by arithmetic instead of by eye.
+for (const name of ['home', 'how', 'work', 'pricing', 'home_hero'] as const) {
   if (existsSync(path.join(PUBLIC, `${name}.png`))) ASSETS[`ast_${name}`] = `${BASE}/${name}.png`;
 }
 for (const [key, file] of [

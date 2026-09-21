@@ -36,19 +36,34 @@ export type BeatVisual =
    *
    * Every director in the screening room went for the opening, and the
    * diagnosis they converged on from five different lenses was one sentence:
-   * the film describes its mechanism instead of showing it operate. The opener
-   * was an atmosphere clip, so "it opens your site" arrived as a claim over a
-   * mood, and the audit premise was never visible before the copy explained it.
+   * the film describes its mechanism instead of showing it operate.
    *
-   * Two atmosphere shots have now been tried there and both were called generic
-   * stock — the second one commissioned to a written brief specifically to
-   * avoid that. A third would be the same experiment. This is not another
-   * atmosphere shot: it is the page, and the marks the system actually makes on
-   * a page. Underline what is there, pin it as evidence, strike what cannot be
-   * proved. The same three verbs recur later in the film, which is what makes
-   * them a grammar rather than an effect.
+   * MARKS ARE PLACED BY ARITHMETIC, NOT BY EYE. The first version aimed bars
+   * at a scrolling screenshot and hoped; they landed near text rather than on
+   * it, cut through words at the wrong height, and stopped mid-word because
+   * the width was a guess. The page is now a plate of KNOWN aspect at a known
+   * position, so every line in it has a computed frame coordinate and a mark
+   * can be told exactly where a line starts, where it ends, and where its
+   * baseline is. Annotating an image by eye is a thing that looks nearly right
+   * once and wrong every time the image changes.
+   *
+   * THE THREE MARKS MEAN THREE DIFFERENT THINGS AND MUST NOT LOOK ALIKE. The
+   * first version drew the underline and the strike in the same accent, so
+   * "this is verified" and "this cannot be proved" were the same gesture in
+   * the same colour — the film's two most important verbs, indistinguishable.
+   * Kept is a fine white rule. Evidence is an amber tag in the margin.
+   * Rejected is the accent, and the accent is spent on nothing else here.
    */
-  | { kind: 'audit'; assetId: string; window: { x: number; width: number; fromY: number; toY: number }; marks: { underlineAt: number; pinAt: number; strikeAt: number } };
+  | {
+      kind: 'audit';
+      assetId: string;
+      /** The page as a plate: how wide, and where its centre sits. */
+      plate: { width: number; centreY: number };
+      /** Each mark in FRAME coordinates, computed from the plate's geometry. */
+      underline: { x: number; y: number; width: number; at: number };
+      pin: { x: number; y: number; at: number };
+      strike: { x: number; y: number; width: number; at: number };
+    };
 
 export type CompileOptions = {
   palette: Palette;
@@ -228,7 +243,22 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       maxLines: 3,
       // Heard, not read: this text is the reading it was generated from.
       spoken: true,
-      staggerBy: 'none', staggerSeconds: 0,
+      /*
+       * WORD BY WORD, which this engine has always been able to do and has
+       * never once done.
+       *
+       * The renderer has had a per-word entrance — each word rising 0.35em on
+       * out_quint behind its own fade — sitting unused behind `staggerBy:
+       * 'none'` on every text object in the film. A line that arrives all at
+       * once is a line that faded in, and "opacity fade instead of motion" is
+       * what a director watching this film wrote down.
+       *
+       * The hero phrase staggers wider than the rest: it is the event of the
+       * beat and it should take fractionally longer to land. Both are small —
+       * at 0.05s a five-word line completes in a fifth of a second, which is
+       * an arrival, not a performance.
+       */
+      staggerBy: 'word', staggerSeconds: hero ? 0.05 : 0.032,
       role: hero ? 'payload' : 'support',
       enterAt: phrase.atSeconds,
       exitAt,
@@ -250,18 +280,21 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
        * should arrive like one. The distances are small: this is a film about
        * certainty, and type that flies is type that is unsure.
        */
+      /*
+       * ONE ENTRANCE, NOT TWO. The words now rise and fade individually, so
+       * the box must stop doing it as well — a block sliding up while its own
+       * words slide up inside it is the mush that reads as "animated" rather
+       * than designed. What the box keeps is the settle: a small scale on the
+       * hero, so the line lands with weight the individual words cannot give
+       * it.
+       */
       transform: Transform.parse({
         x: place.x,
-        y: {
-          from: place.y + (hero ? 0.05 : 0.03),
-          to: place.y,
-          curve: 'out_expo',
-        },
+        y: place.y,
         anchor: { x: place.anchor, y: 0.5 },
         scale: hero
-          ? { from: composition.heroScale * 0.9, to: composition.heroScale, curve: 'out_expo' }
-          : { from: 0.98, to: 1, curve: 'out_expo' },
-        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.08, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
+          ? { from: composition.heroScale * 0.965, to: composition.heroScale, curve: 'out_quint' }
+          : composition.heroScale === 1 ? 1 : composition.heroScale,
       }),
     } as SceneObject);
 
@@ -401,7 +434,17 @@ function cameraFor(beat: TimedBeat, visual: BeatVisual): Record<string, unknown>
    * and beat lengths now vary with the reading rather than being chosen.
    */
   const travel = Math.min(0.3, 0.05 * beat.durationSeconds);
-  const curve = 'linear' as const;
+  /*
+   * NOT LINEAR, which every camera move in this film was.
+   *
+   * A constant-velocity push is the one move no camera operator makes and no
+   * design system ships: it starts at full speed on the cut, holds one speed
+   * throughout, and stops dead on the next cut. That reads as a value being
+   * interpolated, which is exactly what it was. in_out_cubic gives the move a
+   * beginning and an end — it takes up and sets down — so the frame looks
+   * driven rather than animated.
+   */
+  const curve = 'in_out_cubic' as const;
   if (visual.kind === 'product' || visual.kind === 'audit') {
     /*
      * The full push, kept.
@@ -460,111 +503,105 @@ function visualObjects(
 
   if (visual.kind === 'audit' && options.assets[visual.assetId]) {
     /*
-     * The page, and three marks made ON it, in the order the system works.
+     * The page as a plate, and three marks made ON it, in the order the system
+     * works. Every mark's position is arithmetic off the plate's geometry, so
+     * a rule under a headline is under THAT headline rather than near it.
      *
-     * The marks are placed as fractions of the beat rather than at fixed
-     * seconds, because the beat's length is the length of the reading and the
-     * reading changes whenever the line does. A mark at 1.2s would drift off
-     * its word the first time the voice came back a little faster.
+     * Times are fractions of the beat, not seconds: the beat is as long as its
+     * reading, and a mark fixed at 1.2s drifts off its word the moment the
+     * voice comes back faster.
      */
     const at = (fraction: number) => Math.max(0, Math.min(0.96, fraction));
     const objects: SceneObject[] = [{
       kind: 'ui_layer', id: `${beat.id}_page`, assetId: visual.assetId, semantic: 'page',
-      crop: {
-        x: visual.window.x, width: visual.window.width, height: visual.window.width / 1.111,
-        y: { from: visual.window.fromY, to: visual.window.toY, curve: 'in_out_cubic' },
-      },
-      width: 1.04, cornerRadiusPx: 0, shadow: false,
+      crop: { x: 0, width: 1, height: 1, y: 0 },
+      width: visual.plate.width, cornerRadiusPx: 0, shadow: false,
       /*
-       * SUPPORT, not payload — and that is a statement about the beat, not a
-       * way past the inspector.
-       *
-       * Marking it payload put three things on screen asking to be read at
-       * once (the page, the caption, the marks) and the inspector said so. It
-       * was right, and the fix is the honest one: the payload of this beat is
-       * the ACT OF MARKING, not the page. The page is what the marking happens
-       * to — the ground. A beat whose payload is a wall of somebody else's
-       * body copy is the "screenshot with a camera move" the whole revision
-       * was meant to get away from.
+       * SUPPORT, not payload. The payload of this beat is the ACT OF MARKING;
+       * the page is what the marking happens to. Calling the page the payload
+       * put three things on screen asking to be read at once and the inspector
+       * said so — and a beat whose payload is a wall of body copy is the
+       * "screenshot with a camera move" this revision exists to get away from.
        */
       role: 'support', enterAt: 0,
       reason: 'The real page, square-on: the ground the marks are made on.',
-      transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
+      transform: Transform.parse({
+        x: 0.5, y: visual.plate.centreY, anchor: { x: 0.5, y: 0.5 },
+        /*
+         * Settles rather than arrives. A two-percent scale on out_quint reads
+         * as a plate being set down; anything larger reads as a transition and
+         * this beat is not a transition, it is the film starting to look at
+         * something.
+         */
+        scale: { from: 1.02, to: 1, curve: 'out_quint' },
+        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.1, value: 1, curve: 'out_cubic' }, { t: 1, value: 1 }], curve: 'out_cubic' },
+      }),
     } as SceneObject];
 
-    // UNDERLINE: drawn left to right, the way a person reads.
+    /*
+     * KEPT — a fine white rule under the line, drawn left to right the way a
+     * person reads. Thin on purpose: a heavy bar is a highlighter, and this is
+     * meant to read as a precise instrument rather than an emphasis.
+     */
     objects.push({
       kind: 'shape', id: `${beat.id}_underline`, shape: 'rect',
       width: { keyframes: [
         { t: 0, value: 0 },
-        { t: at(visual.marks.underlineAt), value: 0, curve: 'linear' },
-        { t: at(visual.marks.underlineAt + 0.14), value: 0.34, curve: 'out_expo' },
-        { t: 1, value: 0.34 },
-      ], curve: 'out_expo' },
-      height: 0.006,
-      fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+        { t: at(visual.underline.at), value: 0, curve: 'linear' },
+        { t: at(visual.underline.at + 0.11), value: visual.underline.width, curve: 'out_quint' },
+        { t: 1, value: visual.underline.width },
+      ], curve: 'out_quint' },
+      height: 0.0038,
+      fill: palette.paper, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'structure', enterAt: 0,
-      reason: 'One line on the page, underlined: the system reading what is actually there.',
-      transform: Transform.parse({ x: 0.13, y: 0.54, anchor: { x: 0, y: 0.5 } }),
+      reason: 'One line on the page, underlined: what the system read and kept.',
+      transform: Transform.parse({ x: visual.underline.x, y: visual.underline.y, anchor: { x: 0, y: 0.5 }, opacity: 0.92 }),
     } as SceneObject);
     audio.push({
-      at: beat.durationSeconds * at(visual.marks.underlineAt), kind: 'ui_click', intensity: 0.28,
-      causedBy: `${beat.id}_underline`, reason: 'The underline is drawn.',
+      at: beat.durationSeconds * at(visual.underline.at), kind: 'ui_click', intensity: 0.24,
+      causedBy: `${beat.id}_underline`, reason: 'The line is read.',
     });
 
-    // PIN: the evidence kept, as a small solid mark at the end of the line.
+    // EVIDENCE — an amber tag in the margin, level with the line it points at.
+    // In the margin because a mark inside a sentence reads as a redaction.
     objects.push({
       kind: 'shape', id: `${beat.id}_pin`, shape: 'rect',
-      /*
-       * IN THE MARGIN, beside the line it refers to.
-       *
-       * It was at x 0.49 in the middle of the text column, where it landed
-       * inside a sentence — "what ▪ does" — and read as a redaction block or a
-       * rendering fault rather than as a mark somebody made. A pin belongs
-       * where a person would put one: in the margin, level with the line it
-       * points at, touching nothing.
-       */
-      width: 0.016, height: 0.03,
-      fill: palette.amber, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 2,
-      role: 'structure', enterAt: beat.durationSeconds * at(visual.marks.pinAt),
-      reason: 'Pinned as evidence, in the margin: the verbatim excerpt kept behind the fact.',
-      transform: Transform.parse({ x: 0.082, y: 0.54, anchor: { x: 0, y: 0.5 }, opacity: 0.95 }),
+      width: 0.008, height: 0.026,
+      fill: palette.amber, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 1,
+      role: 'structure', enterAt: beat.durationSeconds * at(visual.pin.at),
+      reason: 'Pinned as evidence: the verbatim excerpt kept behind the fact.',
+      transform: Transform.parse({
+        x: visual.pin.x, y: visual.pin.y, anchor: { x: 0, y: 0.5 },
+        scale: { from: 0.4, to: 1, curve: 'out_quint' },
+      }),
     } as SceneObject);
     audio.push({
-      at: beat.durationSeconds * at(visual.marks.pinAt), kind: 'ui_click', intensity: 0.34,
+      at: beat.durationSeconds * at(visual.pin.at), kind: 'ui_click', intensity: 0.3,
       causedBy: `${beat.id}_pin`, reason: 'The excerpt is pinned.',
     });
 
     /*
-     * STRIKE: the verb that makes this film different from a screenshot tour.
-     * Something on the page is crossed out, because the system reports what it
-     * cannot trace rather than repeating it.
+     * REJECTED — the accent, through the line rather than under it, and the
+     * only accent in this beat. This is the verb that makes the film different
+     * from a screenshot tour: the system reports what it cannot trace instead
+     * of repeating it.
      */
     objects.push({
       kind: 'shape', id: `${beat.id}_strike`, shape: 'rect',
       width: { keyframes: [
         { t: 0, value: 0 },
-        { t: at(visual.marks.strikeAt), value: 0, curve: 'linear' },
-        { t: at(visual.marks.strikeAt + 0.08), value: 0.4, curve: 'out_expo' },
-        { t: 1, value: 0.4 },
-      ], curve: 'out_expo' },
-      /*
-       * Thicker than the underline, and ON the words rather than beneath them.
-       *
-       * At the same weight and the same offset, the strike read as a second
-       * underline — the frame had two orange rules under two lines of text and
-       * no sense that anything had been rejected. A strike has to cross the
-       * thing it cancels, and it has to be heavier than the mark that means
-       * "kept", or the film's two most important verbs look identical.
-       */
-      height: 0.014,
+        { t: at(visual.strike.at), value: 0, curve: 'linear' },
+        { t: at(visual.strike.at + 0.07), value: visual.strike.width, curve: 'out_quint' },
+        { t: 1, value: visual.strike.width },
+      ], curve: 'out_quint' },
+      height: 0.0072,
       fill: palette.accent, stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
       role: 'payload', enterAt: 0,
       reason: 'Struck out: a claim the system could not trace to the page.',
-      transform: Transform.parse({ x: 0.13, y: 0.617, anchor: { x: 0, y: 0.5 }, opacity: 0.92 }),
+      transform: Transform.parse({ x: visual.strike.x, y: visual.strike.y, anchor: { x: 0, y: 0.5 } }),
     } as SceneObject);
     audio.push({
-      at: beat.durationSeconds * at(visual.marks.strikeAt), kind: 'impact', intensity: 0.5,
+      at: beat.durationSeconds * at(visual.strike.at), kind: 'impact', intensity: 0.5,
       causedBy: `${beat.id}_strike`, reason: 'The claim is struck out. This is the film performing its own thesis.',
     });
 
