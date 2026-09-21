@@ -327,14 +327,32 @@ function gainFor(type: SoundCueType, intensity: number): number {
   // Intensity 0..1 mapped to a sensible dB window per cue family. Linear gain
   // on a log scale is how automated mixes end up with inaudible textures and
   // deafening impacts.
+  /*
+   * ACCENTS SIT ON THE BED, NOT OVER IT.
+   *
+   * The bed rests at -13 dB. These windows let an impact reach -6 and a
+   * logo sting -5, which is 7 to 8 dB ABOVE the thing they are supposed to
+   * punctuate — and a measured master showed exactly that: a continuous bed
+   * at 0.07 RMS with three hits at 0.5, which is three bangs and a whisper
+   * rather than a mix. Measured against the reference films, which hold a
+   * steady 0.13 to 0.18 with accents that land on it, the ceilings were
+   * simply too high.
+   *
+   * Lowered rather than raising the bed, and that distinction matters. The
+   * one-bed-level rule above is deliberate — the sidechain creates room for a
+   * voice dynamically and releases in the gaps, which is what stops a mix
+   * holding the music down through every pause. Making the resting level
+   * depend on whether there is narration would undo that to fix a problem
+   * that lives in the cues.
+   */
   const windows: Partial<Record<SoundCueType, [number, number]>> = {
-    impact: [-18, -6],
-    sub_drop: [-16, -5],
-    riser: [-22, -10],
-    whoosh: [-26, -14],
-    ui_click: [-30, -20],
+    impact: [-20, -9],
+    sub_drop: [-18, -8],
+    riser: [-24, -12],
+    whoosh: [-27, -15],
+    ui_click: [-31, -21],
     texture: [-34, -24],
-    logo_sting: [-14, -5],
+    logo_sting: [-16, -8],
   };
   const [min, max] = windows[type] ?? [-24, -12];
   return Number((min + (max - min) * Math.min(1, Math.max(0, intensity))).toFixed(1));
