@@ -112,7 +112,17 @@ export const VISUALS: Record<string, BeatVisual> = {
    * it. Losing the left fifth costs some resolution and keeps the lamp, the
    * cup and the scattered paper, which is the shot anyway.
    */
-  b1: { kind: 'clip', assetId: 'ast_before', sourceInSeconds: 0.15, crop: { x: 0.26, y: 0, width: 0.74, height: 1 } },
+  b1: {
+    kind: 'clip', assetId: 'ast_before', sourceInSeconds: 0.15,
+    /*
+     * width and height match, which keeps the source's own 16:9.
+     * Cropping only the width made the box taller than the frame, and the
+     * renderer then filled the frame from a narrower picture — a close-up of
+     * the cup with the lamp pushed out of shot. The crop is meant to lose the
+     * hand, not the composition.
+     */
+    crop: { x: 0.22, y: 0, width: 0.78, height: 0.78 },
+  },
   b2: { kind: 'statement', field: null },
   // Ember was nearly black on a near-black field: the loudest event in the
   // frame was a colour change nobody could see. Amber reads.
