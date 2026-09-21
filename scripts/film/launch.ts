@@ -234,271 +234,488 @@ const chapterWord = (id: string, content: string, colour: string): SceneObject =
   });
 
 // ---------------------------------------------------------------------------
-// The film: pain, brand, how it works, benefit, call.
+// Motion
 // ---------------------------------------------------------------------------
 
+/*
+ * THE MEASUREMENT THAT FORCED THIS REWRITE.
+ *
+ * The same instrument run over this film and the three references:
+ *
+ *                       ref 1     ref 2     ref 3    ours
+ *   motion p90          1.71      2.66      2.25     0.61
+ *   static share        0.25      0.13      0.15     0.51
+ *   shot median s       3.2       5.4       1.25     9.3
+ *   audio accents       44        168       126      3
+ *
+ * Half the film was a still picture, it moved three to four times less than
+ * any reference at its liveliest, and its shots held roughly twice as long as
+ * the slowest of them. That is not a matter of taste. A camera that travels
+ * 1.04x over six seconds moves a fifth of a percent per frame, which is below
+ * what anybody can see — it is a static shot with a note in the graph saying
+ * it is not.
+ *
+ * None of this needed a new primitive. `camera.x`, `camera.y`, `camera.scale`
+ * and every object transform were already animatable; the film simply never
+ * asked them for anything. So the fix is authored, not engineered: real camera
+ * travel, objects that arrive from outside the frame and leave before the cut,
+ * and shots cut to lengths that vary instead of all lasting six seconds.
+ *
+ * WHAT THIS IS NOT. Not motion for the instrument's sake. We have already seen
+ * a cut that beat its replacement on every measurement and was called "a
+ * generic template, entirely disconnected from the narrative". Every move
+ * below is a camera following something, an object arriving because it is its
+ * turn, or a frame leaving because the next one is more interesting.
+ */
+
+type Travel = {
+  /** Fractions of the frame the camera crosses. */
+  x?: [number, number];
+  y?: [number, number];
+  /** Start and end magnification. 1.0 -> 1.25 is a real push, 1.04 is not. */
+  scale?: [number, number];
+  focal?: number | [number, number];
+  dolly?: [number, number];
+  curve?: 'in_out_cubic' | 'out_quint' | 'out_expo' | 'linear' | 'in_out_quart';
+};
+
+const camera = (t: Travel): Record<string, unknown> => {
+  const curve = t.curve ?? 'in_out_cubic';
+  const out: Record<string, unknown> = {
+    focalLengthMm: Array.isArray(t.focal)
+      ? { from: t.focal[0], to: t.focal[1], curve }
+      : (t.focal ?? 60),
+  };
+  if (t.x) out['x'] = { from: t.x[0], to: t.x[1], curve };
+  if (t.y) out['y'] = { from: t.y[0], to: t.y[1], curve };
+  if (t.scale) out['scale'] = { from: t.scale[0], to: t.scale[1], curve };
+  if (t.dolly) out['dollyZ'] = { from: t.dolly[0], to: t.dolly[1], curve };
+  return out;
+};
+
+/** An object that flies in from outside the frame and settles. */
+const arrive = (
+  from: { x?: number; y?: number },
+  to: { x: number; y: number },
+  over: Record<string, unknown> = {},
+): Record<string, unknown> => ({
+  x: { from: from.x ?? to.x, to: to.x, curve: 'out_expo' },
+  y: { from: from.y ?? to.y, to: to.y, curve: 'out_expo' },
+  ...over,
+});
+
+/** An object that settles, holds, then leaves — so the frame is never a still. */
+const passThrough = (
+  from: { x: number; y: number },
+  hold: { x: number; y: number },
+  to: { x: number; y: number },
+): Record<string, unknown> => ({
+  x: { keyframes: [{ t: 0, value: from.x }, { t: 0.32, value: hold.x, curve: 'out_expo' }, { t: 0.72, value: hold.x }, { t: 1, value: to.x, curve: 'in_cubic' }], curve: 'out_expo' },
+  y: { keyframes: [{ t: 0, value: from.y }, { t: 0.32, value: hold.y, curve: 'out_expo' }, { t: 0.72, value: hold.y }, { t: 1, value: to.y, curve: 'in_cubic' }], curve: 'out_expo' },
+});
+
+// ---------------------------------------------------------------------------
+// The film
+// ---------------------------------------------------------------------------
+
+/*
+ * SHOT LENGTHS VARY ON PURPOSE. The references run medians of 1.25s, 3.2s and
+ * 5.4s and none of them holds every shot for the same time; this one held all
+ * of them for six seconds, which is why it read as a sequence of slides even
+ * once the slides were good. Beats of 1.6s sit next to beats of 5.2s below,
+ * and the short ones are where the film is most certain of itself.
+ */
+
 const scenes: Graph[] = [
-  // --- 1. THE PAIN ---------------------------------------------------------
+  // ---- ACT 1: the pain -----------------------------------------------------
   SceneGraph.parse({
-    id: 'l1', durationSeconds: 4.2,
-    intent: 'PAIN: a real room at the end of a long day, before anything is said.',
+    id: 'l1', durationSeconds: 3.6,
+    intent: 'HOOK: a real room at the end of a long day. The camera is already moving when the film starts.',
     background: INK,
-    camera: { scale: { from: 1.08, to: 1.0, curve: 'out_expo' }, focalLengthMm: 40 },
+    camera: camera({ scale: [1.22, 1.0], focal: 40, curve: 'out_expo' }),
     objects: [
       {
         kind: 'clip', id: 'l1_room', assetId: 'ast_before',
         crop: { x: 0, y: 0, width: 1, height: 1 },
-        width: 1.14, sourceInSeconds: 0.15, playbackRate: 0.8, generated: true,
+        width: 1.2, sourceInSeconds: 0.15, playbackRate: 0.8, generated: true,
         role: 'payload',
         reason: 'The world the product lives in, shot rather than drawn. No interface appears in it.',
         transform: Transform.parse({ x: 0.5, y: 0.5, anchor: { x: 0.5, y: 0.5 } }),
       } as SceneObject,
     ],
-    audio: [{ at: 0.1, kind: 'texture', intensity: 0.45, causedBy: 'l1_room', reason: 'Room tone under the shot.' }],
-    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.55, reason: 'The camera pushes through the dark of the room into the line.' },
+    audio: [
+      { at: 0.05, kind: 'texture', intensity: 0.5, causedBy: 'l1_room', reason: 'Room tone under the shot.' },
+      { at: 2.4, kind: 'riser', intensity: 0.4, causedBy: 'l1_room', reason: 'The room is about to give way.' },
+    ],
+    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.5, reason: 'The camera pushes through the dark of the room into the line.' },
     macro: null,
   }),
 
   SceneGraph.parse({
-    id: 'l2', durationSeconds: 5.0,
-    intent: 'PAIN NAMED: the sentence, with the part that matters set apart inside it.',
+    id: 'l2', durationSeconds: 4.8,
+    intent: 'PAIN NAMED: the sentence arrives word by word while the camera drifts across it.',
     background: INK,
-    camera: { scale: { from: 1.02, to: 1.0, curve: 'out_expo' }, focalLengthMm: 55 },
+    camera: camera({ x: [0.07, -0.07], scale: [1.14, 1.0], focal: 55 }),
     objects: [
-      lamp('l2_light', { x: 0.24, y: 0.34 }, { x: 0.34, y: 0.44 }, EMBER, 0.85),
+      lamp('l2_light', { x: 0.18, y: 0.3 }, { x: 0.42, y: 0.5 }, EMBER, 0.85),
       line('l2_line', 'Your problem is not the film.', {
-        maxWidth: 0.5, maxLines: 2, stagger: 0.05,
+        maxWidth: 0.5, maxLines: 2, stagger: 0.07,
         spans: [
           { text: 'Your problem is not ' },
           { text: 'the film', color: ACCENT, weight: 700 },
           { text: '.' },
         ],
-      }, { x: 0.12, y: 0.42, anchor: { x: 0, y: 0.5 } }),
+      }, arrive({ x: 0.2 }, { x: 0.12, y: 0.42 }, { anchor: { x: 0, y: 0.5 } })),
       line('l2_sub', 'It is the six weeks before it.', {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 2, enterAt: 1.1,
+        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 2, enterAt: 1.2,
       }, { x: 0.12, y: 0.56, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
-    audio: [{ at: 0.08, kind: 'impact', intensity: 0.45, causedBy: 'l2_line', reason: 'The line lands.' }],
-    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.5, reason: 'The page wipes in over the ink; the edge is the event.' },
+    audio: [
+      { at: 0.05, kind: 'impact', intensity: 0.5, causedBy: 'l2_line', reason: 'The first word lands.' },
+      { at: 0.42, kind: 'ui_click', intensity: 0.22, causedBy: 'l2_line', reason: 'A word.' },
+      { at: 0.72, kind: 'ui_click', intensity: 0.22, causedBy: 'l2_line', reason: 'A word.' },
+      { at: 1.25, kind: 'whoosh', intensity: 0.3, causedBy: 'l2_sub', reason: 'The counter-line slides under it.' },
+      { at: 3.5, kind: 'riser', intensity: 0.45, causedBy: 'l2_line', reason: 'Into the work.' },
+    ],
+    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.45, reason: 'The page wipes in over the ink; the edge is the event.' },
     macro: null,
   }),
 
   SceneGraph.parse({
-    id: 'l3', durationSeconds: 6.0,
-    intent: 'PAIN SHOWN: the work spread across a desk, too much of it, held at angles.',
+    id: 'l3', durationSeconds: 5.2,
+    intent: 'PAIN SHOWN: four pages fly in from off-frame while the camera cranes across the desk.',
     background: PAPER,
-    camera: {
-      focalLengthMm: { from: 80, to: 72, curve: 'in_out_cubic' },
-      dollyZ: { from: 0, to: 0.4, curve: 'in_out_cubic' },
-      scale: { from: 1.0, to: 1.04, curve: 'in_out_cubic' },
-    },
+    camera: camera({ x: [0.13, -0.13], y: [-0.05, 0.05], scale: [1.16, 1.02], focal: [88, 76], dolly: [0, 0.45] }),
     objects: [
       bloom('l3_bloom', { x: 0.5, y: 0.45 }, '#FFE8D8', 0.9),
       chapterWord('l3_chapter', 'SIX WEEKS', '#DCD3C4'),
-      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.26, y: 0.36, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.38, 0.1, 'The brief, as one of too many pages.'),
-      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.68, y: 0.34, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.40, 0.45, 'The references, as another.'),
-      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.42, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.36, 0.8, 'The terms, as a third.'),
-      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.76, y: 0.74, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.34, 1.15, 'The schedule, as a fourth.'),
+      card('l3_c1', 'ast_how', CARD_CROP['ast_how']!, { x: 0.26, y: 0.36, z: 0.42 }, { rx: 5, ry: 11, rz: -4 }, 0.38, 0.05, 'The brief, as one of too many pages.'),
+      card('l3_c2', 'ast_work', CARD_CROP['ast_work']!, { x: 0.68, y: 0.34, z: -0.05 }, { rx: -4, ry: -9, rz: 3 }, 0.40, 0.35, 'The references, as another.'),
+      card('l3_c3', 'ast_pricing', CARD_CROP['ast_pricing']!, { x: 0.42, y: 0.74, z: 0.2 }, { rx: 7, ry: 4, rz: -2 }, 0.36, 0.7, 'The terms, as a third.'),
+      card('l3_c4', 'ast_home', CARD_CROP['ast_home']!, { x: 0.76, y: 0.74, z: -0.3 }, { rx: -5, ry: -13, rz: 5 }, 0.34, 1.0, 'The schedule, as a fourth.'),
       line('l3_tag', 'Briefs. References. Revisions. Quotes.', {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 2.2,
-      }, { x: 0.07, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 1.8,
+      }, { x: 0.18, y: 0.93, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
     audio: [
-      { at: 0.15, kind: 'ui_click', intensity: 0.3, causedBy: 'l3_c1', reason: 'Each page sets down.' },
-      { at: 3.4, kind: 'riser', intensity: 0.5, causedBy: 'l3_c4', reason: 'Too much of it; something has to give.' },
+      { at: 0.1, kind: 'whoosh', intensity: 0.4, causedBy: 'l3_c1', reason: 'A page arrives.' },
+      { at: 0.42, kind: 'ui_click', intensity: 0.3, causedBy: 'l3_c1', reason: 'It sets down.' },
+      { at: 0.75, kind: 'ui_click', intensity: 0.3, causedBy: 'l3_c2', reason: 'And another.' },
+      { at: 1.1, kind: 'ui_click', intensity: 0.3, causedBy: 'l3_c3', reason: 'And another.' },
+      { at: 1.45, kind: 'ui_click', intensity: 0.32, causedBy: 'l3_c4', reason: 'And another.' },
+      { at: 4.3, kind: 'riser', intensity: 0.55, causedBy: 'l3_c4', reason: 'Too much of it; something has to give.' },
     ],
-    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.55, reason: 'The camera pushes into the paper until the mark is all that is left.' },
+    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.5, reason: 'The camera pushes into the paper until only the mark is left.' },
     macro: null,
   }),
 
-  // --- 2. THE BRAND --------------------------------------------------------
+  // ---- ACT 2: the mark -----------------------------------------------------
   SceneGraph.parse({
-    id: 'l4', durationSeconds: 4.6,
-    intent: 'BRAND: the mark arrives lit, in the dark, alone.',
+    id: 'l4', durationSeconds: 3.4,
+    intent: 'BRAND: the mark arrives lit, in the dark, alone. The shortest shot so far, because it is the most certain.',
     background: INK,
-    camera: { scale: { from: 1.12, to: 1.0, curve: 'out_expo' }, focalLengthMm: 70 },
+    camera: camera({ scale: [1.3, 1.0], focal: 70, curve: 'out_expo' }),
     objects: [
-      lamp('l4_light', { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.46 }, EMBER, 0.7),
+      lamp('l4_light', { x: 0.5, y: 0.56 }, { x: 0.5, y: 0.46 }, EMBER, 0.72),
       line('l4_mark', 'Act One', {
-        align: 'center', maxWidth: 0.5, maxLines: 1,
-        color: PAPER,
-        treatment: { gradient: null, stroke: null, glow: { color: '#FF6A33', radiusPx: { from: 6, to: 30, curve: 'out_expo' }, strength: 0.75 } },
+        align: 'center', maxWidth: 0.5, maxLines: 1, color: PAPER,
+        treatment: { gradient: null, stroke: null, glow: { color: '#FF6A33', radiusPx: { from: 4, to: 34, curve: 'out_expo' }, strength: 0.75 } },
       }, {
         x: 0.5, y: 0.46, anchor: { x: 0.5, y: 0.5 },
-        scale: { from: 0.94, to: 1, curve: 'out_expo' },
+        scale: { from: 0.9, to: 1, curve: 'out_expo' },
         opacity: { from: 0, to: 1, curve: 'out_expo' },
       }),
       line('l4_sub', 'Launch films, directed.', {
-        token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.4, maxLines: 1, enterAt: 1.1,
+        token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.4, maxLines: 1, enterAt: 0.8,
       }, { x: 0.5, y: 0.58, anchor: { x: 0.5, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
-    audio: [{ at: 0.25, kind: 'logo_sting', intensity: 0.65, causedBy: 'l4_mark', reason: 'The mark.' }],
-    handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.5, reason: 'The move continues out of the mark and into the work.' },
+    audio: [
+      { at: 0.12, kind: 'sub_drop', intensity: 0.8, causedBy: 'l4_mark', reason: 'The mark lands in the silence the riser left.' },
+      { at: 0.9, kind: 'ui_confirm', intensity: 0.28, causedBy: 'l4_sub', reason: 'The line under it.' },
+    ],
+    handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.45, reason: 'The move continues out of the mark and into the work.' },
     macro: null,
   }),
 ];
 
-// --- 3. HOW IT WORKS ------------------------------------------------------
+// ---- ACT 3: how it works ---------------------------------------------------
 
-/**
- * One step of the process.
+/*
+ * Each step is TWO shots, not one.
  *
- * Built as a function because the references do this too: the how-it-works act
- * is the same composition three or four times with different content, and that
- * is a rhythm rather than a repetition — the viewer learns the shape in the
- * first one and reads the rest faster. The structural similarity check is
- * right that these are the same picture; here that is the intention, and the
- * handover between them says so.
+ * Held as a single six-second composition, a step is a slide: the title and
+ * the product sit side by side and neither of them does anything. Split, the
+ * title gets a short beat of its own and the product gets a travelling shot,
+ * which is both how the references stage this act and why their shot medians
+ * are a third of what ours was.
  */
-const step = (
-  id: string, index: string, title: string, body: string,
-  asset: string, crop: Record<string, unknown>, seconds: number,
+const stepTitle = (id: string, index: string, title: string, seconds: number, at: number): Graph =>
+  SceneGraph.parse({
+    id, durationSeconds: seconds,
+    intent: `STEP TITLE: ${title.toLowerCase()} — one line, held briefly, on the move.`,
+    background: PAPER,
+    camera: camera({ x: [0.1, -0.04], scale: [1.12, 1.0], focal: 60, curve: 'out_expo' }),
+    objects: [
+      bloom(`${id}_bloom`, { x: 0.3, y: 0.44 }, '#FFEADC', 0.9),
+      line(`${id}_index`, index, {
+        token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
+      }, arrive({ x: 0.02 }, { x: 0.09, y: 0.36 }, { anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } })),
+      line(`${id}_title`, title, {
+        maxWidth: 0.46, maxLines: 2, stagger: 0.06,
+      }, arrive({ x: 0.15 }, { x: 0.09, y: 0.5 }, { anchor: { x: 0, y: 0.5 } })),
+    ],
+    audio: [
+      { at: 0.04, kind: 'impact', intensity: 0.45, causedBy: `${id}_title`, reason: 'The step is announced.' },
+      { at: 0.3, kind: 'ui_click', intensity: 0.2, causedBy: `${id}_title`, reason: 'A word.' },
+      { at: at, kind: 'whoosh', intensity: 0.38, causedBy: `${id}_index`, reason: 'Into the product.' },
+    ],
+    handover: { mechanism: 'camera_carry', carries: [`${id}_title`], durationSeconds: 0.4, reason: 'The camera keeps travelling into the interface the line describes.' },
+    macro: null,
+  });
+
+const stepProduct = (
+  id: string, body: string, asset: string, crop: Record<string, unknown>,
+  seconds: number, travel: Travel, place: { x: number; y: number; z: number },
+  tilt: { rx: number; ry: number; rz: number }, width: number,
 ): Graph =>
   SceneGraph.parse({
     id, durationSeconds: seconds,
-    intent: `HOW IT WORKS: ${title.toLowerCase()}, with the real interface beside it.`,
+    intent: 'STEP PRODUCT: the real interface, large, with the camera travelling across it.',
     background: PAPER,
-    /*
-      * A long lens, because a wide one shears.
-      *
-      * Perspective is tied to focal length, so 42mm put the vanishing point
-      * close enough that a card turned 13 degrees came back as a blade rather
-      * than as a card held at an angle. Product photographers shoot objects
-      * at 85 to 105mm for exactly this reason: the long lens flattens the
-      * foreshortening and the object keeps its shape.
-      */
-    camera: {
-      focalLengthMm: 95,
-      scale: { from: 1.02, to: 1.0, curve: 'out_quint' },
-      x: { from: 0.008, to: -0.008, curve: 'in_out_cubic' },
-    },
+    camera: camera(travel),
     objects: [
-      bloom(`${id}_bloom`, { x: 0.7, y: 0.42 }, '#FFEADC', 0.95),
-      line(`${id}_index`, index, {
-        token: 'mono', color: ACCENT, maxWidth: 0.1, maxLines: 1, role: 'structure',
-      }, { x: 0.09, y: 0.26, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
-      /*
-        * The title gets room to be two lines and the body sits below where two
-        * lines end.
-        *
-        * At 0.32 wrap width the display face broke these titles to THREE lines
-        * and the third one landed on the body copy — two paragraphs occupying
-        * the same band of the page. A text box is a wrap width, and a title
-        * given less width than it needs does not get smaller, it gets taller.
-        */
-      line(`${id}_title`, title, {
-        maxWidth: 0.3, maxLines: 3,
-      }, { x: 0.07, y: 0.4, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } }),
+      bloom(`${id}_bloom`, { x: 0.62, y: 0.44 }, '#FFEADC', 0.95),
+      card(`${id}_card`, asset, crop, place, tilt, width, 0.0,
+        'The real interface at this step, big enough to be the product rather than a picture of it.'),
       line(`${id}_body`, body, {
-        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.26, maxLines: 4, enterAt: 0.55,
-      }, { x: 0.07, y: 0.66, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
-      card(`${id}_card`, asset, crop, { x: 0.68, y: 0.5, z: -0.08 }, { rx: 2, ry: -6, rz: 1 }, 0.56, 0.3,
-        'The real interface at this step, held where a hand would hold it.'),
+        token: 'statement', color: 'onCanvas.secondary', maxWidth: 0.26, maxLines: 4, enterAt: 0.5,
+      }, { x: 0.14, y: 0.84, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
-    audio: [{ at: 0.12, kind: 'ui_click', intensity: 0.35, causedBy: `${id}_card`, reason: 'The step lands.' }],
-    handover: { mechanism: 'camera_carry', carries: [`${id}_card`], durationSeconds: 0.45, reason: 'The camera travels sideways to the next step; the card is the same card.' },
+    audio: [
+      { at: 0.05, kind: 'ui_confirm', intensity: 0.34, causedBy: `${id}_card`, reason: 'The interface arrives.' },
+      { at: 0.55, kind: 'ui_click', intensity: 0.22, causedBy: `${id}_body`, reason: 'The caption under it.' },
+      { at: seconds - 0.5, kind: 'whoosh', intensity: 0.36, causedBy: `${id}_card`, reason: 'The camera leaves for the next step.' },
+    ],
+    handover: { mechanism: 'camera_carry', carries: [`${id}_card`], durationSeconds: 0.42, reason: 'The camera travels sideways to the next step.' },
     macro: null,
   });
 
 scenes.push(
-  /*
-    * The bodies are one clause each, and that is the reference films' lesson
-    * rather than a constraint of this one. All three are narrated: the voice
-    * carries the detail and the screen carries a label. Written as prose, the
-    * same sentences failed the reading-time check by two to three seconds a
-    * shot — a line nobody can finish is a line that was not said.
-    */
-  step('l5', '01', 'We read your product.',
-    'A real capture, never a drawing of one.',
-    'ast_home', CARD_CROP['ast_home']!, 6.2),
-  step('l6', '02', 'Three directions.',
-    'Rendered and watched before one is chosen.',
-    'ast_work', CARD_CROP['ast_work']!, 6.2),
-  step('l7', '03', 'One afternoon.',
-    'The engine checks its own frames, then hands you a master.',
-    'ast_how', CARD_CROP['ast_how']!, 6.2),
+  stepTitle('l5', '01', 'We read your product.', 2.6, 2.0),
+  stepProduct('l6', 'A real capture, never a drawing of one.', 'ast_home', CARD_CROP['ast_home']!, 4.4,
+    { x: [0.1, -0.08], scale: [1.18, 1.02], focal: [110, 95] }, { x: 0.62, y: 0.44, z: -0.1 }, { rx: 3, ry: -8, rz: 1 }, 0.6),
+
+  stepTitle('l7', '02', 'Three directions.', 1.8, 1.35),
+  stepProduct('l8', 'Rendered and watched before one is chosen.', 'ast_work', CARD_CROP['ast_work']!, 4.4,
+    { x: [-0.1, 0.08], y: [0.04, -0.04], scale: [1.02, 1.2], focal: [95, 105] }, { x: 0.58, y: 0.46, z: 0.12 }, { rx: -3, ry: 9, rz: -1.5 }, 0.62),
+
+  stepTitle('l9', '03', 'One afternoon.', 1.8, 1.35),
+  stepProduct('l10', 'It checks its own frames.', 'ast_pricing', CARD_CROP['ast_pricing']!, 4.6,
+    { x: [0.09, -0.09], scale: [1.24, 1.0], focal: [105, 88], dolly: [0, 0.4] }, { x: 0.6, y: 0.45, z: -0.16 }, { rx: 4, ry: -10, rz: 2 }, 0.64),
 );
 
-// --- 4. THE BENEFIT -------------------------------------------------------
+// ---- ACT 4: the argument ---------------------------------------------------
+
+/*
+ * THE MEASURE, which is the one thing in this film that is neither type nor
+ * screenshot.
+ *
+ * Thirty marks across a rule, dense at the left, that gather into the width of
+ * an afternoon while the rule stays exactly where it was. It was built for an
+ * earlier cut and a model watching that film called it the strongest moment in
+ * it — but only once the marks were given time to arrive and SIT there,
+ * gathered, under a line that still said six weeks. Landing the collapse on
+ * the same frame the words changed made the model read the moment as "text
+ * changes" and record no transformation at all. Words win when they move at
+ * the same time.
+ */
+const TICKS = 30;
+const SPREAD_FROM = 0.16;
+const SPREAD_TO = 0.84;
+const GATHERED_AT = 0.18;
+const GATHERED_WIDTH = 0.05;
+const RULE_Y = 0.6;
+
+const tick = (index: number, gathered: boolean): SceneObject => {
+  const t = index / (TICKS - 1);
+  const spread = SPREAD_FROM + t * (SPREAD_TO - SPREAD_FROM);
+  const gather = GATHERED_AT + t * GATHERED_WIDTH;
+  const height = index % 5 === 0 ? 0.08 : 0.045;
+  return {
+    kind: 'shape', id: `tick_${index}`, shape: 'rect',
+    width: 0.0024, height,
+    fill: index % 5 === 0 ? 'accent' : 'onCanvas.primary',
+    stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+    role: 'structure',
+    reason: 'One day of the six weeks, as a mark on the measure.',
+    enterAt: gathered ? 0 : 0.04 + index * 0.011,
+    transform: Transform.parse({
+      x: gathered
+        ? gather
+        : { keyframes: [{ t: 0, value: spread }, { t: 0.4, value: spread }, { t: 0.76, value: gather, curve: 'in_out_quart' }, { t: 1, value: gather }], curve: 'in_out_quart' },
+      y: RULE_Y - height / 2 - 0.006,
+      anchor: { x: 0.5, y: 1 },
+      opacity: gathered ? 1 : { from: 0, to: 1, curve: 'out_cubic' },
+    }),
+  } as SceneObject;
+};
+
+const measureRule = (drawn: boolean): SceneObject =>
+  ({
+    kind: 'shape', id: 'measure_rule', shape: 'rect',
+    width: drawn ? SPREAD_TO - SPREAD_FROM + 0.02 : { from: 0, to: SPREAD_TO - SPREAD_FROM + 0.02, curve: 'out_expo' },
+    height: 0.0024,
+    fill: 'onCanvas.primary', stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
+    role: 'structure',
+    reason: 'The rule the measure is drawn on. It never moves, so the collapse is visible against it.',
+    transform: Transform.parse({ x: SPREAD_FROM - 0.01, y: RULE_Y, anchor: { x: 0, y: 0.5 } }),
+  }) as SceneObject;
 
 scenes.push(
   SceneGraph.parse({
-    id: 'l8', durationSeconds: 5.4,
-    intent: 'BENEFIT: the number, filled with light, against the dark.',
-    background: INK,
-    camera: { scale: { from: 1.06, to: 1.0, curve: 'out_expo' }, focalLengthMm: 60 },
+    id: 'l11', durationSeconds: 5.2,
+    intent: 'THE MEASURE: thirty days drawn across the page, then gathered into one afternoon.',
+    background: PAPER,
+    camera: camera({ x: [-0.06, 0.06], scale: [1.0, 1.1], focal: 70, curve: 'in_out_quart' }),
     objects: [
-      lamp('l8_light', { x: 0.3, y: 0.55 }, { x: 0.42, y: 0.48 }, EMBER, 0.8),
-      line('l8_stat', '6 weeks to 1 day', {
-        maxWidth: 0.5, maxLines: 2,
-        treatment: { gradient: { from: ACCENT, to: AMBER, angleDeg: 105 }, stroke: null, glow: null },
-      }, {
-        x: 0.1, y: 0.42, anchor: { x: 0, y: 0.5 },
-        scale: { from: 1.18, to: 1.28, curve: 'out_expo' },
-        opacity: { from: 0, to: 1, curve: 'out_expo' },
-      }),
-      line('l8_sub', 'Same craft. Same checks. Same master.', {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.42, maxLines: 2, enterAt: 1.6,
-      }, { x: 0.1, y: 0.66, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+      bloom('l11_bloom', { x: 0.4, y: 0.5 }, '#FFEADC', 0.95),
+      ...Array.from({ length: TICKS }, (_, i) => tick(i, false)),
+      measureRule(false),
+      line('l11_line', 'Six weeks', {
+        maxWidth: 0.4, maxLines: 1,
+      }, arrive({ x: 0.18 }, { x: 0.14, y: 0.28 }, { anchor: { x: 0, y: 0.5 } })),
+      line('l11_sub', 'to make one launch film.', {
+        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 1, enterAt: 0.7,
+      }, { x: 0.14, y: 0.375, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
-    audio: [{ at: 0.1, kind: 'sub_drop', intensity: 0.8, causedBy: 'l8_stat', reason: 'The number lands.' }],
-    handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.45, reason: 'The move carries on into the year.' },
+    audio: [
+      { at: 0.06, kind: 'ui_click', intensity: 0.3, causedBy: 'measure_rule', reason: 'The rule is drawn.' },
+      { at: 0.5, kind: 'ui_click', intensity: 0.18, causedBy: 'tick_0', reason: 'A day.' },
+      { at: 0.85, kind: 'ui_click', intensity: 0.18, causedBy: 'tick_10', reason: 'A day.' },
+      { at: 1.2, kind: 'ui_click', intensity: 0.18, causedBy: 'tick_20', reason: 'A day.' },
+      { at: 2.1, kind: 'riser', intensity: 0.6, causedBy: 'tick_29', reason: 'The measure fills; something is about to give.' },
+      { at: 4.15, kind: 'impact', intensity: 0.75, causedBy: 'tick_0', reason: 'The thirty marks arrive together.' },
+    ],
+    handover: {
+      mechanism: 'object_handoff',
+      carries: ['measure_rule', 'tick_0', 'tick_29'],
+      durationSeconds: 0.4,
+      reason: 'The measure is the same measure; only its spacing has changed.',
+    },
     macro: null,
   }),
 
   SceneGraph.parse({
-    id: 'l9', durationSeconds: 4.4,
-    intent: 'THE YEAR: a hollow outline that glows, the way the references set a date.',
-    background: INK,
-    camera: { scale: { from: 1.04, to: 1.0, curve: 'out_expo' }, focalLengthMm: 85 },
+    id: 'l12', durationSeconds: 3.2,
+    intent: 'THE TURN: the same marks, gathered, and the line finally agrees with the picture.',
+    background: PAPER,
+    camera: camera({ scale: [1.1, 1.18], x: [0.06, 0.02], focal: 70 }),
     objects: [
-      lamp('l9_light', { x: 0.5, y: 0.52 }, { x: 0.5, y: 0.48 }, EMBER, 0.65),
-      line('l9_year', '2026', {
+      bloom('l12_bloom', { x: 0.26, y: 0.52 }, '#FFE2CE', 0.85),
+      measureRule(true),
+      ...Array.from({ length: TICKS }, (_, i) => tick(i, true)),
+      line('l12_line', 'One afternoon.', {
+        color: 'accent', maxWidth: 0.46, maxLines: 1,
+      }, {
+        x: 0.14, y: 0.28, anchor: { x: 0, y: 0.5 },
+        opacity: { from: 0, to: 1, curve: 'out_expo' },
+        scale: { from: 0.96, to: 1, curve: 'out_expo' },
+      }),
+    ],
+    audio: [{ at: 0.02, kind: 'sub_drop', intensity: 0.85, causedBy: 'l12_line', reason: 'The counter-statement lands on the gathered marks.' }],
+    handover: { mechanism: 'scale_through', carries: [], durationSeconds: 0.5, reason: 'The camera pushes through the page into the dark.' },
+    macro: null,
+  }),
+);
+
+// ---- ACT 5: benefit and call ----------------------------------------------
+
+scenes.push(
+  SceneGraph.parse({
+    id: 'l13', durationSeconds: 4.4,
+    intent: 'BENEFIT: the number, filled with light, arriving from the left as the camera pulls back.',
+    background: INK,
+    camera: camera({ x: [-0.06, 0.03], scale: [1.26, 1.0], focal: 60, curve: 'out_expo' }),
+    objects: [
+      lamp('l13_light', { x: 0.24, y: 0.6 }, { x: 0.44, y: 0.46 }, EMBER, 0.82),
+      line('l13_stat', '6 weeks to 1 day', {
+        maxWidth: 0.42, maxLines: 2,
+        treatment: { gradient: { from: ACCENT, to: AMBER, angleDeg: { from: 70, to: 115, curve: 'in_out_cubic' } }, stroke: null, glow: null },
+      }, {
+        ...arrive({ x: 0.16 }, { x: 0.28, y: 0.42 }, { anchor: { x: 0, y: 0.5 } }),
+        scale: { from: 1.0, to: 1.08, curve: 'out_expo' },
+        opacity: { from: 0, to: 1, curve: 'out_expo' },
+      }),
+      line('l13_sub', 'Same craft. Same checks.', {
+        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.36, maxLines: 2, enterAt: 0.9,
+      }, { x: 0.28, y: 0.7, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
+    ],
+    audio: [
+      { at: 0.06, kind: 'sub_drop', intensity: 0.85, causedBy: 'l13_stat', reason: 'The number lands.' },
+      { at: 1.15, kind: 'ui_confirm', intensity: 0.3, causedBy: 'l13_sub', reason: 'The qualifier under it.' },
+    ],
+    handover: { mechanism: 'camera_carry', carries: [], durationSeconds: 0.4, reason: 'The move carries on into the year.' },
+    macro: null,
+  }),
+
+  SceneGraph.parse({
+    id: 'l14', durationSeconds: 3.2,
+    intent: 'THE YEAR: a hollow outline that blooms. Short, because it is a punctuation mark.',
+    background: INK,
+    camera: camera({ scale: [1.34, 1.02], focal: 85, curve: 'out_expo' }),
+    objects: [
+      lamp('l14_light', { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.46 }, EMBER, 0.6),
+      line('l14_year', '2026', {
         align: 'center', maxWidth: 0.5, maxLines: 1, color: 'transparent',
         treatment: {
           gradient: null,
           stroke: { color: ACCENT, widthPx: 2.5, hollow: true },
-          glow: { color: ACCENT, radiusPx: { from: 6, to: 32, curve: 'out_expo' }, strength: 1 },
+          glow: { color: ACCENT, radiusPx: { from: 3, to: 36, curve: 'out_expo' }, strength: 1 },
         },
       }, {
-        x: 0.5, y: 0.44, anchor: { x: 0.5, y: 0.5 },
-        scale: { from: 1.5, to: 1.62, curve: 'out_expo' },
+        x: 0.5, y: 0.46, anchor: { x: 0.5, y: 0.5 },
+        scale: { from: 1.42, to: 1.62, curve: 'out_expo' },
         opacity: { from: 0, to: 1, curve: 'out_expo' },
       }),
-      line('l9_sub', 'Launch films stop taking six weeks.', {
-        token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.46, maxLines: 2, enterAt: 0.9,
+      line('l14_sub', 'It stops taking weeks.', {
+        token: 'statement', align: 'center', color: 'onCanvas.muted', maxWidth: 0.44, maxLines: 2, enterAt: 0.55,
       }, { x: 0.5, y: 0.68, anchor: { x: 0.5, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
     ],
-    audio: [{ at: 0.08, kind: 'riser', intensity: 0.5, causedBy: 'l9_year', reason: 'The year arrives.' }],
-    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.45, reason: 'The call wipes in under the year.' },
+    audio: [
+      { at: 0.04, kind: 'impact', intensity: 0.6, causedBy: 'l14_year', reason: 'The year arrives.' },
+      { at: 0.75, kind: 'ui_click', intensity: 0.22, causedBy: 'l14_sub', reason: 'The line under it.' },
+    ],
+    handover: { mechanism: 'mask_reveal', carries: [], durationSeconds: 0.42, reason: 'The call wipes in under the year.' },
     macro: null,
   }),
 
-  // --- 5. THE CALL ---------------------------------------------------------
   SceneGraph.parse({
-    id: 'l10', durationSeconds: 4.2,
-    intent: 'CALL: the mark, the invitation, and the one rule the film opened on.',
+    id: 'l15', durationSeconds: 3.8,
+    intent: 'CALL: the mark, the invitation, and the rule the film has used throughout, closing it.',
     background: INK,
-    camera: { scale: { from: 1.03, to: 1.0, curve: 'out_expo' }, focalLengthMm: 85 },
+    camera: camera({ x: [0.05, 0], scale: [1.08, 1.0], focal: 85, curve: 'out_expo' }),
     objects: [
-      lamp('l10_light', { x: 0.28, y: 0.52 }, { x: 0.3, y: 0.5 }, EMBER, 0.75),
-      line('l10_mark', 'Act One', {
+      lamp('l15_light', { x: 0.24, y: 0.52 }, { x: 0.3, y: 0.5 }, EMBER, 0.75),
+      line('l15_mark', 'Act One', {
         maxWidth: 0.4, maxLines: 1, color: PAPER,
-        treatment: { gradient: null, stroke: null, glow: { color: '#FF6A33', radiusPx: 22, strength: 0.6 } },
-      }, { x: 0.1, y: 0.44, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } }),
-      line('l10_call', 'Give us your product.', {
-        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.38, maxLines: 1, enterAt: 0.9,
+        treatment: { gradient: null, stroke: null, glow: { color: '#FF6A33', radiusPx: { from: 8, to: 24, curve: 'out_expo' }, strength: 0.6 } },
+      }, arrive({ x: 0.16 }, { x: 0.1, y: 0.44 }, { anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_expo' } })),
+      line('l15_call', 'Give us your product.', {
+        token: 'statement', color: 'onCanvas.muted', maxWidth: 0.38, maxLines: 1, enterAt: 0.7,
       }, { x: 0.1, y: 0.58, anchor: { x: 0, y: 0.5 }, opacity: { from: 0, to: 1, curve: 'out_cubic' } }),
       {
-        kind: 'shape', id: 'l10_rule', shape: 'rect',
+        kind: 'shape', id: 'l15_rule', shape: 'rect',
         width: { from: 0, to: 0.16, curve: 'out_expo' }, height: 0.004,
         fill: 'accent', stroke: 'transparent', strokeWidthPx: 0, cornerRadiusPx: 0,
-        role: 'structure', enterAt: 1.5,
+        role: 'structure', enterAt: 1.4,
         reason: 'The rule the film has used throughout, closing it.',
         transform: Transform.parse({ x: 0.1, y: 0.68, anchor: { x: 0, y: 0.5 } }),
       } as SceneObject,
     ],
-    audio: [{ at: 0.15, kind: 'logo_sting', intensity: 0.6, causedBy: 'l10_mark', reason: 'The mark, and the end of the sentence.' }],
+    audio: [
+      { at: 0.1, kind: 'logo_sting', intensity: 0.65, causedBy: 'l15_mark', reason: 'The mark, and the end of the sentence.' },
+      { at: 1.45, kind: 'ui_click', intensity: 0.25, causedBy: 'l15_rule', reason: 'The rule draws.' },
+    ],
     macro: null,
   }),
 );
@@ -539,7 +756,7 @@ console.log(`  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 if (result.undecodable.length) console.log('  undecodable:', result.undecodable);
 
 const design = soundForScenes(scenes, {
-  behaviour: { musicCharacter: 'restrained', openOnMusic: false, uiSoundDensity: 'sparse', impactsOnCuts: true, endWithSting: true },
+  behaviour: { musicCharacter: 'restrained', openOnMusic: false, uiSoundDensity: 'rhythmic', impactsOnCuts: true, endWithSting: true },
   channel: 'web',
 });
 const resolved = Object.fromEntries(
