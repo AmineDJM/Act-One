@@ -98,13 +98,28 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
   const heroColour = fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
   const restColour = fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
 
+  /*
+   * PHRASES REPLACE EACH OTHER. They do not stack.
+   *
+   * Stacking is what put "Only" through the "h" of "cheaper" — a caption
+   * reads as a rendering error, which is exactly what a critic called it.
+   * Each phrase was given a slot one line-gap below the last, and a phrase
+   * that wraps to two or three lines walks straight into the next slot. No
+   * gap fixes that, because the gap would have to know how the text wrapped.
+   *
+   * The reference does not stack either. A model reading the strongest of
+   * them recorded its boundaries as "text changes from '60 secondes' to
+   * 'C'est le temps'" — replacement, one thing at a time, each phrase holding
+   * the frame until the voice moves on. That is also why its type can be
+   * large: it never has to leave room for the line after it.
+   */
   beat.phrases.forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
-    const place = {
-      x: composition.x,
-      y: composition.top + i * composition.lineGap,
-      anchor: composition.anchor,
-    };
+    const next = beat.phrases[i + 1];
+    // Out as the next one arrives, with a breath of overlap so the frame is
+    // never empty between two things being said.
+    const exitAt = next ? next.atSeconds + 0.06 : beat.durationSeconds;
+    const place = { x: composition.x, y: composition.top, anchor: composition.anchor };
     objects.push({
       kind: 'text', id: `${beat.id}_say_${i}`, content: phrase.text,
       token: hero ? 'display' : 'statement',
@@ -134,6 +149,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       staggerBy: 'none', staggerSeconds: 0,
       role: hero ? 'payload' : 'support',
       enterAt: phrase.atSeconds,
+      exitAt,
       reason: hero
         ? `The word the beat turns on, on screen as it is said: "${phrase.text}".`
         : `Spoken at ${phrase.atSeconds.toFixed(2)}s, so it is on screen at ${phrase.atSeconds.toFixed(2)}s.`,
@@ -214,14 +230,13 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
 function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
   x: number; top: number; lineGap: number; anchor: number; width: number; heroScale: number;
 } {
-  const lines = Math.max(1, beat.phrases.length);
 
   if (visual.kind === 'clip' || visual.kind === 'product') {
     // Low and left: the footage is the subject and the words are under it.
-    return { x: 0.07, top: 0.66 - (lines - 1) * 0.1, lineGap: 0.1, anchor: 0, width: 0.5, heroScale: 1 };
+    return { x: 0.07, top: 0.68, lineGap: 0.1, anchor: 0, width: 0.52, heroScale: 1.1 };
   }
   if (visual.kind === 'mark') {
-    return { x: 0.09, top: 0.44 - (lines - 1) * 0.06, lineGap: 0.12, anchor: 0, width: 0.5, heroScale: 1.25 };
+    return { x: 0.09, top: 0.48, lineGap: 0.12, anchor: 0, width: 0.54, heroScale: 1.3 };
   }
   if (visual.kind === 'films') {
     /*
@@ -232,14 +247,14 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
      * statement branch already did this and this one did not, which is what a
      * fixed number rather than a computed one buys you.
      */
-    return { x: 0.5, top: 0.84 - (lines - 1) * 0.085, lineGap: 0.085, anchor: 0.5, width: 0.62, heroScale: 1 };
+    return { x: 0.5, top: 0.84, lineGap: 0.085, anchor: 0.5, width: 0.62, heroScale: 1 };
   }
   if (visual.kind === 'fields') {
     // Inside the first field, and narrow enough to stay in it. The earlier
     // version centred a 54%-wide box at a sixth of the frame and put the line
     // off the left edge — the inspector refused it, correctly.
     const share = 1 / visual.colours.length;
-    return { x: share * 0.5, top: 0.5 - (lines - 1) * 0.07, lineGap: 0.13, anchor: 0.5, width: share * 0.82, heroScale: 1.1 };
+    return { x: share * 0.5, top: 0.5, lineGap: 0.13, anchor: 0.5, width: share * 0.82, heroScale: 1.1 };
   }
 
   /*
@@ -261,8 +276,7 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
     { x: 0.5, top: 0.46, lineGap: 0.14, anchor: 0.5, width: 0.68, heroScale: 1.5 },
     { x: 0.08, top: 0.62, lineGap: 0.1, anchor: 0, width: 0.56, heroScale: 1.15 },
   ];
-  const frame = frames[index % frames.length]!;
-  return { ...frame, top: frame.top - (lines - 1) * frame.lineGap * 0.5 };
+  return frames[index % frames.length]!;
 }
 
 /** The camera, scaled to how long the beat actually runs. */
