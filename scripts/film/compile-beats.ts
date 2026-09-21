@@ -95,8 +95,16 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * behind it, which on a light field is ink.
    */
   const fieldColour = visual.kind === 'statement' ? visual.field : null;
-  const heroColour = fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
-  const restColour = fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
+  /*
+   * On panels, the words are white.
+   *
+   * The accent caption ran across green, blue and orange — and on the orange
+   * third it would have been orange on orange, invisible exactly where the
+   * emphasis lands. Paper reads on all three.
+   */
+  const onPanels = visual.kind === 'films' || visual.kind === 'fields';
+  const heroColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.accent;
+  const restColour = onPanels ? palette.paper : fieldColour && luminance(fieldColour) > 0.45 ? palette.ember : (onPaper ? palette.ink : palette.paper);
 
   /*
    * PHRASES REPLACE EACH OTHER. They do not stack.
@@ -247,7 +255,13 @@ function compositionFor(beat: TimedBeat, index: number, visual: BeatVisual): {
      * statement branch already did this and this one did not, which is what a
      * fixed number rather than a computed one buys you.
      */
-    return { x: 0.5, top: 0.84, lineGap: 0.085, anchor: 0.5, width: 0.62, heroScale: 1 };
+    /*
+     * Wider and higher than it was. At 0.62 the hero phrase "before you see
+     * it." lost its last word off the end, and at 0.84 a second line had
+     * nowhere to go. A caption that spans three colour panels also needs the
+     * room to sit ON one of them rather than across a seam.
+     */
+    return { x: 0.5, top: 0.78, lineGap: 0.085, anchor: 0.5, width: 0.9, heroScale: 1 };
   }
   if (visual.kind === 'fields') {
     // Inside the first field, and narrow enough to stay in it. The earlier
