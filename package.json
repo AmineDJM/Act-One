@@ -53,7 +53,8 @@
     "council": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/council.ts",
     "screen": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/screen.ts",
     "ingest:references": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/ingest-references.ts",
-    "ab:voice": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/ab-voice.ts"
+    "ab:voice": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/ab-voice.ts",
+    "compare": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/compare.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

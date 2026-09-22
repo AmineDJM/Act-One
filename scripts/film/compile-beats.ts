@@ -254,6 +254,9 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
 
   const objects: SceneObject[] = [];
   const audio: Record<string, unknown>[] = [];
+  // How far the ground travels on this beat: the beat's own register, the same
+  // number that scales the camera and the speed the words assemble at.
+  const drift = performanceFor(beat.intent).cameraEnergy;
 
   // --- the light every frame stands on -------------------------------------
   objects.push({
@@ -275,11 +278,51 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
      * a rejected lane, and nowhere else.
      */
     from: onPaper ? '#FFEADC' : '#15171E', to: background,
-    centre: { x: { from: 0.42, to: 0.58, curve: 'in_out_cubic' }, y: 0.5 },
-    radius: 0.9, role: 'atmosphere',
+    /*
+     * A GROUND THAT MOVES, because the reference does and we did not.
+     *
+     * Shown our film beside one, a model watching both named two gaps as
+     * OBVIOUS and they were the same gap twice: "B integrates typography with
+     * shifting backgrounds and continuous momentum, A cuts to flat text on
+     * static backgrounds", and "B builds depth with illuminated objects
+     * responding to an animated light source, A pans linearly across a 2D text
+     * layout". Our light drifted 0.16 across the frame in x and did nothing
+     * else, which at this scale is indistinguishable from still.
+     *
+     * So it travels in both axes and its radius breathes, and a SECOND, wider
+     * and dimmer source sits behind it moving the other way. Two sources at
+     * different rates is parallax, and parallax is the only depth a flat frame
+     * can have honestly — nothing here is pretending to be 3D.
+     *
+     * IT IS CAUSED, not decorative. The distance both sources travel is scaled
+     * by the beat's own register, the same number that sets the camera's
+     * travel and the speed the words assemble at. A confided beat's ground is
+     * nearly still; a pressed beat's moves. Motion that happens because motion
+     * looks expensive is the thing this film has been accused of often enough.
+     */
+    centre: {
+      x: { from: 0.5 - 0.1 * drift, to: 0.5 + 0.12 * drift, curve: 'in_out_cubic' },
+      y: { from: 0.46 + 0.05 * drift, to: 0.54 - 0.04 * drift, curve: 'in_out_cubic' },
+    },
+    radius: { from: 0.82, to: 0.82 + 0.16 * drift, curve: 'in_out_cubic' },
+    role: 'atmosphere',
     reason: 'The source the frame is lit by. Nothing here sits on a flat field.',
     transform: Transform.parse({ x: 0.5, y: 0.5, z: 1, anchor: { x: 0.5, y: 0.5 } }),
   } as SceneObject);
+
+  /*
+   * A SECOND LIGHT SOURCE WAS TRIED HERE AND TAKEN OUT.
+   *
+   * Two radials at low contrast over near-black produced visible concentric
+   * banding — rings that read as compression artifacting, which is a worse
+   * fault than the flatness they were meant to cure. Parallax from two
+   * gradients is not the depth the reference has; its depth comes from real
+   * objects lit by a real source, and two overlapping glows are a cheap
+   * impression of it that this frame cannot carry.
+   *
+   * The single source travels in both axes and breathes now, which is the part
+   * of the change that survived.
+   */
 
   // --- the visual consequence of the idea ----------------------------------
   objects.push(...visualObjects(beat, visual, options, audio, variant));
@@ -536,6 +579,26 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       ? hero.map((phrase) => ({ ...phrase, text: editorial }))
       : hero;
 
+  /*
+   * EDITORIAL COPY ARRIVES WITH THE BEAT, not with its word.
+   *
+   * Showing only the turning phrase was right and left a hole: that phrase is
+   * spoken late in its beat, so the screen was empty for the seconds before
+   * it — on a statement beat that is a black frame with a voice over it, and
+   * the room reported exactly that as dead air and attention drops.
+   *
+   * The hole was the last piece of subtitle thinking. A subtitle must appear
+   * when the word is said; editorial copy must not. It can be on screen first
+   * and let the voice arrive AT it, which is the stronger relationship — the
+   * film states, then says. The word still gets its event, because the
+   * picture reacts on the emphasis regardless: the field opens, the mark
+   * lands, the strike goes through.
+   *
+   * A short lead rather than zero, so the cut and the type are not one event.
+   */
+  const shownFrom = (phrase: { atSeconds: number }) =>
+    editorial === '' ? phrase.atSeconds : Math.min(phrase.atSeconds, beat.voiceAtSeconds * 0.5 + 0.12);
+
   (shown.length > 0 || editorial === '' ? shown : beat.phrases.slice(-1)).forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
     /*
@@ -634,7 +697,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       staggerBy: 'word',
       staggerSeconds: performanceFor(beat.intent).staggerSeconds * (hero ? 1 : 0.7),
       role: hero ? 'payload' : 'support',
-      enterAt: phrase.atSeconds,
+      enterAt: shownFrom(phrase),
       exitAt,
       reason: hero
         ? `The word the beat turns on, on screen as it is said: "${phrase.text}".`

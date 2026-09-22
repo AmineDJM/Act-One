@@ -399,6 +399,19 @@ export class GeminiVideoAnalyst implements VideoAnalyst {
   }
 
   /** Resumable upload, then wait for the service to finish decoding it. */
+  /**
+   * Puts a film where the model can watch it, and hands back the reference.
+   *
+   * Exposed so that a caller who needs the model to watch TWO films at once —
+   * ours beside a reference, which is the only way to ask where a viewer can
+   * still tell them apart — can reuse this exact path rather than writing a
+   * second resumable uploader that drifts from it.
+   */
+  async putFilm(filePath: string, context: CallContext): Promise<{ uri: string; mimeType: string }> {
+    const file = await this.upload(filePath, context);
+    return { uri: file.uri, mimeType: file.mimeType ?? 'video/mp4' };
+  }
+
   private async upload(filePath: string, context: CallContext): Promise<FileResource> {
     const resolved = path.resolve(filePath);
     const info = await stat(resolved).catch(() => null);

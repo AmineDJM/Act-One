@@ -37,6 +37,30 @@ const VO = path.resolve('.renders/vo-beats');
 
 const PALETTE = { ink: '#0B0C10', paper: '#F4F2EC', accent: '#FF4D1F', amber: '#FFB03A', ember: '#2A1006' };
 
+/**
+ * Refuse early if nothing is serving the captures.
+ *
+ * The renderer fetches every capture over HTTP from the web app, so when that
+ * process is not running the render still starts, spends three minutes, and
+ * dies at the last frame with a wall of 404s. That has now cost two full
+ * renders after a container restart took the server with it. A HEAD request
+ * costs nothing and turns a late, noisy failure into an immediate sentence.
+ */
+async function requireCaptureServer(): Promise<void> {
+  const probe = `${BASE}/home_hero.png`;
+  try {
+    const response = await fetch(probe, { method: 'HEAD' });
+    if (response.ok) return;
+    throw new Error(`HTTP ${response.status}`);
+  } catch (error) {
+    throw new Error(
+      `Nothing is serving the captures at ${BASE} (${(error as Error).message}). ` +
+      'Start the web app first: npm run dev',
+    );
+  }
+}
+await requireCaptureServer();
+
 const ASSETS: Record<string, string> = {};
 // The hero crop is a known 1580x680, which is what lets the audit beat place
 // its marks by arithmetic instead of by eye.
