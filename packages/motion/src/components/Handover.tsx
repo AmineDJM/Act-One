@@ -53,9 +53,26 @@ export function handoverOverlap(handover: SceneHandover): number {
 function arriving(mechanism: HandoverSide['mechanism'], p: number): React.CSSProperties {
   const eased = EASINGS.out_quint(p);
   switch (mechanism) {
-    case 'scale_through':
-      // The frame the previous scene pushed INTO, opening out of it.
-      return { opacity: eased, transform: `scale(${(0.88 + 0.12 * eased).toFixed(4)})` };
+    case 'scale_through': {
+      /*
+       * IN-OUT, NOT OUT-QUINT, AND THIS ONE HAD TO BE MEASURED TO BE SEEN.
+       *
+       * out_quint front-loads hard: two fifths of the way through the window
+       * it is ninety percent arrived. On a 0.55s handover that put the whole
+       * transition inside the first tenth of a second, so an authored scene
+       * change rendered as a hard cut — and a film compared against a
+       * reference twice came back with "slideshow format" both times while
+       * this mechanism was, on paper, already being used.
+       *
+       * A transition needs to be visible for the duration it was given. This
+       * is the one mechanism where the travel IS the point: the previous scene
+       * pushes into the frame and this one opens out of it, which only reads
+       * if the opening takes time. The other mechanisms keep the snappier
+       * curve, because for them arrival is the point and travel is not.
+       */
+      const opening = EASINGS.in_out_cubic(p);
+      return { opacity: opening, transform: `scale(${(0.82 + 0.18 * opening).toFixed(4)})` };
+    }
     case 'camera_carry':
       // The move continues: this scene is already travelling when it arrives.
       return { opacity: eased, transform: `translateX(${((1 - eased) * 7).toFixed(3)}%)` };

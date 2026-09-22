@@ -759,12 +759,47 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     camera: cameraFor(beat, visual),
     objects,
     audio,
+    /*
+     * HOW THIS BEAT BECOMES THE NEXT ONE.
+     *
+     * Put beside a reference twice, the same answer came back twice in
+     * different words: "choreographed spatial sequences" against our
+     * "slideshow format", and then "introduce continuous camera motion between
+     * scenes to eliminate the slideshow". We were emitting two mechanisms —
+     * cut, or a small lateral carry — and the renderer has had a third the
+     * whole time whose own comment describes it as "the zoom into the white
+     * space the reference films use to change scene without cutting". It had
+     * never once been asked for.
+     *
+     * It is also the move the Benchmark Lab retrieved from five of seven
+     * references independently: an element expands until it IS the next scene.
+     * The one beat that can do it honestly is the one that has just filled the
+     * frame with a colour — the field the picture became opens into what
+     * follows, so the cut has an author.
+     *
+     * Three mechanisms, each with a reason:
+     *   scale_through  this beat ended as a full-frame field; it opens.
+     *   cut            the emphasis lands at the very end; the word cuts.
+     *   camera_carry   the beat trails off, so the move continues through it.
+     */
     handover: {
-      // A beat that ends on its emphasis hands over hard; one that trails off
-      // is carried. The voice decides, not a table.
-      mechanism: beat.emphasisAtSeconds !== null && beat.emphasisAtSeconds > beat.durationSeconds - 1.2 ? 'cut' : 'camera_carry',
-      carries: [],
-      durationSeconds: 0.4,
+      mechanism: visual.kind === 'statement' && visual.field
+        ? 'scale_through'
+        : beat.emphasisAtSeconds !== null && beat.emphasisAtSeconds > beat.durationSeconds - 1.2
+          ? 'cut'
+          : 'camera_carry',
+      /*
+       * What survives the boundary, named rather than left empty.
+       *
+       * The receipt is on screen across four beats and is the one object the
+       * middle of this film is built to let you follow; a handover that does
+       * not declare it is a handover that does not know what it is carrying.
+       */
+      carries: visual.receipt ? [`${beat.id}_receipt_tag`, `${beat.id}_receipt_text`] : [],
+      // Long enough to be seen. A scene opening out of the frame the last one
+      // pushed into is the slowest thing this film does on purpose, and at
+      // half a second it was over before the eye had started following it.
+      durationSeconds: visual.kind === 'statement' && visual.field ? 0.95 : 0.4,
       reason: next ? `Into ${next.id}: ${next.reason}` : 'The film ends here.',
     },
     macro: null,

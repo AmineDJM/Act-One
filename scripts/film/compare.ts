@@ -37,7 +37,25 @@ if (!analyst.isConfigured()) {
 const context = { organizationId: 'org_platform' } as never;
 
 console.log(`A: ${ours}\nB: ${reference}\n`);
-const [a, b] = await Promise.all([analyst.putFilm(ours, context), analyst.putFilm(reference, context)]);
+/*
+ * One retry on a processing failure, because the service loses a film
+ * occasionally and the film is not at fault. A master that probes as valid
+ * h264/aac locally came back as "could not decode" from an upload that had
+ * accepted the same encoder's output minutes earlier; retrying it worked. The
+ * error is marked non-retryable inside the provider, which is right for a real
+ * decode failure and wrong for this, so the retry lives here where the
+ * distinction can be made.
+ */
+async function put(file: string): Promise<{ uri: string; mimeType: string }> {
+  try {
+    return await analyst.putFilm(file, context);
+  } catch (error) {
+    console.log(`  ${file}: ${(error as Error).message.slice(0, 90)} — retrying once.`);
+    return analyst.putFilm(file, context);
+  }
+}
+
+const [a, b] = await Promise.all([put(ours), put(reference)]);
 
 const QUESTION = [
   'You are shown two launch films. FILM A was made by an automated system. FILM B is a',
