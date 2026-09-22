@@ -947,29 +947,26 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
   })();
 
   /*
-   * A pool of dark under the words, and only where the picture is unknowable.
+   * AN OUTLINE, NOT A SCRIM, AND I TRIED THE SCRIM FIRST.
    *
-   * This is the oldest device in subtitling and it is here for the oldest
-   * reason: the caption cannot be allowed to depend on what the shot happens
-   * to contain. It is radial rather than a bar so it has no edge to notice —
-   * a band across the bottom of a frame is a lower third, and this is not
-   * announcing anything — and it sits at the caption's own z so the camera
-   * moves the two together instead of sliding one over the other.
+   * A soft pool of dark under the words is the textbook answer and it was the
+   * wrong one here: on b7 the frame is a near-white film, and a translucent
+   * dark shape on a white frame is a smudge. It rendered as a grey dome
+   * sitting in the bottom of the shot — legible, and the ugliest thing in the
+   * film. Every variation of it is the same object: on a bright ground there
+   * is no such thing as a subtle dark veil. That reading is on record already,
+   * about this film's own background: "muddy", "murky". I was about to add a
+   * new one on purpose.
    *
-   * On the dark beats it is very nearly invisible, which is correct: it costs
-   * nothing where it is not needed and saves the two beats where it is.
+   * A hair-thin ink outline costs no area. It follows the glyphs, so on the
+   * dark beats it is invisible and on the white film it is the difference
+   * between white type and readable white type — which is what a burnt-in
+   * caption on bright footage has always been. Crisp instead of hazy, and it
+   * takes nothing away from the picture it sits on.
    */
-  if (groundIsPicture && subtitleRows.length) {
-    objects.push({
-      kind: 'gradient', id: `${beat.id}_caption_ground`, shape: 'radial',
-      from: 'rgba(11,12,16,0.80)', to: 'rgba(11,12,16,0)',
-      centre: { x: 0.5, y: 1.04 }, radius: 0.36,
-      role: 'structure',
-      enterAt: subtitleRows[0]!.atSeconds,
-      reason: 'Ground for the caption, because what is behind it is a picture rather than a colour.',
-      transform: Transform.parse({ x: 0.5, y: 0.5, z: -0.5, anchor: { x: 0.5, y: 0.5 } }),
-    } as SceneObject);
-  }
+  const captionOutline = groundIsPicture
+    ? { color: palette.ink, widthPx: 1.6, hollow: false }
+    : null;
 
   // A row becomes one drawn caption, or two when the ground moves under it.
   const drawn = subtitleRows.flatMap((row, i) => {
@@ -1002,6 +999,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       // competes with the headline.
       token: 'body',
       color: colour,
+      treatment: { gradient: null, stroke: captionOutline, glow: null },
       align: 'center', maxWidth: 0.7, maxLines: 2,
       staggerBy: 'none', staggerSeconds: 0,
       spoken: true,
