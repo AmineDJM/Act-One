@@ -14,6 +14,13 @@
  */
 import { SceneGraph, Transform, type SceneObject } from '@act-one/core';
 import { performanceFor, subtitlesFollow, subtitlesFor, type TimedBeat } from '@act-one/creative';
+/*
+ * The WCAG ratio, from the design package, because this file's own
+ * `luminance` at the bottom is not gamma-corrected and is only ever asked
+ * whether something is light or dark. That is enough for a headline's colour
+ * and not enough for a caption's: "readable" is a measurement.
+ */
+import { contrastRatio } from '@act-one/design';
 
 export type Palette = {
   ink: string;
@@ -850,9 +857,138 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     throw new Error(`Beat ${beat.id}: subtitles do not follow the voice — ${subtitlesAreHonest.why}`);
   }
 
-  subtitleRows.forEach((row, i) => {
+  /*
+   * WHAT IS BEHIND THE CAPTION CHANGES DURING THE BEAT, AND IT WAS COLOURED
+   * FOR ONE OF THE TWO.
+   *
+   * A statement beat with a field spends its first half on ink and its second
+   * half on colour: the field grows from the centre on the emphasis word. The
+   * caption took its colour from the field for the WHOLE beat, so on b3 —
+   * where the field is #F4F2EC, a near-white — the subtitle was near-black
+   * type on a near-black frame for three seconds, and then correct. Nothing
+   * was mistimed and nothing was mislabelled; the words were simply not
+   * visible, which from a seat is indistinguishable from not being there.
+   *
+   * So the surface is asked for at a moment rather than assumed for a beat,
+   * and a row that straddles the change is drawn twice — same words, same
+   * clock, one colour each side. The viewer sees one continuous caption that
+   * stays legible through a full-frame colour change.
+   */
+  const fieldArrivesAt = fieldColour
+    /*
+     * When the colour reaches the BOTTOM of the frame, not when it finishes.
+     *
+     * The field opens at `at + 0.16` and is full at `at + 0.42`, growing to
+     * 180% of the height from the centre on an out_expo — which covers y=0.905
+     * about a fifth of the way through that window. Flipping the caption at
+     * the end of the growth would leave it wrong-on-colour for a quarter of a
+     * second; flipping it at the start would leave it wrong-on-ink for the
+     * same. This is where the ground under the words actually changes.
+     */
+    ? (beat.emphasisAtSeconds ?? beat.voiceAtSeconds) + 0.19
+    : Number.POSITIVE_INFINITY;
+
+  /** The colour of whatever the caption is sitting on at a given second. */
+  const surfaceAt = (seconds: number): string =>
+    seconds >= fieldArrivesAt && fieldColour ? fieldColour : background;
+
+  /**
+   * Whichever of the two brand colours can actually be READ on that surface.
+   *
+   * MEASURED, not thresholded. Everything else in this film picks its colour
+   * with `luminance(surface) > 0.45`, which asks "is this light or dark" — a
+   * fine question for a headline, and the wrong one here. The accent field is
+   * L=0.267, so that test calls it dark and puts paper on it at a contrast of
+   * 2.96:1; ink on the same orange measures 5.90:1. The threshold picked the
+   * less readable of the two options for the one element in the frame whose
+   * entire job is to be readable.
+   *
+   * The headline keeps the threshold on purpose: it is enormous, it is the
+   * beat's voice, and paper on accent is the look. A caption is not making a
+   * statement, so it takes the contrast instead — which also stops it reading
+   * as a second headline in the same colour underneath the first.
+   */
+  const legibleOn = (surface: string): string =>
+    contrastRatio(palette.ink, surface) >= contrastRatio(palette.paper, surface)
+      ? palette.ink
+      : palette.paper;
+
+  /**
+   * Whether this beat's ground is a colour I chose or a picture I did not.
+   *
+   * Choosing the caption's colour only works where the thing behind it is a
+   * flat colour this file put there. On b7 the frame is three real renders
+   * cutting full-bleed, and one of them is nearly white — so the caption was
+   * white type on a white film for two seconds, and no colour rule could have
+   * known, because what is under the words is a video.
+   *
+   * The switch is exhaustive on purpose. A new visual kind will not compile
+   * until somebody says which of the two it is, which is the only way this
+   * stops being a thing I have to remember.
+   */
+  const groundIsPicture = ((): boolean => {
+    switch (visual.kind) {
+      // A colour this file painted: measure it and pick type that reads on it.
+      case 'statement':
+      case 'mark':
+        return false;
+      // Photography, screenshots, video, panels: unknowable at compile time.
+      case 'product':
+      case 'clip':
+      case 'fields':
+      case 'films':
+      case 'audit':
+        return true;
+      default: {
+        const unreachable: never = visual;
+        throw new Error(`No caption ground declared for ${JSON.stringify(unreachable)}`);
+      }
+    }
+  })();
+
+  /*
+   * A pool of dark under the words, and only where the picture is unknowable.
+   *
+   * This is the oldest device in subtitling and it is here for the oldest
+   * reason: the caption cannot be allowed to depend on what the shot happens
+   * to contain. It is radial rather than a bar so it has no edge to notice —
+   * a band across the bottom of a frame is a lower third, and this is not
+   * announcing anything — and it sits at the caption's own z so the camera
+   * moves the two together instead of sliding one over the other.
+   *
+   * On the dark beats it is very nearly invisible, which is correct: it costs
+   * nothing where it is not needed and saves the two beats where it is.
+   */
+  if (groundIsPicture && subtitleRows.length) {
     objects.push({
-      kind: 'text', id: `${beat.id}_sub_${i}`, content: row.text,
+      kind: 'gradient', id: `${beat.id}_caption_ground`, shape: 'radial',
+      from: 'rgba(11,12,16,0.80)', to: 'rgba(11,12,16,0)',
+      centre: { x: 0.5, y: 1.04 }, radius: 0.36,
+      role: 'structure',
+      enterAt: subtitleRows[0]!.atSeconds,
+      reason: 'Ground for the caption, because what is behind it is a picture rather than a colour.',
+      transform: Transform.parse({ x: 0.5, y: 0.5, z: -0.5, anchor: { x: 0.5, y: 0.5 } }),
+    } as SceneObject);
+  }
+
+  // A row becomes one drawn caption, or two when the ground moves under it.
+  const drawn = subtitleRows.flatMap((row, i) => {
+    const straddles = row.atSeconds < fieldArrivesAt && row.untilSeconds > fieldArrivesAt;
+    if (!straddles) {
+      return [{ row, id: `${beat.id}_sub_${i}`, from: row.atSeconds, to: row.untilSeconds,
+        colour: legibleOn(surfaceAt(row.atSeconds)) }];
+    }
+    return [
+      { row, id: `${beat.id}_sub_${i}`, from: row.atSeconds, to: fieldArrivesAt,
+        colour: legibleOn(surfaceAt(row.atSeconds)) },
+      { row, id: `${beat.id}_sub_${i}_on_field`, from: fieldArrivesAt, to: row.untilSeconds,
+        colour: legibleOn(surfaceAt(fieldArrivesAt)) },
+    ];
+  });
+
+  drawn.forEach(({ row, id, from, to, colour }) => {
+    objects.push({
+      kind: 'text', id, content: row.text,
       /*
        * Body rather than caption, and ink on a light field.
        *
@@ -865,13 +1001,13 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       // smallest step in the scale rendered as a smudge; the statement step
       // competes with the headline.
       token: 'body',
-      color: fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.paper,
+      color: colour,
       align: 'center', maxWidth: 0.7, maxLines: 2,
       staggerBy: 'none', staggerSeconds: 0,
       spoken: true,
       role: 'structure',
-      enterAt: row.atSeconds,
-      exitAt: row.untilSeconds,
+      enterAt: from,
+      exitAt: to,
       reason: `Subtitle: "${row.text}", at the second it is spoken.`,
       transform: Transform.parse({
         /*
@@ -887,7 +1023,14 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
          * one thing in the frame that must never be behind anything.
          */
         x: 0.5, y: 0.905, z: -0.5, anchor: { x: 0.5, y: 0.5 },
-        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.05, value: 0.95, curve: 'out_cubic' }, { t: 1, value: 0.95 }], curve: 'out_cubic' },
+        /*
+         * The second half of a straddled row does NOT fade in: it is the same
+         * caption continuing, and fading it would blink the words at exactly
+         * the moment the frame changes colour under them.
+         */
+        opacity: from === row.atSeconds
+          ? { keyframes: [{ t: 0, value: 0 }, { t: 0.05, value: 0.95, curve: 'out_cubic' }, { t: 1, value: 0.95 }], curve: 'out_cubic' }
+          : { keyframes: [{ t: 0, value: 0.95 }, { t: 1, value: 0.95 }], curve: 'linear' },
       }),
     } as SceneObject);
   });
