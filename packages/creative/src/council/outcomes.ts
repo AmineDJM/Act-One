@@ -41,7 +41,13 @@ export const InterventionOutcome = z.object({
   /** The film, the loop, the state of the world. Enough to group by later. */
   context: z.string().max(300),
   observedProblem: z.string().min(1).max(400),
-  intervention: z.string().min(1).max(500),
+  /*
+   * Room for what was actually done. At 500 this refused a record describing
+   * four changes under one hypothesis — which is precisely the shape the brief
+   * asks experiments to take — and a dataset that rejects its own best rows
+   * for length is not a dataset.
+   */
+  intervention: z.string().min(1).max(1500),
   /** Where the change was made, so cost and blast radius are comparable. */
   scope: z.enum(['round_1', 'round_2', 'round_3']).default('round_3'),
 
@@ -119,7 +125,26 @@ export class OutcomeMemory {
    * happily accepted the short form the tests used. A recorder that is
    * annoying to call is a recorder that does not get called.
    */
+  /*
+   * Trims rather than throws, for the same reason the journal does. This is a
+   * memory: recording a slightly shortened row is a small loss, refusing the
+   * row outright loses the experiment it was describing, and it has now
+   * happened twice on caps I had set by guessing at how much anyone would
+   * write.
+   */
   record(outcome: Omit<z.input<typeof InterventionOutcome>, 'at'> & { at?: string }): InterventionOutcome {
+    const cap = (value: unknown, max: number) =>
+      typeof value === 'string' && value.length > max ? `${value.slice(0, max - 1)}…` : value;
+    outcome = {
+      ...outcome,
+      intervention: cap(outcome.intervention, 1500) as string,
+      observedProblem: cap(outcome.observedProblem, 400) as string,
+      ...(outcome.note !== undefined ? { note: cap(outcome.note, 1200) as string } : {}),
+      ...(outcome.context !== undefined ? { context: cap(outcome.context, 300) as string } : {}),
+      ...(outcome.criticChanges
+        ? { criticChanges: (outcome.criticChanges as string[]).map((c) => cap(c, 300) as string) }
+        : {}),
+    };
     const full = InterventionOutcome.parse({ ...outcome, at: outcome.at ?? new Date().toISOString() });
     this.records.push(full);
     mkdirSync(path.dirname(this.file), { recursive: true });

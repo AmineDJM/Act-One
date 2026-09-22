@@ -297,5 +297,39 @@
     "result": "improved",
     "confounded": false,
     "note": "THE TYPOGRAPHY CHANGE WAS MY OWN BRIEF, UNFINISHED. The brief asked for three separate things — narration, subtitles, on-screen editorial copy — and I built the first two and never built the third, so every word on screen was the sentence being spoken at the second it was spoken. Building subtitles from the measured performance was right and stays; what was missing was a reason for the type to exist beyond repeating the read. LESSON ON LABELS VS PROOF: naming the three directions inside the colour columns made the beat WORSE, from 4 of 5 high to 5 of 5 critical, because \"Paper\" and \"Depth\" are internal words that mean nothing to a viewer. A room asking for visual proof will not accept a label for the claim, however well set. Showing the three actual renders full frame in sequence is what moved it."
+  },
+  {
+    "at": "2026-09-22T08:18:20.854Z",
+    "context": "Act One launch film, v23 -> v27. Five direct comparisons against reference target7, two Council screenings.",
+    "observedProblem": "Put beside a reference film, a model watching both named OBVIOUS gaps on every run: motion (\"slideshow format\"), typography (\"static white text\"), sound (\"acoustically hollow\", \"a solitary repetitive tick\").",
+    "intervention": "Four changes, one claim: the film reads as a slideshow because three authored mechanisms that already existed were never actually asked for. The ground now moves and breathes, scaled by the beat register. The scale_through handover — described in its own comment as the reference move — is used where a beat ends as a colour field, on in_out_cubic over 0.95s because out_quint made it invisible. Hero type is revealed through a mask rather than faded. The score drop is placed on the film's actual turn.",
+    "scope": "round_3",
+    "beforeArtifact": ".renders/film-v23.mp4",
+    "afterArtifact": ".renders/film-v27.mp4",
+    "before": {
+      "obviousGapsVsReference": 2,
+      "noticeableGaps": 1,
+      "toneMatchesClaim": 7.7,
+      "authoredTogether": 8.7
+    },
+    "after": {
+      "obviousGapsVsReference": 0,
+      "noticeableGaps": 3,
+      "toneMatchesClaim": 9,
+      "authoredTogether": 9
+    },
+    "criticChanges": [
+      "Five consecutive comparisons: obvious gaps went 2, 2, 2, 2, then 0. No dimension is instantly distinguishable from the reference any more.",
+      "Typography moved OBVIOUS -> NOTICEABLE when the masked reveals landed: the reading changed from \"cuts to static white text\" to \"simple horizontal line reveals\".",
+      "toneMatchesClaim 7.7 [8,7,8] -> 9.0 [9,9,9] on the score placement, non-overlapping.",
+      "THE COUNCIL DISAGREES. The screening after these changes returned 5 of 5 critical at the opening: \"music acts as wallpaper\", \"narration merely reads on-screen text\", \"unmotivated camera drift\"."
+    ],
+    "benchmarkGapChange": "",
+    "humanPreference": "",
+    "costUsd": 0,
+    "latencySeconds": 0,
+    "result": "improved",
+    "confounded": true,
+    "note": "THE TWO INSTRUMENTS ANSWER DIFFERENT QUESTIONS AND BOTH ARE RIGHT. The comparison asks whether a viewer can instantly tell which film came from the weaker studio, and the answer is now no on every dimension. The Council asks whether this film is well directed, and the answer is still no: the narration and the on-screen type say the same words even when only the turn phrase is shown, the score is a flat bed for the first forty seconds even with its drop now placed, and the statement beats still have a caption where they need a picture. Convergence is NOT met — the mandate requires two consecutive strong screenings and this is one strong then one weak. THE PATTERN WORTH KEEPING: every one of these four fixes was a mechanism that already existed and had never been asked for — scale_through, masks, the drop alignment, the moving light. Three of them were dead in a way no test could see, because the code ran and produced a defensible-looking result. The drop alignment had run on every film ever made here and aligned nothing, because a scene-graph film stamps every scene mixed_media and the scan looks for product_ui."
   }
 ]
