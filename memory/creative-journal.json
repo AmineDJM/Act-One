@@ -664,5 +664,71 @@
     "what": "Rebuild @21–36 as one receipt path using existing product/films kinds: carry the exact pinned phrase into three real rendered film panels at the same hero timestamp. On “scores,” add one mark per lane. On “fails,” freeze lane 2, strike the pinned phrase in orange, drop its mark. On the repair silence, replace only lane 2’s frame; remove paragraph body copy from this run.",
     "why": "The receipt from the public page stops being the same object. The three directions, score, failed lane and repair are built as separate illustrative beats, so the viewer cannot track one claim being tested and changed. (expected: Muted, the middle reads: source claim → three tests → one rejection → one repair. “Three,” “scores,” and “fails” produce visible consequences instead of labels.)",
     "refs": []
+  },
+  {
+    "at": "2026-09-22T08:16:49.055Z",
+    "kind": "criticism",
+    "what": "@0s: Music acts as wallpaper.",
+    "why": "Seen independently by story, art, product, motion, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-22T08:16:49.056Z",
+    "kind": "criticism",
+    "what": "@26s: Rhythmic flatline causing attention drop",
+    "why": "Seen independently by motion, story, art.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-22T08:16:49.057Z",
+    "kind": "criticism",
+    "what": "@30s: No visual consequence to the thesis",
+    "why": "Seen independently by motion, story, sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-22T08:16:49.057Z",
+    "kind": "criticism",
+    "what": "@21s: Claims to audit like a customer but shows a static highlight.",
+    "why": "Seen independently by story, product.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-22T08:16:49.058Z",
+    "kind": "criticism",
+    "what": "@3s: Audio and visual channels are entirely redundant.",
+    "why": "Seen independently by sound.",
+    "refs": [
+      ".renders/one-timeline.mp4"
+    ]
+  },
+  {
+    "at": "2026-09-22T08:16:49.058Z",
+    "kind": "intervention",
+    "what": "After the receipt-path rebuild, retime only local cues: three dry ticks exactly on the three score marks; one muted strike only when lane 2 is crossed out; remove the tick layer for 0.4s through the first repaired lane-2 frame, leaving room tone and one pin click; bring the pulse back 2 dB lower under “Only the calendar.” Do not change @43–46 or the final silence.",
+    "why": "Sound cues follow paragraph rhythm instead of visible decisions. The tick measures time passing while the picture claims judgement and removal of waiting, so the ear does not confirm score, strike, repair or the @41 turn. (expected: @26–41 becomes score → strike → held repair in the ear as well as the picture. The ticking remains a time motif, but now changes state when waiting is cut away.)",
+    "refs": []
+  },
+  {
+    "at": "2026-09-22T08:16:49.059Z",
+    "kind": "intervention",
+    "what": "Keep the severe opening and current VO cadence. Hold the first square-on browser frame still until the cursor reaches the claim; start the scale push only on the underline drag; land it on the receipt pin; hold URL + underline + pin for 0.7s. Move spoken words into a narrow lower receipt strip and keep the page centre for the audit action.",
+    "why": "The first movement begins before underline, pin, measure or strike gives it a reason, while spoken copy occupies the centre over the page. The viewer learns that motion and type are decoration, so later receipts are read as captions rather than evidence. (expected: The opening reads as public page → claim found → receipt pinned. The first camera move is caused by inspection instead of drift, redu…",
+    "refs": []
+  },
+  {
+    "at": "2026-09-22T08:16:49.059Z",
+    "kind": "intervention",
+    "what": "Rebuild @21–41 as one receipt path using existing product and films kinds: pin one exact public-site phrase with URL visible; carry that same phrase into three real rendered panels at the same hero timestamp; on “scores” place one mark per lane; on “fails” freeze lane 2, strike the pinned phrase in orange and drop its mark; on “repairs” replace only lane 2; at @41 cut near-full-frame to the repai…",
+    "why": "The source receipt dies after the site shot. Three directions, scoring, the failed lane and the repair are built as separate illustrative beats, so narration has to supply causality. Prior typography fixes worsened this because names like “Paper” and “Depth” replaced proof with internal labels. (expected: Muted, the middle reads: source claim → three tests → one rejection → one repair → proof fra…",
+    "refs": []
   }
 ]
