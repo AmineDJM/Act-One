@@ -735,6 +735,53 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       }),
     } as SceneObject);
 
+    /*
+     * REVEALED THROUGH A MASK, not faded into place.
+     *
+     * Three consecutive comparisons against a reference named typography as an
+     * OBVIOUS gap and described the same difference each time: "B reveals text
+     * through masks with kinetic scaling", "A cuts to static white text". A
+     * fade is what type does when nobody decided anything; a wipe has an edge,
+     * and the edge is the event.
+     *
+     * The engine has had referential masks since the scene language was
+     * written and this film has never used one. The mask opens upward from the
+     * line's own baseline, so the words appear to rise out of the frame rather
+     * than to materialise on top of it — which is also the direction the
+     * staggered words are already travelling, so the two agree instead of
+     * fighting.
+     *
+     * Sized generously in width: a mask that clips the line horizontally would
+     * be a wipe, and a wipe across a sentence reads as a lower third.
+     */
+    objects.push({
+      kind: 'mask', id: `${beat.id}_reveal_${i}`, masks: [`${beat.id}_say_${i}`],
+      shape: 'rect',
+      width: 2,
+      height: {
+        keyframes: [
+          { t: 0, value: 0 },
+          { t: Math.max(0.001, shownFrom(phrase) / Math.max(0.01, beat.durationSeconds)), value: 0, curve: 'linear' },
+          { t: Math.min(0.98, (shownFrom(phrase) + 0.5) / Math.max(0.01, beat.durationSeconds)), value: 1.2, curve: 'in_out_cubic' },
+          { t: 1, value: 1.2 },
+        ],
+        // in_out_cubic for the same reason the scene transition needed it:
+        // out_quint is ninety percent done two fifths of the way through, so
+        // the edge that is supposed to BE the event passes before the eye
+        // finds it. A reveal has to be visible for the time it was given.
+        curve: 'in_out_cubic',
+      },
+      invert: false,
+      // A little softness on the edge: a hard clip on a glyph's baseline reads
+      // as a rendering error rather than as a reveal.
+      featherPx: 2,
+      role: 'structure', enterAt: 0,
+      reason: 'The line is revealed by an opening edge rather than faded up.',
+      transform: Transform.parse({
+        x: place.x, y: place.y + 0.16, anchor: { x: place.anchor, y: 1 },
+      }),
+    } as SceneObject);
+
     // A word arriving is an event, and an event has a sound.
     audio.push({
       at: phrase.atSeconds,

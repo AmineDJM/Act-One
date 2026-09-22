@@ -72,6 +72,15 @@ export type PlacedCue = {
 };
 
 export type SoundDirectionInput = {
+  /**
+   * Where the film turns, so the score's drop can land on it.
+   *
+   * Optional, and when it is absent the old scan runs. That scan cannot find
+   * anything in a scene-graph film, which is how this whole mechanism came to
+   * be dead code that ran on every render.
+   */
+  turnAtSeconds?: number;
+
   storyboard: Storyboard;
   /** From the creative system. */
   behaviour: {
@@ -174,7 +183,7 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
       ? {
           trackId: track.id,
           storageKey: track.storageKey,
-          startOffsetSeconds: chooseStartOffset(track, storyboard, enterAt),
+          startOffsetSeconds: chooseStartOffset(track, storyboard, enterAt, input.turnAtSeconds),
           enterAtSeconds: Number(enterAt.toFixed(3)),
           fadeInSeconds: input.behaviour.openOnMusic ? 0.8 : 1.6,
           /*
@@ -407,15 +416,30 @@ function pickTrack(candidates: MusicTrack[], filmSeconds: number, storyboard: St
  * Chooses where in the track to start so a natural drop lands on the film's
  * own turn — usually the first product scene.
  */
-function chooseStartOffset(track: MusicTrack, storyboard: Storyboard, enterAt: number): number {
+function chooseStartOffset(
+  track: MusicTrack,
+  storyboard: Storyboard,
+  enterAt: number,
+  turnAtSeconds?: number,
+): number {
   if (track.dropPoints.length === 0) return 0;
 
-  const turn = storyboard.scenes.find(
+  /*
+   * The caller's turn if it named one, otherwise the old scan.
+   *
+   * The scan looks for the first product scene, and a scene-graph film has
+   * none by construction — the bridge marks every scene `mixed_media` because
+   * a scene graph is not a recipe. So this returned 0 on every film this
+   * project has rendered, and the score started at the top of the track with
+   * its drop wherever the track happened to put it. Three separate readings
+   * called the music a passive bed that ignores the film's structure. It was.
+   */
+  const turnStart = turnAtSeconds ?? storyboard.scenes.find(
     (scene) => scene.visualType === 'product_ui' || scene.visualType === 'screenshot_motion',
-  );
-  if (!turn) return 0;
+  )?.startTime;
+  if (turnStart === undefined) return 0;
 
-  const wantedAt = turn.startTime - enterAt;
+  const wantedAt = turnStart - enterAt;
   if (wantedAt <= 0) return 0;
 
   const drop = [...track.dropPoints].sort(

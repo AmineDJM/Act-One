@@ -291,7 +291,26 @@ if (mixOnly) {
   console.log(`  rendered in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
 
+/*
+ * WHERE THIS FILM TURNS, told rather than guessed.
+ *
+ * The beat whose register is `land` and whose frame fills with the accent is
+ * the turn — "Take the waiting out." The sound director had been inferring it
+ * by scanning for the first product scene, which a scene-graph film never has,
+ * so the score's drop has never once been placed on anything. Three separate
+ * readings called the music a passive bed that ignores the structure; it was
+ * starting at the top of the track and landing its drop wherever the track
+ * happened to put it.
+ */
+const turnBeat = timed.find((beat) => beat.intent === 'land' && VISUALS[beat.id]?.kind === 'statement'
+  && (VISUALS[beat.id] as { field?: string | null }).field === PALETTE.accent);
+const turnAtSeconds = turnBeat ? turnBeat.atSeconds + (turnBeat.emphasisAtSeconds ?? 0) : undefined;
+if (turnAtSeconds !== undefined) {
+  console.log(`  the film turns at ${turnAtSeconds.toFixed(1)}s (${turnBeat!.id}); the score's drop is placed there.`);
+}
+
 const design = soundForScenes(scenes, {
+  ...(turnAtSeconds !== undefined ? { turnAtSeconds } : {}),
   behaviour: { musicCharacter: 'percussive', openOnMusic: false, uiSoundDensity: 'rhythmic', impactsOnCuts: true, endWithSting: true },
   channel: 'web', hasVoiceOver: true,
 });

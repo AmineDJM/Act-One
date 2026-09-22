@@ -31,6 +31,18 @@ export type SceneSoundOptions = {
   channel?: SoundDirectionInput['channel'];
   library?: SoundDirectionInput['library'];
   hasVoiceOver?: boolean;
+  /**
+   * Where the film turns, in seconds, so the score's drop can land on it.
+   *
+   * The director used to infer this by scanning for the first product scene,
+   * and for a scene-graph film it could never find one — the bridge below
+   * stamps every scene `mixed_media`, so the search returned nothing, the
+   * offset came back 0, and the drop-alignment code has run on every film
+   * ever made here without once aligning a drop. A caller that knows where
+   * its own turn is should say so rather than leave it to a heuristic that
+   * cannot see the film.
+   */
+  turnAtSeconds?: number;
 };
 
 /**
@@ -106,6 +118,7 @@ export function soundForScenes(scenes: SceneGraph[], options: SceneSoundOptions)
   return directSound({
     storyboard,
     behaviour: options.behaviour,
+    ...(options.turnAtSeconds !== undefined ? { turnAtSeconds: options.turnAtSeconds } : {}),
     ...(options.channel ? { channel: options.channel } : {}),
     ...(options.library ? { library: options.library } : {}),
     ...(options.hasVoiceOver === undefined ? {} : { hasVoiceOver: options.hasVoiceOver }),
