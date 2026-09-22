@@ -36,25 +36,36 @@ export function dialogueLeadArgs(plan: MixPlan, windows: VoiceWindow[]): string[
   const gate = `aselect='${select}',asetpts=N/SR/TB`;
 
   /*
-   * EVERY BUS NEEDS A SINK, including the ones this measurement ignores.
+   * THE BED IS EVERYTHING THAT IS NOT THE VOICE, AND IT USED TO BE THE MUSIC.
    *
-   * This graph reuses the mix's own bus graph and taps two of its busses. The
-   * effects bus is built there too — with `amix`, when there is more than one
-   * cue — and nothing here consumed it, so ffmpeg refused the whole graph with
-   * "Filter amix:default has an unconnected output" and the measurement
-   * returned null. Since a narrated film essentially always has effects cues,
-   * this failed on every real mix it was ever given: the pipeline's correction
-   * silently skipped, and the one film that is this project's acceptance
-   * criterion shipped with a bed nobody had metered. The unit test passed
-   * throughout, because its fixture has no cues and therefore no effects bus.
+   * This graph reuses the mix's own bus graph and taps its busses. The effects
+   * bus is built there too, and it was sent to `anullsink` — first because
+   * leaving it unconnected made ffmpeg refuse the whole graph, and then
+   * because this measurement was only ever asking about music. That second
+   * part was wrong, and quietly: a viewer does not hear a music bus and an
+   * effects bus, they hear the voice and everything under it. A check that
+   * certifies intelligibility while discarding half of what is playing is
+   * certifying a mix nobody listens to.
+   *
+   * Measured in the master it passed: the cues that land in a gap read +10 to
+   * +35 dB over the moment before them, and the cues that land WHILE THE VOICE
+   * IS SPEAKING read +0.7, -3.2 and +2.9. The worst is at 41.0s, which is the
+   * film's own turn. A model watching both films said ours "lacks sound
+   * effects for on-screen changes"; it is not wrong, and the meter that was
+   * supposed to notice was looking the other way.
+   *
+   * So the two are summed before the gate and metered as one. `normalize=0`
+   * because this is a sum and not an average — halving both busses to keep a
+   * peak would report a bed 6 dB quieter than the one playing.
    */
-  const spare = plan.busses.sfx ? `;[${plan.busses.sfx}]anullsink` : '';
+  const nonVoice = plan.busses.sfx
+    ? `[${plan.busses.music}][${plan.busses.sfx}]amix=inputs=2:duration=longest:normalize=0[nonvoice];[nonvoice]`
+    : `[${plan.busses.music}]`;
 
   const graph =
     `${plan.busGraph};` +
-    `[${plan.busses.music}]${gate},ebur128=peak=none[bed];` +
-    `[${plan.busses.voice}]${gate},ebur128=peak=none[voice]` +
-    spare;
+    `${nonVoice}${gate},ebur128=peak=none[bed];` +
+    `[${plan.busses.voice}]${gate},ebur128=peak=none[voice]`;
 
   const args: string[] = ['-hide_banner', '-nostdin'];
   for (const input of plan.inputs) args.push('-i', input.path);

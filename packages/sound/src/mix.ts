@@ -166,16 +166,67 @@ function buildFilterGraph(
 
   let duckedMusic = musicBus;
   let voiceToMix = voiceBus;
-  if (musicBus && voiceBus) {
+  let sfxToMix = sfxBus;
+
+  /*
+   * THE EFFECTS DUCK UNDER THE VOICE TOO, AND THEY DID NOT.
+   *
+   * The music has been sidechained to the narration since the beginning and
+   * the effects never were, on the reasoning that a cue is a transient and a
+   * transient does not mask. Measured, that is false. The sub drop's energy is
+   * -13 dB below 150 Hz and -18.9 dB between 150 Hz and 1 kHz — six decibels
+   * down, in the band where a voice's fundamental and first formants live.
+   *
+   * What that cost is specific: at 40.7s, on "Take the waiting out.", which is
+   * the line this whole film turns on, the voice led everything under it by
+   * 0.9 LU against a floor of 4. It has been shipping that way, and the check
+   * that exists to catch exactly this could not see it, because it metered the
+   * music alone. Taking the bed down 3.6 dB only reached 1.1 LU — the bed was
+   * never the thing in the way.
+   *
+   * Ducked rather than band-split. A crossover at 150 Hz to spare the sub and
+   * move only the mids is the more surgical answer and it sums through two
+   * filters whose phase does not cancel cleanly; a cue that arrives with a
+   * notch in it to protect a word has broken the cue to fix the word. A duck
+   * with a short release gives the word the mids and hands them straight back
+   * — which is what a dub stage does with an effects stem, and it means the
+   * drop blooms AFTER the line instead of underneath it.
+   */
+  const ducksMusic = Boolean(musicBus && voiceBus);
+  const ducksSfx = Boolean(sfxBus && voiceBus);
+  if (voiceBus && (ducksMusic || ducksSfx)) {
     /*
-     * The voice feeds two filters — the compressor's key and the mix — and a
-     * filter output can be consumed once. This used to hand the same label
-     * to both, and FFmpeg refused the graph: every film with narration would
+     * The voice feeds the mix and every compressor it keys, and a filter
+     * output can be consumed once. This used to hand the same label to two
+     * places, and FFmpeg refused the graph: every film with narration would
      * have failed to mix. No film ever had narration, so nobody saw it until
      * a test gave one a voice.
+     *
+     * The count is computed rather than fixed for the same reason, from the
+     * other side: an asplit output nobody consumes is refused just as hard as
+     * a label consumed twice.
      */
-    parts.push(`[${voiceBus}]asplit=2[voicekey][voicemix]`);
+    const keys = [...(ducksMusic ? ['[voicekey]'] : []), ...(ducksSfx ? ['[sfxkey]'] : [])];
+    parts.push(`[${voiceBus}]asplit=${keys.length + 1}${keys.join('')}[voicemix]`);
     voiceToMix = 'voicemix';
+  }
+  if (ducksSfx) {
+    /*
+     * Gentler and faster to let go than the music's.
+     *
+     * The bed is continuous and can afford to stay down through a sentence;
+     * a cue is an event and must not be flattened into one. Ratio 5 takes the
+     * masking out without taking the punctuation out, and a 180ms release —
+     * half the bed's — lets the tail come back up inside the pause rather
+     * than after it.
+     */
+    parts.push(
+      `[${sfxBus}][sfxkey]sidechaincompress=` +
+        'threshold=0.05:ratio=5:attack=4:release=180:makeup=1[sfxducked]',
+    );
+    sfxToMix = 'sfxducked';
+  }
+  if (ducksMusic) {
     // A real sidechain, not a static envelope: static ducking pumps audibly
     // every time the narration pauses for breath.
     /*
@@ -207,9 +258,9 @@ function buildFilterGraph(
   }
 
   const busGraph = parts.join(';');
-  const named = { music: duckedMusic, voice: voiceToMix, sfx: sfxBus };
+  const named = { music: duckedMusic, voice: voiceToMix, sfx: sfxToMix };
 
-  const busses = [duckedMusic, voiceToMix, sfxBus].filter((label): label is string => Boolean(label));
+  const busses = [duckedMusic, voiceToMix, sfxToMix].filter((label): label is string => Boolean(label));
   if (busses.length === 0) {
     // Silence still needs to be a real track, or the muxer drops the stream.
     parts.push(`anullsrc=r=48000:cl=stereo,atrim=duration=${fixed(duration)}[mixout]`);

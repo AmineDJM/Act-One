@@ -122,7 +122,7 @@ describe('dialogue lead', () => {
    * which is all of them. The suite never saw it because every fixture here
    * had `cues: []`.
    */
-  it('sinks the effects bus, so a mix with cues can actually be metered', async () => {
+  it('meters the effects bus WITH the bed, so a mix with cues is measured whole', async () => {
     const plan = buildMix({
       design: designWithCues(0),
       resolvedPaths: { bed: bedPath, tick: sfxPath },
@@ -131,14 +131,47 @@ describe('dialogue lead', () => {
     });
     expect(plan.busses.sfx, 'the fixture must actually build an effects bus').toBeTruthy();
 
-    const args = dialogueLeadArgs(plan, [{ atSeconds: 1, durationSeconds: 4 }])!;
-    expect(args.join(' ')).toContain('anullsink');
+    const args = dialogueLeadArgs(plan, [{ atSeconds: 1, durationSeconds: 4 }])!.join(' ');
+    // It used to be thrown away. A viewer does not hear busses, they hear the
+    // voice and everything under it.
+    expect(args).not.toContain('anullsink');
+    expect(args).toContain('[nonvoice]');
 
     // And the real proof: ffmpeg accepts it and both meters report.
     const lead = await measureDialogueLead(plan, [{ atSeconds: 1, durationSeconds: 4 }]);
     expect(lead, 'a mix with effects cues must still be measurable').not.toBeNull();
     expect(Number.isFinite(lead!.leadLu)).toBe(true);
   }, 60_000);
+
+  /*
+   * THE DEFECT THE OLD METER COULD NOT SEE.
+   *
+   * With the effects bus discarded, a film could bury its narration under
+   * cues and still be certified: only the music was weighed. Measured in the
+   * finished film, the cues landing while the voice speaks read +0.7, -3.2 and
+   * +2.9 dB over the moment before them — inaudible — while the ones landing
+   * in a gap read +10 to +35. Raising the cues to fix that is exactly the
+   * change the old meter would have waved through, whatever it cost the words.
+   *
+   * So: same bed, same voice, louder effects must measure a SHORTER lead.
+   */
+  it('reports a shorter lead when the effects get louder, with the bed unchanged', async () => {
+    const windows = [{ atSeconds: 1, durationSeconds: 4 }];
+    const measure = async (cueGainDb: number) => {
+      const design = designWithCues(0);
+      const plan = buildMix({
+        design: { ...design, cues: design.cues.map((c) => ({ ...c, gainDb: cueGainDb })) },
+        resolvedPaths: { bed: bedPath, tick: sfxPath },
+        voiceTracks: [{ path: voicePath, atSeconds: 1, durationSeconds: 4 }],
+        durationSeconds: 6,
+      });
+      return (await measureDialogueLead(plan, windows))!;
+    };
+
+    const quiet = await measure(-40);
+    const loud = await measure(0);
+    expect(loud.leadLu).toBeLessThan(quiet.leadLu);
+  }, 120_000);
 
   it('says WHY it could not measure, rather than returning a bare null', async () => {
     const noVoice = buildMix({
