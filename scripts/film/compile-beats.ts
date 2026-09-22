@@ -965,7 +965,17 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    * takes nothing away from the picture it sits on.
    */
   const captionOutline = groundIsPicture
-    ? { color: palette.ink, widthPx: 1.6, hollow: false }
+    ? { color: palette.ink, widthPx: 2.4, hollow: false }
+    : null;
+  /*
+   * A contact edge, not a halo. Radius 2.5 at strength 0.35 puts the shadows
+   * at 0.9px and 2.4px — closer to the glyph than the stroke is wide, so it
+   * grounds the letters on bright material without putting any haze in the
+   * frame. It is the difference between type that is legible on white and
+   * type that looks like it belongs there.
+   */
+  const captionEdge = groundIsPicture
+    ? { color: palette.ink, radiusPx: 2.5, strength: 0.35 }
     : null;
 
   // A row becomes one drawn caption, or two when the ground moves under it.
@@ -999,7 +1009,7 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
       // competes with the headline.
       token: 'body',
       color: colour,
-      treatment: { gradient: null, stroke: captionOutline, glow: null },
+      treatment: { gradient: null, stroke: captionOutline, glow: captionEdge },
       align: 'center', maxWidth: 0.7, maxLines: 2,
       staggerBy: 'none', staggerSeconds: 0,
       spoken: true,
