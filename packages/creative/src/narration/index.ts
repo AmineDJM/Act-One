@@ -8,3 +8,4 @@ export * from './align.ts';
 export * from './spoken-word.ts';
 export * from './av-beat.ts';
 export * from './intent.ts';
+export * from './subtitles.ts';

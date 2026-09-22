@@ -177,6 +177,16 @@ export function emphasisSpan(words: readonly SpokenWord[], emphasis: string): Sp
   return null;
 }
 
+/** A word with no meaning of its own, which therefore belongs to what follows. */
+const HANDOVER_WORDS = new Set([
+  'it', 'its', 'is', 'was', 'be', 'and', 'or', 'but', 'so', 'the', 'a', 'an',
+  'of', 'to', 'that', 'this', 'we', 'you', 'they', 'he', 'she', 'in', 'on',
+  'at', 'for', 'as', 'has', 'have', 'had',
+]);
+
+/** A word with its punctuation and case removed, for comparison only. */
+const bareWord = (word: string): string => word.toLowerCase().replace(/[^a-z']/g, '');
+
 /** Breaks a reading where the voice breathes. */
 export function phrasesOf(
   words: readonly SpokenWord[],
@@ -215,7 +225,25 @@ export function phrasesOf(
      * when the field arrives on it. This is the one place where the layout
      * overrides the breathing.
      */
-    if (word === first && current.length) close();
+    if (word === first && current.length) {
+      /*
+       * A dangling function word goes WITH the emphasis, not before it.
+       *
+       * "Contrast, loudness, timing. It" / "fails itself first." is where the
+       * break landed, and it is wrong in both layers at once: the caption ends
+       * on a word that means nothing yet, and the editorial line starts
+       * mid-clause. Handing the trailing word across gives "Contrast,
+       * loudness, timing." / "It fails itself first." — two readable units.
+       *
+       * At most one word, and only if the phrase keeps three, so "it has" is
+       * left alone rather than hollowed out to "it".
+       */
+      const trailing = current[current.length - 1]!;
+      const handOver = current.length >= 3 && HANDOVER_WORDS.has(bareWord(trailing.word));
+      if (handOver) current.pop();
+      close();
+      if (handOver) current.push(trailing);
+    }
     current.push(word);
     const next = words[i + 1];
     const gap = next ? next.startSeconds - word.endSeconds : Infinity;

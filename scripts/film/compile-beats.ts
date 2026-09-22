@@ -13,7 +13,7 @@
  * present.
  */
 import { SceneGraph, Transform, type SceneObject } from '@act-one/core';
-import { performanceFor, type TimedBeat } from '@act-one/creative';
+import { performanceFor, subtitlesFollow, subtitlesFor, type TimedBeat } from '@act-one/creative';
 
 export type Palette = {
   ink: string;
@@ -596,8 +596,21 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
    *
    * A short lead rather than zero, so the cut and the type are not one event.
    */
-  const shownFrom = (phrase: { atSeconds: number }) =>
-    editorial === '' ? phrase.atSeconds : Math.min(phrase.atSeconds, beat.voiceAtSeconds * 0.5 + 0.12);
+  /*
+   * NOTHING ON SCREEN LEADS THE VOICE. NOTHING.
+   *
+   * This led the editorial phrase to fill the seconds before it was spoken,
+   * and it was solving a real problem the wrong way: with only the turn phrase
+   * shown, the frame sat empty until late in the beat. But the biggest text on
+   * screen IS what a viewer reads as the caption, and leading it by two
+   * seconds means the film shows you "not made yet." while the narrator is
+   * still on "Every company has a film". That is the subtitles not following
+   * the voice, however the layer is labelled internally.
+   *
+   * The dead air is the subtitle track's job and it now has one. So the
+   * editorial arrives on its own word, like everything else.
+   */
+  const shownFrom = (phrase: { atSeconds: number }) => phrase.atSeconds;
 
   (shown.length > 0 || editorial === '' ? shown : beat.phrases.slice(-1)).forEach((phrase, i) => {
     const hero = phrase.carriesEmphasis;
@@ -792,6 +805,93 @@ function compileBeat(beat: TimedBeat, index: number, all: readonly TimedBeat[], 
     });
   });
 
+  /*
+   * THE SUBTITLE TRACK. Every spoken phrase, on its own measured second.
+   *
+   * THIS WAS DELETED BY ACCIDENT AND IT IS THE ONE THING THAT MUST NOT DRIFT.
+   * Building the editorial layer, I filtered the on-screen text down to the
+   * turning phrase and pulled it EARLIER than it is spoken, so the words a
+   * viewer reads stopped being the words being said. That was right for the
+   * editorial layer and it silently removed the other one: the brief has
+   * always asked for three separate things — narration, subtitles, editorial
+   * copy — and I collapsed three into one rather than building the third
+   * alongside.
+   *
+   * So this is the subtitle layer, and it is literal. Every phrase the reading
+   * produced, at `phrase.atSeconds`, gone at the next one. Not the emphasis
+   * only. Not led. Not styled. It comes from the word timings of the
+   * performance itself, so it cannot say anything the voice did not say, or
+   * say it at a second the voice did not say it.
+   *
+   * It is deliberately subordinate: small, centred, in the same place on every
+   * beat. A subtitle that competes with the editorial line is a second
+   * headline; a subtitle nobody notices until they need it is doing its job.
+   * The reference film does exactly this — enormous editorial type with a
+   * quiet burnt-in caption beneath it.
+   *
+   * `spoken: true` keeps the reading-speed check off it: this text is heard,
+   * not read, and it is paced by a performance rather than by a designer.
+   */
+  /*
+   * The rows come from `subtitlesFor`, not from a loop written here.
+   *
+   * That function is in `@act-one/creative` with tests that encode BOTH ways
+   * this has broken — the emphasis-only filter and the early lead — and it
+   * takes no argument that could reintroduce either. Building the rows inline
+   * again is how the rule got lost the first two times: the code read as care
+   * taken by whoever was editing, and care is not a contract. This file now
+   * only decides how a row LOOKS; what it says and when is decided upstream
+   * and is checked by `subtitlesFollow` before anything is drawn.
+   */
+  const subtitleRows = subtitlesFor(beat.phrases, beat.durationSeconds);
+  const subtitlesAreHonest = subtitlesFollow(subtitleRows, beat.phrases);
+  if (!subtitlesAreHonest.ok) {
+    // Loud on purpose. A silent subtitle fault survived two full renders.
+    throw new Error(`Beat ${beat.id}: subtitles do not follow the voice — ${subtitlesAreHonest.why}`);
+  }
+
+  subtitleRows.forEach((row, i) => {
+    objects.push({
+      kind: 'text', id: `${beat.id}_sub_${i}`, content: row.text,
+      /*
+       * Body rather than caption, and ink on a light field.
+       *
+       * At the smallest step in the scale it rendered as a grey smudge along
+       * the bottom edge — present, and unreadable, which is the worst of both.
+       * A subtitle has one job. It also has to survive the one beat whose
+       * frame fills with paper, where white on white is nothing at all.
+       */
+      // Body: readable, and clearly subordinate to the editorial line. The
+      // smallest step in the scale rendered as a smudge; the statement step
+      // competes with the headline.
+      token: 'body',
+      color: fieldColour && luminance(fieldColour) > 0.45 ? palette.ink : palette.paper,
+      align: 'center', maxWidth: 0.7, maxLines: 2,
+      staggerBy: 'none', staggerSeconds: 0,
+      spoken: true,
+      role: 'structure',
+      enterAt: row.atSeconds,
+      exitAt: row.untilSeconds,
+      reason: `Subtitle: "${row.text}", at the second it is spoken.`,
+      transform: Transform.parse({
+        /*
+         * NEGATIVE z, AND THIS IS THE SECOND TIME THIS TRAP HAS BEEN WALKED
+         * INTO. Painter's order sorts by z DESCENDING — furthest first — so a
+         * POSITIVE z is further back. At 0.05 the subtitle sorted ahead of the
+         * page at 0, which means the page was drawn over it: the text was
+         * rendered, correctly timed, and then covered, arriving as a dim grey
+         * smear that looked like a colour or opacity fault and was neither.
+         *
+         * The caption band did exactly this once before, at z 0.1, and the
+         * comment recording it is a few hundred lines above. A subtitle is the
+         * one thing in the frame that must never be behind anything.
+         */
+        x: 0.5, y: 0.905, z: -0.5, anchor: { x: 0.5, y: 0.5 },
+        opacity: { keyframes: [{ t: 0, value: 0 }, { t: 0.05, value: 0.95, curve: 'out_cubic' }, { t: 1, value: 0.95 }], curve: 'out_cubic' },
+      }),
+    } as SceneObject);
+  });
+
   // Room tone under a wordless beat, so silence is a decision and not a hole.
   if (!beat.phrases.length) {
     audio.push({ at: 0.05, kind: 'texture', intensity: 0.45, causedBy: `${beat.id}_light`, reason: beat.reason });
@@ -878,7 +978,7 @@ function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
      * crop opens up at the top.
      */
     return variant === 0
-      ? { x: 0.5, top: 0.88, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 }
+      ? { x: 0.5, top: 0.80, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 }
       : { x: 0.5, top: 0.115, lineGap: 0.1, anchor: 0.5, width: 0.72, heroScale: 1.1 };
   }
   if (visual.kind === 'clip' || visual.kind === 'product') {
@@ -894,7 +994,7 @@ function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
      * band it reads as a deliberate lower third rather than a margin somebody
      * guessed.
      */
-    return { x: 0.5, top: 0.88, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 };
+    return { x: 0.5, top: 0.80, lineGap: 0.1, anchor: 0.5, width: 0.78, heroScale: 1.05 };
   }
   if (visual.kind === 'mark') {
     /*
@@ -935,9 +1035,9 @@ function compositionFor(beat: TimedBeat, variant: number, visual: BeatVisual): {
      * goes under all of it.
      */
     if (visual.focus !== undefined) {
-      return { x: 0.5, top: 0.90, lineGap: 0.08, anchor: 0.5, width: 0.82, heroScale: 1 };
+      return { x: 0.5, top: 0.82, lineGap: 0.08, anchor: 0.5, width: 0.82, heroScale: 1 };
     }
-    return { x: 0.5, top: 0.78, lineGap: 0.085, anchor: 0.5, width: 0.9, heroScale: 1 };
+    return { x: 0.5, top: 0.72, lineGap: 0.085, anchor: 0.5, width: 0.9, heroScale: 1 };
   }
   if (visual.kind === 'fields') {
     // Inside the first field, and narrow enough to stay in it. The earlier

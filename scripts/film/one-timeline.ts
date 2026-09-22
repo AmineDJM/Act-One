@@ -19,7 +19,7 @@ import path from 'node:path';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { BrandSystem, DIALOGUE_LEAD_MIN, inspectScenes } from '@act-one/core';
-import { layout, performanceFor, type BeatIntent, type SpokenWord } from '@act-one/creative';
+import { layout, performanceFor, subtitlesFor, type BeatIntent, type SpokenWord } from '@act-one/creative';
 import { neutralRamp } from '@act-one/design';
 import { EASINGS, renderScenes } from '@act-one/motion';
 import {
@@ -217,6 +217,19 @@ for (const beat of timed) {
   const emphasis = beat.emphasisAtSeconds !== null ? ` emphasis@${beat.emphasisAtSeconds.toFixed(2)}s` : '';
   console.log(`  ${beat.id.padEnd(4)} ${beat.atSeconds.toFixed(1).padStart(5)}s +${beat.durationSeconds.toFixed(2)}s  ${beat.phrases.length} phrase(s)${emphasis}`);
   for (const phrase of beat.phrases) console.log(`        "${phrase.text}" @${phrase.atSeconds.toFixed(2)}s${phrase.carriesEmphasis ? '  <- the word' : ''}`);
+  /*
+   * The subtitle track is PRINTED, because it has broken twice unnoticed.
+   *
+   * Phrases are what the editorial layer composes from; captions are what a
+   * viewer reads, and the two are allowed to differ. Every time they drifted
+   * apart wrongly it was invisible until somebody watched the film. Now the
+   * run that builds the film also shows what it will say, with how long each
+   * line is on screen, so a flash or a lead is visible before a frame renders.
+   */
+  for (const row of subtitlesFor(beat.phrases, beat.durationSeconds)) {
+    const held = row.untilSeconds - row.atSeconds;
+    console.log(`     cc "${row.text}" @${row.atSeconds.toFixed(2)}s for ${held.toFixed(2)}s`);
+  }
 }
 
 const scenes = compileBeats(timed, { palette: PALETTE, visuals: VISUALS, assets: ASSETS });
