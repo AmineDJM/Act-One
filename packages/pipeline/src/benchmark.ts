@@ -210,6 +210,7 @@ export async function runBenchmarkJob(deps: RunnerDeps, job: Job, signal?: Abort
       workDir,
       ffmpeg: overrides.ffmpeg ?? (await resolveFfmpeg()),
       checkpoints: storageCheckpoints(storage, keys.checkpoints!),
+      filmSha256: started.source.sha256,
       gemini,
       recognizer,
       context: { organizationId: PLATFORM_ORGANIZATION_ID, projectId: null, signal: controller.signal },

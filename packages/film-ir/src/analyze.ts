@@ -48,6 +48,12 @@ export type AnalyzeOptions = {
   context: CallContext;
   /** Stages to run again even if a checkpoint exists. */
   redo?: AnalyzeStage[];
+  /**
+   * The film's SHA-256, when the caller already has it. Checkpoints whose
+   * measurements were made from other bytes describe another film, so none
+   * of them is used.
+   */
+  filmSha256?: string;
   onStage?: (stage: AnalyzeStage, state: 'started' | 'completed' | 'failed' | 'skipped', detail?: string) => Promise<void> | void;
   onProgress?: (stage: AnalyzeStage, progress: number, message: string) => void;
 };
@@ -61,9 +67,19 @@ export type AnalyzeResult = {
 
 export const EXPECTED_PASSES = [...PASSES.map((pass) => pass.id), 'integrator'];
 
+/** Every stage whose result is kept between attempts, each derived from the one before. */
+const CHECKPOINTED_STAGES: AnalyzeStage[] = ['forensics', 'transcription', 'upload', 'passes'];
+
 export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResult> {
   await mkdir(options.workDir, { recursive: true });
   const redo = new Set(options.redo ?? []);
+  if (options.filmSha256) {
+    const measured = await options.checkpoints.get<{ input?: { sha256?: string } }>('forensics');
+    if (measured && measured.input?.sha256 !== options.filmSha256) {
+      console.warn(`[film-ir] ${options.id}: the checkpoints were made from other bytes (${measured.input?.sha256?.slice(0, 12) ?? 'unknown'}…, not ${options.filmSha256.slice(0, 12)}…); analysing from the start`);
+      for (const name of CHECKPOINTED_STAGES) redo.add(name);
+    }
+  }
   const stage = async <T>(name: AnalyzeStage, checkpoint: string | null, work: () => Promise<T>): Promise<T> => {
     if (checkpoint && !redo.has(name)) {
       const existing = await options.checkpoints.get<T>(checkpoint);
