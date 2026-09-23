@@ -19,324 +19,83 @@ Hold ground saturation at 0%. Push accent saturation to 95%.
 
 ## The type
 
-- neo-grotesque, weights 400/600 — Set primary statements, body copy, and captions.
-- mono, weights 700 — Set background repeating text grids.
+- neo-grotesque, weights 400/500 — Set primary statements, body copy, and captions.
+- mono, weights 400 — Set background texture and cascading emphasis.
 
-- **display** — 15% of frame height, tracking -0.02em, line height 1, Sentence, max 1 lines (see 3.5s)
-- **body** — 6% of frame height, tracking 0em, line height 1.2, Sentence, max 2 lines (see 1.2s)
-- **caption** — 3% of frame height, tracking 0.02em, line height 1, lowercase, max 1 lines (see 38s)
+- **statement** — 15% of frame height, tracking -0.02em, line height 1.1, Sentence, max 1 lines (see 3.5s)
+- **display** — 12% of frame height, tracking 0.05em, line height 1, UPPERCASE, max 5 lines (see 15s)
+- **body** — 8% of frame height, tracking 0em, line height 1.2, Sentence, max 2 lines (see 1s)
+- **caption** — 3% of frame height, tracking 0em, line height 1.4, Sentence, max 1 lines (see 36s)
 
-Type enters by Type on characters sequentially or scale from 80% to 100% while fading opacity from 0% to 100%. over 0.5s on `out_expo`, staggered 0.03s per letter; it leaves by Fade opacity from 100% to 0%. over 0.3s. Does it ever sit still: **no**.
+Type enters by Reveal characters sequentially from left to right. over 1.5s on `linear`, staggered 0.04s per letter; it leaves by Cut opacity to 0% instantly. over 0s. Does it ever sit still: **yes**.
 
 ## The camera and the motion
 
-- 0s — static 0% over 2.5s on `none`
-- 2.5s — zoom 150% over 3s on `ease_in_out_quad`, because transition to next scene
-- 5.5s — static 0% over 3.5s on `none`
-- 9s — tilt 50% over 2s on `ease_out_cubic`, because reveal of glowing orb
-- 11s — zoom 200% over 3s on `ease_in_expo`, because transition to fast-paced montage
-- 14s — static 0% over 8s on `none`
-- 22s — zoom 50% over 1s on `ease_out_quad`, because reveal of pill-shaped UI element
-- 23s — orbit 180% over 4s on `ease_in_out_sine`, because showcase multiple UI elements in 3D space
-- 27s — zoom 300% over 3s on `ease_in_expo`, because transition to final scene
-- 30s — static 0% over 10s on `none`
+- 0s — static 0% over 5s on `none`, because Hold on typography.
+- 5s — tilt 25% over 6s on `in_out_sine`, because Follow line drawing upwards to reveal orb.
+- 11s — zoom 200% over 3s on `in_expo`, because Push through the orb to transition scenes.
+- 14s — static 0% over 8s on `none`, because Hold on UI cards and typography.
+- 22s — orbit 45% over 5s on `out_cubic`, because Reveal Z-depth array of pill objects.
+- 27s — zoom 500% over 4s on `in_expo`, because Push through the glowing line to transition to end card.
+- 31s — static 0% over 10s on `none`, because Hold on final logo and URL.
 
-Something is always moving: **yes**. subtle fluid-like animations in the background gradients and continuous drawing of the white line
-- `ease_in_out_quad` on camera zooms and UI element scaling, typically 1.5s
-- `ease_out_cubic` on text reveals and camera tilts, typically 1s
-- `ease_in_expo` on fast transitions between scenes, typically 0.5s
-- `linear` on continuous background animations, typically 5s
+Something is always moving: **yes**. Shift gradient mesh nodes at 10% frame width per second.
+- `out_expo` on Typography reveals and UI card entrances., typically 1.5s
+- `linear` on Gradient texture shifts and continuous line drawing., typically 10s
+- `in_expo` on Camera zooms for scene transitions., typically 3s
 
 ## The transitions
 
-- 2.5s — zoom_through over 1s on `ease_in_expo`, caused by zooming into the text 'faster'
-- 5.5s — cut over 0s on `none`, caused by none
-- 11s — zoom_through over 1s on `ease_in_expo`, caused by zooming into the glowing orb
-- 14s — glitch over 0.5s on `linear`, caused by distortion of the glowing orb
-- 22s — cut over 0s on `none`, caused by none
-- 27s — zoom_through over 1s on `ease_in_expo`, caused by zooming into the array of UI elements
-- 30s — fade over 1s on `ease_in_out_quad`, caused by none
+- 3.1s — hard_cut over 0s on `none`, caused by None.
+- 5s — hard_cut over 0s on `none`, caused by None.
+- 14s — displacement_glitch over 0.5s on `in_expo`, caused by Orb scales to 200% frame width, triggering RGB split.
+- 19s — hard_cut over 0s on `none`, caused by None.
+- 22s — hard_cut over 0s on `none`, caused by None.
+- 27s — hard_cut over 0s on `none`, caused by None.
+- 31s — additive_fade over 1s on `linear`, caused by Glowing line scales to 100% frame height, blowing out exposure.
 
 ## Dimension
 
-**Yes.** the pill-shaped UI elements and the glowing orb Lit by single overhead spotlight with a soft falloff, creating a dramatic, high-contrast look; materials glass-like material for the UI elements with internal fluid animations, and an emissive material for the glowing orb; perspective 50mm. adds depth and complexity to the visual representation of the technologies being discussed
+**Yes.** Render spherical orb at 11.00s and pill-shaped capsules at 22.00s. Lit by Set ambient light to 0%. Place 100% intensity point lights inside geometry. Add 80% intensity directional rim light at 90 degrees.; materials Apply 90% transmission glass to outer shells. Apply 100% emission to inner fluid meshes.; perspective 50mm. Translates abstract investment concepts into measurable spatial arrays.
 
 ## The cut and the sound
 
-19 cuts, average shot 2.05s (0.5s–8s). Cuts on the beat: **yes**. Decrease shot duration to 0.50s during lists, increase to 8.00s for resolutions.
+6 cuts, average shot 4.1s (0.95s–10s). Cuts on the beat: **yes**. Decrease shot duration by 50% during the middle section (14.00s to 20.00s), then hold the final shot for 10.00s.
 
-Music at 120 BPM in D minor, bed -18 LUFS, master -14 LUFS, sidechained to the voice: **yes**.
-- 0s — ambient drone
-- 14s — rhythmic pulse
-- 22s — riser
-- 30s — climax
-- digital glitches × 15, about 10 dB below the voice
-- low frequency impacts × 3, about 2 dB below the voice
+Music at 65 BPM in C minor, bed -18 LUFS, master -14 LUFS, sidechained to the voice: **yes**.
+- 0s — Apply a low-pass filter at 400Hz to an ambient drone.
+- 3.1s — Introduce quarter-note synth bass hits.
+- 14s — Add a 16th-note arpeggiator layer.
+- 22s — Open the low-pass filter to 5000Hz to widen the spectrum.
+- 31s — Mute all percussion and arpeggiators; sustain the root note drone.
+- Digital typing × 2, about 12 dB below the voice
+- Low-frequency whoosh × 2, about 6 dB below the voice
+- UI interface pop × 8, about 10 dB below the voice
 
-Voice: baritone, 106 wpm, median pause 0.8s, leading the bed by 4 LU.
-- 14s — measured → urgent, match 0.50s cut rate
-- 27s — urgent → reverent, deliver core thesis
+Voice: Baritone, 120 wpm, median pause 0.8s, leading the bed by 4 LU.
+- 0s — neutral → authoritative, Deliver initial thesis statement.
+- 14s — authoritative → staccato, Punctuate the list of technology sectors.
+- 22s — staccato → intense, Emphasize the ambition of the target audience.
 
-**Sync rule.** Snap hard cuts to 120 BPM grid transients. Tolerance 0.04s. Flash screen to 100% white for 0.08s, trigger 40Hz sub-boom.
+**Sync rule.** Snap visual cuts and UI element reveals to the quarter-note grid of the music track. Tolerance 0.04s. Cut to a full-screen white flash at 31.00s and instantly mute all rhythmic audio stems.
 
 ## What it never does
 
-- Center all primary text horizontally at 50% of frame width.
-- Restrict color palette to #FFFFFF text on #111111 backgrounds, using #FF0055 and #0044FF exclusively for gradient accents.
-- Maintain voiceover pacing at 130 WPM with -14 LUFS integrated loudness.
+- Center all primary text blocks at 50% frame width and 50% frame height.
+- Hold ground saturation at 0% and push accent saturation to 95%.
+- Reveal characters sequentially from left to right at 0.04s intervals.
 
 ## What a weaker studio would get wrong
 
-- T
-- h
-- e
--  
-- 3
-- D
--  
-- p
-- i
-- l
-- l
--  
-- c
-- a
-- s
-- c
-- a
-- d
-- e
--  
-- (
-- 2
-- 2
-- .
-- 0
-- 0
-- s
-- -
-- 2
-- 7
-- .
-- 0
-- 0
-- s
-- )
-- .
--  
-- W
-- e
-- a
-- k
-- e
-- r
--  
-- s
-- t
-- u
-- d
-- i
-- o
-- s
--  
-- w
-- i
-- l
-- l
--  
-- f
-- a
-- i
-- l
--  
-- t
-- h
-- e
--  
-- d
-- e
-- p
-- t
-- h
--  
-- o
-- f
--  
-- f
-- i
-- e
-- l
-- d
--  
-- (
-- f
-- /
-- 2
-- .
-- 8
--  
-- e
-- q
-- u
-- i
-- v
-- a
-- l
-- e
-- n
-- t
--  
-- b
-- l
-- u
-- r
--  
-- o
-- n
--  
-- b
-- a
-- c
-- k
-- g
-- r
-- o
-- u
-- n
-- d
--  
-- p
-- i
-- l
-- l
-- s
-- )
--  
-- a
-- n
-- d
--  
-- t
-- h
-- e
--  
-- p
-- r
-- e
-- c
-- i
-- s
-- e
--  
-- 4
-- 5
-- -
-- d
-- e
-- g
-- r
-- e
-- e
--  
-- s
-- p
-- a
-- t
-- i
-- a
-- l
--  
-- d
-- i
-- s
-- t
-- r
-- i
-- b
-- u
-- t
-- i
-- o
-- n
-- ,
--  
-- r
-- e
-- s
-- u
-- l
-- t
-- i
-- n
-- g
--  
-- i
-- n
--  
-- a
--  
-- f
-- l
-- a
-- t
--  
-- 2
-- D
--  
-- a
-- r
-- r
-- a
-- y
--  
-- i
-- n
-- s
-- t
-- e
-- a
-- d
--  
-- o
-- f
--  
-- a
--  
-- v
-- o
-- l
-- u
-- m
-- e
-- t
-- r
-- i
-- c
--  
-- 3
-- D
--  
-- t
-- u
-- n
-- n
-- e
-- l
-- .
+- Executing the 0.50s displacement glitch at 14.00s while maintaining the 21:1 contrast ratio and seamlessly transitioning from the 200% camera zoom into the rapid 40% frame width UI card sequence without dropping the 24fps frame rate.
 
 ## The recipe
 
-1. Set project resolution to 1920x1080, 30fps. Set base background to #111111.
-2. 0.00s-0.02s: Type '{We invest in te}' at 50% frame width, 50% frame height, 48px font size, over 2.00s.
-3. 0.02s-0.05s: Flash 3 horizontal bands (100% width, 30% height) with #0044FF to #FF0055 gradients. Scale text 'Faster.', 'Smarter.', 'Stronger.' from 100% to 115% over 1.00s each using ease_out_cubic.
-4. 0.05s-0.11s: Draw a continuous 2px #FFFFFF line forming a human profile at 50% width, 50% height over 6.00s. Drop a 300px circular gradient orb from -20% height to 20% height.
-5. 0.11s-0.14s: Animate two 400px hand vectors reaching toward the center orb. Apply a 0.20s displacement map glitch effect at 13.00s.
-6. 0.14s-0.19s: Tile background with 64px monospace text. Overlay 800x450px glassmorphism cards (20px background blur, 10% opacity white fill) containing 3D renders. Cycle cards every 1.25s.
-7. 0.19s-0.22s: Cascade the word 'NOW' vertically down the Y-axis from 20% to 80% height in 0.50s increments.
-8. 0.22s-0.27s: Generate 3D pill shapes (400x150px). Extrude 50px. Map #0044FF/#FF0055 gradients. Multiply to 20 instances, align along a 45-degree Z-axis diagonal, and rotate camera -30 degrees on Y-axis.
-9. 0.27s-0.31s: Draw a 4px horizontal line at 50% height. Scale Y from 4px to 1080px over 4.00s using ease_in_expo, filling the screen with a #A020F0 to #FFC0CB gradient.
-10. 0.31s-0.40s: Fade to #111111. Morph SVG paths to form 'augment.' logo at 50% width, 40% height over 1.50s. Type subtitle at 55% height over 2.00s. Fade in 'www.augment.fund' at 80% height at 38.00s.
-11. Audio: Mix voiceover to -14 LUFS. Add 60 BPM ambient synth bed at -24 LUFS. Layer 0.10s digital glitch SFX at 13.00s and 14.00s at -18 LUFS.
+1. Set ground to #0A0A0A. Type '{We invest in te}' at 50% frame width, 50% frame height. Reveal letters at 0.04s intervals. At 3.10s, execute a 0.00s hard cut to 'Faster.' over a 100% frame width gradient bar driven by #0033FF.
+2. At 5.00s, execute a 0.00s hard cut to #0A0A0A ground. Draw a 2px (inferred) #FFFFFF continuous line from 50% frame width, 100% frame height, forming a face profile. Tilt camera up 25% over 6.00s on in_out_sine to reveal a 30% frame width (inferred) orb.
+3. At 11.00s, zoom camera 200% over 3.00s on in_expo. At 14.00s, apply a 0.50s displacement glitch. Display 40% frame width (inferred) UI cards at 50% frame width, 50% frame height. Flash mono text in background at 100% frame width.
+4. At 22.00s, orbit camera 45 degrees over 5.00s on out_cubic to reveal an array of 3D pill shapes. Apply 5% blur radius to pills beyond 200% Z-depth. At 27.00s, display a 100% frame width horizontal glowing line. Zoom camera 500% over 4.00s on in_expo.
+5. At 31.00s, cut to #0A0A0A ground. Reveal 'augment.' logo at 50% frame width, 50% frame height. Shift logo gradient mesh nodes at 10% frame width per second. Type tagline at 55% frame height (inferred). Type URL at 50% frame width, 90% frame height at 34.00s.
 
 ## The timeline
 

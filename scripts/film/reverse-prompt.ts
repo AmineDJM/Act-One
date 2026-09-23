@@ -33,6 +33,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { GeminiVideoAnalyst } from '@act-one/providers';
 import { readModelJson } from '@act-one/qa';
 
@@ -335,8 +336,34 @@ const startedAt = Date.now();
  * behind is a reading paid for twice. The file on disk is also the only way to
  * see WHAT the model said when the JSON is wrong.
  */
-async function run(name: string, prompt: string, maxOutputTokens: number, window?: { from: number; to: number }) {
-  const raw = path.join(RAW, `${id}.${name}.txt`);
+/*
+ * A window pass is cached against the SYSTEM IT WAS ASKED UNDER.
+ *
+ * The system passes were rerun to stop them contradicting each other, and the
+ * timeline passes stayed in the cache — so the document came back with its
+ * sound section saying 120 words per minute and its own timeline saying 130.
+ * The contradiction I had just removed reappeared one level down, because a
+ * cache keyed only on the question serves an answer to a different one.
+ *
+ * Eight characters of the system's hash in the filename is enough: change the
+ * system and every window is asked again; change nothing and nothing is
+ * re-bought. The system passes have no such key on purpose — they are what the
+ * hash is taken OF.
+ */
+function keyFor(name: string, against?: Record<string, unknown>): string {
+  if (!against || Object.keys(against).length === 0) return name;
+  const hash = createHash('sha256').update(JSON.stringify(against)).digest('hex').slice(0, 8);
+  return `${name}.${hash}`;
+}
+
+async function run(
+  name: string,
+  prompt: string,
+  maxOutputTokens: number,
+  window?: { from: number; to: number },
+  against?: Record<string, unknown>,
+) {
+  const raw = path.join(RAW, `${id}.${keyFor(name, against)}.txt`);
   /*
    * A pass already paid for is never paid for again.
    *
@@ -412,7 +439,7 @@ console.log(`  the timeline, in ${windows.length} window(s)`);
 const events: unknown[] = [];
 const seconds: unknown[] = [];
 for (const w of windows) {
-  const e = (await run(`events-${w.from}-${w.to}`, windowEvents(w.from, w.to, system), 16_384, w)) as {
+  const e = (await run(`events-${w.from}-${w.to}`, windowEvents(w.from, w.to, system), 16_384, w, system)) as {
     events?: unknown[];
   };
   events.push(...(e.events ?? []));
@@ -483,8 +510,20 @@ console.log(
  * one letter long. The schema is a request, not a guarantee, and every place
  * that walks a model's array has to survive being handed a string instead.
  */
-const asList = (value: unknown): string[] =>
-  Array.isArray(value) ? value.map(String) : typeof value === 'string' && value.trim() ? [value] : [];
+/*
+ * A declaration, not a const, and that is load-bearing.
+ *
+ * This file runs its work at the top level and keeps its helpers at the
+ * bottom. `asBrief` is hoisted and can be called from above; a `const` arrow
+ * is not, so the first run after this was written died on "Cannot access
+ * 'asList' before initialization" — after every pass had already been paid
+ * for. The cache is what made that cost nothing.
+ */
+function asList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string' && value.trim()) return [value];
+  return [];
+}
 
 /** The document as a brief: the same facts, in the order somebody builds in. */
 function asBrief(doc: {
@@ -631,7 +670,7 @@ function asBrief(doc: {
   out.push(`**Sync rule.** ${num(sy.rule)} Tolerance ${num(sy.toleranceSeconds, 's')}. ${sy.whatHappensOnTheLoudestHit ?? ''}`);
   out.push('');
 
-  out.push('## What it never does');
+  out.push('## What it does every single time');
   out.push('');
   for (const r of asList(sys['rulesItNeverBreaks'])) out.push(`- ${r}`);
   out.push('');

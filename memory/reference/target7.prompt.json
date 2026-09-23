@@ -5,7 +5,7 @@
     "durationSeconds": 40.98
   },
   "model": "gemini-3.1-pro-preview",
-  "analysedAt": "2026-09-23T15:26:20.951Z",
+  "analysedAt": "2026-09-23T15:33:20.148Z",
   "windowSeconds": 20,
   "system": {
     "identity": {
@@ -70,80 +70,89 @@
           "classification": "neo-grotesque",
           "weights": [
             400,
-            600
+            500
           ],
           "usedFor": "Set primary statements, body copy, and captions."
         },
         {
           "classification": "mono",
           "weights": [
-            700
+            400
           ],
-          "usedFor": "Set background repeating text grids."
+          "usedFor": "Set background texture and cascading emphasis."
         }
       ],
       "scale": [
         {
-          "role": "display",
+          "role": "statement",
           "sizePercentOfFrameHeight": 15,
           "trackingEm": -0.02,
-          "lineHeight": 1,
+          "lineHeight": 1.1,
           "case": "Sentence",
           "maxLines": 1,
           "exampleWordsAtSeconds": 3.5
         },
         {
+          "role": "display",
+          "sizePercentOfFrameHeight": 12,
+          "trackingEm": 0.05,
+          "lineHeight": 1,
+          "case": "UPPERCASE",
+          "maxLines": 5,
+          "exampleWordsAtSeconds": 15
+        },
+        {
           "role": "body",
-          "sizePercentOfFrameHeight": 6,
+          "sizePercentOfFrameHeight": 8,
           "trackingEm": 0,
           "lineHeight": 1.2,
           "case": "Sentence",
           "maxLines": 2,
-          "exampleWordsAtSeconds": 1.2
+          "exampleWordsAtSeconds": 1
         },
         {
           "role": "caption",
           "sizePercentOfFrameHeight": 3,
-          "trackingEm": 0.02,
-          "lineHeight": 1,
-          "case": "lowercase",
+          "trackingEm": 0,
+          "lineHeight": 1.4,
+          "case": "Sentence",
           "maxLines": 1,
-          "exampleWordsAtSeconds": 38
+          "exampleWordsAtSeconds": 36
         }
       ],
       "setting": {
         "alignment": "center",
         "maxMeasurePercentOfFrameWidth": 80,
-        "opticalNotes": "Align text blocks to absolute center. Ignore ascenders and descenders for vertical centering."
+        "opticalNotes": "Center all text blocks at 50% frame width and 50% frame height."
       }
     },
     "layout": {
       "gridColumns": 12,
-      "marginPercentOfFrameWidth": 10,
+      "marginPercentOfFrameWidth": 5,
       "anchorsUsed": [
         {
           "xPercent": 50,
           "yPercent": 50,
-          "whatSitsThere": "Place primary statements and body copy.",
-          "howOftenUsed": 85
+          "whatSitsThere": "Anchor primary text and central visual elements.",
+          "howOftenUsed": 15
         },
         {
           "xPercent": 50,
           "yPercent": 90,
-          "whatSitsThere": "Place URL and footer captions.",
-          "howOftenUsed": 15
+          "whatSitsThere": "Anchor website URL.",
+          "howOftenUsed": 1
         }
       ]
     },
     "typeInMotion": {
-      "entrance": "Type on characters sequentially or scale from 80% to 100% while fading opacity from 0% to 100%.",
-      "entranceDurationSeconds": 0.5,
-      "entranceEasing": "out_expo",
-      "staggerSecondsBetweenUnits": 0.03,
+      "entrance": "Reveal characters sequentially from left to right.",
+      "entranceDurationSeconds": 1.5,
+      "entranceEasing": "linear",
+      "staggerSecondsBetweenUnits": 0.04,
       "staggerUnit": "letter",
-      "exit": "Fade opacity from 100% to 0%.",
-      "exitDurationSeconds": 0.3,
-      "doesTypeEverSitStill": false
+      "exit": "Cut opacity to 0% instantly.",
+      "exitDurationSeconds": 0,
+      "doesTypeEverSitStill": true
     },
     "camera": {
       "moves": [
@@ -151,41 +160,25 @@
           "atSeconds": 0,
           "kind": "static",
           "amplitudePercent": 0,
-          "durationSeconds": 2.5,
+          "durationSeconds": 5,
           "easing": "none",
-          "whatMotivatesIt": "none"
+          "whatMotivatesIt": "Hold on typography."
         },
         {
-          "atSeconds": 2.5,
-          "kind": "zoom",
-          "amplitudePercent": 150,
-          "durationSeconds": 3,
-          "easing": "ease_in_out_quad",
-          "whatMotivatesIt": "transition to next scene"
-        },
-        {
-          "atSeconds": 5.5,
-          "kind": "static",
-          "amplitudePercent": 0,
-          "durationSeconds": 3.5,
-          "easing": "none",
-          "whatMotivatesIt": "none"
-        },
-        {
-          "atSeconds": 9,
+          "atSeconds": 5,
           "kind": "tilt",
-          "amplitudePercent": 50,
-          "durationSeconds": 2,
-          "easing": "ease_out_cubic",
-          "whatMotivatesIt": "reveal of glowing orb"
+          "amplitudePercent": 25,
+          "durationSeconds": 6,
+          "easing": "in_out_sine",
+          "whatMotivatesIt": "Follow line drawing upwards to reveal orb."
         },
         {
           "atSeconds": 11,
           "kind": "zoom",
           "amplitudePercent": 200,
           "durationSeconds": 3,
-          "easing": "ease_in_expo",
-          "whatMotivatesIt": "transition to fast-paced montage"
+          "easing": "in_expo",
+          "whatMotivatesIt": "Push through the orb to transition scenes."
         },
         {
           "atSeconds": 14,
@@ -193,169 +186,160 @@
           "amplitudePercent": 0,
           "durationSeconds": 8,
           "easing": "none",
-          "whatMotivatesIt": "none"
+          "whatMotivatesIt": "Hold on UI cards and typography."
         },
         {
           "atSeconds": 22,
-          "kind": "zoom",
-          "amplitudePercent": 50,
-          "durationSeconds": 1,
-          "easing": "ease_out_quad",
-          "whatMotivatesIt": "reveal of pill-shaped UI element"
-        },
-        {
-          "atSeconds": 23,
           "kind": "orbit",
-          "amplitudePercent": 180,
-          "durationSeconds": 4,
-          "easing": "ease_in_out_sine",
-          "whatMotivatesIt": "showcase multiple UI elements in 3D space"
+          "amplitudePercent": 45,
+          "durationSeconds": 5,
+          "easing": "out_cubic",
+          "whatMotivatesIt": "Reveal Z-depth array of pill objects."
         },
         {
           "atSeconds": 27,
           "kind": "zoom",
-          "amplitudePercent": 300,
-          "durationSeconds": 3,
-          "easing": "ease_in_expo",
-          "whatMotivatesIt": "transition to final scene"
+          "amplitudePercent": 500,
+          "durationSeconds": 4,
+          "easing": "in_expo",
+          "whatMotivatesIt": "Push through the glowing line to transition to end card."
         },
         {
-          "atSeconds": 30,
+          "atSeconds": 31,
           "kind": "static",
           "amplitudePercent": 0,
           "durationSeconds": 10,
           "easing": "none",
-          "whatMotivatesIt": "none"
+          "whatMotivatesIt": "Hold on final logo and URL."
         }
       ],
-      "lensFeelMm": 35,
-      "depthOfFieldNote": "shallow depth of field used during the 3D orbit sequence to focus on the central UI elements",
+      "lensFeelMm": 50,
+      "depthOfFieldNote": "Apply 5% blur radius to objects exceeding 200% Z-depth distance from focal point at 22.00s.",
       "shakeAmplitudePercent": 0,
-      "isAnythingEverCompletelyStill": true
+      "isAnythingEverCompletelyStill": false
     },
     "motion": {
       "easingsUsed": [
         {
-          "name": "ease_in_out_quad",
-          "appliedTo": "camera zooms and UI element scaling",
+          "name": "out_expo",
+          "appliedTo": "Typography reveals and UI card entrances.",
           "typicalDurationSeconds": 1.5
         },
         {
-          "name": "ease_out_cubic",
-          "appliedTo": "text reveals and camera tilts",
-          "typicalDurationSeconds": 1
-        },
-        {
-          "name": "ease_in_expo",
-          "appliedTo": "fast transitions between scenes",
-          "typicalDurationSeconds": 0.5
-        },
-        {
           "name": "linear",
-          "appliedTo": "continuous background animations",
-          "typicalDurationSeconds": 5
+          "appliedTo": "Gradient texture shifts and continuous line drawing.",
+          "typicalDurationSeconds": 10
+        },
+        {
+          "name": "in_expo",
+          "appliedTo": "Camera zooms for scene transitions.",
+          "typicalDurationSeconds": 3
         }
       ],
       "somethingAlwaysMoving": true,
-      "idleMotionDescription": "subtle fluid-like animations in the background gradients and continuous drawing of the white line",
-      "velocityProfile": "starts slow, builds to a fast-paced montage in the middle, and ends with a slow, deliberate reveal"
+      "idleMotionDescription": "Shift gradient mesh nodes at 10% frame width per second.",
+      "velocityProfile": "Accelerate to 100% velocity at 15% of duration, decelerate to 0% over the remaining 85%."
     },
     "transitions": [
       {
-        "atSeconds": 2.5,
-        "kind": "zoom_through",
-        "durationSeconds": 1,
-        "causedByWhatIsAlreadyOnScreen": "zooming into the text 'faster'",
-        "easing": "ease_in_expo"
-      },
-      {
-        "atSeconds": 5.5,
-        "kind": "cut",
+        "atSeconds": 3.1,
+        "kind": "hard_cut",
         "durationSeconds": 0,
-        "causedByWhatIsAlreadyOnScreen": "none",
+        "causedByWhatIsAlreadyOnScreen": "None.",
         "easing": "none"
       },
       {
-        "atSeconds": 11,
-        "kind": "zoom_through",
-        "durationSeconds": 1,
-        "causedByWhatIsAlreadyOnScreen": "zooming into the glowing orb",
-        "easing": "ease_in_expo"
+        "atSeconds": 5,
+        "kind": "hard_cut",
+        "durationSeconds": 0,
+        "causedByWhatIsAlreadyOnScreen": "None.",
+        "easing": "none"
       },
       {
         "atSeconds": 14,
-        "kind": "glitch",
+        "kind": "displacement_glitch",
         "durationSeconds": 0.5,
-        "causedByWhatIsAlreadyOnScreen": "distortion of the glowing orb",
-        "easing": "linear"
+        "causedByWhatIsAlreadyOnScreen": "Orb scales to 200% frame width, triggering RGB split.",
+        "easing": "in_expo"
+      },
+      {
+        "atSeconds": 19,
+        "kind": "hard_cut",
+        "durationSeconds": 0,
+        "causedByWhatIsAlreadyOnScreen": "None.",
+        "easing": "none"
       },
       {
         "atSeconds": 22,
-        "kind": "cut",
+        "kind": "hard_cut",
         "durationSeconds": 0,
-        "causedByWhatIsAlreadyOnScreen": "none",
+        "causedByWhatIsAlreadyOnScreen": "None.",
         "easing": "none"
       },
       {
         "atSeconds": 27,
-        "kind": "zoom_through",
-        "durationSeconds": 1,
-        "causedByWhatIsAlreadyOnScreen": "zooming into the array of UI elements",
-        "easing": "ease_in_expo"
+        "kind": "hard_cut",
+        "durationSeconds": 0,
+        "causedByWhatIsAlreadyOnScreen": "None.",
+        "easing": "none"
       },
       {
-        "atSeconds": 30,
-        "kind": "fade",
+        "atSeconds": 31,
+        "kind": "additive_fade",
         "durationSeconds": 1,
-        "causedByWhatIsAlreadyOnScreen": "none",
-        "easing": "ease_in_out_quad"
+        "causedByWhatIsAlreadyOnScreen": "Glowing line scales to 100% frame height, blowing out exposure.",
+        "easing": "linear"
       }
     ],
     "threeD": {
       "present": true,
-      "whatIsDimensional": "the pill-shaped UI elements and the glowing orb",
-      "lightingSetup": "single overhead spotlight with a soft falloff, creating a dramatic, high-contrast look",
-      "materials": "glass-like material for the UI elements with internal fluid animations, and an emissive material for the glowing orb",
+      "whatIsDimensional": "Render spherical orb at 11.00s and pill-shaped capsules at 22.00s.",
+      "lightingSetup": "Set ambient light to 0%. Place 100% intensity point lights inside geometry. Add 80% intensity directional rim light at 90 degrees.",
+      "materials": "Apply 90% transmission glass to outer shells. Apply 100% emission to inner fluid meshes.",
       "cameraPerspectiveMm": 50,
       "atSecondsExamples": [
         11,
-        23
+        22
       ],
-      "whyItEarnsItsPlace": "adds depth and complexity to the visual representation of the technologies being discussed"
+      "whyItEarnsItsPlace": "Translates abstract investment concepts into measurable spatial arrays."
     },
     "ui": {
       "present": true,
-      "howProductIsShown": "pill-shaped elements containing text and icons, arranged in a 3D array",
-      "cropOrFraming": "centered, taking up 60% of the frame width",
-      "annotationStyle": "minimalist sans-serif text, white on dark backgrounds or dark on light backgrounds"
+      "howProductIsShown": "Render 16:9 image cards at 60% frame width. Stack 3 cards in Z-depth.",
+      "cropOrFraming": "Center cards at 50% X and 50% Y.",
+      "annotationStyle": "Draw 1px white circle at 50% X, 50% Y. Set radius to 15% frame height."
     },
     "editing": {
-      "cutCount": 19,
-      "averageShotSeconds": 2.05,
-      "shortestShotSeconds": 0.5,
-      "longestShotSeconds": 8,
-      "rhythmRule": "Decrease shot duration to 0.50s during lists, increase to 8.00s for resolutions.",
+      "cutCount": 6,
+      "averageShotSeconds": 4.1,
+      "shortestShotSeconds": 0.95,
+      "longestShotSeconds": 10,
+      "rhythmRule": "Decrease shot duration by 50% during the middle section (14.00s to 20.00s), then hold the final shot for 10.00s.",
       "cutsOnTheBeat": true
     },
     "sound": {
-      "musicBpm": 120,
-      "musicKey": "D minor",
+      "musicBpm": 65,
+      "musicKey": "C minor",
       "musicStructure": [
         {
           "atSeconds": 0,
-          "section": "ambient drone"
+          "section": "Apply a low-pass filter at 400Hz to an ambient drone."
+        },
+        {
+          "atSeconds": 3.1,
+          "section": "Introduce quarter-note synth bass hits."
         },
         {
           "atSeconds": 14,
-          "section": "rhythmic pulse"
+          "section": "Add a 16th-note arpeggiator layer."
         },
         {
           "atSeconds": 22,
-          "section": "riser"
+          "section": "Open the low-pass filter to 5000Hz to widen the spectrum."
         },
         {
-          "atSeconds": 30,
-          "section": "climax"
+          "atSeconds": 31,
+          "section": "Mute all percussion and arpeggiators; sustain the root note drone."
         }
       ],
       "bedLufs": -18,
@@ -363,114 +347,123 @@
       "sidechainedToVoice": true,
       "sfxFamilies": [
         {
-          "family": "digital glitches",
-          "countInFilm": 15,
-          "typicalLevelDbBelowVoice": 10,
+          "family": "Digital typing",
+          "countInFilm": 2,
+          "typicalLevelDbBelowVoice": 12,
           "atSecondsExamples": [
             0,
-            14,
-            25
+            34
           ]
         },
         {
-          "family": "low frequency impacts",
-          "countInFilm": 3,
-          "typicalLevelDbBelowVoice": 2,
+          "family": "Low-frequency whoosh",
+          "countInFilm": 2,
+          "typicalLevelDbBelowVoice": 6,
           "atSecondsExamples": [
-            14,
-            21,
-            30
+            11,
+            27
+          ]
+        },
+        {
+          "family": "UI interface pop",
+          "countInFilm": 8,
+          "typicalLevelDbBelowVoice": 10,
+          "atSecondsExamples": [
+            14.5,
+            15.5,
+            16.5
           ]
         }
       ]
     },
     "voice": {
       "present": true,
-      "register": "baritone",
-      "wordsPerMinute": 106,
+      "register": "Baritone",
+      "wordsPerMinute": 120,
       "medianPauseSeconds": 0.8,
       "leadOverBedLu": 4,
       "toneChanges": [
         {
-          "atSeconds": 14,
-          "from": "measured",
-          "to": "urgent",
-          "whyThere": "match 0.50s cut rate"
+          "atSeconds": 0,
+          "from": "neutral",
+          "to": "authoritative",
+          "whyThere": "Deliver initial thesis statement."
         },
         {
-          "atSeconds": 27,
-          "from": "urgent",
-          "to": "reverent",
-          "whyThere": "deliver core thesis"
+          "atSeconds": 14,
+          "from": "authoritative",
+          "to": "staccato",
+          "whyThere": "Punctuate the list of technology sectors."
+        },
+        {
+          "atSeconds": 22,
+          "from": "staccato",
+          "to": "intense",
+          "whyThere": "Emphasize the ambition of the target audience."
         }
       ]
     },
     "sync": {
-      "rule": "Snap hard cuts to 120 BPM grid transients.",
+      "rule": "Snap visual cuts and UI element reveals to the quarter-note grid of the music track.",
       "toleranceSeconds": 0.04,
       "examplesAtSeconds": [
-        14,
-        18,
-        21,
-        30
+        3.1,
+        4.05,
+        5,
+        15,
+        22
       ],
-      "whatHappensOnTheLoudestHit": "Flash screen to 100% white for 0.08s, trigger 40Hz sub-boom."
+      "whatHappensOnTheLoudestHit": "Cut to a full-screen white flash at 31.00s and instantly mute all rhythmic audio stems."
     },
     "structure": {
       "beats": [
         {
           "atSeconds": 0,
           "untilSeconds": 5,
-          "job": "Establish thesis",
-          "whatChanges": "Transitions from 48px monochrome typing to 100% width gradient bands with scaling text."
+          "job": "Establish typography and gradient palette.",
+          "whatChanges": "Text reveals sequentially, then cuts to full-width gradient bars."
         },
         {
           "atSeconds": 5,
           "untilSeconds": 14,
-          "job": "Introduce human element",
-          "whatChanges": "Shifts to 2px continuous line drawing and 2D vector hands interacting with a 300px gradient orb."
+          "job": "Introduce continuous line and 3D orb.",
+          "whatChanges": "Camera tilts up 25%, hands reach for orb, camera zooms 200%."
         },
         {
           "atSeconds": 14,
           "untilSeconds": 22,
-          "job": "List investment sectors",
-          "whatChanges": "Rapid 1.25s cuts of 800x450px glassmorphism cards over tiled monospace background text."
+          "job": "Deliver core investment sectors.",
+          "whatChanges": "Displacement glitch triggers rapid UI card sequence and cascading text."
         },
         {
           "atSeconds": 22,
           "untilSeconds": 31,
-          "job": "Demonstrate scale",
-          "whatChanges": "Introduces 3D extruded pill shapes multiplying along a 45-degree Z-axis, ending in a 100% Y-axis gradient scale."
+          "job": "Visualize scale and transition to end card.",
+          "whatChanges": "Camera orbits 45 degrees around 3D pills, then zooms 500% through a horizontal line."
         },
         {
           "atSeconds": 31,
-          "untilSeconds": 40,
-          "job": "Deliver brand identity",
-          "whatChanges": "Fades to #111111 for 1.50s SVG path morph of the logo and 2.00s subtitle typing."
+          "untilSeconds": 41,
+          "job": "Resolve brand identity.",
+          "whatChanges": "Static hold on logo, tagline, and URL with continuous gradient shift."
         }
       ],
       "turnAtSeconds": 14,
-      "callToActionAtSeconds": 38
+      "callToActionAtSeconds": 34
     },
     "rulesItNeverBreaks": [
-      "Center all primary text horizontally at 50% of frame width.",
-      "Restrict color palette to #FFFFFF text on #111111 backgrounds, using #FF0055 and #0044FF exclusively for gradient accents.",
-      "Maintain voiceover pacing at 130 WPM with -14 LUFS integrated loudness."
+      "Center all primary text blocks at 50% frame width and 50% frame height.",
+      "Hold ground saturation at 0% and push accent saturation to 95%.",
+      "Reveal characters sequentially from left to right at 0.04s intervals."
     ],
     "recipe": [
-      "Set project resolution to 1920x1080, 30fps. Set base background to #111111.",
-      "0.00s-0.02s: Type '{We invest in te}' at 50% frame width, 50% frame height, 48px font size, over 2.00s.",
-      "0.02s-0.05s: Flash 3 horizontal bands (100% width, 30% height) with #0044FF to #FF0055 gradients. Scale text 'Faster.', 'Smarter.', 'Stronger.' from 100% to 115% over 1.00s each using ease_out_cubic.",
-      "0.05s-0.11s: Draw a continuous 2px #FFFFFF line forming a human profile at 50% width, 50% height over 6.00s. Drop a 300px circular gradient orb from -20% height to 20% height.",
-      "0.11s-0.14s: Animate two 400px hand vectors reaching toward the center orb. Apply a 0.20s displacement map glitch effect at 13.00s.",
-      "0.14s-0.19s: Tile background with 64px monospace text. Overlay 800x450px glassmorphism cards (20px background blur, 10% opacity white fill) containing 3D renders. Cycle cards every 1.25s.",
-      "0.19s-0.22s: Cascade the word 'NOW' vertically down the Y-axis from 20% to 80% height in 0.50s increments.",
-      "0.22s-0.27s: Generate 3D pill shapes (400x150px). Extrude 50px. Map #0044FF/#FF0055 gradients. Multiply to 20 instances, align along a 45-degree Z-axis diagonal, and rotate camera -30 degrees on Y-axis.",
-      "0.27s-0.31s: Draw a 4px horizontal line at 50% height. Scale Y from 4px to 1080px over 4.00s using ease_in_expo, filling the screen with a #A020F0 to #FFC0CB gradient.",
-      "0.31s-0.40s: Fade to #111111. Morph SVG paths to form 'augment.' logo at 50% width, 40% height over 1.50s. Type subtitle at 55% height over 2.00s. Fade in 'www.augment.fund' at 80% height at 38.00s.",
-      "Audio: Mix voiceover to -14 LUFS. Add 60 BPM ambient synth bed at -24 LUFS. Layer 0.10s digital glitch SFX at 13.00s and 14.00s at -18 LUFS."
+      "Set ground to #0A0A0A. Type '{We invest in te}' at 50% frame width, 50% frame height. Reveal letters at 0.04s intervals. At 3.10s, execute a 0.00s hard cut to 'Faster.' over a 100% frame width gradient bar driven by #0033FF.",
+      "At 5.00s, execute a 0.00s hard cut to #0A0A0A ground. Draw a 2px (inferred) #FFFFFF continuous line from 50% frame width, 100% frame height, forming a face profile. Tilt camera up 25% over 6.00s on in_out_sine to reveal a 30% frame width (inferred) orb.",
+      "At 11.00s, zoom camera 200% over 3.00s on in_expo. At 14.00s, apply a 0.50s displacement glitch. Display 40% frame width (inferred) UI cards at 50% frame width, 50% frame height. Flash mono text in background at 100% frame width.",
+      "At 22.00s, orbit camera 45 degrees over 5.00s on out_cubic to reveal an array of 3D pill shapes. Apply 5% blur radius to pills beyond 200% Z-depth. At 27.00s, display a 100% frame width horizontal glowing line. Zoom camera 500% over 4.00s on in_expo.",
+      "At 31.00s, cut to #0A0A0A ground. Reveal 'augment.' logo at 50% frame width, 50% frame height. Shift logo gradient mesh nodes at 10% frame width per second. Type tagline at 55% frame height (inferred). Type URL at 50% frame width, 90% frame height at 34.00s."
     ],
-    "whatWouldBeHardestToCopy": "The 3D pill cascade (22.00s-27.00s). Weaker studios will fail the depth of field (f/2.8 equivalent blur on background pills) and the precise 45-degree spatial distribution, resulting in a flat 2D array instead of a volumetric 3D tunnel."
+    "whatWouldBeHardestToCopy": "Executing the 0.50s displacement glitch at 14.00s while maintaining the 21:1 contrast ratio and seamlessly transitioning from the 200% camera zoom into the rapid 40% frame width UI card sequence without dropping the 24fps frame rate."
   },
   "events": [
     {
