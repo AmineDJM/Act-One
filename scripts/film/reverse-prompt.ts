@@ -271,6 +271,33 @@ const systemPass = (pass: Pass, established: Record<string, unknown>): string =>
  * `events` and a half-second sampling of the same twenty seconds is one answer
  * that spends its whole budget thinking; asked separately, both arrive.
  */
+/*
+ * What a timeline pass needs from the system, and nothing else.
+ *
+ * The whole system was handed over — nineteen sections, five thousand
+ * characters — and every events pass then failed at about 135 seconds, the
+ * same number the sampling pass used to fail at. It is the same cause: a
+ * bigger question is more thinking, and thinking happens before the first byte
+ * the gateway is waiting for.
+ *
+ * It was also the wrong context. A pass describing what happens between 20s
+ * and 40s does not need the recipe or the editing statistics; it needs the
+ * vocabulary to be consistent with — which hexes exist, what the type steps
+ * are called, which easings the film uses, what sound is allowed to land on.
+ * Cutting it to that made the answer arrive AND made it agree with the rest.
+ */
+const vocabularyOf = (system: Record<string, any>) => ({
+  palette: (system['palette'] ?? []).map((c: any) => `${c.hex} (${c.role})`),
+  typeSteps: (system['typography']?.scale ?? []).map(
+    (t: any) => `${t.role} at ${t.sizePercentOfFrameHeight}% of frame height`,
+  ),
+  easings: (system['motion']?.easingsUsed ?? []).map((e: any) => e.name),
+  musicBpm: system['sound']?.musicBpm,
+  syncRule: system['sync']?.rule,
+  voiceWordsPerMinute: system['voice']?.wordsPerMinute,
+  somethingAlwaysMoving: system['motion']?.somethingAlwaysMoving,
+});
+
 const windowEvents = (from: number, to: number, system: unknown): string =>
   [
     RULES,
@@ -278,8 +305,9 @@ const windowEvents = (from: number, to: number, system: unknown): string =>
     `THIS PASS: every discrete thing that HAPPENS between ${from.toFixed(2)}s and ${to.toFixed(2)}s.`,
     'Times are absolute seconds in the whole film, not offsets into the window.',
     '',
-    'You already described this film\'s system. Use it, do not repeat it:',
-    JSON.stringify(system).slice(0, 5000),
+    'The vocabulary already established for this film. Use these exact values where they',
+    'apply; do not invent a second name or a second number for the same thing:',
+    JSON.stringify(vocabularyOf(system as Record<string, any>)),
     '',
     'A cut, a word arriving, a colour changing, a hit landing, a camera starting or stopping,',
     'a shape growing — however small. If two things happen at the same second, list both.',
@@ -439,7 +467,7 @@ console.log(`  the timeline, in ${windows.length} window(s)`);
 const events: unknown[] = [];
 const seconds: unknown[] = [];
 for (const w of windows) {
-  const e = (await run(`events-${w.from}-${w.to}`, windowEvents(w.from, w.to, system), 16_384, w, system)) as {
+  const e = (await run(`events-${w.from}-${w.to}`, windowEvents(w.from, w.to, system), 16_384, w, vocabularyOf(system) as Record<string, unknown>)) as {
     events?: unknown[];
   };
   events.push(...(e.events ?? []));
