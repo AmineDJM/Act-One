@@ -128,7 +128,7 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
   const stageFailures: string[] = [];
   const nonFatal = (name: AnalyzeStage) => (error: unknown): null => {
     if (options.context.signal?.aborted) throw error;
-    stageFailures.push(`${name}: ${((error as Error).message ?? String(error)).slice(0, 300)}`);
+    stageFailures.push(`${name}: ${oneLine((error as Error).message ?? String(error)).slice(0, 300)}`);
     return null;
   };
 
@@ -221,7 +221,7 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
       const failed = Object.values(records).filter((record) => record.status !== 'completed');
       return failed.length === 0
         ? null
-        : `${failed.length} of ${EXPECTED_PASSES.length} passes failed; retrying runs only these: ${failed.map((record) => `${record.id} (${(record.error ?? 'failed').slice(0, 120)})`).join('; ')}`;
+        : `${failed.length} of ${EXPECTED_PASSES.length} passes failed; retrying runs only these: ${failed.map((record) => `${record.id} (${oneLine(record.error ?? 'failed').slice(0, 160)})`).join('; ')}`;
     });
   }
 
@@ -246,6 +246,11 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
   await options.onStage?.('validate', 'completed', validation.status);
   const costUsd = Object.values(passes).reduce((sum, record) => sum + (record.costUsd ?? 0), 0);
   return { document, validation, passes, costUsd };
+}
+
+/** A provider's error on one line: they often carry the service's JSON body, indented. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 /** A file-system checkpoint store: one JSON file per checkpoint, for the command line and tests. */
