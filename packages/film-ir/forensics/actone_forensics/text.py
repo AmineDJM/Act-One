@@ -83,34 +83,50 @@ def _iou(a, b):
 
 
 def link(ocr_frames, stride, width):
-    """Readings into line tracks."""
+    """
+    Readings into line tracks.
+
+    Only tracks read within the last three strides are candidates, and a
+    reading's words are compared with a track's only where their boxes
+    overlap or sit near each other — the only pairs that can link. A screen
+    of interface text otherwise compares every reading with every line the
+    film has shown, letter by letter.
+    """
     tracks = []
+    open_tracks = []
     for entry in ocr_frames:
         frame = entry["frame"]
+        # A track not read for three strides is closed for good: nothing is added to it again.
+        open_tracks = [index for index in open_tracks if frame - tracks[index]["lastFrame"] <= 3 * stride]
         claimed = set()
         for line in entry["lines"]:
             box = _bbox(line["poly"])
             best, best_score = None, 0.0
-            for index, track in enumerate(tracks):
-                if index in claimed or frame - track["lastFrame"] > 3 * stride:
+            for index in open_tracks:
+                if index in claimed:
                     continue
+                track = tracks[index]
                 last = track["readings"][-1]
-                last_box = _bbox(last["poly"])
+                last_box = track["lastBox"]
                 iou = _iou(box, last_box)
+                distance = math.hypot((box[0] + box[2] / 2) - (last_box[0] + last_box[2] / 2), (box[1] + box[3] / 2) - (last_box[1] + last_box[3] / 2)) / width
+                if iou < 0.3 and distance >= 0.15:
+                    continue
                 similarity = text_similarity(line["text"], last["text"])
                 a, b = normalise_text(line["text"]), normalise_text(last["text"])
                 growing = min(len(a), len(b)) >= 3 and (a.startswith(b) or b.startswith(a))
-                distance = math.hypot((box[0] + box[2] / 2) - (last_box[0] + last_box[2] / 2), (box[1] + box[3] / 2) - (last_box[1] + last_box[3] / 2)) / width
                 if (iou >= 0.3 or (similarity >= 0.9 and distance < 0.15)) and (similarity >= 0.7 or growing):
                     score = iou + similarity
                     if score > best_score:
                         best, best_score = index, score
             if best is None:
-                tracks.append({"readings": [dict(line, frame=frame)], "lastFrame": frame})
+                tracks.append({"readings": [dict(line, frame=frame)], "lastFrame": frame, "lastBox": box})
+                open_tracks.append(len(tracks) - 1)
                 claimed.add(len(tracks) - 1)
             else:
                 tracks[best]["readings"].append(dict(line, frame=frame))
                 tracks[best]["lastFrame"] = frame
+                tracks[best]["lastBox"] = box
                 claimed.add(best)
     kept = []
     for track in tracks:
@@ -177,24 +193,27 @@ def merge_row_fragments(lines, stride):
     for members in by_frame.values():
         for i in members:
             for j in members:
-                if i == j or (i, j) in checked:
+                # Each pair once: which piece is on the left is decided by the boxes, not the order.
+                if i >= j or (i, j) in checked:
                     continue
                 checked.add((i, j))
-                common = sorted(set(boxes[i]) & set(boxes[j]))
-                if len(common) < needed:
-                    continue
                 a, b = lines[i], lines[j]
                 # Pieces of one line arrive and leave together; interface text
                 # side by side on a screen does too, but is not read as one
                 # string of words with a word's gap between them.
                 if abs(a["firstRead"] - b["firstRead"]) > 2 * stride or abs(a["lastRead"] - b["lastRead"]) > 2 * stride:
                     continue
-                if text_similarity(a["text"], b["text"]) >= 0.8:
+                common = sorted(set(boxes[i]) & set(boxes[j]))
+                if len(common) < needed:
                     continue
                 frame = common[len(common) // 2]
                 left, right = (i, j) if boxes[i][frame][0] <= boxes[j][frame][0] else (j, i)
-                if _row_neighbours(boxes[left][frame], boxes[right][frame], _shared_edge(lines[left]["text"], lines[right]["text"])):
-                    parent[find(i)] = find(j)
+                # Where they sit is cheap to compare; their words, letter by letter, are compared only then.
+                if not _row_neighbours(boxes[left][frame], boxes[right][frame], _shared_edge(lines[left]["text"], lines[right]["text"])):
+                    continue
+                if text_similarity(a["text"], b["text"]) >= 0.8:
+                    continue
+                parent[find(i)] = find(j)
     groups = {}
     for index in range(len(lines)):
         groups.setdefault(find(index), []).append(index)
@@ -916,6 +935,37 @@ class Refiner:
     def windows(self):
         return [state["window"] for state in self.state if state is not None]
 
+    @staticmethod
+    def _near_last(state, grey, template):
+        """
+        The line where it was on the frame before, when it is still there.
+
+        The full search spans a quarter of the frame's width either side, for
+        a line that moves; most lines, most of the time, hold still, and are
+        found within half their height of where they were. That match is
+        taken only when it is trusted and not at the edge of the small window
+        — a line moving further than that is looked for across the whole
+        search, as before. Near where it was, too, a line is not mistaken for
+        the same words elsewhere on the screen.
+        """
+        last = state.get("last")
+        if last is None:
+            return None
+        th, tw = template.shape
+        margin_x, margin_y = max(4, th // 2), max(3, th // 2)
+        lx, ly = last
+        x0, y0 = max(0, lx - margin_x), max(0, ly - margin_y)
+        x1, y1 = min(grey.shape[1], lx + tw + margin_x), min(grey.shape[0], ly + th + margin_y)
+        region = grey[y0:y1, x0:x1]
+        if region.shape[0] < th or region.shape[1] < tw:
+            return None
+        scores = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
+        _, best, _, (mx, my) = cv2.minMaxLoc(scores)
+        at_edge = (mx == 0 and x0 > 0) or (my == 0 and y0 > 0) or (mx == scores.shape[1] - 1 and x1 < grey.shape[1]) or (my == scores.shape[0] - 1 and y1 < grey.shape[0])
+        if best < MATCH_TRUSTED or at_edge:
+            return None
+        return region, x0, y0, best, (mx, my)
+
     def measure(self, frame_index, grey):
         for state in self.state:
             if state is None:
@@ -926,17 +976,22 @@ class Refiner:
             template = state["template"]
             th, tw = template.shape
             ox, oy = state["origin"]
-            sx, sy = state["search"]
-            x0, y0 = max(0, ox - sx), max(0, oy - sy)
-            x1, y1 = min(grey.shape[1], ox + tw + sx), min(grey.shape[0], oy + th + sy)
-            region = grey[y0:y1, x0:x1]
-            if region.shape[0] < th or region.shape[1] < tw:
-                state["samples"].append({"frame": frame_index, "match": None})
-                continue
-            scores = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
-            _, best, _, location = cv2.minMaxLoc(scores)
+            found = self._near_last(state, grey, template)
+            if found is None:
+                sx, sy = state["search"]
+                x0, y0 = max(0, ox - sx), max(0, oy - sy)
+                x1, y1 = min(grey.shape[1], ox + tw + sx), min(grey.shape[0], oy + th + sy)
+                region = grey[y0:y1, x0:x1]
+                if region.shape[0] < th or region.shape[1] < tw:
+                    state["samples"].append({"frame": frame_index, "match": None})
+                    continue
+                scores = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
+                _, best, _, location = cv2.minMaxLoc(scores)
+            else:
+                region, x0, y0, best, location = found
             mx, my = location
             matched = best >= MATCH_TRUSTED
+            state["last"] = (x0 + mx, y0 + my) if matched else None
             # Where the line is measured: where it matches, when the match can be
             # trusted; otherwise where it will settle. Never the best match of a
             # template that matches nothing, which lands on whatever else is there.

@@ -99,6 +99,21 @@ class Decoder:
             self.reformat_args = {"src_colorspace": Colorspace.ITU709}
             self.assumed_matrix = "bt709 (untagged HD)"
 
+    def expected_frames(self):
+        """
+        How many frames to expect, for reporting progress only: what the stream
+        declares, or else what its duration and average rate imply. Never a
+        measurement — the frame table counts the frames that were decoded.
+        """
+        if self.stream.frames:
+            return int(self.stream.frames)
+        rate = self.stream.average_rate
+        if rate and self.stream.duration and self.stream.time_base:
+            return int(round(float(self.stream.duration * self.stream.time_base * rate)))
+        if rate and self.container.duration:
+            return int(round(self.container.duration / 1_000_000 * float(rate)))
+        return 0
+
     def frames(self):
         for frame in self.container.decode(self.stream):
             yield frame
@@ -249,7 +264,7 @@ def analyze_video(path, ocr=None, ocr_stride=None, progress_every=60):
     flow_w, flow_h = _size_for(width, height, FLOW_WIDTH)
     colour_w, colour_h = _size_for(width, height, COLOUR_WIDTH)
     ocr_w, ocr_h = _size_for(width, height, min(OCR_WIDTH, width))
-    declared = decoder.stream.frames or 0
+    declared = decoder.expected_frames()
 
     table = {"pts": [], "durations": [], "keyframe": [], "pictureType": [], "hash": [], "repeatOf": []}
     features = {name: [] for name in (

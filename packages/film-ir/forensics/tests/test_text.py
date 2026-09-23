@@ -193,6 +193,24 @@ def piece(text_, box, frames=(10, 12, 14)):
             "referenceFrame": frames[1], "referenceBox": box, "variants": [text_]}
 
 
+def ocr_line(words, x, y, w=100, h=20, score=0.9):
+    return {"poly": [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], "text": words, "score": score}
+
+
+class LinkTest(unittest.TestCase):
+    def test_readings_become_the_lines_they_are(self):
+        frames = [{"frame": f, "lines": [ocr_line("Search", 100, 100), ocr_line("Settings", 1400, 800)]} for f in range(0, 80, 4)]
+        # A line typed letter by letter, read as it grows.
+        for k, (words, width) in enumerate((("Hel", 40), ("Hello", 60), ("Hello world", 120))):
+            frames[2 + k]["lines"].append(ocr_line(words, 300, 200, w=width))
+        # Gone for longer than three readings, then back in the same place: a line that returns, read again.
+        for entry in frames[8:14]:
+            entry["lines"] = [line for line in entry["lines"] if line["text"] != "Settings"]
+        lines = text.link(frames, stride=4, width=1920)
+        found = sorted((line["text"], line["firstRead"], line["lastRead"]) for line in lines)
+        self.assertEqual(found, [("Hello world", 8, 16), ("Search", 0, 76), ("Settings", 0, 28), ("Settings", 56, 76)])
+
+
 class FragmentsTest(unittest.TestCase):
     def test_letters_read_twice_under_an_overlap_are_read_once(self):
         self.assertEqual(text._shared_edge("LAUNCH", "HDAY"), 1)
