@@ -409,6 +409,16 @@ const document = {
 
 writeFileSync(path.join(DURABLE, `${id}.prompt.json`), JSON.stringify(document, null, 2));
 
+/*
+ * The JSON is what retrieval reads; the prose is what a person reads.
+ *
+ * Both are the same document. Writing only the JSON would leave the actual
+ * deliverable — a brief somebody could hand to a studio, or paste into a
+ * system, and get this film back — locked inside a structure nobody reads
+ * aloud. Writing only the prose would leave nothing queryable.
+ */
+writeFileSync(path.join(DURABLE, `${id}.prompt.md`), asBrief(document));
+
 console.log(
   `\n=== ${id}: ${Object.keys(system).length} system sections, ${events.length} events, ` +
     `${seconds.length} half-second samples ===`,
@@ -416,3 +426,198 @@ console.log(
 console.log(
   `  ${(tokens / 1000).toFixed(0)}k tokens, ${((Date.now() - startedAt) / 1000).toFixed(0)}s -> memory/reference/${id}.prompt.json`,
 );
+
+/** The document as a brief: the same facts, in the order somebody builds in. */
+function asBrief(doc: {
+  source: { id: string; durationSeconds: number };
+  model: string;
+  system: Record<string, unknown>;
+  events: unknown[];
+  seconds: unknown[];
+}): string {
+  const out: string[] = [];
+  const sys = doc.system as Record<string, any>;
+  const num = (v: unknown, unit = '') => (v === undefined || v === null || v === '' ? '—' : `${v}${unit}`);
+
+  out.push(`# ${doc.source.id} — the prompt that would rebuild this film`);
+  out.push('');
+  out.push(
+    `${doc.source.durationSeconds.toFixed(2)}s · ${num(sys['identity']?.aspectRatio)} · ` +
+      `${num(sys['identity']?.framesPerSecond, 'fps')} · read and heard by ${doc.model}`,
+  );
+  out.push('');
+  out.push(`**Subject.** ${num(sys['identity']?.subject)}`);
+  out.push(`**Claim.** ${num(sys['identity']?.proposition)}`);
+  out.push('');
+
+  out.push('## The ground and the colour');
+  out.push('');
+  for (const c of sys['palette'] ?? []) {
+    out.push(
+      `- \`${c.hex}\` — ${c.role}, from ${num(c.firstAtSeconds, 's')}, ` +
+        `${num(c.sharePercentOfRunningTime, '% of the running time')}. ${c.whatItIsFor ?? ''}`,
+    );
+  }
+  const g = sys['grade'] ?? {};
+  out.push('');
+  out.push(
+    `Black point \`${num(g.blackPointHex)}\`, white point \`${num(g.whitePointHex)}\`, ` +
+      `type against ground at ${num(g.contrastRatioTypeToGround, ':1')}. ` +
+      `Grain ${num(g.grainPercent, '%')}, vignette ${num(g.vignettePercent, '%')}, bloom ${num(g.bloomPercent, '%')}.`,
+  );
+  if (g.isTheGroundFlatOrLit) out.push(`The ground is **${g.isTheGroundFlatOrLit}**. ${g.lightSourceDescription ?? ''}`);
+  if (g.saturationNote) out.push(g.saturationNote);
+  out.push('');
+
+  out.push('## The type');
+  out.push('');
+  for (const f of sys['typography']?.families ?? []) {
+    out.push(`- ${f.classification}, weights ${(f.weights ?? []).join('/')} — ${f.usedFor ?? ''}`);
+  }
+  out.push('');
+  for (const step of sys['typography']?.scale ?? []) {
+    out.push(
+      `- **${step.role}** — ${num(step.sizePercentOfFrameHeight, '% of frame height')}, ` +
+        `tracking ${num(step.trackingEm, 'em')}, line height ${num(step.lineHeight)}, ` +
+        `${num(step.case)}, max ${num(step.maxLines)} lines` +
+        (step.exampleWordsAtSeconds ? ` (see ${step.exampleWordsAtSeconds}s)` : ''),
+    );
+  }
+  const tm = sys['typeInMotion'] ?? {};
+  if (Object.keys(tm).length) {
+    out.push('');
+    out.push(
+      `Type enters by ${num(tm.entrance)} over ${num(tm.entranceDurationSeconds, 's')} on ` +
+        `\`${num(tm.entranceEasing)}\`, staggered ${num(tm.staggerSecondsBetweenUnits, 's')} per ` +
+        `${num(tm.staggerUnit)}; it leaves by ${num(tm.exit)} over ${num(tm.exitDurationSeconds, 's')}. ` +
+        `Does it ever sit still: **${tm.doesTypeEverSitStill ? 'yes' : 'no'}**.`,
+    );
+  }
+  out.push('');
+
+  out.push('## The camera and the motion');
+  out.push('');
+  for (const m of sys['camera']?.moves ?? []) {
+    out.push(
+      `- ${num(m.atSeconds, 's')} — ${m.kind} ${num(m.amplitudePercent, '%')} over ` +
+        `${num(m.durationSeconds, 's')} on \`${num(m.easing)}\`` +
+        (m.whatMotivatesIt && m.whatMotivatesIt !== 'none' ? `, because ${m.whatMotivatesIt}` : ''),
+    );
+  }
+  const mo = sys['motion'] ?? {};
+  out.push('');
+  out.push(`Something is always moving: **${mo.somethingAlwaysMoving ? 'yes' : 'no'}**. ${mo.idleMotionDescription ?? ''}`);
+  for (const e of mo.easingsUsed ?? []) {
+    out.push(`- \`${e.name}\` on ${e.appliedTo}, typically ${num(e.typicalDurationSeconds, 's')}`);
+  }
+  out.push('');
+
+  if ((sys['transitions'] ?? []).length) {
+    out.push('## The transitions');
+    out.push('');
+    for (const t of sys['transitions']) {
+      out.push(
+        `- ${num(t.atSeconds, 's')} — ${t.kind} over ${num(t.durationSeconds, 's')} on \`${num(t.easing)}\`, ` +
+          `caused by ${t.causedByWhatIsAlreadyOnScreen ?? '—'}`,
+      );
+    }
+    out.push('');
+  }
+
+  const td = sys['threeD'] ?? {};
+  out.push('## Dimension');
+  out.push('');
+  out.push(
+    td.present
+      ? `**Yes.** ${td.whatIsDimensional ?? ''} Lit by ${td.lightingSetup ?? '—'}; materials ${td.materials ?? '—'}; ` +
+          `perspective ${num(td.cameraPerspectiveMm, 'mm')}. ${td.whyItEarnsItsPlace ?? ''}`
+      : '**No 3D.** The film is flat, and that is a decision it keeps.',
+  );
+  out.push('');
+
+  const ed = sys['editing'] ?? {};
+  const sd = sys['sound'] ?? {};
+  const vo = sys['voice'] ?? {};
+  const sy = sys['sync'] ?? {};
+  out.push('## The cut and the sound');
+  out.push('');
+  out.push(
+    `${num(ed.cutCount)} cuts, average shot ${num(ed.averageShotSeconds, 's')} ` +
+      `(${num(ed.shortestShotSeconds, 's')}–${num(ed.longestShotSeconds, 's')}). ` +
+      `Cuts on the beat: **${ed.cutsOnTheBeat ? 'yes' : 'no'}**. ${ed.rhythmRule ?? ''}`,
+  );
+  out.push('');
+  out.push(
+    `Music at ${num(sd.musicBpm, ' BPM')}${sd.musicKey ? ` in ${sd.musicKey}` : ''}, ` +
+      `bed ${num(sd.bedLufs, ' LUFS')}, master ${num(sd.masterLufs, ' LUFS')}, ` +
+      `sidechained to the voice: **${sd.sidechainedToVoice ? 'yes' : 'no'}**.`,
+  );
+  for (const s2 of sd.musicStructure ?? []) out.push(`- ${num(s2.atSeconds, 's')} — ${s2.section}`);
+  for (const f of sd.sfxFamilies ?? []) {
+    out.push(`- ${f.family} × ${num(f.countInFilm)}, about ${num(f.typicalLevelDbBelowVoice, ' dB')} below the voice`);
+  }
+  out.push('');
+  if (vo.present) {
+    out.push(
+      `Voice: ${num(vo.register)}, ${num(vo.wordsPerMinute, ' wpm')}, median pause ` +
+        `${num(vo.medianPauseSeconds, 's')}, leading the bed by ${num(vo.leadOverBedLu, ' LU')}.`,
+    );
+    for (const t of vo.toneChanges ?? []) {
+      out.push(`- ${num(t.atSeconds, 's')} — ${t.from} → ${t.to}${t.whyThere ? `, ${t.whyThere}` : ''}`);
+    }
+  } else {
+    out.push('**No narration.** Everything is carried by type, picture and score.');
+  }
+  out.push('');
+  out.push(`**Sync rule.** ${num(sy.rule)} Tolerance ${num(sy.toleranceSeconds, 's')}. ${sy.whatHappensOnTheLoudestHit ?? ''}`);
+  out.push('');
+
+  out.push('## What it never does');
+  out.push('');
+  for (const r of sys['rulesItNeverBreaks'] ?? []) out.push(`- ${r}`);
+  out.push('');
+  if ((sys['whatWouldBeHardestToCopy'] ?? []).length) {
+    out.push('## What a weaker studio would get wrong');
+    out.push('');
+    for (const r of sys['whatWouldBeHardestToCopy']) out.push(`- ${r}`);
+    out.push('');
+  }
+
+  out.push('## The recipe');
+  out.push('');
+  (sys['recipe'] ?? []).forEach((step: string, i: number) => out.push(`${i + 1}. ${step}`));
+  out.push('');
+
+  out.push('## The timeline');
+  out.push('');
+  for (const e of doc.events as any[]) {
+    const q = Object.entries(e.quantities ?? {})
+      .map(([k, v]) => `${k} ${v}`)
+      .join(', ');
+    out.push(
+      `- **${Number(e.atSeconds ?? 0).toFixed(2)}s–${Number(e.untilSeconds ?? e.atSeconds ?? 0).toFixed(2)}s** ` +
+        `· ${e.domain} · ${e.instruction}` +
+        (q ? `  \n  *${q}*` : '') +
+        (e.whyItReads ? `  \n  ${e.whyItReads}` : '') +
+        (e.confidence === 'inferred' ? '  *(inferred)*' : ''),
+    );
+  }
+  out.push('');
+
+  if ((doc.seconds as any[]).length) {
+    out.push('## Every half second');
+    out.push('');
+    out.push('| at | on screen | type | hex | motion | audio | spoken |');
+    out.push('| --- | --- | --- | --- | --- | --- | --- |');
+    for (const s3 of doc.seconds as any[]) {
+      const cell = (v: unknown) => String(v ?? '').replace(/\|/g, '\\|') || '—';
+      out.push(
+        `| ${Number(s3.at ?? 0).toFixed(2)}s | ${cell(s3.onScreen)} | ${cell(s3.typeOnScreen)} | ` +
+          `${cell(s3.dominantHex)} | ${cell(s3.motionNow)} | ${cell(s3.audioNow)} | ${cell(s3.spokenNow)} |`,
+      );
+    }
+    out.push('');
+  }
+
+  return out.join('\n');
+}
