@@ -19,8 +19,16 @@ import type { ForensicAudio } from '../forensics/report.ts';
  *
  * A recogniser writes sentences over music. Words inside measured silence,
  * or in segments the recogniser itself says hold no speech, are discarded
- * and counted rather than kept.
+ * and counted rather than kept. And a recogniser is one listener: a run of
+ * words that no measured voice activity overlaps at all — "Thanks for
+ * watching!" over the last bars of a score is the classic — is withheld and
+ * returned for the document's unsupported list rather than transcribed. The
+ * check is per run of words, not per word, because the voice-activity
+ * measure is precise and patchy: on narration mixed over music it covers 40
+ * to 70% of the speech, and never nothing of a spoken phrase.
  */
+export type WithheldSpeech = { text: string; startSeconds: number; endSeconds: number; reason: string };
+
 export type TranscriptInput = {
   text: string;
   language: string | null;
@@ -75,25 +83,42 @@ export const ASR_METHODS: Method[] = [
 const BOUNDS_S = 0.08;
 const PAUSE_S = 0.25;
 const SNAP_S = 0.12;
+/** Voice activity a run of words must overlap to be heard by two listeners: 100 ms, or a tenth of a shorter run. */
+const CORROBORATION_S = 0.1;
 
 export function buildNarration(input: {
   transcript: TranscriptInput;
   audio: ForensicAudio;
   samples: SampleClock;
   producer: Producer;
-}): { narration: NarrationIR; discarded: number } {
+}): { narration: NarrationIR; discarded: number; withheld: WithheldSpeech[] } {
   const { transcript, audio, samples } = input;
   const pass: Ref = `producer:${input.producer.id}`;
   const second = (value: number): RationalTime => addTime(samples.start, fromSeconds(value, 1000));
   const silences = audio.silences.map((silence) => [silence.startSample / audio.rate, silence.endSample / audio.rate] as const);
   const noSpeech = (transcript.segments ?? []).filter((segment) => (segment.noSpeechProbability ?? 0) > 0.6 && (segment.averageLogProbability ?? 0) < -1);
   let discarded = 0;
-  const kept = transcript.words.filter((word) => {
+  const audible = transcript.words.filter((word) => {
     const middle = (word.start + word.end) / 2;
     const silent = silences.some(([a, b]) => middle >= a && middle <= b);
     const unheard = noSpeech.some((segment) => middle >= segment.start && middle <= segment.end);
     if (silent || unheard) discarded += 1;
     return !silent && !unheard && word.end >= word.start;
+  });
+  const voice = audio.voiceSpans.map((span) => [span.startSample / audio.rate - BOUNDS_S, span.endSample / audio.rate + BOUNDS_S] as const);
+  const withheld: WithheldSpeech[] = [];
+  const kept = runsOf(audible).flatMap((run) => {
+    const from = run[0]!.start;
+    const to = run[run.length - 1]!.end;
+    const overlap = voice.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, to) - Math.max(a, from)), 0);
+    if (overlap >= Math.min(CORROBORATION_S, 0.1 * (to - from))) return run;
+    withheld.push({
+      text: run.map((word) => word.word.trim()).join(' ').slice(0, 600),
+      startSeconds: round(from, 3),
+      endSeconds: round(to, 3),
+      reason: 'heard only by the recogniser: the analyzer measured no voice activity anywhere in it',
+    });
+    return [];
   });
 
   const hop = audio.hop / audio.rate;
@@ -215,8 +240,8 @@ export function buildNarration(input: {
   const spoken = words.length >= 3;
   const narration: NarrationIR = {
     present: spoken
-      ? measured(true, 'asr.transcript', [pass], round(confidence, 3), { note: `${words.length} words recognised${discarded ? `, ${discarded} discarded as heard over silence or non-speech` : ''}` })
-      : estimated(false, 'asr.transcript', [pass], 0.6, { note: `${words.length} word(s) recognised after discarding ${discarded}` }),
+      ? measured(true, 'asr.transcript', [pass], round(confidence, 3), { note: `${words.length} words recognised${discarded ? `, ${discarded} discarded as heard over silence or non-speech` : ''}${withheld.length ? `, ${withheld.length} run(s) withheld as heard by the recogniser alone` : ''}` })
+      : estimated(false, 'asr.transcript', [pass], 0.6, { note: `${words.length} word(s) kept; ${discarded} discarded over silence or non-speech, ${withheld.length} run(s) withheld as heard by the recogniser alone` }),
     language: transcript.language ? measured(transcript.language, 'asr.transcript', [pass], round(confidence, 3)) : unknown('asr.transcript', 'The recogniser did not report a language.'),
     transcript: spoken ? measured(words.map((word) => word.text).join(' '), 'asr.transcript', [pass], round(confidence, 3)) : unknown('asr.transcript', 'No speech was recognised.'),
     speakers: [],
@@ -226,7 +251,18 @@ export function buildNarration(input: {
     pauses,
     agreement: { comparedWith: null, wordErrorRate: null, comparedWords: 0 },
   };
-  return { narration, discarded };
+  return { narration, discarded, withheld };
+}
+
+/** Words grouped where they are less than a pause apart: the unit a listener either heard or did not. */
+function runsOf<T extends { start: number; end: number }>(words: T[]): T[][] {
+  const runs: T[][] = [];
+  for (const word of words) {
+    const current = runs[runs.length - 1];
+    if (current && word.start - current[current.length - 1]!.end < PAUSE_S) current.push(word);
+    else runs.push([word]);
+  }
+  return runs;
 }
 
 /** Word error rate of `hypothesis` against `reference`: edits over reference words. */

@@ -143,6 +143,118 @@ def link(ocr_frames, stride, width):
     return kept
 
 
+def merge_row_fragments(lines, stride):
+    """
+    Pieces of one line of type, read as separate lines, joined back into one.
+
+    The recogniser's detector splits a line where the gap between two words is
+    wide — "LAUNCH" and "DAY" come back as two readings — and a line that is
+    two tracks is measured as two, with its own timings and its own block. Two
+    tracks are one line when they sit on the same row, side by side with no
+    more than a word's gap between them, at the same size, and are on screen
+    together. Words that arrive one after another stay one line: their own
+    timing is measured per word, inside it.
+    """
+    lines = list(lines)
+    merged = True
+    while merged:
+        merged = False
+        for i in range(len(lines)):
+            for j in range(len(lines)):
+                if i == j:
+                    continue
+                left, right = lines[i], lines[j]
+                common = sorted({r["frame"] for r in left["readings"]} & {r["frame"] for r in right["readings"]})
+                if len(common) < 2 and not (common and stride == 1):
+                    continue
+                frame = common[len(common) // 2]
+                lb = next(r["box"] for r in left["readings"] if r["frame"] == frame)
+                rb = next(r["box"] for r in right["readings"] if r["frame"] == frame)
+                height = max(lb[3], rb[3])
+                if height <= 0 or max(lb[3], rb[3]) / max(1.0, min(lb[3], rb[3])) > 1.4:
+                    continue
+                vertical = min(lb[1] + lb[3], rb[1] + rb[3]) - max(lb[1], rb[1])
+                gap = rb[0] - (lb[0] + lb[2])
+                if vertical < 0.6 * min(lb[3], rb[3]) or not (-0.1 * height <= gap <= 1.2 * height):
+                    continue
+                lines[i] = _join(left, right, frame)
+                del lines[j]
+                merged = True
+                break
+            if merged:
+                break
+    return lines
+
+
+def _join(left, right, frame):
+    by_frame = {}
+    for side, line in (("left", left), ("right", right)):
+        for reading in line["readings"]:
+            by_frame.setdefault(reading["frame"], {})[side] = reading
+    readings = []
+    for index in sorted(by_frame):
+        pair = by_frame[index]
+        if "left" in pair and "right" in pair:
+            a, b = pair["left"], pair["right"]
+            x0, y0 = min(a["box"][0], b["box"][0]), min(a["box"][1], b["box"][1])
+            x1 = max(a["box"][0] + a["box"][2], b["box"][0] + b["box"][2])
+            y1 = max(a["box"][1] + a["box"][3], b["box"][1] + b["box"][3])
+            readings.append({"frame": index, "text": f'{a["text"]} {b["text"]}', "score": min(a["score"], b["score"]), "box": [x0, y0, x1 - x0, y1 - y0]})
+        else:
+            readings.append(next(iter(pair.values())))
+    reference = next(r for r in readings if r["frame"] == frame)
+    x, y, w, h = reference["box"]
+    return {
+        "text": f'{left["text"]} {right["text"]}',
+        "score": min(left["score"], right["score"]),
+        "readings": readings,
+        "firstRead": min(left["firstRead"], right["firstRead"]),
+        "lastRead": max(left["lastRead"], right["lastRead"]),
+        "referenceFrame": frame,
+        "referenceBox": reference["box"],
+        "referencePoly": [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+        "variants": sorted(set(left["variants"]) | set(right["variants"]) | {reference["text"]})[:8],
+        "fragments": left.get("fragments", 1) + right.get("fragments", 1),
+    }
+
+
+def spaced_words(glyphs):
+    """
+    Glyphs grouped into words, at spaces the recogniser wrote and at gaps it did not.
+
+    Recognition drops the space between two words set close together —
+    "NEWFEATURE" — while the glyph boxes still show it: the gap between the W
+    and the F is several times any gap inside a word. A gap counts as a space
+    when it is a clear fraction of the type's height and well above the line's
+    own letter spacing, so type that is tracked out wide is not cut into letters.
+    """
+    visible = [g for g in glyphs if not g["char"].isspace()]
+    if len(visible) < 2:
+        gaps_threshold = float("inf")
+    else:
+        heights = sorted(g["box"][3] for g in visible)
+        height = heights[len(heights) // 2]
+        gaps = sorted(max(0.0, visible[k + 1]["box"][0] - (visible[k]["box"][0] + visible[k]["box"][2])) for k in range(len(visible) - 1))
+        typical = gaps[len(gaps) // 2]
+        gaps_threshold = max(0.3 * height, 1.8 * typical)
+    words, current, previous = [], [], None
+    for glyph in glyphs:
+        if glyph["char"].isspace():
+            if current:
+                words.append(current)
+                current = []
+            previous = None
+            continue
+        if previous is not None and glyph["box"][0] - (previous["box"][0] + previous["box"][2]) >= gaps_threshold and current:
+            words.append(current)
+            current = []
+        current.append(glyph)
+        previous = glyph
+    if current:
+        words.append(current)
+    return words
+
+
 def group_blocks(lines):
     """Lines that appear together, stacked and aligned, are one block."""
     parent = list(range(len(lines)))

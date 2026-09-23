@@ -137,6 +137,12 @@ def _yin(frames, rate, fmin=60.0, fmax=500.0, threshold=0.15):
             shift = 0.5 * (a - c) / (a - 2 * b + c) if (a - 2 * b + c) != 0 else 0.0
         else:
             shift = 0.0
+        # A signal that also repeats at half this period has its fundamental above
+        # fmax, where this tracker cannot see: an 880 Hz tone found at 440 Hz. Its
+        # pitch is unknown here, not the subharmonic.
+        half = int(round((tau + shift) / 2))
+        if half >= 2 and row[half - 1: half + 2].min() < threshold:
+            continue
         f0[i] = rate / (tau + shift)
         aperiodicity[i] = row[tau]
     return f0, aperiodicity
@@ -158,20 +164,23 @@ def _refine_rise(signal, around, radius, rate):
     return offset + start + int(np.argmax(rise[start:]))
 
 
-def _refine_crossing(signal, around, radius, rate, level_db, rising):
-    """The first sample, near `around`, where a 5 ms RMS crosses `level_db` in the given direction."""
-    lo, hi = max(0, around - radius), min(len(signal), around + radius)
+def _refine_crossing(signal, lo, hi, rate, level_db, rising, fallback):
+    """
+    Where a 5 ms RMS crosses `level_db` between samples lo and hi: the first
+    rising crossing, or the last falling one — the edges of a silence that the
+    analysis frames only bracket. Good to half the RMS window, 2.5 ms.
+    """
+    lo, hi = max(0, lo), min(len(signal), hi)
     if hi - lo < 8:
-        return around
+        return fallback
     width = max(8, int(rate * 0.005))
     segment = signal[lo:hi].astype(np.float64)
     rms = np.sqrt(np.convolve(segment ** 2, np.ones(width) / width, mode="same"))
     above = _db(rms) > level_db
-    changes = np.where(above[1:] != above[:-1])[0]
-    for change in changes:
-        if bool(above[change + 1]) == rising:
-            return lo + int(change) + 1
-    return around
+    changes = [int(c) for c in np.where(above[1:] != above[:-1])[0] if bool(above[c + 1]) == rising]
+    if not changes:
+        return fallback
+    return lo + (changes[0] if rising else changes[-1]) + 1
 
 
 def _runs(flags, minimum):
@@ -352,24 +361,41 @@ def analyze_audio(path, ffmpeg, stream_index):
     median_window = 50
     threshold = np.array([np.median(onset[max(0, i - median_window): i + median_window]) for i in range(n)]) + 0.5 * onset.std()
     for i in range(2, n - 2):
-        if onset[i] >= threshold[i] and onset[i] == onset[max(0, i - 5): i + 6].max() and onset[i] > 0.05 and rms_db[i] > -50:
+        # Something starts only where the sound gets louder. The end of a note
+        # splashes energy across the spectrum too — spectral flux rises there —
+        # but the level falls, and a note ending is not an onset.
+        rising = rms_db[i] >= rms_db[max(0, i - 3)] - 1.0 if i >= 3 else True
+        if onset[i] >= threshold[i] and onset[i] == onset[max(0, i - 5): i + 6].max() and onset[i] > 0.05 and rms_db[i] > -50 and rising:
             sample = _refine_rise(mono, i * hop, hop, rate)
             later = min(n - 1, i + 15)
             decay = float(rms_db[later] - rms_db[i])
             high_share = float(power[i, frequencies > 4000].sum() / total[i])
             kind = "transient" if decay < -6 and high_share > 0.1 else "onset"
             events.append({"kind": kind, "sample": int(sample), "hop": i, "magnitude": float(onset[i]), "decayDb": decay, "highShare": high_share, "centroidHz": float(centroid[i])})
+    # Before the first sample there is silence, so a film that opens on a sound
+    # has an onset where that sound begins. Flux cannot see it — there is no
+    # frame before the first to differ from — so it is found on the samples.
+    if n and rms_db[0] > SILENCE_DB and not any(event["hop"] <= 5 for event in events):
+        audible_samples = np.flatnonzero(np.abs(mono[: 2 * hop]) > 10 ** (SILENCE_DB / 20))
+        first = int(audible_samples[0]) if len(audible_samples) else 0
+        events.insert(0, {"kind": "onset", "sample": first, "hop": 0, "magnitude": float(onset[0]), "decayDb": float(rms_db[min(n - 1, 15)] - rms_db[0]),
+                          "highShare": float(power[0, frequencies > 4000].sum() / total[0]), "centroidHz": float(centroid[0])})
     silent = rms_db < SILENCE_DB
     silences = []
+    half = WINDOW // 2
     for a, b in _runs(silent, 20):
-        start = _refine_crossing(mono, a * hop, hop, rate, SILENCE_DB, rising=False) if a > 0 else 0
-        end = _refine_crossing(mono, (b + 1) * hop, hop, rate, SILENCE_DB, rising=True) if b + 1 < n else count
+        # Frame a is the first whose whole window is silent and frame a−1 still
+        # heard something, so the sound ended inside the part of a−1's window
+        # that a's does not cover; symmetrically for where it comes back.
+        start = _refine_crossing(mono, (a - 1) * hop - half - hop, a * hop - half + hop, rate, SILENCE_DB, rising=False, fallback=a * hop) if a > 0 else 0
+        end = _refine_crossing(mono, b * hop + half - hop, (b + 1) * hop + half + hop, rate, SILENCE_DB, rising=True, fallback=(b + 1) * hop) if b + 1 < n else count
         silences.append({"startSample": int(start), "endSample": int(min(count, end)), "levelDb": float(np.median(rms_db[a: b + 1]))})
     voiced = voice_probability > 0.5
     voice_spans = []
     for a, b in _runs(voiced, 15):
-        start = _refine_crossing(mono, a * hop, 3 * hop, rate, float(np.median(rms_db[a: b + 1]) - 20), rising=True)
-        end = _refine_crossing(mono, (b + 1) * hop, 3 * hop, rate, float(np.median(rms_db[a: b + 1]) - 20), rising=False)
+        level = float(np.median(rms_db[a: b + 1]) - 20)
+        start = _refine_crossing(mono, a * hop - 3 * hop, a * hop + 3 * hop, rate, level, rising=True, fallback=a * hop)
+        end = _refine_crossing(mono, (b + 1) * hop - 3 * hop, (b + 1) * hop + 3 * hop, rate, level, rising=False, fallback=(b + 1) * hop)
         voice_spans.append({"startSample": int(start), "endSample": int(end), "meanProbability": float(voice_probability[a: b + 1].mean())})
 
     ducking = []

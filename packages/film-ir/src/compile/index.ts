@@ -1,6 +1,7 @@
 import { FILM_IR_SCHEMA, FILM_IR_VERSION, type FilmIR } from '../schema/document.ts';
 import type { InterpretationIR } from '../schema/interpretation.ts';
 import type { NarrationIR } from '../schema/audio.ts';
+import type { WithheldSpeech } from '../narration/asr.ts';
 import type { Method, Producer } from '../schema/source.ts';
 import type { ForensicReport } from '../forensics/report.ts';
 import { compileMeasured, forensicProducer, type Measured } from './deterministic.ts';
@@ -12,15 +13,20 @@ import { buildEventGraph } from './events.ts';
  * The measured document is built first and stands on its own. Anything later
  * stages add — a transcription, the model's interpretation — is merged onto
  * it through the functions in this package, each of which keeps the measured
- * values and records disagreement rather than overwriting it. The event graph
- * is rebuilt last so it reflects everything the document finally contains.
+ * values and records disagreement rather than overwriting it.
+ *
+ * The event graph is built from the measurements, before any interpretation,
+ * and never rebuilt: its events and sync clusters are what the model was
+ * shown and cited by id, so an interpretation merged afterwards must find
+ * `evt.0042` meaning what it meant when the model read it. Interpretations
+ * do not add events; they annotate the ones measured.
  */
 export type CompileInput = {
   id: string;
   title: string | null;
   report: ForensicReport;
   createdAt?: string;
-  narration?: { ir: NarrationIR; producer: Producer; methods: Method[] } | null;
+  narration?: { ir: NarrationIR; producer: Producer; methods: Method[]; withheld?: WithheldSpeech[] } | null;
   interpretation?: {
     apply: (document: FilmIR, measured: Measured) => { document: FilmIR; producers: Producer[]; methods: Method[] };
   } | null;
@@ -82,11 +88,13 @@ export function compileFilmIR(input: CompileInput): { document: FilmIR; measured
     unsupported: [],
     validation: null,
   };
-  if (input.interpretation) {
-    const applied = input.interpretation.apply(document, measured);
-    document = applied.document;
-    document.producers = [...document.producers, ...applied.producers.filter((p) => !document.producers.some((q) => q.id === p.id))];
-    document.methods = [...document.methods, ...applied.methods.filter((m) => !document.methods.some((n) => n.id === m.id))];
+  for (const speech of input.narration?.withheld ?? []) {
+    document.unsupported.push({
+      id: `unsupported.${String(document.unsupported.length + 1).padStart(4, '0')}`,
+      claim: `speech "${speech.text}" at ${speech.startSeconds.toFixed(2)}–${speech.endSeconds.toFixed(2)} s`,
+      sourceRef: `producer:${input.narration!.producer.id}`,
+      reason: speech.reason,
+    });
   }
   document.events = buildEventGraph({
     clock: measured.clock,
@@ -103,5 +111,11 @@ export function compileFilmIR(input: CompileInput): { document: FilmIR; measured
     fieldChanges: input.report.fieldChanges,
     hopResolution: document.audio.analysis?.hop ?? null,
   });
+  if (input.interpretation) {
+    const applied = input.interpretation.apply(document, measured);
+    document = applied.document;
+    document.producers = [...document.producers, ...applied.producers.filter((p) => !document.producers.some((q) => q.id === p.id))];
+    document.methods = [...document.methods, ...applied.methods.filter((m) => !document.methods.some((n) => n.id === m.id))];
+  }
   return { document, measured };
 }

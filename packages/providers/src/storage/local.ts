@@ -1,11 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile, rm, readdir, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile, rm, readdir, stat } from 'node:fs/promises';
 import { createReadStream, existsSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import { AppError } from '@act-one/core';
 import { httpRequest } from '../http.ts';
 import type { ProviderHealth } from '../types.ts';
+import { sha256File } from './files.ts';
 import type { PutOptions, StorageProvider, StoredObject } from './types.ts';
 
 /**
@@ -70,6 +71,24 @@ export class LocalFsStorageProvider implements StorageProvider {
       checksum: checksum(data),
       url: this.publicBaseUrl ? `${this.publicBaseUrl.replace(/\/$/, '')}/${key}` : null,
     };
+  }
+
+  async putFile(key: string, filePath: string, options: PutOptions = {}): Promise<StoredObject> {
+    const target = this.resolve(key);
+    await mkdir(path.dirname(target), { recursive: true });
+    await copyFile(filePath, target);
+    return {
+      key,
+      bytes: (await stat(target)).size,
+      contentType: options.contentType ?? 'application/octet-stream',
+      checksum: await sha256File(target),
+      url: this.publicBaseUrl ? `${this.publicBaseUrl.replace(/\/$/, '')}/${key}` : null,
+    };
+  }
+
+  async getToFile(key: string, filePath: string): Promise<void> {
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await copyFile(this.resolve(key), filePath);
   }
 
   async ingestFromUrl(key: string, url: string, options: PutOptions = {}): Promise<StoredObject> {

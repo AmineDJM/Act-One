@@ -47,22 +47,52 @@ def measured_rate(table, timescale_den, timebase_num):
 
 
 def words_from_glyphs(glyphs):
-    words, current = [], []
-    for glyph in glyphs:
-        if glyph["char"].isspace():
-            if current:
-                words.append(current)
-                current = []
-            continue
-        current.append(glyph)
-    if current:
-        words.append(current)
+    words = text.spaced_words(glyphs)
     out = []
     for word in words:
         xs = [g["box"][0] for g in word] + [g["box"][0] + g["box"][2] for g in word]
         ys = [g["box"][1] for g in word] + [g["box"][1] + g["box"][3] for g in word]
         out.append({"text": "".join(g["char"] for g in word), "box": [min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)], "glyphs": word})
     return out
+
+
+def glyphs_for(line, read):
+    """
+    The glyphs of one line at its reference frame, from every reading inside its box.
+
+    A line joined from fragments is read back as fragments; their glyphs are
+    put in order with a space between them. Readings that are not the line —
+    too little of them inside its box, or text that does not match — are left.
+    """
+    lx, ly, lw, lh = line["referenceBox"]
+    inside = []
+    for candidate in read:
+        cx, cy, cw, ch = text._bbox(candidate["poly"])
+        area = max(1.0, cw * ch)
+        overlap_w = max(0.0, min(lx + lw, cx + cw) - max(lx, cx))
+        overlap_h = max(0.0, min(ly + lh, cy + ch) - max(ly, cy))
+        if overlap_w * overlap_h / area >= 0.6:
+            inside.append(candidate)
+    inside.sort(key=lambda candidate: text._bbox(candidate["poly"])[0])
+    if not inside or text.text_similarity(" ".join(c["text"] for c in inside), line["text"]) <= 0.6:
+        return []
+    glyphs = []
+    for k, candidate in enumerate(inside):
+        if k > 0 and glyphs and candidate["glyphs"]:
+            before, after = glyphs[-1]["box"], candidate["glyphs"][0]["box"]
+            gap_x = before[0] + before[2]
+            glyphs.append({"char": " ", "box": [gap_x, before[1], max(0.0, after[0] - gap_x), before[3]]})
+        glyphs.extend(candidate["glyphs"])
+    return glyphs
+
+
+def respace(line, glyphs):
+    """The line's text with the spaces its glyphs show, when the letters are the same letters."""
+    words = ["".join(g["char"] for g in word) for word in text.spaced_words(glyphs)]
+    if not words:
+        return line["text"]
+    squeeze = lambda value: "".join(value.split())
+    return " ".join(words) if squeeze(" ".join(words)) == squeeze(line["text"]) else line["text"]
 
 
 def collect_references(path, lines, panel_frames, ocr_engine, width, height):
@@ -86,18 +116,12 @@ def collect_references(path, lines, panel_frames, ocr_engine, width, height):
             read = ocr_engine.read_glyphs(decoder.bgr(frame, ocr_w, ocr_h), scale=width / float(ocr_w)) if ocr_engine else []
             for index in wanted[frame_index]:
                 line = lines[index]
-                match = None
-                best = 0.0
-                for candidate in read:
-                    iou = text._iou(text._bbox(candidate["poly"]), line["referenceBox"])
-                    similarity = text.text_similarity(candidate["text"], line["text"])
-                    if iou > 0.3 and similarity > 0.6 and iou + similarity > best:
-                        best, match = iou + similarity, candidate
+                glyphs = glyphs_for(line, read)
                 references[index] = {
                     "grey": grey,
                     "bgr": bgr,
-                    "words": words_from_glyphs(match["glyphs"]) if match else [],
-                    "glyphs": match["glyphs"] if match else [],
+                    "words": words_from_glyphs(glyphs),
+                    "glyphs": glyphs,
                 }
         if frame_index >= last:
             break
@@ -165,11 +189,17 @@ def main(argv=None):
     cam = camera.trajectories(segmentation["shots"], video["homographies"], video["features"], fps, work["width"], work["height"])
 
     emit("text", 0.0, "linking readings")
-    lines = text.link(video["ocrFrames"], stride, video["width"])
+    lines = text.merge_row_fragments(text.link(video["ocrFrames"], stride, video["width"]), stride)
     blocks = text.group_blocks(lines)
     panel_frames = {(a + b) // 2 for a, b in segmentation["shots"] if b - a >= 2}
     emit("tracks", 0.0, "collecting references")
     references, panel_greys = collect_references(args.input, lines, panel_frames, ocr_engine, video["width"], video["height"])
+    for line, reference in zip(lines, references):
+        if reference and reference["glyphs"]:
+            spaced = respace(line, reference["glyphs"])
+            if spaced != line["text"]:
+                line["variants"] = sorted(set(line["variants"]) | {line["text"]})[:8]
+                line["text"] = spaced
     usable = [i for i, ref in enumerate(references) if ref is not None]
     if len(usable) < len(lines):
         warnings.append(f"{len(lines) - len(usable)} text line(s) had no reference frame to measure against")

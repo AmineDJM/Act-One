@@ -12,6 +12,8 @@ called a boundary here: it is motion, and it is measured as motion.
 import numpy as np
 
 UNIFORM_STD = 0.02
+# Mean absolute luma change between frames above which the picture is still moving.
+RAMP_CHANGE = 0.002
 
 
 def _values(series):
@@ -92,27 +94,36 @@ def detect_fades(features, vectors, small_grey):
         a = i
         while i + 1 < n and uniform[i + 1]:
             i += 1
-        b = i
+        run_end = b = i
+        # The field is where the picture stops changing, not where it first looks
+        # uniform: the last frames of a fade to black are dark enough to pass for
+        # the field while they are still fading, as are the first of a fade in.
+        while a < b and np.isfinite(change[a + 1]) and change[a + 1] > RAMP_CHANGE:
+            a += 1
+        while b > a and np.isfinite(change[b]) and change[b] > RAMP_CHANGE:
+            b -= 1
+        # Back over the ramp: s ends on the last frame the fade out has not touched.
         s = a
-        while s - 1 >= 0 and np.isfinite(change[s]) and change[s] > 0.002 and spread[s - 1] >= spread[s] - 1e-4:
+        while s - 1 >= 0 and np.isfinite(change[s]) and change[s] > RAMP_CHANGE and spread[s - 1] >= spread[s] - 1e-4:
             s -= 1
+        # Forward over the ramp: e ends on the first frame the fade in has fully revealed.
         e = b
-        while e + 1 < n and np.isfinite(change[e + 1]) and change[e + 1] > 0.002 and spread[e + 1] >= spread[e] - 1e-4:
+        while e + 1 < n and np.isfinite(change[e + 1]) and change[e + 1] > RAMP_CHANGE and spread[e + 1] >= spread[e] - 1e-4:
             e += 1
-        out_fit = _fade_fit(small_grey, s, a) if a - s >= 3 and s >= 1 else None
-        in_fit = _fade_fit(small_grey, b + 1, e + 1) if e - b >= 3 and e + 1 < n else None
+        out_fit = _fade_fit(small_grey, s + 1, a) if a - s >= 3 else None
+        in_fit = _fade_fit(small_grey, b + 1, e) if e - b >= 3 else None
         rgb = np.median(np.array(vectors["border_rgb"][a: b + 1]), axis=0)
         field = "black" if luma[a: b + 1].mean() < 0.04 else "white" if luma[a: b + 1].mean() > 0.96 else "colour"
         found.append({
             "uniform": [a, b],
-            "outFrom": s if out_fit else None,
-            "inTo": e if in_fit else None,
+            "lastUntouched": s if out_fit else None,
+            "firstRevealed": e if in_fit else None,
             "outFit": out_fit,
             "inFit": in_fit,
             "field": field,
             "rgb": rgb.tolist(),
         })
-        i = b + 1
+        i = run_end + 1
     return found
 
 
@@ -122,7 +133,7 @@ def _fade_fit(frames, first, last):
     the second is the field, for a fade in the first is; either way the weight
     moves one way and the blend explains the pixels.
     """
-    if last - first < 1:
+    if last - first < 1 or first < 1 or last >= len(frames):
         return None
     fit = mixing_fit(frames, first, last - 1)
     if fit is None:
@@ -201,20 +212,20 @@ def segment(features, vectors, repeat_of, small_grey, fps):
         "scores": c["scores"],
     } for c in cuts]
     cut_frames = [c["frame"] for c in cuts]
+    # Every boundary's span is [lastOutgoing, firstIncoming]: the last frame the
+    # change has not touched and the first it has completed. The change itself
+    # is the frames strictly between them — none for a cut, the ramp for a fade.
     for fade in detect_fades(features, vectors, small_grey):
         a, b = fade["uniform"]
-        fits = {"outFit": fade["outFit"], "inFit": fade["inFit"]}
-        if fade["outFrom"] is not None and fade["inTo"] is not None:
-            kind = "dip_to_colour" if fade["field"] == "colour" else "fade_out"
-            if fade["field"] != "colour":
-                boundaries.append({"kind": "fade_out", "lastOutgoing": max(0, fade["outFrom"] - 1), "firstIncoming": a, "span": [fade["outFrom"], a], "scores": {"field": fade["field"], "fieldRgb": fade["rgb"], **fits}})
-                boundaries.append({"kind": "fade_in", "lastOutgoing": b, "firstIncoming": min(n - 1, fade["inTo"] + 1), "span": [b, fade["inTo"]], "scores": {"field": fade["field"], "fieldRgb": fade["rgb"], **fits}})
-                continue
-            boundaries.append({"kind": kind, "lastOutgoing": max(0, fade["outFrom"] - 1), "firstIncoming": min(n - 1, fade["inTo"] + 1), "span": [fade["outFrom"], fade["inTo"]], "scores": {"field": fade["field"], "fieldRgb": fade["rgb"], **fits}})
-        elif fade["outFrom"] is not None:
-            boundaries.append({"kind": "fade_out", "lastOutgoing": max(0, fade["outFrom"] - 1), "firstIncoming": a, "span": [fade["outFrom"], a], "scores": {"field": fade["field"], "fieldRgb": fade["rgb"], **fits}})
-        elif fade["inTo"] is not None:
-            boundaries.append({"kind": "fade_in", "lastOutgoing": b, "firstIncoming": min(n - 1, fade["inTo"] + 1), "span": [b, fade["inTo"]], "scores": {"field": fade["field"], "fieldRgb": fade["rgb"], **fits}})
+        scores = {"field": fade["field"], "fieldRgb": fade["rgb"], "outFit": fade["outFit"], "inFit": fade["inFit"]}
+        untouched, revealed = fade["lastUntouched"], fade["firstRevealed"]
+        if untouched is not None and revealed is not None and fade["field"] == "colour":
+            boundaries.append({"kind": "dip_to_colour", "lastOutgoing": untouched, "firstIncoming": revealed, "span": [untouched, revealed], "scores": scores})
+            continue
+        if untouched is not None:
+            boundaries.append({"kind": "fade_out", "lastOutgoing": untouched, "firstIncoming": a, "span": [untouched, a], "scores": scores})
+        if revealed is not None:
+            boundaries.append({"kind": "fade_in", "lastOutgoing": b, "firstIncoming": revealed, "span": [b, revealed], "scores": scores})
     for dissolve in detect_dissolves(features, small_grey, cut_frames, fps):
         a, b = dissolve["span"]
         boundaries.append({"kind": "dissolve", "lastOutgoing": a, "firstIncoming": b, "span": [a, b], "scores": {

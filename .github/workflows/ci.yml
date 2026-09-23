@@ -54,6 +54,18 @@ jobs:
 
       - run: npm ci
 
+      # The forensic analyzer behind FilmIR is Python (NumPy, OpenCV, PyAV,
+      # RapidOCR). Its integration test runs the real thing on a synthetic
+      # film whose every fact is known; without these it would skip itself.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: packages/film-ir/forensics/requirements.txt
+
+      - name: Install the forensic analyzer's requirements
+        run: python3 -m pip install -r packages/film-ir/forensics/requirements.txt
+
       - name: Typecheck
         run: npm run typecheck
 

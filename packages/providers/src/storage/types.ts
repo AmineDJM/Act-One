@@ -36,6 +36,16 @@ export interface StorageProvider extends Provider {
    */
   readonly shared: boolean;
   put(key: string, data: Uint8Array, options?: PutOptions): Promise<StoredObject>;
+  /**
+   * A file on disk, stored without ever being held in memory whole.
+   *
+   * A reference film can be a gigabyte; reading one into a buffer to hand it
+   * to `put` costs a gigabyte of the worker's memory per film in flight, and
+   * the web service's too while an upload is being received.
+   */
+  putFile(key: string, filePath: string, options?: PutOptions): Promise<StoredObject>;
+  /** An object written to a file on disk, streamed, for the same reason. */
+  getToFile(key: string, filePath: string): Promise<void>;
   /** Copies a provider-hosted URL into our storage. Returns our object. */
   ingestFromUrl(key: string, url: string, options?: PutOptions): Promise<StoredObject>;
   get(key: string): Promise<Uint8Array>;

@@ -100,7 +100,8 @@ export function compileMeasured(report: ForensicReport): Measured {
   report.text.lines.forEach((line, index) => {
     const object = textLineObject(line, lineIds[index]!, clock, fps, shots);
     if (!object) {
-      u([`obj:${lineIds[index]}`], 'insufficient_evidence', 'low', `The line "${line.text.slice(0, 60)}" was read but could not be measured on the frames around it.`);
+      // No object exists for a line that could not be measured, so the uncertainty points at the frames it was read on.
+      u([framesRef(line.firstRead, line.lastRead)], 'insufficient_evidence', 'low', `The line "${line.text.slice(0, 60)}" was read but could not be measured on the frames around it.`);
       return;
     }
     lineObjects.push(object);
@@ -273,6 +274,12 @@ function buildSource(report: ForensicReport, clock: FrameClock): SourceInfo {
 
 type FeatureSpec = { quantity: string; unit: string; method: string; evidence: 'MEASURED' | 'ESTIMATED' };
 
+/** A tempo needs at least this many heard onsets, and this share of its beats on them. */
+const MIN_ONSETS_FOR_TEMPO = 8;
+const MIN_BEATS_ON_ONSETS = 0.4;
+/** Below this correlation margin over the runner-up, a key is a coin toss between two. */
+const MIN_KEY_MARGIN = 0.05;
+
 const FEATURES: Record<string, FeatureSpec> = {
   luma_mean: { quantity: 'mean luma', unit: 'ratio', method: 'pixels.luma', evidence: 'MEASURED' },
   luma_std: { quantity: 'luma standard deviation (RMS contrast)', unit: 'ratio', method: 'pixels.luma', evidence: 'MEASURED' },
@@ -389,7 +396,8 @@ function buildBoundary(
     at: clock.at(boundary.firstIncoming),
     frames: { lastOutgoing: boundary.lastOutgoing, firstIncoming: boundary.firstIncoming },
     span: { first: Math.min(boundary.span[0], boundary.span[1]), last: Math.max(boundary.span[0], boundary.span[1]) },
-    range: { start: clock.at(Math.min(boundary.span[0], boundary.span[1])), end: clock.end(Math.max(boundary.span[0], boundary.span[1])) },
+    // The change itself: after the last frame it has not touched, until the first it has completed — an instant for a cut.
+    range: { start: clock.end(boundary.lastOutgoing), end: clock.at(boundary.firstIncoming) },
     outgoing,
     incoming,
     residuals: {
@@ -1075,18 +1083,40 @@ function buildAudio(
   };
 
   const musicShare = share(audio.series['music_probability'] ?? [], (v) => v > 0.5, audio.series['rms_db'] ?? [], (v) => v > -50);
-  const tempoKnown = audio.tempo.bpm !== null && audio.tempo.strength >= 0.1;
+  /*
+   * A tempo is a claim about many onsets. An autocorrelation of three clicks
+   * in four seconds is strong and says nothing, and a beat grid laid over it
+   * would put forty events on a timeline where nothing happens. So a tempo
+   * needs enough onsets to establish a period, and beats that actually land
+   * on what was heard.
+   */
+  const onsetCount = audio.events.length;
+  const snappedShare = audio.beats.length ? audio.beats.filter((beat) => beat.snapped).length / audio.beats.length : 0;
+  const tempoGap = audio.tempo.bpm === null
+    ? 'No periodicity in the onsets strong enough to call a tempo.'
+    : audio.tempo.strength < 0.1
+      ? `A periodicity was found but too weak (strength ${round(audio.tempo.strength, 3)}) to call a tempo.`
+      : onsetCount < MIN_ONSETS_FOR_TEMPO
+        ? `Only ${onsetCount} onset(s) were heard: too few to establish a period.`
+        : snappedShare < MIN_BEATS_ON_ONSETS
+          ? `Only ${Math.round(snappedShare * 100)}% of the beats a ${round(audio.tempo.bpm, 1)} BPM grid would place land on a heard onset.`
+          : null;
+  const tempoKnown = tempoGap === null;
+  const keyUsable = audio.key !== null && musicShare !== null && musicShare >= 0.3 && audio.key.margin >= MIN_KEY_MARGIN;
   const music: MusicIR = {
     present: musicShare === null
       ? unknown('audio.music', 'Nothing audible to judge.', refs)
-      : estimated(musicShare >= 0.3, 'audio.music', refs, round(Math.abs(musicShare - 0.3) + 0.4, 3), { note: `${Math.round(musicShare * 100)}% of the audible stretches sound like music` }),
+      // A spectral heuristic, not a trained classifier: however one-sided the share, it is never certain.
+      : estimated(musicShare >= 0.3, 'audio.music', refs, Math.min(0.8, round(Math.abs(musicShare - 0.3) + 0.4, 3)), { note: `${Math.round(musicShare * 100)}% of the audible stretches sound like music` }),
     tempoBpm: tempoKnown
-      ? estimated(round(audio.tempo.bpm!, 2), 'audio.beats', refs, clamp01(audio.tempo.strength * 2), { unit: 'BPM', note: `autocorrelation strength ${round(audio.tempo.strength, 3)}` })
-      : unknown('audio.beats', audio.tempo.bpm === null ? 'No periodicity in the onsets strong enough to call a tempo.' : `A periodicity was found but too weak (strength ${round(audio.tempo.strength, 3)}) to call a tempo.`, refs),
+      ? estimated(round(audio.tempo.bpm!, 2), 'audio.beats', refs, clamp01(audio.tempo.strength * 2), { unit: 'BPM', note: `autocorrelation strength ${round(audio.tempo.strength, 3)}; ${Math.round(snappedShare * 100)}% of beats on heard onsets` })
+      : unknown('audio.beats', tempoGap!, refs),
     meter: unknown('audio.beats', 'The meter is not established: bar grouping would be an assumption.', refs),
-    key: audio.key && musicShare !== null && musicShare >= 0.3
-      ? estimated(audio.key.key, 'audio.key', refs, clamp01(audio.key.margin * 4), { note: `correlation ${round(audio.key.correlation, 3)}; runner-up ${audio.key.runnerUp}` })
-      : unknown('audio.key', 'No key is estimated where the sound is not clearly music.', refs),
+    key: keyUsable
+      ? estimated(audio.key!.key, 'audio.key', refs, clamp01(audio.key!.margin * 4), { note: `correlation ${round(audio.key!.correlation, 3)}; runner-up ${audio.key!.runnerUp}` })
+      : unknown('audio.key', audio.key && musicShare !== null && musicShare >= 0.3
+        ? `Ambiguous: ${audio.key.key} and ${audio.key.runnerUp} fit the pitch content almost equally (margin ${round(audio.key.margin, 3)}).`
+        : 'No key is estimated where the sound is not clearly music.', refs),
     beats: {
       times: tempoKnown ? audio.beats.map((beat) => samples.at(beat.sample)) : [],
       provenance: provenance(tempoKnown ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, tempoKnown ? clamp01(audio.tempo.strength * 2) : 0, 'beats within 35 ms of an onset sit on that onset\'s sample; the others on the 10 ms grid'),

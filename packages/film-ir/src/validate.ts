@@ -1,6 +1,6 @@
 import { FilmIR, type ValidationCheck, type ValidationReport } from './schema/document.ts';
 import type { EvidenceType, RationalTime } from './schema/primitives.ts';
-import { compareTime, isInt64String, sameTime, subtractTime } from './time.ts';
+import { addTime, compareTime, isInt64String, maxTime, minTime, rt, sameTime, subtractTime } from './time.ts';
 
 /**
  * Whether a FilmIR can be trusted.
@@ -177,8 +177,18 @@ export function validateFilmIR(input: unknown, options: ValidationOptions = {}):
 
   // ——— timelines ———
   const timeFailures: string[] = [];
-  const filmStart = doc.source?.frameTiming?.firstPts ?? null;
-  const filmEnd = doc.source?.frameTiming?.lastPtsEnd ?? doc.target?.duration ?? null;
+  // The film is every stream it carries: audio routinely starts a few
+  // milliseconds before the first frame or runs on after the last, and what
+  // happens there happens in the film.
+  let filmStart = doc.source?.frameTiming?.firstPts ?? null;
+  let filmEnd = doc.source?.frameTiming?.lastPtsEnd ?? doc.target?.duration ?? null;
+  for (const stream of doc.source?.audio ?? []) {
+    if (stream.startPts === null) continue;
+    const start = rt(BigInt(stream.startPts) * BigInt(stream.timebase.num), stream.timebase.den);
+    const end = addTime(start, rt(stream.decodedSamples, stream.sampleRate));
+    filmStart = filmStart ? minTime(filmStart, start) : start;
+    filmEnd = filmEnd ? maxTime(filmEnd, end) : end;
+  }
   const within = (time: RationalTime, what: string) => {
     if (filmStart && compareTime(time, filmStart) < 0) timeFailures.push(`${what} is before the film starts`);
     if (filmEnd && compareTime(time, filmEnd) > 0) timeFailures.push(`${what} is after the film ends`);

@@ -127,7 +127,8 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
         const samples = new SampleClock(report.audio!.rate, report.audio!.samples, report.audio!.firstPts, report.audio!.timebase);
         const built = buildNarration({ transcript, audio: report.audio!, samples, producer: asrProducer! });
         if (built.discarded > 0) asrProducer!.notes.push(`${built.discarded} word(s) discarded: heard over measured silence or in segments the recogniser marked as non-speech`);
-        return { ir: built.narration, producer: asrProducer!, methods: ASR_METHODS };
+        if (built.withheld.length > 0) asrProducer!.notes.push(`${built.withheld.length} run(s) of words withheld: no measured voice activity overlaps them`);
+        return { ir: built.narration, producer: asrProducer!, methods: ASR_METHODS, withheld: built.withheld };
       })()
     : null;
 

@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { httpRequest, sleep } from '../http.ts';
+import { backoffMs, httpRequest, httpStream, sleep } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 
 /**
@@ -173,6 +173,20 @@ export class GeminiVideoProvider {
     return toFile(current);
   }
 
+  /**
+   * One structured answer, streamed.
+   *
+   * Streamed for survival, not display: a long prompt makes the model think
+   * silently before its first byte, and the egress in front of it cuts a
+   * silent request at thirty seconds (measured: the integration pass failed
+   * at 30.5 s on every attempt, identically, which no retry fixes). With
+   * thought summaries requested, bytes arrive within seconds and the only
+   * timeout left is how long nothing at all may happen. The summaries are
+   * discarded; only the answer's own parts are kept.
+   *
+   * A stream cannot be resumed, so each attempt starts a fresh collection:
+   * a retry after a cut never appends a second answer to half of the first.
+   */
   async generate(request: GenerateRequest, context: CallContext): Promise<GenerateResult> {
     const model = request.model ?? this.model;
     const body = {
@@ -182,25 +196,43 @@ export class GeminiVideoProvider {
         responseMimeType: 'application/json',
         responseJsonSchema: request.schema,
         temperature: request.temperature ?? 0.2,
+        thinkingConfig: { includeThoughts: true },
         ...(request.maxOutputTokens ? { maxOutputTokens: request.maxOutputTokens } : {}),
         ...(request.mediaResolution ? { mediaResolution: `MEDIA_RESOLUTION_${request.mediaResolution.toUpperCase()}` } : {}),
       },
     };
-    const response = await httpRequest<RawResponse>(this.name, `${this.baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST',
-      headers: this.headers(),
-      body,
-      timeoutMs: 10 * 60_000,
-      attempts: 3,
-      ...(context.signal ? { signal: context.signal } : {}),
-    });
+    const url = `${this.baseUrl}/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+    let collected: StreamCollector | null = null;
+    for (let attempt = 1; collected === null; attempt += 1) {
+      const collector = newCollector();
+      try {
+        await httpStream(this.name, url, {
+          method: 'POST',
+          headers: this.headers(),
+          body,
+          attempts: 1,
+          idleTimeoutMs: 120_000,
+          ...(context.signal ? { signal: context.signal } : {}),
+          onChunk: (text) => consumeSse(this.name, text, collector),
+        });
+        consumeSse(this.name, '\n\n', collector);
+        collected = collector;
+      } catch (error) {
+        const retryable = error instanceof ProviderError ? error.retryable : true;
+        if (!retryable || attempt >= 3 || context.signal?.aborted) throw error;
+        await sleep(backoffMs(attempt, null, error instanceof ProviderError ? error.status : undefined));
+      }
+    }
+
+    const metadata = collected.usage;
     const usage = {
-      promptTokens: response?.usageMetadata?.promptTokenCount ?? 0,
-      outputTokens: (response?.usageMetadata?.candidatesTokenCount ?? 0) + (response?.usageMetadata?.thoughtsTokenCount ?? 0),
-      videoTokens: (response?.usageMetadata?.promptTokensDetails ?? []).filter((d) => d.modality === 'VIDEO').reduce((sum, d) => sum + (d.tokenCount ?? 0), 0),
-      totalTokens: response?.usageMetadata?.totalTokenCount ?? 0,
+      promptTokens: metadata?.promptTokenCount ?? 0,
+      outputTokens: (metadata?.candidatesTokenCount ?? 0) + (metadata?.thoughtsTokenCount ?? 0),
+      videoTokens: (metadata?.promptTokensDetails ?? []).filter((d) => d.modality === 'VIDEO').reduce((sum, d) => sum + (d.tokenCount ?? 0), 0),
+      totalTokens: metadata?.totalTokenCount ?? 0,
     };
     const rate = RATES[model] ?? RATES[DEFAULT_MODEL]!;
+    // At the listed input price even for tokens the service served from its cache: an upper bound, never an underestimate.
     const costUsd = (usage.promptTokens * rate.input + usage.outputTokens * rate.output) / 1_000_000;
     await this.costSink?.record({
       provider: this.name,
@@ -211,19 +243,18 @@ export class GeminiVideoProvider {
       quantity: usage.totalTokens,
       unit: 'token',
       costBasis: RATES[model] ? 'listed' : 'unknown_price',
-      metadata: { projectId: context.projectId ?? null, label: request.label, videoTokens: usage.videoTokens },
+      metadata: { projectId: context.projectId ?? null, label: request.label, videoTokens: usage.videoTokens, cachedTokens: metadata?.cachedContentTokenCount ?? 0 },
     });
-    const candidate = response?.candidates?.[0];
-    const finishReason = candidate?.finishReason ?? null;
-    if (response?.promptFeedback?.blockReason) {
-      throw new ProviderError(this.name, `The request was refused (${response.promptFeedback.blockReason}).`, { retryable: false });
+    if (collected.blockReason) {
+      throw new ProviderError(this.name, `The request was refused (${collected.blockReason}).`, { retryable: false });
     }
+    const finishReason = collected.finishReason;
     if (finishReason && finishReason !== 'STOP') {
       throw new ProviderError(this.name, `The answer did not finish (${finishReason}) and cannot be used as a complete answer.`, {
         retryable: finishReason === 'MAX_TOKENS' || finishReason === 'OTHER',
       });
     }
-    const text = (candidate?.content?.parts ?? []).filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('');
+    const text = collected.text;
     if (!text.trim()) throw new ProviderError(this.name, 'The model returned no answer.', { retryable: true });
     let json: unknown;
     try {
@@ -231,7 +262,7 @@ export class GeminiVideoProvider {
     } catch {
       throw new ProviderError(this.name, 'The answer was not the JSON that was asked for.', { retryable: true });
     }
-    return { json, text, model: response?.modelVersion ?? model, usage, costUsd, finishReason };
+    return { json, text, model: collected.modelVersion ?? model, usage, costUsd, finishReason };
   }
 
   private headers(): Record<string, string> {
@@ -240,18 +271,81 @@ export class GeminiVideoProvider {
 }
 
 type RawFile = { name: string; uri: string; mimeType?: string; state?: string; expirationTime?: string };
-type RawResponse = {
+type UsageMetadata = {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
+  totalTokenCount?: number;
+  cachedContentTokenCount?: number;
+  promptTokensDetails?: { modality?: string; tokenCount?: number }[];
+};
+/** One server-sent event of a streamed answer. */
+type RawChunk = {
   candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
   promptFeedback?: { blockReason?: string };
-  usageMetadata?: {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    thoughtsTokenCount?: number;
-    totalTokenCount?: number;
-    promptTokensDetails?: { modality?: string; tokenCount?: number }[];
-  };
+  usageMetadata?: UsageMetadata;
   modelVersion?: string;
+  error?: { code?: number; message?: string; status?: string };
 };
+
+type StreamCollector = {
+  pending: string;
+  text: string;
+  thoughtParts: number;
+  finishReason: string | null;
+  blockReason: string | null;
+  usage: UsageMetadata | null;
+  modelVersion: string | null;
+};
+
+function newCollector(): StreamCollector {
+  return { pending: '', text: '', thoughtParts: 0, finishReason: null, blockReason: null, usage: null, modelVersion: null };
+}
+
+/**
+ * Server-sent events, as they arrive: whole events only, in order.
+ *
+ * The answer is the concatenation of every non-thought text part; usage and
+ * the finish reason come with the last events and the latest one wins. An
+ * error event mid-stream is the service giving up, and is raised as such.
+ */
+export function consumeSse(provider: string, chunk: string, collector: StreamCollector): void {
+  collector.pending += chunk.replace(/\r\n/g, '\n');
+  let boundary = collector.pending.indexOf('\n\n');
+  while (boundary >= 0) {
+    const block = collector.pending.slice(0, boundary);
+    collector.pending = collector.pending.slice(boundary + 2);
+    boundary = collector.pending.indexOf('\n\n');
+    const data = block
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n');
+    if (!data || data === '[DONE]') continue;
+    let event: RawChunk;
+    try {
+      event = JSON.parse(data) as RawChunk;
+    } catch {
+      throw new ProviderError(provider, 'The stream carried an event that is not JSON.', { retryable: true });
+    }
+    if (event.error) {
+      const status = event.error.code;
+      throw new ProviderError(provider, `The stream stopped with an error: ${event.error.status ?? ''} ${event.error.message ?? ''}`.trim(), {
+        retryable: status === undefined || status === 429 || status >= 500,
+        ...(status !== undefined ? { status } : {}),
+      });
+    }
+    if (event.promptFeedback?.blockReason) collector.blockReason = event.promptFeedback.blockReason;
+    const candidate = event.candidates?.[0];
+    for (const part of candidate?.content?.parts ?? []) {
+      if (part.thought) collector.thoughtParts += 1;
+      else if (typeof part.text === 'string') collector.text += part.text;
+    }
+    if (candidate?.finishReason) collector.finishReason = candidate.finishReason;
+    if (event.usageMetadata) collector.usage = event.usageMetadata;
+    if (event.modelVersion) collector.modelVersion = event.modelVersion;
+  }
+}
 
 function toFile(file: RawFile): GeminiFile {
   return { name: file.name, uri: file.uri, mimeType: file.mimeType ?? 'video/mp4', expiresAt: file.expirationTime ?? null };

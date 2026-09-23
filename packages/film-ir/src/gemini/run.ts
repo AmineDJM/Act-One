@@ -247,10 +247,39 @@ function failed(id: PassRecord['id'], title: string, startedAt: string, error: s
   return { id, title, status: 'failed', model, output: null, error: error.slice(0, 600), costUsd: round(cost, 5), tokens, startedAt, finishedAt: new Date().toISOString(), inspections: [], fps };
 }
 
-/** The JSON Schema a model is held to, from the same Zod schema its answer is validated with. */
+/**
+ * The JSON Schema a model is held to, from the same Zod schema its answer is validated with.
+ *
+ * Array-length bounds are moved from `maxItems` into the description. The
+ * service compiles the schema into a decoding grammar, and bounded lists of
+ * bounded lists multiply its size until it refuses the request outright
+ * (HTTP 400, INVALID_ARGUMENT, no detail) — a pass as small as a dozen
+ * moments, each citing up to sixteen ids, is enough. The bound still holds:
+ * the answer is validated against the Zod schema, and a violation is sent
+ * back once as feedback like any other.
+ */
 export function jsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   const out = z.toJSONSchema(schema, { target: 'draft-2020-12', unrepresentable: 'any' }) as Record<string, unknown>;
   delete out['$schema'];
+  return withoutItemBounds(out) as Record<string, unknown>;
+}
+
+function withoutItemBounds(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(withoutItemBounds);
+  if (!node || typeof node !== 'object') return node;
+  const record = node as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === 'maxItems' && typeof value === 'number') continue;
+    // Property names are data, not keywords: a property called "maxItems" must survive.
+    out[key] = key === 'properties' && value && typeof value === 'object'
+      ? Object.fromEntries(Object.entries(value).map(([name, child]) => [name, withoutItemBounds(child)]))
+      : withoutItemBounds(value);
+  }
+  if (typeof record['maxItems'] === 'number') {
+    const described = typeof record['description'] === 'string' ? `${record['description']} ` : '';
+    out['description'] = `${described}At most ${record['maxItems']} items.`;
+  }
   return out;
 }
 

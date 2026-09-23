@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { httpRequest } from '../http.ts';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, rm, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { httpRequest, sleep } from '../http.ts';
+import { sha256File } from './files.ts';
 import { ProviderError, type ProviderHealth } from '../types.ts';
 import type { PutOptions, StorageProvider, StoredObject } from './types.ts';
 
@@ -91,6 +97,78 @@ export class SupabaseStorageProvider implements StorageProvider {
           ? `${this.baseUrl}/storage/v1/object/public/${this.bucket}/${key}`
           : null,
     };
+  }
+
+  /**
+   * A file, streamed from disk.
+   *
+   * A stream cannot be replayed, so a retry reopens the file rather than
+   * going through the shared client's retry loop, which resends one body.
+   */
+  async putFile(key: string, filePath: string, options: PutOptions = {}): Promise<StoredObject> {
+    this.assertConfigured();
+    const bytes = (await stat(filePath)).size;
+    const checksum = await sha256File(filePath);
+    const contentType = options.contentType ?? 'application/octet-stream';
+    for (let attempt = 1; ; attempt += 1) {
+      let failure: ProviderError;
+      try {
+        const response = await fetch(this.objectUrl(key), {
+          method: 'POST',
+          headers: {
+            ...this.headers(),
+            'content-type': contentType,
+            'content-length': String(bytes),
+            'cache-control': options.cacheControl ?? 'max-age=31536000',
+            'x-upsert': 'true',
+          },
+          body: Readable.toWeb(createReadStream(filePath)) as ReadableStream<Uint8Array>,
+          duplex: 'half',
+          signal: AbortSignal.timeout(60 * 60_000),
+        } as RequestInit & { duplex: 'half' });
+        if (response.ok) {
+          await response.body?.cancel();
+          return {
+            key,
+            bytes,
+            contentType,
+            checksum,
+            url: options.visibility === 'public' ? `${this.baseUrl}/storage/v1/object/public/${this.bucket}/${key}` : null,
+          };
+        }
+        const detail = (await response.text().catch(() => '')).slice(0, 300);
+        const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+        failure = new ProviderError(this.name, `Storing ${key} failed: HTTP ${response.status} ${detail}`, { retryable, status: response.status });
+      } catch (error) {
+        failure = new ProviderError(this.name, `Storing ${key} failed: ${(error as Error).message}`, { retryable: true, cause: error });
+      }
+      if (!failure.retryable || attempt >= 3) throw failure;
+      await sleep(2_000 * 2 ** (attempt - 1));
+    }
+  }
+
+  /** An object streamed to a file; a partial file never survives a failure. */
+  async getToFile(key: string, filePath: string): Promise<void> {
+    this.assertConfigured();
+    await mkdir(path.dirname(filePath), { recursive: true });
+    for (let attempt = 1; ; attempt += 1) {
+      let failure: ProviderError;
+      try {
+        const response = await fetch(this.objectUrl(key), { headers: this.headers(), signal: AbortSignal.timeout(60 * 60_000) });
+        if (response.ok && response.body) {
+          await pipeline(Readable.fromWeb(response.body as import('node:stream/web').ReadableStream<Uint8Array>), createWriteStream(filePath));
+          return;
+        }
+        const detail = (await response.text().catch(() => '')).slice(0, 300);
+        const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+        failure = new ProviderError(this.name, `Reading ${key} failed: HTTP ${response.status} ${detail}`, { retryable, status: response.status });
+      } catch (error) {
+        failure = new ProviderError(this.name, `Reading ${key} failed: ${(error as Error).message}`, { retryable: true, cause: error });
+      }
+      await rm(filePath, { force: true });
+      if (!failure.retryable || attempt >= 3) throw failure;
+      await sleep(2_000 * 2 ** (attempt - 1));
+    }
   }
 
   async ingestFromUrl(key: string, url: string, options: PutOptions = {}): Promise<StoredObject> {

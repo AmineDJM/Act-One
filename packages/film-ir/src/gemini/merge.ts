@@ -25,8 +25,16 @@ import type { PassRecord } from './run.ts';
  * camera move claimed on a shot whose camera is unobservable is recorded as a
  * contradiction and the measurement is kept. Nothing here overwrites a
  * measured value.
+ *
+ * A model's confidence in its own answer is not calibrated against anything.
+ * It is kept for ranking one claim against another, and held below a ceiling
+ * so that no interpretation ever carries the confidence of a measurement.
  */
 export type GeminiMerge = { document: FilmIR; producers: Producer[]; methods: Method[] };
+
+export const MODEL_CONFIDENCE_CEILING = 0.75;
+/** Below all of these a window shows nothing changing at all: calibrated on held frames, where each is zero. */
+const CHANGE_FLOOR = { flowMean: 0.0008, pixelDifferenceSum: 0.005, edgeChangeMax: 0.3 };
 
 export function mergeGemini(document: FilmIR, measured: Measured, records: Record<string, PassRecord>, pack: EvidencePack): GeminiMerge {
   const doc: FilmIR = structuredClone(document);
@@ -87,7 +95,7 @@ export function mergeGemini(document: FilmIR, measured: Measured, records: Recor
 
   const output = <T extends z.ZodTypeAny>(id: PassId | 'integrator'): z.infer<T> | null => {
     const record = records[id];
-    return record && record.status === 'completed' ? (record.output as z.infer<T>) : null;
+    return record && record.status === 'completed' ? (underCeiling(record.output) as z.infer<T>) : null;
   };
 
   // ——— identity (p01) ———
@@ -296,6 +304,17 @@ export function mergeGemini(document: FilmIR, measured: Measured, records: Recor
         severity: 'medium',
       });
     }
+    const withheldSpeech = doc.unsupported.filter((entry) => entry.sourceRef === 'producer:asr' && entry.claim.startsWith('speech '));
+    if (heard && withheldSpeech.length > 0) {
+      // Two listeners against one measurement: not settled here, and not hidden.
+      contradictions.push({
+        id: `contradiction.${String(contradictions.length + 1).padStart(4, '0')}`,
+        refs: ['producer:asr', passRef('p05_audio')],
+        description: `Both the recogniser and the multimodal model heard speech where the analyzer measured no voice activity (${withheldSpeech.map((entry) => entry.claim).join('; ').slice(0, 400)}). The words stay out of the narration until someone listens.`,
+        resolution: 'unresolved',
+        severity: 'medium',
+      });
+    }
     doc.narration.speakers = p05.speakers.flatMap((speaker, index) => {
       const refs = cite('p05_audio', speaker.evidence);
       if (refs.length === 0) return [];
@@ -381,13 +400,13 @@ export function mergeGemini(document: FilmIR, measured: Measured, records: Recor
   for (const entry of p07?.continuousChanges ?? []) {
     const refs = cite('p07_transitions', entry.evidence);
     const r = range('p07_transitions', entry.startSeconds, entry.endSeconds, refs, entry.confidence);
-    const activity = motionIn(doc, entry.startSeconds, entry.endSeconds);
     if (refs.length === 0 || !r) {
       refuse('p07_transitions', `continuous change ${entry.startSeconds}-${entry.endSeconds}s: ${entry.technique}`, 'no evidence or times outside the film');
       continue;
     }
-    if (activity !== null && activity < 0.0008) {
-      refuse('p07_transitions', `continuous change ${entry.startSeconds}-${entry.endSeconds}s: ${entry.technique}`, `almost nothing moves in that window (mean flow ${activity.toFixed(5)} frame widths per frame)`);
+    const change = changeIn(doc, entry.startSeconds - halfStep('p07_transitions'), entry.endSeconds + halfStep('p07_transitions'));
+    if (!change.changed) {
+      refuse('p07_transitions', `continuous change ${entry.startSeconds}-${entry.endSeconds}s: ${entry.technique}`, `nothing measurably changes in that window (${change.detail})`);
       continue;
     }
     transitions.push({
@@ -465,15 +484,16 @@ export function mergeGemini(document: FilmIR, measured: Measured, records: Recor
     for (const inspection of record.inspections) {
       if (!inspection.output) continue;
       const refs: Ref[] = [passRef(record.id), `frames:${inspection.firstFrame}-${inspection.lastFrame}`];
+      const confidence = Math.min(MODEL_CONFIDENCE_CEILING, inspection.output.confidence);
       const r = inferred(
         { start: clock.at(inspection.firstFrame), end: clock.end(inspection.lastFrame) },
         methodFor(record.id),
         refs,
-        inspection.output.confidence,
+        confidence,
         { note: 'a window inspected at the film\'s own frames' },
       );
       const detail = inspection.output.observations.map((o) => `frame ${o.frame}: ${o.observation}`).join(' | ');
-      observations.push(observation(`inspection (${record.id})`, inferred(`${inspection.question} → ${inspection.output.answer}${detail ? ` [${detail}]` : ''}`.slice(0, 4000), methodFor(record.id), refs, inspection.output.confidence), r));
+      observations.push(observation(`inspection (${record.id})`, inferred(`${inspection.question} → ${inspection.output.answer}${detail ? ` [${detail}]` : ''}`.slice(0, 4000), methodFor(record.id), refs, confidence), r));
     }
   }
 
@@ -702,16 +722,57 @@ function nearestSfx(doc: FilmIR, seconds: number, tolerance: number) {
   return best;
 }
 
-function motionIn(doc: FilmIR, start: number, end: number): number | null {
-  const flow = doc.frames?.features.find((series) => series.id === 'frame.flow_mean')?.values;
-  if (!flow || !doc.frames) return null;
-  const values: number[] = [];
-  doc.frames.pts.forEach((pts, i) => {
+/**
+ * Whether anything measurably changes in a window.
+ *
+ * Motion alone is the wrong test: a crossfade, a counter ticking over or type
+ * changing in place moves no pixels anywhere and changes the picture
+ * completely. So a window changes if something moves, if the picture's
+ * pixels or edges change, or if a text milestone or a boundary was measured
+ * inside it. Only a window where all of these are flat is a window where the
+ * model saw a change that the film does not contain.
+ */
+function changeIn(doc: FilmIR, start: number, end: number): { changed: boolean; detail: string } {
+  if (!doc.frames) return { changed: true, detail: 'no frame measurements to check against' };
+  const series = (id: string) => doc.frames!.features.find((candidate) => candidate.id === id)?.values ?? [];
+  const inside: number[] = [];
+  doc.frames.pts.forEach((pts, index) => {
     const t = Number(pts) / doc.frames!.timescale;
-    const v = flow[i];
-    if (t >= start && t <= end && v !== null && v !== undefined) values.push(v);
+    if (t >= start && t <= end) inside.push(index);
   });
-  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  const values = (id: string) => {
+    const all = series(id);
+    return inside.map((index) => all[index]).filter((value): value is number => typeof value === 'number');
+  };
+  const flow = values('frame.flow_mean');
+  const flowMean = flow.length ? flow.reduce((a, b) => a + b, 0) / flow.length : 0;
+  const pixelDifferenceSum = values('frame.pixel_difference').reduce((a, b) => a + b, 0);
+  const edgeChangeMax = Math.max(0, ...values('frame.edge_change_ratio'));
+  const within = (time: { ticks: string; timescale: number } | null | undefined) => {
+    if (!time) return false;
+    const t = toSeconds(time);
+    return t >= start && t <= end;
+  };
+  const milestone = doc.typography.blocks.some((block) => within(block.timing.firstVisible.value) || within(block.timing.exitStart.value) || within(block.timing.lastVisible.value))
+    || doc.structure.boundaries.some((boundary) => within(boundary.at));
+  const detail = `mean flow ${flowMean.toFixed(5)} frame widths per frame, summed pixel change ${pixelDifferenceSum.toFixed(4)}, largest edge change ${edgeChangeMax.toFixed(2)}, ${milestone ? 'a' : 'no'} text milestone or boundary inside`;
+  const changed = milestone
+    || flowMean >= CHANGE_FLOOR.flowMean
+    || pixelDifferenceSum >= CHANGE_FLOOR.pixelDifferenceSum
+    || edgeChangeMax >= CHANGE_FLOOR.edgeChangeMax;
+  return { changed, detail };
+}
+
+/** Every `confidence` a model wrote, held under the ceiling; everything else as it was. */
+function underCeiling(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(underCeiling);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+      key,
+      key === 'confidence' && typeof child === 'number' ? Math.min(MODEL_CONFIDENCE_CEILING, child) : underCeiling(child),
+    ]),
+  );
 }
 
 function allTextRefs(doc: FilmIR): Ref[] {
@@ -722,10 +783,11 @@ function allPassRefs(records: Record<string, PassRecord>): Ref[] {
   return Object.values(records).filter((r) => r.status === 'completed' && r.id !== 'integrator').map((r) => `pass:${r.id}` as Ref);
 }
 
+/** Whether an answer says anything at all. A confidence on its own is not a finding: `{ value: null, confidence: 0 }` says nothing. */
 function isEmpty(value: unknown): boolean {
   if (value === null || value === undefined) return true;
-  if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === 'object') return Object.values(value as Record<string, unknown>).every(isEmpty);
+  if (Array.isArray(value)) return value.every(isEmpty);
+  if (typeof value === 'object') return Object.entries(value as Record<string, unknown>).every(([key, child]) => key === 'confidence' || isEmpty(child));
   if (typeof value === 'string') return value.trim() === '';
   return false;
 }

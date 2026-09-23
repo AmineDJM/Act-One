@@ -69,10 +69,13 @@ export type BoundaryState = z.infer<typeof BoundaryState>;
 export const Boundary = z.object({
   id: z.string().regex(/^boundary\.[0-9]{3,4}$/),
   kind: evidenced(BoundaryKind),
-  /** The first frame of what comes after. For a gradual change, `span` covers the whole change. */
+  /** The first frame of what comes after, complete. */
   at: RationalTime,
+  /** The last frame the change has not touched, and the first it has completed. */
   frames: z.object({ lastOutgoing: z.number().int().nonnegative(), firstIncoming: z.number().int().nonnegative() }),
+  /** Those two frames and every frame between them. */
   span: FrameSpan,
+  /** The change itself: from the end of the last untouched frame to the start of the first completed one. Zero-length for a cut. */
   range: TimeRange,
   outgoing: BoundaryState,
   incoming: BoundaryState,
