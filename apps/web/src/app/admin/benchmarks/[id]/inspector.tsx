@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { FilmIR, ValidationReport } from '@act-one/film-ir';
-import { EVIDENCE_LABEL, EVIDENCE_ORDER, clock, seconds, statusBadge, type TimeLike } from '../format.ts';
+import { EVIDENCE_LABEL, EVIDENCE_ORDER, clock, seconds, show, statusBadge, time, type TimeLike } from '../format.ts';
+import { composeWindow } from './composition.ts';
 import adminStyles from '../../admin.module.css';
 import styles from '../benchmarks.module.css';
 
@@ -41,20 +42,6 @@ function Refs({ refs }: { refs: readonly string[] }) {
   return <div className={styles.refs}>{refs.slice(0, 12).join(' · ')}{refs.length > 12 ? ` · +${refs.length - 12}` : ''}</div>;
 }
 
-function show(value: unknown): string {
-  if (value === null || value === undefined) return '—';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(3);
-  if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (Array.isArray(value)) return value.map(show).join(', ');
-  if (typeof value === 'object' && 'ticks' in (value as object)) return clock(seconds(value as TimeLike));
-  if (typeof value === 'object' && 'start' in (value as object) && 'end' in (value as object)) {
-    const range = value as { start: TimeLike; end: TimeLike };
-    return `${clock(seconds(range.start))} – ${clock(seconds(range.end))}`;
-  }
-  return JSON.stringify(value);
-}
-
 export function Claim({ label, value }: { label: string; value: Evidenced | null | undefined }) {
   return (
     <div className={styles.claim}>
@@ -69,7 +56,6 @@ export function Claim({ label, value }: { label: string; value: Evidenced | null
   );
 }
 
-const time = (value: TimeLike | null | undefined) => clock(seconds(value));
 
 function durationOf(doc: Doc): number {
   const end = seconds(doc.source?.frameTiming?.lastPtsEnd ?? null);
@@ -283,7 +269,7 @@ export function TypographyView({ doc }: { doc: Doc }) {
     <>
       <p className="muted" style={{ fontSize: '0.84rem' }}>
         {blocks.length} block(s). Milestones are the first frames where visibility crosses a fraction of its settled value; the bounds are the frame before and the frame itself. Font families are never read from pixels.
-        {blocks.length > shown.length ? ` The first ${shown.length} are shown; download the FilmIR for all.` : ''}
+        <Shown total={blocks.length} shown={shown.length} />
       </p>
       <div className={adminStyles.tableWrap}>
         <table className={adminStyles.table}>
@@ -554,25 +540,42 @@ export function TransitionsView({ doc }: { doc: Doc }) {
 
 // ——— events ———
 
+/** Rows a list view renders at most; a long film's document holds thousands, and the download holds them all. */
+const LIST_LIMIT = 300;
+
+function Shown({ total, shown }: { total: number; shown: number }) {
+  return total > shown ? <> The first {shown} are shown; download the FilmIR for all.</> : null;
+}
+
 export function EventsView({ doc }: { doc: Doc }) {
   const events = new Map(doc.events.events.map((event) => [event.id, event]));
   const ms = (value: TimeLike) => `${((seconds(value) ?? 0) * 1000).toFixed(1)} ms`;
+  const clusters = doc.events.clusters.slice(0, LIST_LIMIT);
+  const relations = doc.events.relations.slice(0, LIST_LIMIT);
   return (
     <>
       <section className={adminStyles.section}>
         <h2>Sync clusters</h2>
         {doc.events.clusters.length === 0 ? <p className={adminStyles.empty}>No three events from two senses land within 120 ms of each other.</p> : (
+          <>
+          <p className="muted" style={{ fontSize: '0.84rem' }}>
+            {doc.events.clusters.length} cluster(s) of events from two or more senses within 120 ms.
+            <Shown total={doc.events.clusters.length} shown={clusters.length} />
+          </p>
           <div className={adminStyles.tableWrap}>
             <table className={adminStyles.table}>
               <thead><tr><th>Cluster</th><th>Anchor</th><th>Members (offset from the anchor)</th><th>Spread</th><th>Reading</th></tr></thead>
               <tbody>
-                {doc.events.clusters.map((cluster) => {
+                {clusters.map((cluster) => {
                   const anchor = events.get(cluster.anchor);
                   return (
                     <tr key={cluster.id}>
                       <td className="mono">{cluster.id}</td>
                       <td className="mono">{anchor ? `${anchor.type} @ ${time(anchor.start)}` : cluster.anchor}</td>
-                      <td className={styles.sub} style={{ whiteSpace: 'normal' }}>{cluster.members.map((member) => `${events.get(member.eventId)?.type ?? member.eventId} ${ms(member.offset)}`).join(' · ')}</td>
+                      <td className={styles.sub} style={{ whiteSpace: 'normal' }}>
+                        {cluster.members.slice(0, 16).map((member) => `${events.get(member.eventId)?.type ?? member.eventId} ${ms(member.offset)}`).join(' · ')}
+                        {cluster.members.length > 16 ? ` · +${cluster.members.length - 16} more` : ''}
+                      </td>
                       <td className="mono">{ms(cluster.spread)}</td>
                       <td style={{ maxWidth: 280 }}>{cluster.interpretation ? <>{show(cluster.interpretation.value)} <Tag value={cluster.interpretation} /></> : <span className="muted">—</span>}</td>
                     </tr>
@@ -581,18 +584,20 @@ export function EventsView({ doc }: { doc: Doc }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
       <section className={adminStyles.section}>
         <h2>Relations</h2>
         <p className="muted" style={{ fontSize: '0.84rem' }}>
           {doc.events.relations.length} relation(s) between events of different senses within 250 ms. Each offset is exact; its uncertainty is the sum of the two events&apos; resolutions.
+          <Shown total={doc.events.relations.length} shown={relations.length} />
         </p>
         <div className={adminStyles.tableWrap}>
           <table className={adminStyles.table}>
             <thead><tr><th>From</th><th>To</th><th className={adminStyles.num}>Offset</th><th className={adminStyles.num}>±</th><th>Kind</th></tr></thead>
             <tbody>
-              {doc.events.relations.slice(0, 300).map((relation) => {
+              {relations.map((relation) => {
                 const from = events.get(relation.from);
                 const to = events.get(relation.to);
                 return (
@@ -834,32 +839,8 @@ export function WindowView({ doc, id, start, end }: { doc: Doc; id: string; star
   const cam = (name: 'tx' | 'ty' | 'scale', k: number | undefined) => (k === undefined ? null : doc.camera?.columns[name]?.[k] ?? null);
   const audioIn = (a: number, b: number) => doc.audio.events.filter((event) => { const t = seconds(event.at)!; return t >= a && t < b; });
   const wordsIn = (a: number, b: number) => doc.narration.words.filter((word) => word.range.value && seconds(word.range.value.start)! >= a && seconds(word.range.value.start)! < b);
-  const beatsIn = (a: number, b: number) => doc.sound.music.beats.times.filter((beat) => { const t = seconds(beat)!; return t >= a && t < b; }).length;
 
-  const blocksHere = doc.typography.blocks.filter((block) => {
-    const a = seconds(block.timing.firstVisible.value);
-    const b = seconds(block.timing.lastVisible.value);
-    return a !== null && b !== null && a < to && b >= from;
-  });
-  const startsHere = (value: TimeLike | null) => { const t = seconds(value); return t !== null && t >= from && t < to; };
-  const story: string[] = [];
-  for (const boundary of doc.structure.boundaries.filter((candidate) => startsHere(candidate.at) || (seconds(candidate.range.start)! < to && seconds(candidate.range.end)! >= from))) {
-    story.push(`${boundary.id}: a ${show(boundary.kind.value)} (${boundary.kind.evidenceType.toLowerCase()}) — frame ${boundary.frames.lastOutgoing} is the last untouched, frame ${boundary.frames.firstIncoming} the first complete, the change spanning ${time(boundary.range.start)}–${time(boundary.range.end)}.`);
-  }
-  for (const block of blocksHere) {
-    const milestones = (['firstVisible', 'p50', 'settled', 'exitStart', 'lastVisible'] as const).filter((key) => startsHere(block.timing[key].value)).map((key) => `${key} ${time(block.timing[key].value)}`);
-    story.push(`${block.id} “${show(block.text.value)}” (${show(block.classification.value)}) is on screen${milestones.length ? `; inside this window: ${milestones.join(', ')}` : ' throughout'}${block.enter.durationMs.value ? `; it enters over ${show(block.enter.durationMs.value)} ms` : ''}.`);
-  }
-  const events = doc.events.events.filter((event) => startsHere(event.start));
-  if (events.length) story.push(`${events.length} event(s) begin here: ${events.slice(0, 12).map((event) => `${event.type} at ${time(event.start)}`).join('; ')}.`);
-  for (const cluster of doc.events.clusters) {
-    const anchor = doc.events.events.find((event) => event.id === cluster.anchor);
-    if (anchor && startsHere(anchor.start)) story.push(`${cluster.id}: ${cluster.members.length} events land within ${((seconds(cluster.spread) ?? 0) * 1000).toFixed(0)} ms${cluster.interpretation?.value ? ` — read as “${cluster.interpretation.value}” (inferred)` : ''}.`);
-  }
-  const heard = doc.audio.events.filter((event) => { const t = seconds(event.at)!; return t >= from && t < to; });
-  if (heard.length) story.push(`Heard: ${heard.map((event) => `${event.kind} at ${time(event.at)}`).join(', ')}.`);
-  const beatCount = beatsIn(from, to);
-  if (beatCount) story.push(`${beatCount} musical beat(s) fall in the window (${doc.sound.music.beats.provenance.evidenceType.toLowerCase()}).`);
+  const story = composeWindow(doc, from, to);
 
   return (
     <>

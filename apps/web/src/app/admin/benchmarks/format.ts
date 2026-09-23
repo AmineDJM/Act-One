@@ -79,3 +79,21 @@ export const EVIDENCE_LABEL: Record<string, string> = {
   SPECIFIED: 'specified',
   UNKNOWN: 'unknown',
 };
+
+/** Any evidenced value, as a sentence shows it. */
+export function show(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(3);
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (Array.isArray(value)) return value.map(show).join(', ');
+  if (typeof value === 'object' && 'ticks' in (value as object)) return clock(seconds(value as TimeLike));
+  if (typeof value === 'object' && 'start' in (value as object) && 'end' in (value as object)) {
+    const range = value as { start: TimeLike; end: TimeLike };
+    return `${clock(seconds(range.start))} – ${clock(seconds(range.end))}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** A film time, from its rational form. */
+export const time = (value: TimeLike | null | undefined): string => clock(seconds(value));
