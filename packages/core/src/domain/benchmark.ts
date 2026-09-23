@@ -17,6 +17,18 @@ import { z } from 'zod';
  * new one is complete.
  */
 export const BENCHMARK_STAGES = ['validate', 'probe', 'forensics', 'transcription', 'upload', 'passes', 'compile', 'integrity'] as const;
+
+/**
+ * The forensic analyzer this code runs: ANALYZER_VERSION in
+ * packages/film-ir/forensics/actone_forensics/common.py, which a test holds
+ * it to. An analysis measured by another version says so in the console.
+ */
+export const BENCHMARK_ANALYZER_VERSION = '1.4.0';
+
+/** The analyzer version an analysis was measured with, read back from its version string; null when it does not say. */
+export function measuredWith(analysisVersion: string | null | undefined): string | null {
+  return /(?:^| · )forensics (\S+)/.exec(analysisVersion ?? '')?.[1] ?? null;
+}
 export const BenchmarkStageId = z.enum(BENCHMARK_STAGES);
 export type BenchmarkStageId = z.infer<typeof BenchmarkStageId>;
 

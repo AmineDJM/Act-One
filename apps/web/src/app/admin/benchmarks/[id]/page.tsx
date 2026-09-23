@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BENCHMARK_STAGES, BENCHMARK_STAGE_LABELS, benchmarkBusy, benchmarkRetrievable } from '@act-one/core';
+import { BENCHMARK_ANALYZER_VERSION, BENCHMARK_STAGES, BENCHMARK_STAGE_LABELS, benchmarkBusy, benchmarkRetrievable, measuredWith } from '@act-one/core';
 import { getBenchmark, readFilmIr, readValidation } from '@/server/benchmarks.ts';
 import { analyzeBenchmarkAction, deleteBenchmarkAction, setRetrievalAction, updateBenchmarkAction } from '../actions.ts';
 import { bytes, duration, frameRate, percent, statusBadge, when } from '../format.ts';
@@ -56,6 +56,7 @@ export default async function BenchmarkPage({ params, searchParams }: { params: 
   const [document, validation] = await Promise.all([readFilmIr(benchmark), readValidation(benchmark)]);
   const media = benchmark.media;
   const analysis = benchmark.analysis;
+  const measuredBy = measuredWith(analysis.version);
   const busy = benchmarkBusy(benchmark);
   const anyFailed = BENCHMARK_STAGES.some((stage) => benchmark.stages[stage].status === 'failed');
   const here = `/admin/benchmarks/${id}`;
@@ -76,6 +77,11 @@ export default async function BenchmarkPage({ params, searchParams }: { params: 
         </p>
       </header>
 
+      {measuredBy && measuredBy !== BENCHMARK_ANALYZER_VERSION ? (
+        <p className={styles.notice}>
+          Measured with analyzer {measuredBy}; this deployment runs {BENCHMARK_ANALYZER_VERSION}. Re-analyse to measure it again. The model&apos;s passes run again with it: they cite the measured shots, boundaries and type by id, and those change with the measurements.
+        </p>
+      ) : null}
       {read('notice') ? <p className={styles.notice}>{read('notice')}</p> : null}
       {read('error') ? <p className={styles.notice} data-tone="error">{read('error')}</p> : null}
 

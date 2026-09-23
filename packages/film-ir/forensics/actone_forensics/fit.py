@@ -59,17 +59,47 @@ def phases(times, values, fps, rest_fraction=0.08, min_rest_frames=3):
     return found
 
 
+# Where the curve's x is tabulated to start Newton's method from.
+_BEZIER_TABLE = np.linspace(0.0, 1.0, 129)
+
+
 def _bezier_curve(x1, y1, x2, y2, t):
-    """CSS cubic-bezier(x1, y1, x2, y2) evaluated at progress t, by solving x(s) = t with bisection."""
-    lo = np.zeros_like(t)
-    hi = np.ones_like(t)
-    for _ in range(40):
-        mid = (lo + hi) / 2
-        x = 3 * (1 - mid) ** 2 * mid * x1 + 3 * (1 - mid) * mid ** 2 * x2 + mid ** 3
-        lo = np.where(x < t, mid, lo)
-        hi = np.where(x < t, hi, mid)
-    s = (lo + hi) / 2
-    return 3 * (1 - s) ** 2 * s * y1 + 3 * (1 - s) * s ** 2 * y2 + s ** 3
+    """
+    CSS cubic-bezier(x1, y1, x2, y2) evaluated at progress t, solving x(s) = t.
+
+    As browsers do: from a table of the curve, a few steps of Newton's method,
+    and bisection wherever the curve is too flat in x for Newton to pin s
+    down. Fitting evaluates it hundreds of thousands of times, and forty
+    steps of bisection on small arrays cost most of a reference film's
+    analysis; this agrees with them to 1e-12 (tests/test_fit.py).
+    """
+    t = np.asarray(t, dtype=np.float64)
+    cx = 3.0 * x1
+    bx = 3.0 * (x2 - x1) - cx
+    ax = 1.0 - cx - bx
+    cy = 3.0 * y1
+    by = 3.0 * (y2 - y1) - cy
+    ay = 1.0 - cy - by
+    table = ((ax * _BEZIER_TABLE + bx) * _BEZIER_TABLE + cx) * _BEZIER_TABLE
+    s = np.interp(t, table, _BEZIER_TABLE)
+    for _ in range(3):
+        slope = (3.0 * ax * s + 2.0 * bx) * s + cx
+        steep = slope > 1e-3
+        s = np.where(steep, s - (((ax * s + bx) * s + cx) * s - t) / np.where(steep, slope, 1.0), s)
+    slope = (3.0 * ax * s + 2.0 * bx) * s + cx
+    # How far s may still be from the root: the residual in x over the slope there.
+    error = np.abs(((ax * s + bx) * s + cx) * s - t) / np.maximum(slope, 1e-300)
+    unsettled = ~(error < 1e-12) | (slope <= 1e-3) | (s < 0.0) | (s > 1.0)
+    if unsettled.any():
+        target = t[unsettled]
+        lo, hi = np.zeros_like(target), np.ones_like(target)
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            below = ((ax * mid + bx) * mid + cx) * mid < target
+            lo, hi = np.where(below, mid, lo), np.where(below, hi, mid)
+        s = s.copy()
+        s[unsettled] = (lo + hi) / 2
+    return ((ay * s + by) * s + cy) * s
 
 
 def _spring(omega, zeta, t):
