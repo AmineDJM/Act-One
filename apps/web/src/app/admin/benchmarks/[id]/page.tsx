@@ -167,7 +167,12 @@ export default async function BenchmarkPage({ params, searchParams }: { params: 
           {analysis.counts ? <div><dt>Contents</dt><dd>{analysis.counts.shots} shots · {analysis.counts.boundaries} boundaries · {analysis.counts.textBlocks} text blocks · {analysis.counts.objects} tracks · {analysis.counts.events} events</dd></div> : null}
           {analysis.counts ? <div><dt>Findings</dt><dd>{analysis.counts.contradictions} contradictions · {analysis.counts.unsupported} unsupported claims · {analysis.counts.uncertainties} uncertainties</dd></div> : null}
         </dl>
-        {Object.keys(analysis.evidenceMix).length ? <EvidenceMix mix={analysis.evidenceMix} /> : null}
+        {Object.keys(analysis.evidenceMix).length ? (
+          <>
+            <p className="muted" style={{ fontSize: '0.84rem', margin: 'var(--space-3) 0 var(--space-1)' }}>How each value in the FilmIR is known:</p>
+            <EvidenceMix mix={analysis.evidenceMix} />
+          </>
+        ) : null}
         {analysis.failures.length ? (
           <div className={styles.notice} data-tone="error">
             {analysis.failures.map((failure, i) => <div key={i}>{failure}</div>)}

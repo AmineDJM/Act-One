@@ -770,6 +770,7 @@ export function ValidationView({ validation }: { validation: ValidationReport | 
         <span className={`badge ${statusBadge(validation.status.toLowerCase() === 'ready' ? 'ready' : validation.status.toLowerCase())}`}>{validation.status}</span>{' '}
         <span className="muted">validator {validation.validatorVersion}, {new Date(validation.checkedAt).toLocaleString('en-GB', { hour12: false })}</span>
       </p>
+      <p className="muted" style={{ fontSize: '0.84rem' }}>Every evidence record the validator checked: values, and the provenance of each measured series and track column.</p>
       <EvidenceMix mix={validation.evidenceMix} />
       <div className={adminStyles.tableWrap} style={{ marginTop: 'var(--space-4)' }}>
         <table className={adminStyles.table}>

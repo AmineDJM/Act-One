@@ -103,11 +103,18 @@ export type FilmIrSummary = {
  * Confidence is the mean over values that are known, and never the whole
  * story alone: a document that says UNKNOWN to everything it cannot measure
  * has high confidence in very little, which is what `knownShare` shows.
+ *
+ * The mix, the share and the confidence are all over values — claims with a
+ * value — so the library's bar and its "known" figure describe the same
+ * things. The validator's own mix also counts the provenance of every
+ * measured series and track column, which is almost never unknown and would
+ * make a film look more known than it is; it stays in the validation report.
  */
 export function summarizeFilmIR(document: FilmIR, validation: ValidationReport): FilmIrSummary {
   let known = 0;
   let total = 0;
   let confidenceSum = 0;
+  const mix: Record<string, number> = {};
   const visit = (node: unknown) => {
     if (Array.isArray(node)) {
       for (const item of node) visit(item);
@@ -117,6 +124,7 @@ export function summarizeFilmIR(document: FilmIR, validation: ValidationReport):
     const record = node as Record<string, unknown>;
     if (typeof record['evidenceType'] === 'string' && typeof record['confidence'] === 'number' && 'value' in record) {
       total += 1;
+      mix[record['evidenceType']] = (mix[record['evidenceType']] ?? 0) + 1;
       if (record['evidenceType'] !== 'UNKNOWN') {
         known += 1;
         confidenceSum += record['confidence'];
@@ -126,7 +134,7 @@ export function summarizeFilmIR(document: FilmIR, validation: ValidationReport):
   };
   visit(document);
   return {
-    evidenceMix: validation.evidenceMix,
+    evidenceMix: mix,
     meanConfidence: known > 0 ? round(confidenceSum / known, 3) : null,
     knownShare: total > 0 ? round(known / total, 3) : null,
     counts: {
