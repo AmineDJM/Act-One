@@ -200,14 +200,21 @@ export function sniffContainer(head: Uint8Array): BenchmarkContainer | null {
 /** A file name safe to show and to store beside the film: no path, no control characters, bounded. */
 export function cleanFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? '';
-  const cleaned = base.normalize('NFC').replace(/[^\p{L}\p{N}._ ()-]+/gu, '_').replace(/_+/g, '_').trim().slice(0, 160);
+  // Letters, digits, spaces, dashes of any kind and a little harmless punctuation; anything else becomes "_".
+  const cleaned = base.normalize('NFC').replace(/[^\p{L}\p{N}\p{Pd}._ (),'&+]+/gu, '_').replace(/_+/g, '_').trim().slice(0, 160);
   return cleaned.length > 0 && cleaned !== '.' && cleaned !== '..' ? cleaned : 'film';
 }
 
-/** A readable title from a file name, until someone writes a better one. */
+/**
+ * A readable title from a file name, until someone writes a better one.
+ * Underscores are spaces; hyphens are, in a name that has no spaces of its
+ * own; a dot between two digits is a version number and stays.
+ */
 export function titleFromFileName(name: string): string {
   const stem = cleanFileName(name).replace(/\.[A-Za-z0-9]{2,4}$/, '');
-  const title = stem.replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let title = stem.replace(/_+/g, ' ');
+  if (!/\s/.test(stem)) title = title.replace(/-+/g, ' ');
+  title = title.replace(/(?<!\d)\.|\.(?!\d)/g, ' ').replace(/\s+/g, ' ').trim();
   return (title || 'Untitled film').slice(0, 200);
 }
 

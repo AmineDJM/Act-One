@@ -28,13 +28,17 @@ describe('file names', () => {
   it('keeps a name readable and harmless', () => {
     expect(cleanFileName('../../etc/passwd')).toBe('passwd');
     expect(cleanFileName('C:\\films\\Launch <final>.mp4')).toBe('Launch _final_.mp4');
+    expect(cleanFileName('Plasma 5.25 — launch.mp4')).toBe('Plasma 5.25 — launch.mp4');
+    expect(cleanFileName('a\u0000b\u202ec.mp4')).toBe('a_b_c.mp4');
     expect(cleanFileName('Présentation 2026.mov')).toBe('Présentation 2026.mov');
     expect(cleanFileName('..')).toBe('film');
     expect(cleanFileName('a'.repeat(400) + '.mp4')).toHaveLength(160);
   });
 
   it('makes a title until someone writes one', () => {
-    expect(titleFromFileName('plasma-5.25_amazement_guaranteed.mp4')).toBe('plasma 5 25 amazement guaranteed');
+    expect(titleFromFileName('plasma-5.25_amazement_guaranteed.mp4')).toBe('plasma 5.25 amazement guaranteed');
+    expect(titleFromFileName('Plasma 5.25 — launch.mp4')).toBe('Plasma 5.25 — launch');
+    expect(titleFromFileName('my.final.cut.v2.mov')).toBe('my final cut v2');
     expect(titleFromFileName('.mp4')).toBe('Untitled film');
   });
 });

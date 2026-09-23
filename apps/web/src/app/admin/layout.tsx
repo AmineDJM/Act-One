@@ -37,6 +37,7 @@ const NAV = [
   { href: '/admin/logs', label: 'Logs' },
   { href: '/admin/quality', label: 'Quality' },
   { href: '/admin/director', label: 'Director Lab' },
+  { href: '/admin/benchmarks', label: 'Benchmark library' },
   { href: '/admin/standards', label: 'Standards' },
   { href: '/admin/staff', label: 'Access' },
 ];
