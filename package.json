@@ -25,6 +25,7 @@
     "verify": "npm run typecheck && npm run test",
     "demo": "NODE_USE_ENV_PROXY=1 vite-node scripts/demo.ts",
     "reference-films": "NODE_USE_ENV_PROXY=1 vite-node scripts/reference-films.ts",
+    "ingest": "NODE_USE_ENV_PROXY=1 vite-node scripts/ingest.ts",
     "prove:repair-loop": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-repair-loop.ts",
     "prove:creative-replan": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-creative-replan.ts",
     "sound-library": "NODE_USE_ENV_PROXY=1 vite-node scripts/build-sound-library.ts",

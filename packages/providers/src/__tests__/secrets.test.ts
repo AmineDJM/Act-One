@@ -98,10 +98,18 @@ describe('redact', () => {
       ['failed with sk-proj-ABCDEFGHIJKLMNOP', /ABCDEFGHIJKLMNOP/],
       ['token=eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.SflKxwRJSMeKKF2QT4', /SflKxwRJSMeKKF2QT4/],
       ['"password": "correct-horse"', /correct-horse/],
+      ['wss://connect.browserbase.com?signingKey=sk9f8e7d6c5b4a&sessionId=s1', /sk9f8e7d6c5b4a/],
+      ['wss://connect.browserbase.com?apiKey=bb_live_0123456789ab&sessionId=s1', /0123456789ab/],
     ];
     for (const [input, leaked] of samples) {
       expect(redact(input), input).not.toMatch(leaked);
     }
+  });
+
+  it('stops at the end of a query value, so the rest of an address stays readable', () => {
+    expect(redact('wss://connect.browserbase.com?signingKey=abcdef123456&sessionId=sess_42')).toContain(
+      'sessionId=sess_42',
+    );
   });
 
   it('leaves ordinary error text readable', () => {

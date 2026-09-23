@@ -33,6 +33,8 @@ class FakeBrowserbase {
   projects: Project[] = [];
   /** Where a created session says its browser is. */
   connectUrl: string | null = null;
+  /** False stands in for an egress proxy that adds the key on the way out. */
+  requireKey = true;
   url = '';
   private server: Server | null = null;
   private counter = 0;
@@ -60,6 +62,7 @@ class FakeBrowserbase {
       { id: 'proj_a', name: 'Act One research', concurrency: 3, defaultTimeout: 600 },
     ];
     this.connectUrl = null;
+    this.requireKey = true;
     this.counter = 0;
   }
 
@@ -81,7 +84,7 @@ class FakeBrowserbase {
 
     const body: unknown = raw.length > 0 ? JSON.parse(raw.toString('utf8')) : undefined;
     this.calls.push({ method, path: requestPath, headers: request.headers, body });
-    if (request.headers['x-bb-api-key'] !== KEY) {
+    if (this.requireKey && request.headers['x-bb-api-key'] !== KEY) {
       return json(response, 401, {
         statusCode: 401,
         error: 'Unauthorized',
@@ -250,6 +253,47 @@ describe('Browserbase', () => {
     ).rejects.toThrow(/not configured/);
   });
 
+  it('releases a session it cannot reach, records it as failed, and says so retryably', async () => {
+    // A connect address nothing listens on: the vendor made the session, the
+    // DevTools connection fails, and the session must not be left running.
+    fake.connectUrl = 'ws://127.0.0.1:9/devtools/browser/gone';
+    const sink = new NullCostSink();
+    await expect(
+      provider({ costSink: sink }).openPage({ projectId: 'prj_1', organizationId: 'org_1' }, call),
+    ).rejects.toMatchObject({ retryable: true, message: expect.stringMatching(/Could not reach/) });
+
+    const released = fake.calls.find((entry) => entry.method === 'POST' && entry.path === '/v1/sessions/sess_1');
+    expect(released?.body).toEqual({ projectId: 'proj_a', status: 'REQUEST_RELEASE' });
+    expect(sink.records).toHaveLength(1);
+    expect(sink.records[0]).toMatchObject({ operation: 'browser.session', succeeded: false });
+  });
+
+  it('never creates a second session behind one that failed', async () => {
+    fake.connectUrl = 'ws://127.0.0.1:9/devtools/browser/gone';
+    await provider().openPage({ projectId: 'prj_1', organizationId: 'org_1' }, call).catch(() => undefined);
+    expect(fake.calls.filter((entry) => entry.method === 'POST' && entry.path === '/v1/sessions')).toHaveLength(1);
+  });
+
+  describe('with the key added by the egress proxy', () => {
+    it('is configured, and sends no key of its own', async () => {
+      fake.requireKey = false;
+      const proxied = new BrowserbaseProvider({ baseUrl: fake.url, keyFromProxy: true });
+      expect(proxied.isConfigured()).toBe(true);
+      expect((await proxied.health()).healthy).toBe(true);
+      expect(fake.calls[0]?.headers['x-bb-api-key']).toBeUndefined();
+    });
+
+    it('refuses to guess a connect address it would need the key to build, and releases the session', async () => {
+      fake.requireKey = false;
+      const proxied = new BrowserbaseProvider({ baseUrl: fake.url, keyFromProxy: true });
+      await expect(proxied.openPage({ projectId: 'prj_1', organizationId: 'org_1' }, call)).rejects.toMatchObject({
+        retryable: false,
+        message: expect.stringMatching(/no connect address/),
+      });
+      expect(fake.calls.some((entry) => entry.path === '/v1/sessions/sess_1')).toBe(true);
+    });
+  });
+
   describe.skipIf(!executablePath)('a session on the vendor browser', () => {
     let chrome: { child: ChildProcess; wsUrl: string; profile: string } | null = null;
 
@@ -257,6 +301,29 @@ describe('Browserbase', () => {
       chrome?.child.kill('SIGKILL');
       if (chrome) rmSync(chrome.profile, { recursive: true, force: true });
     });
+
+    it('hands over the page itself, and closes it exactly once', async () => {
+      chrome ??= await launchCdpChromium();
+      fake.connectUrl = chrome.wsUrl;
+      const sink = new NullCostSink();
+      const handle = await provider({ costSink: sink }).openPage(
+        { projectId: 'prj_1', organizationId: 'org_1', viewport: { width: 1024, height: 700 } },
+        call,
+      );
+      expect(handle.provider).toBe('browserbase');
+      await handle.page.goto(`${fake.origin}/page`);
+      expect(await handle.page.title()).toBe('Acme');
+      expect(handle.page.viewportSize()).toEqual({ width: 1024, height: 700 });
+
+      await Promise.all([handle.close(), handle.close()]);
+      await handle.close();
+      expect(fake.calls.filter((entry) => entry.path === `/v1/sessions/${handle.id}`)).toHaveLength(1);
+      expect(sink.records).toHaveLength(1);
+      // The vendor browser outlives our disconnect; only the release ends it.
+      chrome.child.kill('SIGKILL');
+      rmSync(chrome.profile, { recursive: true, force: true });
+      chrome = null;
+    }, 60_000);
 
     it('is created in the project, browses, is released early, and is billed by the minute', async () => {
       chrome = await launchCdpChromium();

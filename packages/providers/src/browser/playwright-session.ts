@@ -46,6 +46,7 @@ export class PlaywrightSession implements BrowserSession {
   private readonly policy: NavigationPolicy;
   private readonly audit: AuditHook | undefined;
   private readonly ownsBrowser: boolean;
+  private readonly onClose: (() => Promise<void>) | undefined;
   private pagesVisited = 0;
   private closed = false;
   /** HTTP status of the last navigation. A capture of a 404 page is not evidence. */
@@ -68,6 +69,11 @@ export class PlaywrightSession implements BrowserSession {
     id?: string;
     /** What the context was created with, so it can be restored after a raise. */
     deviceScaleFactor?: number;
+    /**
+     * Runs once the browser is closed: the vendor's release and the ledger
+     * entry, which are only correct after the session has actually ended.
+     */
+    onClose?: () => Promise<void>;
   }) {
     this.browser = params.browser;
     this.context = params.context;
@@ -76,6 +82,7 @@ export class PlaywrightSession implements BrowserSession {
     this.deviceScale = params.deviceScaleFactor ?? 2;
     this.audit = params.audit;
     this.ownsBrowser = params.ownsBrowser ?? true;
+    this.onClose = params.onClose;
     this.id = params.id ?? newId('sec');
     this.audit?.({ action: 'session_open', detail: this.id });
   }
@@ -390,6 +397,7 @@ export class PlaywrightSession implements BrowserSession {
     await this.clearState().catch(() => undefined);
     await this.context.close().catch(() => undefined);
     if (this.ownsBrowser) await this.browser.close().catch(() => undefined);
+    await this.onClose?.();
   }
 
   private async performOne(step: InteractionStep): Promise<void> {

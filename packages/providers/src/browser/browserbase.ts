@@ -1,9 +1,16 @@
-import { chromium } from 'playwright-core';
+import { chromium, type Browser } from 'playwright-core';
 import { z } from 'zod';
-import { httpRequest } from '../http.ts';
+import { httpRequest, redact } from '../http.ts';
 import { ProviderError, type CallContext, type CostSink, type ProviderHealth } from '../types.ts';
 import { PlaywrightSession, type AuditHook } from './playwright-session.ts';
-import type { BrowserAutomationProvider, BrowserSession, SessionOptions } from './types.ts';
+import type {
+  BrowserAutomationProvider,
+  BrowserSession,
+  PageAccess,
+  PageHandle,
+  PageOptions,
+  SessionOptions,
+} from './types.ts';
 
 const Project = z.object({
   id: z.string(),
@@ -35,6 +42,13 @@ export type BrowserbaseConfig = {
   /** USD per browser-minute, for the ledger. Configurable in Super Admin. */
   costPerMinuteUsd?: number;
   audit?: AuditHook;
+  /**
+   * The egress proxy adds the key to every request bound for the vendor, so
+   * this process legitimately holds none. Without this a deployment whose
+   * credentials live in its proxy reads as unconfigured and never browses.
+   * Defaults to `ACT_ONE_BROWSERBASE_KEY_FROM_PROXY=1`.
+   */
+  keyFromProxy?: boolean;
 };
 
 /**
@@ -44,7 +58,7 @@ export type BrowserbaseConfig = {
  * property we need — one customer's authenticated session can never be handed to
  * another, because the container is destroyed with the session.
  */
-export class BrowserbaseProvider implements BrowserAutomationProvider {
+export class BrowserbaseProvider implements BrowserAutomationProvider, PageAccess {
   readonly name = 'browserbase';
   readonly kind = 'browser' as const;
 
@@ -54,6 +68,7 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
   private readonly costSink: CostSink | undefined;
   private readonly costPerMinuteUsd: number;
   private readonly audit: AuditHook | undefined;
+  private readonly keyFromProxy: boolean;
   private resolved: Promise<Project> | null = null;
 
   constructor(config: BrowserbaseConfig = {}) {
@@ -63,10 +78,11 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
     this.costSink = config.costSink;
     this.costPerMinuteUsd = config.costPerMinuteUsd ?? 0.02;
     this.audit = config.audit;
+    this.keyFromProxy = config.keyFromProxy ?? process.env.ACT_ONE_BROWSERBASE_KEY_FROM_PROXY === '1';
   }
 
   isConfigured(): boolean {
-    return this.apiKey.length > 0;
+    return this.apiKey.length > 0 || this.keyFromProxy;
   }
 
   /**
@@ -105,6 +121,29 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
   }
 
   async createSession(options: SessionOptions, context: CallContext): Promise<BrowserSession> {
+    const handle = await this.openPage(
+      {
+        projectId: options.projectId,
+        organizationId: options.organizationId,
+        ...(options.viewport ? { viewport: options.viewport } : {}),
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      },
+      context,
+    );
+    return new PlaywrightSession({
+      browser: handle.browser,
+      context: handle.context,
+      page: handle.page,
+      policy: options.policy,
+      audit: this.audit,
+      // The handle closes the browser, once, after the session has wiped it.
+      ownsBrowser: false,
+      id: handle.id,
+      onClose: handle.close,
+    });
+  }
+
+  async openPage(options: PageOptions, context: CallContext): Promise<PageHandle> {
     if (!this.isConfigured()) {
       /*
        * Retryable, because a fallback is exactly what this case is for.
@@ -119,6 +158,10 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
       throw new ProviderError(this.name, 'Browserbase is not configured.', { retryable: true });
     }
     const project = await this.project();
+    const viewport = {
+      width: options.viewport?.width ?? 1920,
+      height: options.viewport?.height ?? 1080,
+    };
 
     const startedAt = Date.now();
     let created: unknown;
@@ -129,10 +172,7 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
         body: {
           projectId: project.id,
           browserSettings: {
-            viewport: {
-              width: options.viewport?.width ?? 1920,
-              height: options.viewport?.height ?? 1080,
-            },
+            viewport,
             blockAds: true,
             solveCaptchas: false,
           },
@@ -145,65 +185,125 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
           keepAlive: false,
         },
         timeoutMs: 45_000,
+        /*
+         * Once. Creating a session is not idempotent: a retry after a timeout
+         * that the vendor did in fact serve leaves a second, orphaned browser
+         * holding one of the project's few concurrency slots until its own
+         * timeout, and the next job is refused for a session nobody is using.
+         * The job-level retry is the right place to try again.
+         */
+        attempts: 1,
         signal: context.signal,
       });
     } catch (error) {
       throw this.describe(error);
     }
 
-    const session = SessionResponse.parse(created);
-    const connectUrl =
-      session.connectUrl ??
-      `wss://connect.browserbase.com?apiKey=${encodeURIComponent(this.apiKey)}&sessionId=${session.id}`;
-
-    const browser = await chromium.connectOverCDP(connectUrl, { timeout: 45_000 });
-    const browserContext = browser.contexts()[0] ?? (await browser.newContext());
-    const page = browserContext.pages()[0] ?? (await browserContext.newPage());
-    await page.setViewportSize({
-      width: options.viewport?.width ?? 1920,
-      height: options.viewport?.height ?? 1080,
-    });
-
-    const costSink = this.costSink;
-    const costPerMinute = this.costPerMinuteUsd;
-    const providerName = this.name;
-
-    const playwrightSession = new PlaywrightSession({
-      browser,
-      context: browserContext,
-      page,
-      policy: options.policy,
-      audit: this.audit,
-      ownsBrowser: true,
-      id: session.id,
-    });
-
-    // Billing is by wall-clock minute, so the ledger entry is only correct once
-    // the session actually ends.
-    const originalClose = playwrightSession.close.bind(playwrightSession);
-    playwrightSession.close = async () => {
-      await originalClose();
-      const minutes = (Date.now() - startedAt) / 60_000;
-      await costSink?.record({
-        provider: providerName,
-        operation: 'browser.session',
-        estimatedCostUsd: costPerMinute * minutes,
-        actualCostUsd: costPerMinute * minutes,
-        quantity: minutes,
-        unit: 'minute',
-        metadata: { sessionId: session.id, projectId: options.projectId },
+    const parsedSession = SessionResponse.safeParse(created);
+    if (!parsedSession.success) {
+      throw new ProviderError(this.name, 'Browserbase answered the session request with something unexpected.', {
+        retryable: true,
       });
-      // Released early, so the vendor stops the meter before its own timeout.
-      await httpRequest(providerName, `${this.baseUrl}/v1/sessions/${session.id}`, {
-        method: 'POST',
-        headers: this.headers(),
-        body: { projectId: project.id, status: 'REQUEST_RELEASE' },
-        attempts: 1,
-        timeoutMs: 10_000,
-      }).catch(() => undefined);
+    }
+    const session = parsedSession.data;
+    const released = { done: false };
+    const endSession = async (succeeded: boolean): Promise<void> => {
+      if (released.done) return;
+      released.done = true;
+      await this.recordMinutes(startedAt, session.id, options.projectId, succeeded);
+      await this.release(project.id, session.id);
     };
 
-    return playwrightSession;
+    const connectUrl =
+      session.connectUrl ??
+      (this.apiKey
+        ? `wss://connect.browserbase.com?apiKey=${encodeURIComponent(this.apiKey)}&sessionId=${session.id}`
+        : null);
+    if (!connectUrl) {
+      await endSession(false);
+      throw new ProviderError(
+        this.name,
+        'Browserbase returned no connect address, and no key is held here to build one.',
+        { retryable: false },
+      );
+    }
+
+    /*
+     * A session that cannot be reached is still a session the vendor is
+     * running and billing. It used to be left to expire on its own when the
+     * DevTools connection failed, holding a concurrency slot for the length of
+     * its timeout; it is released here on every path that does not hand it on.
+     */
+    let browser: Browser;
+    try {
+      browser = await chromium.connectOverCDP(connectUrl, { timeout: 45_000 });
+    } catch (error) {
+      await endSession(false);
+      throw new ProviderError(
+        this.name,
+        `Could not reach the Browserbase session: ${redact(String((error as Error)?.message ?? error)).slice(0, 300)}`,
+        { retryable: true },
+      );
+    }
+
+    try {
+      const browserContext = browser.contexts()[0] ?? (await browser.newContext());
+      const page = browserContext.pages()[0] ?? (await browserContext.newPage());
+      await page.setViewportSize(viewport);
+
+      let closing: Promise<void> | null = null;
+      return {
+        id: session.id,
+        provider: this.name,
+        browser,
+        context: browserContext,
+        page,
+        close: () =>
+          (closing ??= (async () => {
+            await browser.close().catch(() => undefined);
+            await endSession(true);
+          })()),
+      };
+    } catch (error) {
+      await browser.close().catch(() => undefined);
+      await endSession(false);
+      throw new ProviderError(
+        this.name,
+        `The Browserbase session did not give us a page: ${redact(String((error as Error)?.message ?? error)).slice(0, 300)}`,
+        { retryable: true },
+      );
+    }
+  }
+
+  /** Billing is by wall-clock minute, so the entry is only correct once the session ends. */
+  private async recordMinutes(
+    startedAt: number,
+    sessionId: string,
+    projectId: string,
+    succeeded: boolean,
+  ): Promise<void> {
+    const minutes = (Date.now() - startedAt) / 60_000;
+    await this.costSink?.record({
+      provider: this.name,
+      operation: 'browser.session',
+      estimatedCostUsd: this.costPerMinuteUsd * minutes,
+      actualCostUsd: this.costPerMinuteUsd * minutes,
+      quantity: minutes,
+      unit: 'minute',
+      ...(succeeded ? {} : { succeeded: false }),
+      metadata: { sessionId, projectId },
+    });
+  }
+
+  /** Released early, so the vendor stops the meter before its own timeout. */
+  private async release(projectId: string, sessionId: string): Promise<void> {
+    await httpRequest(this.name, `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: { projectId, status: 'REQUEST_RELEASE' },
+      attempts: 1,
+      timeoutMs: 10_000,
+    }).catch(() => undefined);
   }
 
   /**
@@ -278,7 +378,8 @@ export class BrowserbaseProvider implements BrowserAutomationProvider {
     return error;
   }
 
+  /** The key, unless the proxy is the one adding it. */
   private headers(): Record<string, string> {
-    return { 'x-bb-api-key': this.apiKey, accept: 'application/json' };
+    return this.apiKey ? { 'x-bb-api-key': this.apiKey, accept: 'application/json' } : { accept: 'application/json' };
   }
 }

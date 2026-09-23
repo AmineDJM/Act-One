@@ -336,7 +336,7 @@ export function redact(input: string): string {
     .replace(/(sk|rk|pk|bb|hf)[-_][A-Za-z0-9_-]{12,}/g, '$1_[redacted]')
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]{12,}=*/gi, '$1[redacted]')
     .replace(
-      /("?(?:api[-_]?key|apikey|authorization|token|password|secret)"?\s*[:=]\s*"?)([^"',}\s]{6,})/gi,
+      /("?(?:api[-_]?key|apikey|signing[-_]?key|authorization|token|password|secret)"?\s*[:=]\s*"?)([^"',}&\s]{6,})/gi,
       '$1[redacted]',
     )
     .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[redacted-jwt]');

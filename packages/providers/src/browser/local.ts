@@ -2,7 +2,14 @@ import { chromium } from 'playwright-core';
 import { newId } from '@act-one/core';
 import type { CallContext, CostSink, ProviderHealth } from '../types.ts';
 import { PlaywrightSession, type AuditHook } from './playwright-session.ts';
-import type { BrowserAutomationProvider, BrowserSession, SessionOptions } from './types.ts';
+import type {
+  BrowserAutomationProvider,
+  BrowserSession,
+  PageAccess,
+  PageHandle,
+  PageOptions,
+  SessionOptions,
+} from './types.ts';
 
 export type LocalBrowserConfig = {
   executablePath?: string;
@@ -30,7 +37,7 @@ export type LocalBrowserConfig = {
  * managed provider. Isolation is per-context rather than per-container, so it
  * is not used for authenticated customer products in production.
  */
-export class LocalChromiumProvider implements BrowserAutomationProvider {
+export class LocalChromiumProvider implements BrowserAutomationProvider, PageAccess {
   readonly name = 'local-chromium';
   readonly kind = 'browser' as const;
 
@@ -97,10 +104,31 @@ export class LocalChromiumProvider implements BrowserAutomationProvider {
     }
   }
 
-  async createSession(
-    options: SessionOptions,
-    _context: CallContext,
-  ): Promise<BrowserSession> {
+  async createSession(options: SessionOptions, context: CallContext): Promise<BrowserSession> {
+    const handle = await this.openPage(
+      {
+        projectId: options.projectId,
+        organizationId: options.organizationId,
+        ...(options.viewport ? { viewport: options.viewport } : {}),
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+        ...(options.userAgent ? { userAgent: options.userAgent } : {}),
+      },
+      context,
+    );
+    return new PlaywrightSession({
+      browser: handle.browser,
+      context: handle.context,
+      page: handle.page,
+      policy: options.policy,
+      audit: this.audit,
+      ownsBrowser: false,
+      id: handle.id,
+      deviceScaleFactor: options.viewport?.deviceScaleFactor ?? 2,
+      onClose: handle.close,
+    });
+  }
+
+  async openPage(options: PageOptions, _context: CallContext): Promise<PageHandle> {
     const startedAt = Date.now();
     const browser = await chromium.launch({
       headless: this.headless,
@@ -109,51 +137,55 @@ export class LocalChromiumProvider implements BrowserAutomationProvider {
       args: this.launchArgs(),
     });
 
-    const context = await browser.newContext({
-      viewport: {
-        width: options.viewport?.width ?? 1920,
-        height: options.viewport?.height ?? 1080,
-      },
-      deviceScaleFactor: options.viewport?.deviceScaleFactor ?? 2,
-      userAgent:
-        options.userAgent ??
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      // Deterministic rendering: the same page must screenshot identically for
-      // capture and for re-capture during repair.
-      colorScheme: 'light',
-      reducedMotion: 'no-preference',
-      locale: 'en-US',
-      timezoneId: 'UTC',
-    });
-    context.setDefaultTimeout(options.timeoutMs ?? 45_000);
-    const page = await context.newPage();
-
-    const session = new PlaywrightSession({
-      browser,
-      context,
-      page,
-      policy: options.policy,
-      audit: this.audit,
-      ownsBrowser: true,
-      id: newId('sec'),
-    });
-
-    const costSink = this.costSink;
-    const providerName = this.name;
-    const originalClose = session.close.bind(session);
-    session.close = async () => {
-      await originalClose();
-      await costSink?.record({
-        provider: providerName,
-        operation: 'browser.session',
-        estimatedCostUsd: 0,
-        actualCostUsd: 0,
-        quantity: (Date.now() - startedAt) / 60_000,
-        unit: 'minute',
-        metadata: { projectId: options.projectId },
+    try {
+      const context = await browser.newContext({
+        viewport: {
+          width: options.viewport?.width ?? 1920,
+          height: options.viewport?.height ?? 1080,
+        },
+        deviceScaleFactor: options.viewport?.deviceScaleFactor ?? 2,
+        userAgent:
+          options.userAgent ??
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        // Deterministic rendering: the same page must screenshot identically for
+        // capture and for re-capture during repair.
+        colorScheme: 'light',
+        reducedMotion: 'no-preference',
+        locale: 'en-US',
+        timezoneId: 'UTC',
       });
-    };
+      context.setDefaultTimeout(options.timeoutMs ?? 45_000);
+      const page = await context.newPage();
 
-    return session;
+      const costSink = this.costSink;
+      const providerName = this.name;
+      let closing: Promise<void> | null = null;
+      return {
+        id: newId('sec'),
+        provider: this.name,
+        browser,
+        context,
+        page,
+        close: () =>
+          (closing ??= (async () => {
+            await context.close().catch(() => undefined);
+            await browser.close().catch(() => undefined);
+            await costSink?.record({
+              provider: providerName,
+              operation: 'browser.session',
+              estimatedCostUsd: 0,
+              actualCostUsd: 0,
+              quantity: (Date.now() - startedAt) / 60_000,
+              unit: 'minute',
+              metadata: { projectId: options.projectId },
+            });
+          })()),
+      };
+    } catch (error) {
+      // A browser that launched and then failed to give us a page is still a
+      // process on this host; it does not get to outlive the request.
+      await browser.close().catch(() => undefined);
+      throw error;
+    }
   }
 }

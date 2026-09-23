@@ -1,3 +1,4 @@
+import type { Browser, BrowserContext, Page } from 'playwright-core';
 import type { CallContext, Provider } from '../types.ts';
 import type { NavigationPolicy } from './policy.ts';
 
@@ -131,4 +132,44 @@ export type SessionOptions = {
 export interface BrowserAutomationProvider extends Provider {
   readonly kind: 'browser';
   createSession(options: SessionOptions, context: CallContext): Promise<BrowserSession>;
+}
+
+export type PageOptions = {
+  /** Project scoping is mandatory here too: it is what the ledger attributes to. */
+  projectId: string;
+  organizationId: string;
+  viewport?: Viewport;
+  /** Upper bound on the vendor session's life, in milliseconds. */
+  timeoutMs?: number;
+  userAgent?: string;
+};
+
+/**
+ * A browser page handed over whole.
+ *
+ * `BrowserSession` is the curated surface the research agent is allowed to
+ * drive, and it hides the protocol on purpose. An in-house engine that reads
+ * response bodies, captures through the DevTools protocol or asks the renderer
+ * which font it actually used needs the page itself. Whoever holds one of these
+ * owns the navigation policy for every request it makes.
+ */
+export type PageHandle = {
+  /** The vendor's session id, for the console and the ledger. */
+  readonly id: string;
+  readonly provider: string;
+  readonly browser: Browser;
+  readonly context: BrowserContext;
+  readonly page: Page;
+  /** Idempotent. Closes the browser, releases the vendor session and records its cost. */
+  close(): Promise<void>;
+};
+
+export interface PageAccess {
+  openPage(options: PageOptions, context: CallContext): Promise<PageHandle>;
+}
+
+export function supportsPageAccess(
+  provider: BrowserAutomationProvider,
+): provider is BrowserAutomationProvider & PageAccess {
+  return typeof (provider as Partial<PageAccess>).openPage === 'function';
 }
