@@ -95,6 +95,27 @@ describe('compiling the synthetic film', () => {
     });
   });
 
+  it('never lets a music heuristic claim certainty, however strong its statistic', () => {
+    // The same film, as if it were unmistakably music with a strong period, a clear key and a strong accent.
+    const loud = structuredClone(report);
+    const audio = loud.audio!;
+    audio.series['music_probability'] = audio.series['rms_db']!.map(() => 1);
+    const onset = audio.events[0]!;
+    audio.events = Array.from({ length: 12 }, (_, i) => ({ ...onset, sample: i * 24_000 }));
+    audio.tempo = { bpm: 120, strength: 0.95 };
+    audio.beats = Array.from({ length: 8 }, (_, i) => ({ sample: i * 24_000, snapped: true }));
+    audio.downbeat = { phase: 0, contrast: 5 };
+    audio.key = { key: 'A major', correlation: 0.97, margin: 0.6, runnerUp: 'E major' };
+    const music = compileFilmIR({ id: 'bench_synthetic_music', title: 'synthetic', report: loud, createdAt: '2026-09-23T00:00:00.000Z' }).document.sound.music;
+
+    expect(music.tempoBpm).toMatchObject({ evidenceType: 'ESTIMATED', value: 120, confidence: 0.8 });
+    expect(music.tempoBpm.note).toMatch(/half or double this tempo is not excluded/);
+    expect(music.key).toMatchObject({ evidenceType: 'ESTIMATED', value: 'A major', confidence: 0.7 });
+    expect(music.beats.provenance.confidence).toBe(0.8);
+    expect(music.downbeats.provenance.confidence).toBe(0.6);
+    expect(music.present.confidence).toBe(0.8);
+  });
+
   it('calls no tempo, beat or key where two tones and a click establish none', () => {
     expect(document.sound.music.tempoBpm).toMatchObject({ evidenceType: 'UNKNOWN', value: null });
     expect(document.sound.music.tempoBpm.note).toMatch(/too few to establish a period/);

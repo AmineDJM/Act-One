@@ -279,6 +279,15 @@ const MIN_ONSETS_FOR_TEMPO = 8;
 const MIN_BEATS_ON_ONSETS = 0.4;
 /** Below this correlation margin over the runner-up, a key is a coin toss between two. */
 const MIN_KEY_MARGIN = 0.05;
+/**
+ * The most a music heuristic may claim, however strong its own statistic.
+ * Key-profile correlation and beat autocorrelation are right often, not
+ * always, on a real mix — a key a fifth away and a tempo an octave off are
+ * their ordinary mistakes, and exactly the ones their statistics cannot see —
+ * and nothing else in a film can confirm them. The statistic scales the
+ * confidence below the ceiling; it never reaches certainty.
+ */
+const MUSIC_CEILING = { presence: 0.8, tempo: 0.8, key: 0.7, downbeat: 0.6 };
 
 const FEATURES: Record<string, FeatureSpec> = {
   luma_mean: { quantity: 'mean luma', unit: 'ratio', method: 'pixels.luma', evidence: 'MEASURED' },
@@ -1103,29 +1112,30 @@ function buildAudio(
           : null;
   const tempoKnown = tempoGap === null;
   const keyUsable = audio.key !== null && musicShare !== null && musicShare >= 0.3 && audio.key.margin >= MIN_KEY_MARGIN;
+  const tempoConfidence = round(MUSIC_CEILING.tempo * clamp01(audio.tempo.strength * 2), 3);
   const music: MusicIR = {
     present: musicShare === null
       ? unknown('audio.music', 'Nothing audible to judge.', refs)
       // A spectral heuristic, not a trained classifier: however one-sided the share, it is never certain.
-      : estimated(musicShare >= 0.3, 'audio.music', refs, Math.min(0.8, round(Math.abs(musicShare - 0.3) + 0.4, 3)), { note: `${Math.round(musicShare * 100)}% of the audible stretches sound like music` }),
+      : estimated(musicShare >= 0.3, 'audio.music', refs, Math.min(MUSIC_CEILING.presence, round(Math.abs(musicShare - 0.3) + 0.4, 3)), { note: `${Math.round(musicShare * 100)}% of the audible stretches sound like music` }),
     tempoBpm: tempoKnown
-      ? estimated(round(audio.tempo.bpm!, 2), 'audio.beats', refs, clamp01(audio.tempo.strength * 2), { unit: 'BPM', note: `autocorrelation strength ${round(audio.tempo.strength, 3)}; ${Math.round(snappedShare * 100)}% of beats on heard onsets` })
+      ? estimated(round(audio.tempo.bpm!, 2), 'audio.beats', refs, tempoConfidence, { unit: 'BPM', note: `autocorrelation strength ${round(audio.tempo.strength, 3)}; ${Math.round(snappedShare * 100)}% of beats on heard onsets; half or double this tempo is not excluded` })
       : unknown('audio.beats', tempoGap!, refs),
     meter: unknown('audio.beats', 'The meter is not established: bar grouping would be an assumption.', refs),
     key: keyUsable
-      ? estimated(audio.key!.key, 'audio.key', refs, clamp01(audio.key!.margin * 4), { note: `correlation ${round(audio.key!.correlation, 3)}; runner-up ${audio.key!.runnerUp}` })
+      ? estimated(audio.key!.key, 'audio.key', refs, round(MUSIC_CEILING.key * clamp01(audio.key!.margin * 4), 3), { note: `correlation ${round(audio.key!.correlation, 3)}; runner-up ${audio.key!.runnerUp}` })
       : unknown('audio.key', audio.key && musicShare !== null && musicShare >= 0.3
         ? `Ambiguous: ${audio.key.key} and ${audio.key.runnerUp} fit the pitch content almost equally (margin ${round(audio.key.margin, 3)}).`
         : 'No key is estimated where the sound is not clearly music.', refs),
     beats: {
       times: tempoKnown ? audio.beats.map((beat) => samples.at(beat.sample)) : [],
-      provenance: provenance(tempoKnown ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, tempoKnown ? clamp01(audio.tempo.strength * 2) : 0, 'beats within 35 ms of an onset sit on that onset\'s sample; the others on the 10 ms grid'),
+      provenance: provenance(tempoKnown ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, tempoKnown ? tempoConfidence : 0, 'beats within 35 ms of an onset sit on that onset\'s sample; the others on the 10 ms grid'),
     },
     downbeats: {
       times: tempoKnown && audio.downbeat && audio.downbeat.contrast >= 1.25
         ? audio.beats.filter((_, i) => i % 4 === audio.downbeat!.phase).map((beat) => samples.at(beat.sample))
         : [],
-      provenance: provenance(tempoKnown && audio.downbeat && audio.downbeat.contrast >= 1.25 ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, audio.downbeat ? clamp01((audio.downbeat.contrast - 1) / 2) : 0, 'every fourth beat, phase chosen by accent; four beats to a bar is an assumption'),
+      provenance: provenance(tempoKnown && audio.downbeat && audio.downbeat.contrast >= 1.25 ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, audio.downbeat ? round(MUSIC_CEILING.downbeat * clamp01((audio.downbeat.contrast - 1) / 2), 3) : 0, 'every fourth beat, phase chosen by accent; four beats to a bar is an assumption'),
     },
     sections: [],
     ducking: audio.ducking.map((duck, index) => ({
