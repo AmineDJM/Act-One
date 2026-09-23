@@ -3,7 +3,7 @@ A film whose every fact is known, for testing the analyzer against the truth.
 
     python3 -m actone_forensics.synthetic OUT.mp4
 
-Writes a five-second 320x180 film at exactly 25 frames per second with a
+Writes a seven-second 320x180 film at exactly 25 frames per second with a
 48 kHz mono soundtrack, and prints the ground truth as JSON. Everything in it
 is placed on a frame or a sample by construction, so a measurement can be
 checked to the frame rather than eyeballed:
@@ -14,13 +14,21 @@ checked to the frame rather than eyeballed:
     frame   65     "Deploy in minutes" (regular weight) cuts in below it
     frames 80–89   the picture fades linearly to black; black from 90 to 99
     frame  100     hard cut to a slate field, "SEARCH" in white bold, tracked
-                   out by 0.3 em, until the end at frame 124
+                   out by 0.3 em
+    frame  125     a wipe completed within the frame: its top two thirds are
+                   already the next picture — a teal field with a white card
+                   patterned in squares — its bottom third still the slate;
+                   the next picture is whole from 126
+    frames 140–149 the field behind the card cross-fades, linearly, to purple;
+                   the card stays: a cross-fade inside the shot, not a boundary
+    frame  162     the whole picture brightens in one frame, nothing moving:
+                   the same picture, not a cut; until the end at frame 174
 
     0.0–1.0 s      440 Hz tone
     1.0–1.6 s      digital silence
     1.6 s          a 5 ms click, on the cut
     2.0–3.2 s      880 Hz tone
-    3.2–5.0 s      digital silence
+    3.2–7.0 s      digital silence
 
 The type is set in DejaVu Sans, shipped beside this module so the film is the
 same film on every machine. Its geometry — baseline, cap height, x-height —
@@ -36,11 +44,13 @@ import av
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-WIDTH, HEIGHT, FPS, FRAMES = 320, 180, 25, 125
+WIDTH, HEIGHT, FPS, FRAMES = 320, 180, 25, 175
 RATE = 48000
 BLUE = (20, 32, 92)
 ORANGE = (236, 118, 36)
 SLATE = (38, 44, 54)
+TEAL = (20, 140, 140)
+PURPLE = (110, 40, 160)
 FONTS = {
     "bold": (os.path.join(os.path.dirname(__file__), "fonts", "DejaVuSans-Bold.ttf"), 700),
     "book": (os.path.join(os.path.dirname(__file__), "fonts", "DejaVuSans.ttf"), 400),
@@ -183,17 +193,58 @@ TRUTH = {
         {"text": "SEARCH", "firstVisible": 100, "fullyVisible": 100, "lastVisible": 124, "trackingPx": 13},
     ],
     "cut2": {"lastOutgoing": 99, "firstIncoming": 100},
+    "wipe": {"lastOutgoing": 124, "firstIncoming": 126},
+    "crossfade": {"lastOutgoing": 139, "firstIncoming": 150},
+    "brightens": 162,
     "audio": {
         "rate": RATE,
         "tones": [{"hz": 440, "start": 0.0, "end": 1.0}, {"hz": 880, "start": 2.0, "end": 3.2}],
-        "silences": [[1.0, 1.6], [3.2, 5.0]],
+        "silences": [[1.0, 1.6], [3.2, 7.0]],
         "click": 1.6,
     },
 }
 
 
+def _card():
+    """A white card patterned in dark squares, so the picture it is on has edges and corners to follow."""
+    card = np.zeros((HEIGHT, WIDTH), np.float32)
+    card[50:130, 100:220] = 1.0
+    for row in range(58, 122, 16):
+        for column in range(108, 212, 16):
+            if ((row - 58) // 16 + (column - 108) // 16) % 2 == 0:
+                card[row: row + 8, column: column + 8] = 0.0
+    return card
+
+
+def _on_field(field, card, ink=(255.0, 255.0, 255.0), square=(20.0, 24.0, 30.0)):
+    """The card on a field: white where the card is, its squares dark, the field around it."""
+    inside = np.zeros((HEIGHT, WIDTH), bool)
+    inside[50:130, 100:220] = True
+    picture = np.empty((HEIGHT, WIDTH, 3), np.float32)
+    picture[:] = np.array(field, np.float32)
+    picture[inside & (card > 0.5)] = np.array(ink, np.float32)
+    picture[inside & (card <= 0.5)] = np.array(square, np.float32)
+    return picture
+
+
 def frame_rgb(index):
     launch, feature, deploy = _layer("launch"), _layer("feature"), _layer("deploy")
+    if index >= 125:
+        card = _card()
+        if index < 140:
+            picture = _on_field(TEAL, card)
+        elif index < 150:
+            mix = (index - 139) / 11.0
+            picture = _on_field(tuple((1 - mix) * t + mix * p for t, p in zip(TEAL, PURPLE)), card)
+        elif index < 162:
+            picture = _on_field(PURPLE, card)
+        else:
+            # Everything lighter by the same amount; nothing moves.
+            picture = np.minimum(255.0, _on_field(PURPLE, card) + 70.0)
+        if index == 125:
+            slate = np.array(SLATE, np.float32)[None, None, :] * (1 - _layer("search")[..., None]) + 255.0 * _layer("search")[..., None]
+            picture[120:] = slate[120:]
+        return np.clip(np.rint(picture), 0, 255).astype(np.uint8)
     if index >= 100:
         picture = np.array(SLATE, np.float32)[None, None, :] * (1 - _layer("search")[..., None]) + 255.0 * _layer("search")[..., None]
         return np.clip(np.rint(picture), 0, 255).astype(np.uint8)

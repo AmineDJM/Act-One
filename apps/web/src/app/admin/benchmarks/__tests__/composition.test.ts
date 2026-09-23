@@ -10,7 +10,9 @@ import { composeWindow } from '../[id]/composition.ts';
  * fact was placed by construction: "LAUNCH DAY" on a blue field, a hard cut
  * from frame 39 to 40 with a click on it, "NEW FEATURE" fading in over
  * frames 50–59 on orange, "Deploy in minutes" cutting in at 65, a fade to
- * black over frames 80–89, and a hard cut to "SEARCH" at frame 100.
+ * black over frames 80–89, a hard cut to "SEARCH" at frame 100, a wipe within
+ * frame 125, the field cross-fading behind a card over frames 140–149, and
+ * the picture brightening at 162.
  */
 const here = path.dirname(fileURLToPath(import.meta.url));
 const report = ForensicReport.parse(JSON.parse(readFileSync(path.join(here, '../../../../../../../packages/film-ir/src/__tests__/fixtures/synthetic-report.json'), 'utf8')));
@@ -39,6 +41,14 @@ describe('composeWindow', () => {
     expect(story).toContainEqual(expect.stringMatching(/^boundary\.003: a hard_cut \(measured\) — frame 99 is the last untouched, frame 100 the first complete; luma 0\.000 → 0\.\d+\./));
     expect(story).toContain('1 line(s) of type arrive with boundary.003: text.0004 “SEARCH”.');
     expect(composeWindow(document, 2.5, 2.7)).toContain('1 line(s) hold throughout: text.0002 “NEW FEATURE”.');
+  });
+
+  it('tells a wipe to the frame, and a cross-fade and a change of light as happening inside the shot', () => {
+    expect(composeWindow(document, 4.9, 5.1)).toContainEqual(expect.stringMatching(/^boundary\.004: a wipe \(measured\) — frame 124 is the last untouched, frame 126 the first complete, 1 mixed frame\(s\) between;/));
+    const inside = composeWindow(document, 5.5, 6.6);
+    expect(inside).toContainEqual(expect.stringMatching(/^Part of the picture cross-fades inside the shot over frames 139–150, 0:05\.600–0:06\.000 \(measured\): part of the picture cross-fades while \d+% of its edges stay: not a boundary\.$/));
+    expect(inside).toContainEqual(expect.stringMatching(/^The field changes colour with no boundary at .*0:06\.480/));
+    expect(inside.some((line) => line.startsWith('boundary.'))).toBe(false);
   });
 
   it('says that type holds, rather than listing it, where nothing changes', () => {

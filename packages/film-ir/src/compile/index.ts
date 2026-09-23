@@ -109,6 +109,7 @@ export function compileFilmIR(input: CompileInput): { document: FilmIR; measured
     sfx: document.sound.sfx,
     narration: document.narration,
     fieldChanges: input.report.fieldChanges,
+    crossfades: input.report.crossfades,
     hopResolution: document.audio.analysis?.hop ?? null,
   });
   if (input.interpretation) {

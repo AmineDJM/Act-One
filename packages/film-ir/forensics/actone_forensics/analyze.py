@@ -208,7 +208,7 @@ def main(argv=None):
     fps = rate["num"] / float(rate["den"]) if rate else nominal_fps
 
     emit("structure", 0.0, "boundaries")
-    segmentation = shots.segment(video["features"], video["vectors"], table["repeatOf"], video["smallGrey"], fps)
+    segmentation = shots.segment(video["features"], video["vectors"], table["repeatOf"], video["smallGrey"], fps, video["edges"])
     fields = shots.field_changes(video["vectors"], fps)
     work = video["work"]
     cam = camera.trajectories(segmentation["shots"], video["homographies"], video["features"], fps, work["width"], work["height"])
@@ -294,6 +294,7 @@ def main(argv=None):
         },
         "boundaries": segmentation["boundaries"],
         "shots": segmentation["shots"],
+        "crossfades": segmentation["crossfades"],
         "shotColours": [dominant_hex(np.mean(np.array(video["vectors"]["dominant_colours"][a: b + 1]), axis=0).tolist()) for a, b in segmentation["shots"]],
         "fieldChanges": fields,
         "camera": {

@@ -265,6 +265,9 @@ def analyze_video(path, ocr=None, ocr_stride=None, progress_every=60):
     homographies = []
     small_grey = []
     small_bgr = []
+    # Each frame's edges at working resolution, a bit a pixel: whether a change keeps the picture's
+    # structure is read from them across the frames either side of it (shots.py).
+    edges_packed = []
     ocr_frames = []
 
     prev = None
@@ -318,6 +321,7 @@ def analyze_video(path, ocr=None, ocr_stride=None, progress_every=60):
 
         features["sharpness"].append(float(cv2.Laplacian(grey, cv2.CV_64F).var()))
         edges = cv2.Canny(grey, 80, 160)
+        edges_packed.append(np.packbits(edges > 0))
         features["edge_density"].append(float((edges > 0).mean()))
         sobel_x = cv2.Sobel(grey, cv2.CV_32F, 1, 0, ksize=3)
         sobel_y = cv2.Sobel(grey, cv2.CV_32F, 0, 1, ksize=3)
@@ -418,6 +422,7 @@ def analyze_video(path, ocr=None, ocr_stride=None, progress_every=60):
         "homographies": homographies,
         "smallGrey": small_grey,
         "smallBgr": small_bgr,
+        "edges": {"packed": edges_packed, "shape": (work_h, work_w)},
         "ocrFrames": ocr_frames,
     }
 

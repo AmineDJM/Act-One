@@ -16,8 +16,10 @@ import { validateFilmIR } from '../validate.ts';
  * `python3 -m actone_forensics.synthetic` (see that module for the truth:
  * a cut at frame 40, "NEW FEATURE" fading in over frames 50–59, "Deploy in
  * minutes" cutting in at 65, a fade to black over frames 80–89, a cut to
- * "SEARCH" at 100, a click at 1.6 s). Regenerate it with the analyzer
- * whenever the report format changes:
+ * "SEARCH" at 100, a wipe completed within frame 125, the field cross-fading
+ * behind a card over frames 140–149, the picture brightening at 162, a click
+ * at 1.6 s). Regenerate it with the analyzer whenever the report format
+ * changes:
  *
  *   python3 -m actone_forensics.synthetic /tmp/film.mp4
  *   python3 -m actone_forensics.analyze /tmp/film.mp4 fixtures/synthetic-report.json --ffmpeg …
@@ -37,7 +39,7 @@ const seconds = (time: { ticks: string; timescale: number } | null | undefined) 
 
 describe('compiling the synthetic film', () => {
   it('keeps the stream\'s own clock for every frame', () => {
-    expect(document.frames?.count).toBe(125);
+    expect(document.frames?.count).toBe(175);
     expect(document.frames?.timescale).toBe(12800);
     expect(document.frames?.pts.slice(0, 3)).toEqual(['0', '512', '1024']);
     expect(document.source?.frameTiming?.variableFrameRate).toBe(false);
@@ -57,7 +59,31 @@ describe('compiling the synthetic film', () => {
     // After frame 79 ends and before frame 90 begins: 3.2 s to 3.6 s.
     expect(sameTime(fade.range.start, at(80))).toBe(true);
     expect(sameTime(fade.range.end, at(90))).toBe(true);
-    expect(document.structure.shots.map((shot) => [shot.frames.first, shot.frames.last])).toEqual([[0, 39], [40, 79], [90, 99], [100, 124]]);
+    expect(document.structure.shots.map((shot) => [shot.frames.first, shot.frames.last])).toEqual([[0, 39], [40, 79], [90, 99], [100, 124], [126, 174]]);
+  });
+
+  it('calls a wipe completed within a frame a wipe, and gives it that frame', () => {
+    const wipe = document.structure.boundaries.find((boundary) => boundary.kind.value === 'wipe')!;
+    expect(wipe.frames).toEqual({ lastOutgoing: 124, firstIncoming: 126 });
+    expect(wipe.kind.method).toBe('boundary.wipe');
+    // Frame 125 is the change: two thirds already the next picture, a third still the slate.
+    expect(sameTime(wipe.range.start, at(125))).toBe(true);
+    expect(sameTime(wipe.range.end, at(126))).toBe(true);
+    expect(wipe.residuals['score.outgoingShare']).toBeCloseTo(1 / 3, 1);
+  });
+
+  it('keeps a cross-fade behind a card that stays inside its shot, and a picture brightening out of the cuts', () => {
+    // No boundary between the wipe and the end: the field cross-fading at 140–149 and the brightening at 162 change no shot.
+    expect(document.structure.boundaries.filter((boundary) => boundary.frames.lastOutgoing > 126)).toEqual([]);
+    const crossfades = document.events.events.filter((event) => event.type === 'visual.crossfade');
+    expect(crossfades).toHaveLength(1);
+    expect(sameTime(crossfades[0]!.start, at(140))).toBe(true);
+    expect(sameTime(crossfades[0]!.end!, at(150))).toBe(true);
+    expect(crossfades[0]!.provenance).toMatchObject({ evidenceType: 'MEASURED', method: 'visual.crossfade' });
+    // The colour changes are still there to see, as changes of the field.
+    const fieldChanges = document.events.events.filter((event) => event.type === 'visual.field_change').map((event) => toSeconds(event.start));
+    expect(fieldChanges.some((t) => t >= 5.6 && t <= 6.0)).toBe(true);
+    expect(fieldChanges.some((t) => Math.abs(t - 162 / 25) < 0.001)).toBe(true);
   });
 
   it('reads every line of type whole, spaced, and times it to the frame', () => {
@@ -165,6 +191,8 @@ describe('compiling the synthetic film', () => {
     expect(document.sound.music.beats.times).toEqual([]);
     expect(document.events.events.some((event) => event.type === 'music.beat')).toBe(false);
     expect(document.sound.music.key).toMatchObject({ evidenceType: 'UNKNOWN', value: null });
+    // Unknown is unknown: whatever accent the analyzer saw, no bar is claimed and no confidence given.
+    expect(document.sound.music.downbeats).toMatchObject({ times: [], provenance: { evidenceType: 'UNKNOWN', confidence: 0 } });
     expect(document.sound.music.present.confidence).toBeLessThanOrEqual(0.8);
   });
 
@@ -187,7 +215,7 @@ describe('compiling the synthetic film', () => {
     const { report: validation } = validateFilmIR(document, { now: () => '2026-09-23T00:00:00.000Z' });
     expect(validation.checks.filter((check) => check.status !== 'pass')).toEqual([]);
     expect(validation.status).toBe('READY');
-    expect(validation.coverage.frames).toEqual({ expected: 125, analyzed: 125 });
+    expect(validation.coverage.frames).toEqual({ expected: 175, analyzed: 175 });
     expect(validation.evidenceMix['MEASURED']).toBeGreaterThan(50);
     expect(validation.evidenceMix['INFERRED'] ?? 0).toBe(0);
   });

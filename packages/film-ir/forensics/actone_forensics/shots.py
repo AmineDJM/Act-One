@@ -4,16 +4,26 @@ Where the picture is replaced, and how.
 A hard cut is a single-frame discontinuity that three independent signals
 agree on: the colour histogram, the pixels, and the edges (Zabih's edge
 change ratio). A one-frame flash that returns to the picture before it is not
-a cut. A fade is a ramp into or out of a nearly uniform field; a dissolve is
-a run of frames that are, measurably, a linear mix of the frames either side
-of it. Anything else that changes gradually — a push, a morph, a whip — is not
-called a boundary here: it is motion, and it is measured as motion.
+a cut, and neither is the same picture brightening or changing colour: its
+edges stay where they were and its features track. A cut whose first frame is
+still part the outgoing picture and part the incoming is a wipe completed
+within a frame. A fade is a ramp into or out of a nearly uniform field; a
+dissolve is a run of frames that are, measurably, a linear mix of the frames
+either side of it — and where the frames either side keep most of the same
+edges, it is part of the picture cross-fading inside the shot (a wallpaper
+behind windows that stay), which is not a boundary. Anything else that changes
+gradually — a push, a morph, a whip — is not called a boundary here: it is
+motion, and it is measured as motion.
 """
 import numpy as np
 
 UNIFORM_STD = 0.02
 # Mean absolute luma change between frames above which the picture is still moving.
 RAMP_CHANGE = 0.002
+# The edge change ratio, at working resolution, below which the frames either side of a change
+# are the same picture. On the Plasma 5.25 film, its 21 cuts replaced 58–100% of their edges;
+# its wallpaper cross-fading behind unchanged windows, 3–38%.
+KEPT_STRUCTURE = 0.5
 
 
 def _values(series):
@@ -41,8 +51,10 @@ def detect_cuts(features, repeat_of, small_grey):
         strong = hd[i] >= max(0.3, 3 * hd_base + 0.05) and pd[i] >= max(0.05, 3 * pd_base + 0.02)
         if not strong:
             continue
+        # The same picture brightening or changing colour: its edges stay where they were and its features track.
+        same_picture = np.isfinite(ecr[i]) and ecr[i] < 0.3 and np.isfinite(tracked[i]) and tracked[i] >= 0.7
         supported = (np.isfinite(ecr[i]) and ecr[i] >= 0.5) or (np.isfinite(tracked[i]) and tracked[i] < 0.3) or hd[i] >= 0.6
-        if not supported:
+        if same_picture or not supported:
             continue
         if i + 1 < n:
             # A flash: the frame after looks like the frame before.
@@ -69,6 +81,53 @@ def detect_cuts(features, repeat_of, small_grey):
             continue
         kept.append(candidate)
     return kept
+
+
+def split_frame(frames, i, block=10):
+    """
+    Whether frame i, the first changed frame of a cut, is still part the
+    outgoing picture and part the incoming — an iris or a wipe completed within
+    one frame — and if so how.
+
+    Block by block, the frame is compared with the frames either side of it.
+    A wipe's frame is explained far better by taking each block from whichever
+    side it matches than by either side alone, and a real share of it is still
+    the outgoing picture. A cut's first frame is already the incoming picture;
+    a cut followed by fast motion matches neither side. None when it is not a
+    split frame.
+    """
+    if i < 1 or i + 1 >= len(frames):
+        return None
+    before, this, after = (frames[k].astype(np.float32) for k in (i - 1, i, i + 1))
+
+    def per_block(difference):
+        h, w = difference.shape
+        return difference[: h // block * block, : w // block * block].reshape(h // block, block, w // block, block).mean(axis=(1, 3))
+
+    from_outgoing, from_incoming = per_block(np.abs(this - before)), per_block(np.abs(this - after))
+    outgoing, incoming = float(from_outgoing.mean()), float(from_incoming.mean())
+    composite = float(np.minimum(from_outgoing, from_incoming).mean())
+    share = float((from_outgoing < from_incoming).mean())
+    if not 0.1 <= share <= 0.9 or composite > 0.4 * outgoing or composite > 0.8 * incoming:
+        return None
+    return {"outgoingShare": share, "compositeResidual": composite / 255.0, "outgoingResidual": outgoing / 255.0, "incomingResidual": incoming / 255.0}
+
+
+def structure_change(edges, a, b):
+    """
+    Zabih's edge change ratio between frames a and b at working resolution: how
+    much of the picture's structure was replaced. None where either frame has
+    too few edges to say.
+    """
+    if edges is None:
+        return None
+    from .video import edge_change_ratio
+
+    height, width = edges["shape"]
+    maps = [np.unpackbits(edges["packed"][k])[: height * width].reshape(height, width).astype(np.uint8) * 255 for k in (a, b)]
+    if min(float((m > 0).mean()) for m in maps) < 0.002:
+        return None
+    return edge_change_ratio(maps[0], maps[1])
 
 
 def detect_fades(features, vectors, small_grey):
@@ -192,25 +251,79 @@ def detect_dissolves(features, small_grey, cut_frames, fps):
             monotonic = all(alphas[k + 1] <= alphas[k] + 0.05 for k in range(len(alphas) - 1))
             if not monotonic or alphas[0] < 0.7 or alphas[-1] > 0.3 or mean_residual > 0.02:
                 continue
+            # The mix itself: a window padded with frames it has not touched fits as well, and a step
+            # from one picture to the next (α jumping from 1 to 0) fits too, but mixes nothing.
+            mixing = [k for k, alpha in enumerate(alphas) if 0.03 < alpha < 0.97]
+            steps = np.abs(np.diff([1.0] + list(alphas) + [0.0]))
+            if len(mixing) < 2 or float(steps.max()) > 0.6:
+                continue
             score = mean_residual / total
             if best is None or score < best["score"]:
-                best = {"span": [a - 1, b + 1], "score": score, "meanResidual": mean_residual, "totalChange": total, "alphas": alphas}
+                best = {"span": [a + mixing[0] - 1, a + mixing[-1] + 1], "score": score, "meanResidual": mean_residual, "totalChange": total,
+                        "alphas": alphas[mixing[0]: mixing[-1] + 1]}
+        if best:
+            best = _widened(small_grey, pd, best, limit=int(round(3 * fps)))
         if best and not any(best["span"][0] <= f["span"][1] and f["span"][0] <= best["span"][1] for f in found):
             found.append(best)
     return found
 
 
-def segment(features, vectors, repeat_of, small_grey, fps):
-    """Boundaries of every kind, in order, and the shots between them."""
+def _mix(frames, first, last):
+    """The weights of frames first+1..last−1 as a mix of frame first and frame last, when they fit one; else None."""
+    fit = mixing_fit(frames, first + 1, last - 1) if last - first >= 2 else None
+    if fit is None:
+        return None
+    alphas, residuals = fit
+    if float(np.mean(residuals)) > 0.02 or any(alphas[k + 1] > alphas[k] + 0.05 for k in range(len(alphas) - 1)):
+        return None
+    return alphas, float(np.mean(residuals))
+
+
+def _widened(frames, change, found, limit):
+    """
+    A mix found in a window centred on its fastest change, pushed out to where
+    the picture stops changing — a cross-fade that jumps in and then eases out
+    runs longer on one side than the other — for as long as its frames fit the
+    mix as well as they did, then trimmed again to the frames it mixes. As well
+    as they did, not merely well: a picture that goes on drifting after the mix
+    would otherwise draw the next change into it.
+    """
+    first, last = found["span"]
+    allowed = max(1.25 * found["meanResidual"], found["meanResidual"] + 0.002)
+
+    def fits(a, b):
+        mix = _mix(frames, a, b)
+        return mix is not None and mix[1] <= allowed
+
+    while last + 1 < len(frames) and last - first < limit and np.isfinite(change[last + 1]) and change[last + 1] > RAMP_CHANGE and fits(first, last + 1):
+        last += 1
+    while first - 1 >= 0 and last - first < limit and np.isfinite(change[first]) and change[first] > RAMP_CHANGE and fits(first - 1, last):
+        first -= 1
+    if [first, last] == found["span"]:
+        return found
+    alphas, residual = _mix(frames, first, last)
+    mixing = [k for k, alpha in enumerate(alphas) if 0.03 < alpha < 0.97]
+    if len(mixing) < 2:
+        return found
+    total = float(np.abs(frames[first].astype(np.float32) - frames[last].astype(np.float32)).mean() / 255.0)
+    return dict(found, span=[first + mixing[0], first + mixing[-1] + 2], meanResidual=residual, totalChange=total, alphas=alphas[mixing[0]: mixing[-1] + 1])
+
+
+def segment(features, vectors, repeat_of, small_grey, fps, edges=None):
+    """
+    Boundaries of every kind, in order, the shots between them, and the
+    cross-fades of part of the picture inside a shot.
+    """
     n = len(features["luma_mean"])
     cuts = detect_cuts(features, repeat_of, small_grey)
-    boundaries = [{
-        "kind": "hard_cut",
-        "lastOutgoing": c["frame"] - 1,
-        "firstIncoming": c["frame"],
-        "span": [c["frame"] - 1, c["frame"]],
-        "scores": c["scores"],
-    } for c in cuts]
+    boundaries = []
+    for c in cuts:
+        i = c["frame"]
+        split = split_frame(small_grey, i)
+        if split:
+            boundaries.append({"kind": "wipe", "lastOutgoing": i - 1, "firstIncoming": i + 1, "span": [i - 1, i + 1], "scores": {**c["scores"], **split}})
+        else:
+            boundaries.append({"kind": "hard_cut", "lastOutgoing": i - 1, "firstIncoming": i, "span": [i - 1, i], "scores": c["scores"]})
     cut_frames = [c["frame"] for c in cuts]
     # Every boundary's span is [lastOutgoing, firstIncoming]: the last frame the
     # change has not touched and the first it has completed. The change itself
@@ -226,20 +339,27 @@ def segment(features, vectors, repeat_of, small_grey, fps):
             boundaries.append({"kind": "fade_out", "lastOutgoing": untouched, "firstIncoming": a, "span": [untouched, a], "scores": scores})
         if revealed is not None:
             boundaries.append({"kind": "fade_in", "lastOutgoing": b, "firstIncoming": revealed, "span": [b, revealed], "scores": scores})
+    crossfades = []
     for dissolve in detect_dissolves(features, small_grey, cut_frames, fps):
         a, b = dissolve["span"]
-        boundaries.append({"kind": "dissolve", "lastOutgoing": a, "firstIncoming": b, "span": [a, b], "scores": {
+        scores = {
             "meanMixResidual": dissolve["meanResidual"], "totalChange": dissolve["totalChange"],
             "alphaFirst": dissolve["alphas"][0], "alphaLast": dissolve["alphas"][-1],
-        }})
+            "edgeChangeRatio": structure_change(edges, a, b),
+        }
+        if scores["edgeChangeRatio"] is not None and scores["edgeChangeRatio"] < KEPT_STRUCTURE:
+            crossfades.append({"lastOutgoing": a, "firstIncoming": b, "span": [a, b], "scores": scores})
+            continue
+        boundaries.append({"kind": "dissolve", "lastOutgoing": a, "firstIncoming": b, "span": [a, b], "scores": scores})
     boundaries.sort(key=lambda boundary: boundary["span"][0])
     # Overlapping boundaries: a cut inside a fade is the fade's.
+    instant = ("hard_cut", "wipe")
     merged = []
     for boundary in boundaries:
         if merged and boundary["span"][0] < merged[-1]["span"][1]:
-            if boundary["kind"] == "hard_cut":
+            if boundary["kind"] in instant:
                 continue
-            if merged[-1]["kind"] == "hard_cut":
+            if merged[-1]["kind"] in instant:
                 merged[-1] = boundary
                 continue
         merged.append(boundary)
@@ -252,7 +372,7 @@ def segment(features, vectors, repeat_of, small_grey, fps):
         start = max(start, boundary["firstIncoming"])
     if start <= n - 1:
         shots.append([start, n - 1])
-    return {"boundaries": merged, "shots": shots}
+    return {"boundaries": merged, "shots": shots, "crossfades": crossfades}
 
 
 def field_changes(vectors, fps, threshold=0.12):

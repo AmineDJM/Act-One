@@ -37,6 +37,7 @@ export function buildEventGraph(input: {
   sfx: SfxEvent[];
   narration: NarrationIR;
   fieldChanges: { frame: number; deltaE: number }[];
+  crossfades: { lastOutgoing: number; firstIncoming: number; scores: Record<string, unknown> }[];
   hopResolution: RationalTime | null;
 }): EventGraph {
   const { clock } = input;
@@ -70,6 +71,24 @@ export function buildEventGraph(input: {
       resolution: frame(change.frame),
       subjectRefs: [`frame:${change.frame}`],
       provenance: provenance('MEASURED', 'boundary.field', ['producer:forensics', `frame:${change.frame}`]),
+    });
+  }
+  for (const crossfade of input.crossfades) {
+    const span = `frames:${crossfade.lastOutgoing}-${crossfade.firstIncoming}` as const;
+    const kept = crossfade.scores['edgeChangeRatio'];
+    const change = crossfade.scores['totalChange'];
+    add({
+      modality: 'visual',
+      type: 'visual.crossfade',
+      // As a boundary's range: after the last frame the mix has not touched, until the first it has completed.
+      start: clock.end(crossfade.lastOutgoing),
+      peak: null,
+      end: clock.at(crossfade.firstIncoming),
+      magnitude: typeof change === 'number' ? round(change, 4) : null,
+      unit: 'mean luma change',
+      resolution: frame(crossfade.firstIncoming),
+      subjectRefs: [span],
+      provenance: provenance('MEASURED', 'visual.crossfade', ['producer:forensics', span], 1, typeof kept === 'number' ? `part of the picture cross-fades while ${Math.round((1 - kept) * 100)}% of its edges stay: not a boundary` : undefined),
     });
   }
   for (const block of input.typography.blocks) {

@@ -104,10 +104,10 @@ describe('the benchmark job', () => {
     expect(after.stages.integrity).toMatchObject({ status: 'completed', detail: 'READY' });
     // No Gemini key: the model's stages say so rather than sitting pending.
     expect(after.stages.passes).toMatchObject({ status: 'skipped', detail: expect.stringMatching(/No Gemini key/) });
-    expect(after.media).toMatchObject({ width: 320, height: 180, frameRate: '25/1', frameRateSource: 'measured', frameCount: 125, variableFrameRate: false });
-    expect(after.analysis).toMatchObject({ filmIr: 'ready', gemini: 'skipped', deterministic: 'completed', counts: { shots: 4, boundaries: 3, textBlocks: 4 } });
+    expect(after.media).toMatchObject({ width: 320, height: 180, frameRate: '25/1', frameRateSource: 'measured', frameCount: 175, variableFrameRate: false });
+    expect(after.analysis).toMatchObject({ filmIr: 'ready', gemini: 'skipped', deterministic: 'completed', counts: { shots: 5, boundaries: 4, textBlocks: 4 } });
     expect(after.analysis.knownShare).toBeGreaterThan(0.5);
-    expect(after.analysis.version).toMatch(/actone\.film-ir 1\.1 · forensics 1\.3\.0/);
+    expect(after.analysis.version).toMatch(/actone\.film-ir 1\.1 · forensics 1\.4\.0/);
     expect(seen[0]!.checkpoints).toBeDefined();
     const stored = JSON.parse(new TextDecoder().decode(await storage.get(benchmarkKeys(benchmark.id, runId).filmIr!)));
     expect(stored.schema).toBe('actone.film-ir');

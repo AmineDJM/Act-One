@@ -57,6 +57,17 @@ export function composeWindow(doc: FilmIR, from: number, to: number): string[] {
     const frames = boundary.frames.firstIncoming - boundary.frames.lastOutgoing;
     story.push(`${boundary.id}: a ${show(boundary.kind.value)} (${boundary.kind.evidenceType.toLowerCase()}) — frame ${boundary.frames.lastOutgoing} is the last untouched, frame ${boundary.frames.firstIncoming} the first complete${frames > 1 ? `, ${frames - 1} mixed frame(s) between` : ''}; luma ${boundary.outgoing.lumaMean?.toFixed(3) ?? '?'} → ${boundary.incoming.lumaMean?.toFixed(3) ?? '?'}.${boundary.description?.value ? ` The model reads it as ${quote(boundary.description.value, 200)} (inferred).` : ''}`);
   }
+  // Inside a shot: part of the picture cross-fading behind what stays, and the field changing colour with no boundary.
+  for (const event of doc.events.events.filter((candidate) => candidate.type === 'visual.crossfade' && overlaps({ start: candidate.start, end: candidate.end ?? candidate.start }))) {
+    const span = event.subjectRefs.find((ref) => ref.startsWith('frames:'))?.slice('frames:'.length).replace('-', '–');
+    story.push(`Part of the picture cross-fades inside the shot${span ? ` over frames ${span}` : ''}, ${time(event.start)}–${time(event.end ?? event.start)} (measured)${event.provenance.note ? `: ${event.provenance.note}` : ''}.`);
+  }
+  const atBoundary = (value: TimeLike) => {
+    const t = seconds(value)!;
+    return doc.structure.boundaries.some((boundary) => t >= (seconds(boundary.range.start) ?? 0) - 0.08 && t <= (seconds(boundary.range.end) ?? 0) + 0.08);
+  };
+  const fields = doc.events.events.filter((candidate) => candidate.type === 'visual.field_change' && startsHere(candidate.start) && !atBoundary(candidate.start));
+  if (fields.length) story.push(`The field changes colour with no boundary at ${fields.map((event) => `${time(event.start)} (ΔE ${show(event.magnitude)})`).join(', ')} (measured).`);
   for (const move of (doc.camera?.moves ?? []).filter((candidate) => overlaps(candidate.range))) {
     story.push(`${move.id}: ${show(move.type.value)} over frames ${move.frames.first}–${move.frames.last} (${move.type.evidenceType.toLowerCase()}, ${move.type.confidence.toFixed(2)}).`);
   }

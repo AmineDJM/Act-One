@@ -395,7 +395,7 @@ function buildBoundary(
   samples: SampleClock | null,
   facts: CompileFacts,
 ): Boundary {
-  const method = boundary.kind === 'hard_cut' ? 'boundary.cut' : boundary.kind === 'dissolve' ? 'boundary.dissolve' : 'boundary.fade';
+  const method = boundary.kind === 'hard_cut' ? 'boundary.cut' : boundary.kind === 'wipe' ? 'boundary.wipe' : boundary.kind === 'dissolve' ? 'boundary.dissolve' : 'boundary.fade';
   const kind: BoundaryKind = boundary.kind;
   const outgoing = boundaryState(report, boundary.lastOutgoing, clock, samples, facts);
   const incoming = boundaryState(report, boundary.firstIncoming, clock, samples, facts);
@@ -1116,6 +1116,7 @@ function buildAudio(
   const tempoKnown = tempoGap === null;
   const keyUsable = audio.key !== null && musicShare !== null && musicShare >= 0.3 && audio.key.margin >= MIN_KEY_MARGIN;
   const tempoConfidence = round(MUSIC_CEILING.tempo * clamp01(audio.tempo.strength * 2), 3);
+  const accented = tempoKnown && audio.downbeat !== null && audio.downbeat.contrast >= 1.25;
   const music: MusicIR = {
     present: musicShare === null
       ? unknown('audio.music', 'Nothing audible to judge.', refs)
@@ -1134,12 +1135,12 @@ function buildAudio(
       times: tempoKnown ? audio.beats.map((beat) => samples.at(beat.sample)) : [],
       provenance: provenance(tempoKnown ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, tempoKnown ? tempoConfidence : 0, 'beats within 35 ms of an onset sit on that onset\'s sample; the others on the 10 ms grid'),
     },
-    downbeats: {
-      times: tempoKnown && audio.downbeat && audio.downbeat.contrast >= 1.25
-        ? audio.beats.filter((_, i) => i % 4 === audio.downbeat!.phase).map((beat) => samples.at(beat.sample))
-        : [],
-      provenance: provenance(tempoKnown && audio.downbeat && audio.downbeat.contrast >= 1.25 ? 'ESTIMATED' : 'UNKNOWN', 'audio.beats', refs, audio.downbeat ? round(MUSIC_CEILING.downbeat * clamp01((audio.downbeat.contrast - 1) / 2), 3) : 0, 'every fourth beat, phase chosen by accent; four beats to a bar is an assumption'),
-    },
+    downbeats: accented
+      ? {
+          times: audio.beats.filter((_, i) => i % 4 === audio.downbeat!.phase).map((beat) => samples.at(beat.sample)),
+          provenance: provenance('ESTIMATED', 'audio.beats', refs, round(MUSIC_CEILING.downbeat * clamp01((audio.downbeat!.contrast - 1) / 2), 3), 'every fourth beat, phase chosen by accent; four beats to a bar is an assumption'),
+        }
+      : { times: [], provenance: provenance('UNKNOWN', 'audio.beats', refs, 0, tempoKnown ? 'No beat in four stands out by its accent.' : 'No tempo, so no bar to begin.') },
     sections: [],
     ducking: audio.ducking.map((duck, index) => ({
       id: `music.ducking.${String(index + 1).padStart(3, '0')}`,

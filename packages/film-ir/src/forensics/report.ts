@@ -121,13 +121,23 @@ const TextLine = z.object({
 export type ForensicTextLine = z.infer<typeof TextLine>;
 
 const Boundary = z.object({
-  kind: z.enum(['hard_cut', 'fade_out', 'fade_in', 'dip_to_colour', 'dissolve']),
+  // wipe: a cut whose first frame is still part the outgoing picture and part the incoming (analyzer 1.4.0 on).
+  kind: z.enum(['hard_cut', 'wipe', 'fade_out', 'fade_in', 'dip_to_colour', 'dissolve']),
   lastOutgoing: FrameIndex,
   firstIncoming: FrameIndex,
   span: z.tuple([FrameIndex, FrameIndex]),
   scores: z.record(z.string(), z.unknown()),
 });
 export type ForensicBoundary = z.infer<typeof Boundary>;
+
+/** Part of the picture cross-fading inside a shot: a mix whose two ends keep most of the same edges. */
+const Crossfade = z.object({
+  lastOutgoing: FrameIndex,
+  firstIncoming: FrameIndex,
+  span: z.tuple([FrameIndex, FrameIndex]),
+  scores: z.record(z.string(), z.unknown()),
+});
+export type ForensicCrossfade = z.infer<typeof Crossfade>;
 
 const CameraMove = z.object({
   shot: z.number().int().nonnegative(),
@@ -306,6 +316,8 @@ export const ForensicReport = z
     }),
     boundaries: z.array(Boundary),
     shots: z.array(z.tuple([FrameIndex, FrameIndex])),
+    // Absent from reports older than 1.4.0, which called these dissolves.
+    crossfades: z.array(Crossfade).default([]),
     shotColours: z.array(z.array(z.object({ hex: z.string().regex(/^#[0-9a-f]{6}$/), share: Num }))),
     fieldChanges: z.array(z.object({ frame: FrameIndex, deltaE: Num, fromRgb: z.array(Num), toRgb: z.array(Num) })),
     camera: z.object({
@@ -358,6 +370,9 @@ export const ForensicReport = z
     for (const [a, b] of report.shots) if (outOfRange(a) || outOfRange(b) || a > b) context.addIssue({ code: 'custom', message: `shot [${a}, ${b}] is not inside ${n} frames` });
     for (const boundary of report.boundaries) {
       if (outOfRange(boundary.lastOutgoing) || outOfRange(boundary.firstIncoming)) context.addIssue({ code: 'custom', message: `a boundary points past the last frame` });
+    }
+    for (const crossfade of report.crossfades) {
+      if (outOfRange(crossfade.lastOutgoing) || outOfRange(crossfade.firstIncoming) || crossfade.lastOutgoing >= crossfade.firstIncoming) context.addIssue({ code: 'custom', message: `a cross-fade does not lie inside ${n} frames` });
     }
     for (const line of report.text.lines) {
       if (outOfRange(line.referenceFrame) || outOfRange(line.lastRead)) context.addIssue({ code: 'custom', message: `the line "${line.text.slice(0, 40)}" points past the last frame` });

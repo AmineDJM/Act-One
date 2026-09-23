@@ -21,6 +21,8 @@ if (!runtime.ok) console.warn(`forensics integration skipped: ${runtime.reason}`
 type Truth = {
   cut: { lastOutgoing: number; firstIncoming: number };
   cut2: { lastOutgoing: number; firstIncoming: number };
+  wipe: { lastOutgoing: number; firstIncoming: number };
+  crossfade: { lastOutgoing: number; firstIncoming: number };
   fadeOut: { first: number; black: number };
   texts: { text: string; geometry: { baselineY: number; capHeightPx: number | null; xHeightPx: number | null } }[];
 };
@@ -41,12 +43,15 @@ describe.skipIf(!runtime.ok)('the forensic analyzer on the synthetic film', () =
     });
     expect(stages).toContain('audio');
 
-    expect(report.frames.count).toBe(125);
+    expect(report.frames.count).toBe(175);
     expect(report.boundaries.map((b) => [b.kind, b.lastOutgoing, b.firstIncoming])).toEqual([
       ['hard_cut', truth.cut.lastOutgoing, truth.cut.firstIncoming],
       ['fade_out', truth.fadeOut.first - 1, truth.fadeOut.black],
       ['hard_cut', truth.cut2.lastOutgoing, truth.cut2.firstIncoming],
+      ['wipe', truth.wipe.lastOutgoing, truth.wipe.firstIncoming],
     ]);
+    // The cross-fade behind the card is inside its shot; the brightening at 162 is neither.
+    expect(report.crossfades.map((c) => [c.lastOutgoing, c.firstIncoming])).toEqual([[truth.crossfade.lastOutgoing, truth.crossfade.firstIncoming]]);
     expect(report.text.lines.map((line) => line.text)).toEqual(truth.texts.map((entry) => entry.text));
     const feature = report.text.lines[1]!.refinement;
     expect(feature && feature.measured ? feature.milestones : null).toMatchObject({ firstVisible: 50, settled: 60, exitStart: 80, lastVisible: 89 });
