@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AssetCollector } from '../assets.ts';
 import { unsafeRequestReason } from '../browser/request-guard.ts';
 import { fitScale, inspectPixels, visualSimilarity } from '../capture/element-capture.ts';
@@ -27,6 +27,24 @@ describe('Deadline', () => {
     expect(deadline.remaining()).toBe(0);
     expect(() => deadline.check('after')).toThrow(/time was spent/);
     deadline.dispose();
+  });
+
+  it('is spent when the clock says so, even before its timer has run', () => {
+    vi.useFakeTimers();
+    try {
+      const deadline = new Deadline(40);
+      const listener = vi.fn();
+      deadline.signal.addEventListener('abort', listener);
+      // The moment a step's timer set to the run's last millisecond can fire before the run's own.
+      vi.setSystemTime(Date.now() + 41);
+      expect(deadline.remaining()).toBe(0);
+      expect(() => deadline.check('after')).toThrow(/time was spent/);
+      expect(deadline.signal.aborted).toBe(true);
+      expect(listener).toHaveBeenCalledTimes(1);
+      deadline.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports cancellation as cancellation, not as a timeout', async () => {

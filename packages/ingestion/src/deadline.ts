@@ -33,12 +33,20 @@ export class Deadline {
     return Math.max(0, this.endsAt - Date.now());
   }
 
-  /** Throws the right failure for why the clock stopped, if it has. */
+  /**
+   * Throws the right failure for why the clock stopped, if it has.
+   *
+   * The clock decides, not the timer: a step's own timer set to the run's
+   * last millisecond can fire before the run's timer does, and for that
+   * moment the time is up while the signal still says otherwise. The signal
+   * is brought into line so everything listening to it stops too.
+   */
   check(stage: string): void {
-    if (!this.signal.aborted) return;
+    if (!this.signal.aborted && this.remaining() > 0) return;
     if (this.parent?.aborted) {
       throw new IngestionError('cancelled', `Cancelled during ${stage}.`, { stage });
     }
+    if (!this.signal.aborted) this.controller.abort(new Error('timeout'));
     throw new IngestionError('timeout', `The run's time was spent by ${stage}.`, { stage });
   }
 
