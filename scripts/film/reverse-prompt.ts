@@ -230,12 +230,36 @@ const SYSTEM_PASSES: Pass[] = [
   },
 ];
 
-const systemPass = (pass: Pass): string =>
+const systemPass = (pass: Pass, established: Record<string, unknown>): string =>
   [
     RULES,
     '',
     `THIS PASS: ${pass.title}. Watch and listen to the whole film, then answer about this`,
     'alone. Do not describe anything outside it — other passes cover the rest.',
+    /*
+     * Each pass sees what the earlier ones settled, and that is a repair.
+     *
+     * Asked independently, the passes contradicted each other about the same
+     * film: the palette pass measured the ground at #0A0A0A and the rules pass
+     * called it #111111; the voice pass measured 106 words per minute and the
+     * rules pass wrote 130. Neither is a hallucination exactly — they are two
+     * estimates of one thing, made twice — but a specification that disagrees
+     * with itself is one a builder has to arbitrate, which is the work this is
+     * supposed to remove.
+     *
+     * So the numbers already established are handed forward as facts. A later
+     * pass may still correct one, and then it is correcting rather than
+     * guessing again.
+     */
+    ...(Object.keys(established).length > 0
+      ? [
+          '',
+          'ALREADY ESTABLISHED about this film, by earlier passes. Treat these as measured.',
+          'Use these exact values where they apply rather than estimating them again; if one',
+          'is plainly wrong, say so in your answer rather than quietly disagreeing:',
+          JSON.stringify(established).slice(0, 5000),
+        ]
+      : []),
     '',
     'Return ONLY JSON:',
     ...pass.schema,
@@ -380,7 +404,7 @@ async function run(name: string, prompt: string, maxOutputTokens: number, window
 console.log(`  the system, in ${SYSTEM_PASSES.length} passes`);
 const system: Record<string, unknown> = {};
 for (const pass of SYSTEM_PASSES) {
-  const part = await run(pass.key, systemPass(pass), pass.maxOutputTokens);
+  const part = await run(pass.key, systemPass(pass, system), pass.maxOutputTokens);
   Object.assign(system, part);
 }
 
@@ -449,6 +473,18 @@ console.log(
 console.log(
   `  ${(tokens / 1000).toFixed(0)}k tokens, ${((Date.now() - startedAt) / 1000).toFixed(0)}s -> memory/reference/${id}.prompt.json`,
 );
+
+/*
+ * A field asked for as a list can come back as a sentence.
+ *
+ * `whatWouldBeHardestToCopy` was specified as an array and answered as one
+ * paragraph, and the renderer iterated it — which in JavaScript means it
+ * iterated the CHARACTERS, and printed the answer as thirty-one bullet points
+ * one letter long. The schema is a request, not a guarantee, and every place
+ * that walks a model's array has to survive being handed a string instead.
+ */
+const asList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(String) : typeof value === 'string' && value.trim() ? [value] : [];
 
 /** The document as a brief: the same facts, in the order somebody builds in. */
 function asBrief(doc: {
@@ -597,18 +633,18 @@ function asBrief(doc: {
 
   out.push('## What it never does');
   out.push('');
-  for (const r of sys['rulesItNeverBreaks'] ?? []) out.push(`- ${r}`);
+  for (const r of asList(sys['rulesItNeverBreaks'])) out.push(`- ${r}`);
   out.push('');
-  if ((sys['whatWouldBeHardestToCopy'] ?? []).length) {
+  if (asList(sys['whatWouldBeHardestToCopy']).length) {
     out.push('## What a weaker studio would get wrong');
     out.push('');
-    for (const r of sys['whatWouldBeHardestToCopy']) out.push(`- ${r}`);
+    for (const r of asList(sys['whatWouldBeHardestToCopy'])) out.push(`- ${r}`);
     out.push('');
   }
 
   out.push('## The recipe');
   out.push('');
-  (sys['recipe'] ?? []).forEach((step: string, i: number) => out.push(`${i + 1}. ${step}`));
+  asList(sys['recipe']).forEach((step, i) => out.push(`${i + 1}. ${step}`));
   out.push('');
 
   out.push('## The timeline');

@@ -1,0 +1,1639 @@
+{
+  "source": {
+    "reference": "/home/user/Act-One/.renders/ref/target7.mp4",
+    "id": "target7",
+    "durationSeconds": 40.98
+  },
+  "model": "gemini-3.1-pro-preview",
+  "analysedAt": "2026-09-23T15:26:20.951Z",
+  "windowSeconds": 20,
+  "system": {
+    "identity": {
+      "durationSeconds": 41,
+      "aspectRatio": "16:9",
+      "framesPerSecond": 24,
+      "subject": "Venture capital fund launch",
+      "language": "English",
+      "proposition": "Invest in technologies that expand human limits."
+    },
+    "palette": [
+      {
+        "hex": "#0A0A0A",
+        "role": "ground",
+        "firstAtSeconds": 0,
+        "sharePercentOfRunningTime": 100,
+        "whatItIsFor": "Fill base environment."
+      },
+      {
+        "hex": "#FFFFFF",
+        "role": "type",
+        "firstAtSeconds": 0,
+        "sharePercentOfRunningTime": 85,
+        "whatItIsFor": "Render text and vector lines."
+      },
+      {
+        "hex": "#0033FF",
+        "role": "accent",
+        "firstAtSeconds": 3.1,
+        "sharePercentOfRunningTime": 45,
+        "whatItIsFor": "Drive primary gradient nodes."
+      },
+      {
+        "hex": "#FF0055",
+        "role": "accent",
+        "firstAtSeconds": 4.05,
+        "sharePercentOfRunningTime": 45,
+        "whatItIsFor": "Drive secondary gradient nodes."
+      },
+      {
+        "hex": "#8800FF",
+        "role": "accent",
+        "firstAtSeconds": 5,
+        "sharePercentOfRunningTime": 40,
+        "whatItIsFor": "Drive tertiary gradient nodes."
+      }
+    ],
+    "grade": {
+      "blackPointHex": "#050505",
+      "whitePointHex": "#FFFFFF",
+      "contrastRatioTypeToGround": 21,
+      "saturationNote": "Hold ground saturation at 0%. Push accent saturation to 95%.",
+      "grainPercent": 15,
+      "vignettePercent": 50,
+      "bloomPercent": 25,
+      "isTheGroundFlatOrLit": "lit",
+      "lightSourceDescription": "Direct a 90-degree spotlight from 50% width, 0% height with 80% radial falloff."
+    },
+    "typography": {
+      "families": [
+        {
+          "classification": "neo-grotesque",
+          "weights": [
+            400,
+            600
+          ],
+          "usedFor": "Set primary statements, body copy, and captions."
+        },
+        {
+          "classification": "mono",
+          "weights": [
+            700
+          ],
+          "usedFor": "Set background repeating text grids."
+        }
+      ],
+      "scale": [
+        {
+          "role": "display",
+          "sizePercentOfFrameHeight": 15,
+          "trackingEm": -0.02,
+          "lineHeight": 1,
+          "case": "Sentence",
+          "maxLines": 1,
+          "exampleWordsAtSeconds": 3.5
+        },
+        {
+          "role": "body",
+          "sizePercentOfFrameHeight": 6,
+          "trackingEm": 0,
+          "lineHeight": 1.2,
+          "case": "Sentence",
+          "maxLines": 2,
+          "exampleWordsAtSeconds": 1.2
+        },
+        {
+          "role": "caption",
+          "sizePercentOfFrameHeight": 3,
+          "trackingEm": 0.02,
+          "lineHeight": 1,
+          "case": "lowercase",
+          "maxLines": 1,
+          "exampleWordsAtSeconds": 38
+        }
+      ],
+      "setting": {
+        "alignment": "center",
+        "maxMeasurePercentOfFrameWidth": 80,
+        "opticalNotes": "Align text blocks to absolute center. Ignore ascenders and descenders for vertical centering."
+      }
+    },
+    "layout": {
+      "gridColumns": 12,
+      "marginPercentOfFrameWidth": 10,
+      "anchorsUsed": [
+        {
+          "xPercent": 50,
+          "yPercent": 50,
+          "whatSitsThere": "Place primary statements and body copy.",
+          "howOftenUsed": 85
+        },
+        {
+          "xPercent": 50,
+          "yPercent": 90,
+          "whatSitsThere": "Place URL and footer captions.",
+          "howOftenUsed": 15
+        }
+      ]
+    },
+    "typeInMotion": {
+      "entrance": "Type on characters sequentially or scale from 80% to 100% while fading opacity from 0% to 100%.",
+      "entranceDurationSeconds": 0.5,
+      "entranceEasing": "out_expo",
+      "staggerSecondsBetweenUnits": 0.03,
+      "staggerUnit": "letter",
+      "exit": "Fade opacity from 100% to 0%.",
+      "exitDurationSeconds": 0.3,
+      "doesTypeEverSitStill": false
+    },
+    "camera": {
+      "moves": [
+        {
+          "atSeconds": 0,
+          "kind": "static",
+          "amplitudePercent": 0,
+          "durationSeconds": 2.5,
+          "easing": "none",
+          "whatMotivatesIt": "none"
+        },
+        {
+          "atSeconds": 2.5,
+          "kind": "zoom",
+          "amplitudePercent": 150,
+          "durationSeconds": 3,
+          "easing": "ease_in_out_quad",
+          "whatMotivatesIt": "transition to next scene"
+        },
+        {
+          "atSeconds": 5.5,
+          "kind": "static",
+          "amplitudePercent": 0,
+          "durationSeconds": 3.5,
+          "easing": "none",
+          "whatMotivatesIt": "none"
+        },
+        {
+          "atSeconds": 9,
+          "kind": "tilt",
+          "amplitudePercent": 50,
+          "durationSeconds": 2,
+          "easing": "ease_out_cubic",
+          "whatMotivatesIt": "reveal of glowing orb"
+        },
+        {
+          "atSeconds": 11,
+          "kind": "zoom",
+          "amplitudePercent": 200,
+          "durationSeconds": 3,
+          "easing": "ease_in_expo",
+          "whatMotivatesIt": "transition to fast-paced montage"
+        },
+        {
+          "atSeconds": 14,
+          "kind": "static",
+          "amplitudePercent": 0,
+          "durationSeconds": 8,
+          "easing": "none",
+          "whatMotivatesIt": "none"
+        },
+        {
+          "atSeconds": 22,
+          "kind": "zoom",
+          "amplitudePercent": 50,
+          "durationSeconds": 1,
+          "easing": "ease_out_quad",
+          "whatMotivatesIt": "reveal of pill-shaped UI element"
+        },
+        {
+          "atSeconds": 23,
+          "kind": "orbit",
+          "amplitudePercent": 180,
+          "durationSeconds": 4,
+          "easing": "ease_in_out_sine",
+          "whatMotivatesIt": "showcase multiple UI elements in 3D space"
+        },
+        {
+          "atSeconds": 27,
+          "kind": "zoom",
+          "amplitudePercent": 300,
+          "durationSeconds": 3,
+          "easing": "ease_in_expo",
+          "whatMotivatesIt": "transition to final scene"
+        },
+        {
+          "atSeconds": 30,
+          "kind": "static",
+          "amplitudePercent": 0,
+          "durationSeconds": 10,
+          "easing": "none",
+          "whatMotivatesIt": "none"
+        }
+      ],
+      "lensFeelMm": 35,
+      "depthOfFieldNote": "shallow depth of field used during the 3D orbit sequence to focus on the central UI elements",
+      "shakeAmplitudePercent": 0,
+      "isAnythingEverCompletelyStill": true
+    },
+    "motion": {
+      "easingsUsed": [
+        {
+          "name": "ease_in_out_quad",
+          "appliedTo": "camera zooms and UI element scaling",
+          "typicalDurationSeconds": 1.5
+        },
+        {
+          "name": "ease_out_cubic",
+          "appliedTo": "text reveals and camera tilts",
+          "typicalDurationSeconds": 1
+        },
+        {
+          "name": "ease_in_expo",
+          "appliedTo": "fast transitions between scenes",
+          "typicalDurationSeconds": 0.5
+        },
+        {
+          "name": "linear",
+          "appliedTo": "continuous background animations",
+          "typicalDurationSeconds": 5
+        }
+      ],
+      "somethingAlwaysMoving": true,
+      "idleMotionDescription": "subtle fluid-like animations in the background gradients and continuous drawing of the white line",
+      "velocityProfile": "starts slow, builds to a fast-paced montage in the middle, and ends with a slow, deliberate reveal"
+    },
+    "transitions": [
+      {
+        "atSeconds": 2.5,
+        "kind": "zoom_through",
+        "durationSeconds": 1,
+        "causedByWhatIsAlreadyOnScreen": "zooming into the text 'faster'",
+        "easing": "ease_in_expo"
+      },
+      {
+        "atSeconds": 5.5,
+        "kind": "cut",
+        "durationSeconds": 0,
+        "causedByWhatIsAlreadyOnScreen": "none",
+        "easing": "none"
+      },
+      {
+        "atSeconds": 11,
+        "kind": "zoom_through",
+        "durationSeconds": 1,
+        "causedByWhatIsAlreadyOnScreen": "zooming into the glowing orb",
+        "easing": "ease_in_expo"
+      },
+      {
+        "atSeconds": 14,
+        "kind": "glitch",
+        "durationSeconds": 0.5,
+        "causedByWhatIsAlreadyOnScreen": "distortion of the glowing orb",
+        "easing": "linear"
+      },
+      {
+        "atSeconds": 22,
+        "kind": "cut",
+        "durationSeconds": 0,
+        "causedByWhatIsAlreadyOnScreen": "none",
+        "easing": "none"
+      },
+      {
+        "atSeconds": 27,
+        "kind": "zoom_through",
+        "durationSeconds": 1,
+        "causedByWhatIsAlreadyOnScreen": "zooming into the array of UI elements",
+        "easing": "ease_in_expo"
+      },
+      {
+        "atSeconds": 30,
+        "kind": "fade",
+        "durationSeconds": 1,
+        "causedByWhatIsAlreadyOnScreen": "none",
+        "easing": "ease_in_out_quad"
+      }
+    ],
+    "threeD": {
+      "present": true,
+      "whatIsDimensional": "the pill-shaped UI elements and the glowing orb",
+      "lightingSetup": "single overhead spotlight with a soft falloff, creating a dramatic, high-contrast look",
+      "materials": "glass-like material for the UI elements with internal fluid animations, and an emissive material for the glowing orb",
+      "cameraPerspectiveMm": 50,
+      "atSecondsExamples": [
+        11,
+        23
+      ],
+      "whyItEarnsItsPlace": "adds depth and complexity to the visual representation of the technologies being discussed"
+    },
+    "ui": {
+      "present": true,
+      "howProductIsShown": "pill-shaped elements containing text and icons, arranged in a 3D array",
+      "cropOrFraming": "centered, taking up 60% of the frame width",
+      "annotationStyle": "minimalist sans-serif text, white on dark backgrounds or dark on light backgrounds"
+    },
+    "editing": {
+      "cutCount": 19,
+      "averageShotSeconds": 2.05,
+      "shortestShotSeconds": 0.5,
+      "longestShotSeconds": 8,
+      "rhythmRule": "Decrease shot duration to 0.50s during lists, increase to 8.00s for resolutions.",
+      "cutsOnTheBeat": true
+    },
+    "sound": {
+      "musicBpm": 120,
+      "musicKey": "D minor",
+      "musicStructure": [
+        {
+          "atSeconds": 0,
+          "section": "ambient drone"
+        },
+        {
+          "atSeconds": 14,
+          "section": "rhythmic pulse"
+        },
+        {
+          "atSeconds": 22,
+          "section": "riser"
+        },
+        {
+          "atSeconds": 30,
+          "section": "climax"
+        }
+      ],
+      "bedLufs": -18,
+      "masterLufs": -14,
+      "sidechainedToVoice": true,
+      "sfxFamilies": [
+        {
+          "family": "digital glitches",
+          "countInFilm": 15,
+          "typicalLevelDbBelowVoice": 10,
+          "atSecondsExamples": [
+            0,
+            14,
+            25
+          ]
+        },
+        {
+          "family": "low frequency impacts",
+          "countInFilm": 3,
+          "typicalLevelDbBelowVoice": 2,
+          "atSecondsExamples": [
+            14,
+            21,
+            30
+          ]
+        }
+      ]
+    },
+    "voice": {
+      "present": true,
+      "register": "baritone",
+      "wordsPerMinute": 106,
+      "medianPauseSeconds": 0.8,
+      "leadOverBedLu": 4,
+      "toneChanges": [
+        {
+          "atSeconds": 14,
+          "from": "measured",
+          "to": "urgent",
+          "whyThere": "match 0.50s cut rate"
+        },
+        {
+          "atSeconds": 27,
+          "from": "urgent",
+          "to": "reverent",
+          "whyThere": "deliver core thesis"
+        }
+      ]
+    },
+    "sync": {
+      "rule": "Snap hard cuts to 120 BPM grid transients.",
+      "toleranceSeconds": 0.04,
+      "examplesAtSeconds": [
+        14,
+        18,
+        21,
+        30
+      ],
+      "whatHappensOnTheLoudestHit": "Flash screen to 100% white for 0.08s, trigger 40Hz sub-boom."
+    },
+    "structure": {
+      "beats": [
+        {
+          "atSeconds": 0,
+          "untilSeconds": 5,
+          "job": "Establish thesis",
+          "whatChanges": "Transitions from 48px monochrome typing to 100% width gradient bands with scaling text."
+        },
+        {
+          "atSeconds": 5,
+          "untilSeconds": 14,
+          "job": "Introduce human element",
+          "whatChanges": "Shifts to 2px continuous line drawing and 2D vector hands interacting with a 300px gradient orb."
+        },
+        {
+          "atSeconds": 14,
+          "untilSeconds": 22,
+          "job": "List investment sectors",
+          "whatChanges": "Rapid 1.25s cuts of 800x450px glassmorphism cards over tiled monospace background text."
+        },
+        {
+          "atSeconds": 22,
+          "untilSeconds": 31,
+          "job": "Demonstrate scale",
+          "whatChanges": "Introduces 3D extruded pill shapes multiplying along a 45-degree Z-axis, ending in a 100% Y-axis gradient scale."
+        },
+        {
+          "atSeconds": 31,
+          "untilSeconds": 40,
+          "job": "Deliver brand identity",
+          "whatChanges": "Fades to #111111 for 1.50s SVG path morph of the logo and 2.00s subtitle typing."
+        }
+      ],
+      "turnAtSeconds": 14,
+      "callToActionAtSeconds": 38
+    },
+    "rulesItNeverBreaks": [
+      "Center all primary text horizontally at 50% of frame width.",
+      "Restrict color palette to #FFFFFF text on #111111 backgrounds, using #FF0055 and #0044FF exclusively for gradient accents.",
+      "Maintain voiceover pacing at 130 WPM with -14 LUFS integrated loudness."
+    ],
+    "recipe": [
+      "Set project resolution to 1920x1080, 30fps. Set base background to #111111.",
+      "0.00s-0.02s: Type '{We invest in te}' at 50% frame width, 50% frame height, 48px font size, over 2.00s.",
+      "0.02s-0.05s: Flash 3 horizontal bands (100% width, 30% height) with #0044FF to #FF0055 gradients. Scale text 'Faster.', 'Smarter.', 'Stronger.' from 100% to 115% over 1.00s each using ease_out_cubic.",
+      "0.05s-0.11s: Draw a continuous 2px #FFFFFF line forming a human profile at 50% width, 50% height over 6.00s. Drop a 300px circular gradient orb from -20% height to 20% height.",
+      "0.11s-0.14s: Animate two 400px hand vectors reaching toward the center orb. Apply a 0.20s displacement map glitch effect at 13.00s.",
+      "0.14s-0.19s: Tile background with 64px monospace text. Overlay 800x450px glassmorphism cards (20px background blur, 10% opacity white fill) containing 3D renders. Cycle cards every 1.25s.",
+      "0.19s-0.22s: Cascade the word 'NOW' vertically down the Y-axis from 20% to 80% height in 0.50s increments.",
+      "0.22s-0.27s: Generate 3D pill shapes (400x150px). Extrude 50px. Map #0044FF/#FF0055 gradients. Multiply to 20 instances, align along a 45-degree Z-axis diagonal, and rotate camera -30 degrees on Y-axis.",
+      "0.27s-0.31s: Draw a 4px horizontal line at 50% height. Scale Y from 4px to 1080px over 4.00s using ease_in_expo, filling the screen with a #A020F0 to #FFC0CB gradient.",
+      "0.31s-0.40s: Fade to #111111. Morph SVG paths to form 'augment.' logo at 50% width, 40% height over 1.50s. Type subtitle at 55% height over 2.00s. Fade in 'www.augment.fund' at 80% height at 38.00s.",
+      "Audio: Mix voiceover to -14 LUFS. Add 60 BPM ambient synth bed at -24 LUFS. Layer 0.10s digital glitch SFX at 13.00s and 14.00s at -18 LUFS."
+    ],
+    "whatWouldBeHardestToCopy": "The 3D pill cascade (22.00s-27.00s). Weaker studios will fail the depth of field (f/2.8 equivalent blur on background pills) and the precise 45-degree spatial distribution, resulting in a flat 2D array instead of a volumetric 3D tunnel."
+  },
+  "events": [
+    {
+      "atSeconds": 0,
+      "untilSeconds": 2.5,
+      "domain": "type",
+      "instruction": "Type on '{We invest in technologies that make humans}' at 50% x, 50% y over 1.50s. Hold for 0.70s. Fade opacity to 0% over 0.30s.",
+      "quantities": {
+        "xPercent": "50",
+        "yPercent": "50",
+        "durationSeconds": "1.50",
+        "opacityPercent": "0"
+      },
+      "whyItReads": "Establishes core premise at 130 WPM.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 0,
+      "untilSeconds": 2.5,
+      "domain": "voice",
+      "instruction": "Speak 'We invest in technologies that make humans' at 130 WPM. Peak level at -14 LUFS.",
+      "quantities": {
+        "wpm": "130",
+        "peakLUFS": "-14"
+      },
+      "whyItReads": "Delivers primary narrative.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 2.5,
+      "untilSeconds": 3.1,
+      "domain": "ui",
+      "instruction": "Reveal a horizontal container at 50% y, 100% width, 25% height. Fill with #0033FF gradient. Render 'Faster.' at 50% x, 50% y.",
+      "quantities": {
+        "heightPercent": "25",
+        "widthPercent": "100",
+        "hex": "#0033FF"
+      },
+      "whyItReads": "Accelerates pacing with 0.60s cuts.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 3.1,
+      "untilSeconds": 4.05,
+      "domain": "ui",
+      "instruction": "Shift gradient to include #FF0055. Replace text with 'Smarter.' at 50% x, 50% y.",
+      "quantities": {
+        "hex": "#FF0055",
+        "durationSeconds": "0.95"
+      },
+      "whyItReads": "Builds visual intensity via color shift.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 4.05,
+      "untilSeconds": 5,
+      "domain": "ui",
+      "instruction": "Shift gradient to include #8800FF. Replace text with 'Stronger.' Expand container height to 100% over 0.95s on ease_out_cubic. Overlay 1px white sine waves.",
+      "quantities": {
+        "hex": "#8800FF",
+        "heightPercent": "100",
+        "waveStrokePx": "1"
+      },
+      "whyItReads": "Maximizes visual weight before a hard cut.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 5,
+      "untilSeconds": 8.5,
+      "domain": "motion",
+      "instruction": "Draw a 2px #FFFFFF path starting from 50% x, 100% y. Trace a human profile ending at 50% x, 40% y over 3.50s on linear easing.",
+      "quantities": {
+        "strokePx": "2",
+        "startXPercent": "50",
+        "endYPercent": "40",
+        "durationSeconds": "3.50"
+      },
+      "whyItReads": "Connects human element to abstract space.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 8.5,
+      "untilSeconds": 10,
+      "domain": "camera",
+      "instruction": "Tilt camera down 50% over 1.50s on ease_out_cubic to reveal a 30% width spherical gradient orb at 50% x, 20% y.",
+      "quantities": {
+        "tiltPercent": "50",
+        "durationSeconds": "1.50",
+        "orbWidthPercent": "30"
+      },
+      "whyItReads": "Introduces the technological catalyst.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 10,
+      "untilSeconds": 13.5,
+      "domain": "motion",
+      "instruction": "Translate two #FF0055 hand vectors from 0% x and 100% x to intersect the orb at 50% x over 2.00s. Trigger 1.50s of RGB split and horizontal displacement glitch at 12.00s.",
+      "quantities": {
+        "durationSeconds": "2.00",
+        "glitchDurationSeconds": "1.50",
+        "hex": "#FF0055"
+      },
+      "whyItReads": "Visualizes human-tech synthesis via 15% frame distortion.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 13.5,
+      "untilSeconds": 14.5,
+      "domain": "layout",
+      "instruction": "Tile 'ROBOTICS' in mono font at 10% height across background. Center a 60% width, 40% height video container at 50% x, 50% y. Overlay 'Robotics.' and a 20% width 1px circle.",
+      "quantities": {
+        "bgTextHeightPercent": "10",
+        "containerWidthPercent": "60",
+        "containerHeightPercent": "40"
+      },
+      "whyItReads": "Establishes 1.00s montage rhythm.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 14.5,
+      "untilSeconds": 15.5,
+      "domain": "layout",
+      "instruction": "Update background text to 'NEUROTECH'. Update video container content. Update overlay text to 'Neurotech.'",
+      "quantities": {
+        "durationSeconds": "1.00"
+      },
+      "whyItReads": "Maintains 1.00s montage rhythm.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 15.5,
+      "untilSeconds": 16.5,
+      "domain": "layout",
+      "instruction": "Update background text to 'DEFENSE'. Update video container content. Update overlay text to 'Defense.'",
+      "quantities": {
+        "durationSeconds": "1.00"
+      },
+      "whyItReads": "Maintains 1.00s montage rhythm.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 16.5,
+      "untilSeconds": 17.5,
+      "domain": "layout",
+      "instruction": "Update background text to 'AI AGENTS'. Update video container content. Update overlay text to 'AI agents.'",
+      "quantities": {
+        "durationSeconds": "1.00"
+      },
+      "whyItReads": "Maintains 1.00s montage rhythm.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 17.5,
+      "untilSeconds": 20,
+      "domain": "camera",
+      "instruction": "Update background text to 'LONGEVITY'. Update video to eye macro. Update text to 'Longevity.' Zoom camera 20% into the video container over 2.50s on linear easing.",
+      "quantities": {
+        "zoomPercent": "20",
+        "durationSeconds": "2.50"
+      },
+      "whyItReads": "Breaks the 1.00s rhythm to signal section end.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 20,
+      "untilSeconds": 20.5,
+      "domain": "type",
+      "instruction": "Display the string 'ISN'T FUTURE TALK' in a repeating grid layout covering 100% of the frame.",
+      "quantities": {
+        "fontSize": "15% of frame height",
+        "opacity": "100%"
+      },
+      "whyItReads": "Establishes the initial textual context before a rapid transition.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 20,
+      "untilSeconds": 21.2,
+      "domain": "motion",
+      "instruction": "Scale the central gradient mask from 40% to 100% of frame width and height.",
+      "quantities": {
+        "scaleStart": "40%",
+        "scaleEnd": "100%",
+        "duration": "1.20s"
+      },
+      "whyItReads": "Creates a visual expansion that overtakes the background text.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 20.5,
+      "untilSeconds": 21.2,
+      "domain": "type",
+      "instruction": "Replace the repeating grid text with the string 'IT'S HAPPENING'.",
+      "quantities": {
+        "fontSize": "15% of frame height",
+        "opacity": "100%"
+      },
+      "whyItReads": "Accelerates the pacing through rapid copy changes.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 21.2,
+      "untilSeconds": 22,
+      "domain": "type",
+      "instruction": "Replace the text with the string 'NOW' arranged in a staggered vertical column, offset by 10% of frame width per line.",
+      "quantities": {
+        "fontSize": "15% of frame height",
+        "xOffsetPerLine": "10% of frame width"
+      },
+      "whyItReads": "Focuses attention on a single, urgent word before a scene cut.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 22,
+      "untilSeconds": 23,
+      "domain": "ui",
+      "instruction": "Fade in a pill-shaped container at 50% width, 50% height. Render the string 'We build.' and a globe vector icon inside. Apply a gradient background to the container.",
+      "quantities": {
+        "containerWidth": "30% of frame width",
+        "containerHeight": "10% of frame height",
+        "fadeDuration": "1.00s"
+      },
+      "whyItReads": "Introduces the core visual motif for the next sequence.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 23,
+      "untilSeconds": 27,
+      "domain": "camera",
+      "instruction": "Orbit the camera 180 degrees around the central container while translating backward on the Z-axis to reveal an array of 20 identical containers spaced evenly.",
+      "quantities": {
+        "orbitAngle": "180 degrees",
+        "zTranslation": "500% of frame width",
+        "containerCount": "20"
+      },
+      "whyItReads": "Demonstrates scale and multiplicity of the subject matter.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 27,
+      "untilSeconds": 28,
+      "domain": "transition",
+      "instruction": "Scale the Y-axis of all containers to 1% of frame height, merging them into a single horizontal line spanning 100% of frame width.",
+      "quantities": {
+        "targetHeight": "1% of frame height",
+        "duration": "1.00s"
+      },
+      "whyItReads": "Condenses complex 3D geometry into a simple 2D graphic element.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 28,
+      "untilSeconds": 31,
+      "domain": "motion",
+      "instruction": "Scale the horizontal line on the Y-axis from 1% to 100% of frame height, filling the screen with the gradient colors.",
+      "quantities": {
+        "scaleYStart": "1%",
+        "scaleYEnd": "100%",
+        "duration": "3.00s"
+      },
+      "whyItReads": "Washes the screen with color to act as a transitional wipe.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 31,
+      "untilSeconds": 33,
+      "domain": "transition",
+      "instruction": "Fade the screen opacity from 100% to 0%, revealing a black background.",
+      "quantities": {
+        "opacityStart": "100%",
+        "opacityEnd": "0%",
+        "duration": "2.00s"
+      },
+      "whyItReads": "Provides a visual reset before the final logo reveal.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 33,
+      "untilSeconds": 34,
+      "domain": "type",
+      "instruction": "Reveal the string 'augment.' at 50% width, 50% height. Morph the vector paths of the characters from abstract curves to standard neo-grotesque letterforms.",
+      "quantities": {
+        "fontSize": "15% of frame height",
+        "morphDuration": "1.00s"
+      },
+      "whyItReads": "Introduces the brand identity with a custom typographic animation.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 33,
+      "untilSeconds": 40,
+      "domain": "picture",
+      "instruction": "Render a radial gradient glow behind the 'augment.' text. Shift the hue of the gradient continuously through the accent palette.",
+      "quantities": {
+        "glowRadius": "25% of frame height",
+        "hueShiftDuration": "7.00s"
+      },
+      "whyItReads": "Adds visual interest and ties the logo back to the film's color system.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 34,
+      "untilSeconds": 38,
+      "domain": "type",
+      "instruction": "Type on the string 'A fund for those who rewrite human capability.' at 50% width, 60% height.",
+      "quantities": {
+        "fontSize": "6% of frame height",
+        "charactersPerSecond": "12"
+      },
+      "whyItReads": "Delivers the primary proposition statement clearly.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 38,
+      "untilSeconds": 40,
+      "domain": "type",
+      "instruction": "Type on the string 'www.augment.fund' at 50% width, 90% height.",
+      "quantities": {
+        "fontSize": "3% of frame height",
+        "charactersPerSecond": "15"
+      },
+      "whyItReads": "Provides the call to action and destination URL.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 40,
+      "untilSeconds": 40.98,
+      "domain": "type",
+      "instruction": "Hold the word 'augment.' at 50% of frame width and 45% of frame height. Hold the sentence 'A fund for those who rewrite human capability.' at 50% of frame width and 55% of frame height. Hold the URL 'www.augment.fund' at 50% of frame width and 90% of frame height.",
+      "quantities": {
+        "augmentYPercent": "45%",
+        "subheadYPercent": "55%",
+        "urlYPercent": "90%"
+      },
+      "whyItReads": "Provides time to read the final brand lockup.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 40,
+      "untilSeconds": 40.98,
+      "domain": "picture",
+      "instruction": "Hold the background spotlight at 50% of frame width and 50% of frame height with 80% radial falloff over a #0A0A0A ground.",
+      "quantities": {
+        "spotlightXPercent": "50%",
+        "spotlightYPercent": "50%",
+        "falloffPercent": "80%"
+      },
+      "whyItReads": "Maintains visual focus on the center text.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 40,
+      "untilSeconds": 40.98,
+      "domain": "sound",
+      "instruction": "Fade the low-frequency synth drone from -24 LUFS to -60 LUFS over 0.98s on a linear curve.",
+      "quantities": {
+        "startLevelLUFS": "-24 LUFS",
+        "endLevelLUFS": "-60 LUFS",
+        "durationSeconds": "0.98s"
+      },
+      "whyItReads": "Concludes the audio track.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 40,
+      "untilSeconds": 40.98,
+      "domain": "motion",
+      "instruction": "Hold all elements at 0 pixels per second velocity.",
+      "quantities": {
+        "velocityPixelsPerSecond": "0"
+      },
+      "whyItReads": "Creates a static end frame.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 40,
+      "untilSeconds": 40.98,
+      "domain": "camera",
+      "instruction": "Hold camera position at 0% amplitude.",
+      "quantities": {
+        "amplitudePercent": "0%"
+      },
+      "whyItReads": "Keeps the frame stable.",
+      "confidence": "observed"
+    }
+  ],
+  "seconds": [
+    {
+      "at": 0,
+      "onScreen": "{We invest in te}",
+      "typeOnScreen": "Sans-serif, white, centered, approx 10% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Text types on from left to right.",
+      "audioNow": "Low drone begins, approx -20 LUFS.",
+      "spokenNow": "We invest in technologies"
+    },
+    {
+      "at": 0.5,
+      "onScreen": "{We invest in technologies that make humans}",
+      "typeOnScreen": "Sans-serif, white, centered, approx 10% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Text continues typing on.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "We invest in technologies"
+    },
+    {
+      "at": 1,
+      "onScreen": "that make humans",
+      "typeOnScreen": "Sans-serif, white, centered, approx 10% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Text scales up slightly, brackets disappear.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "that make humans"
+    },
+    {
+      "at": 1.5,
+      "onScreen": "that make humans",
+      "typeOnScreen": "Sans-serif, white, centered, approx 10% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Text holds position.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "that make humans"
+    },
+    {
+      "at": 2,
+      "onScreen": "Faster.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#1A4B8C",
+      "motionNow": "Text cuts in. Background reveals a blue/purple gradient band, approx 30% frame height.",
+      "audioNow": "Drone continues, slight swell.",
+      "spokenNow": "faster"
+    },
+    {
+      "at": 2.5,
+      "onScreen": "Faster.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#1A4B8C",
+      "motionNow": "Background band expands vertically.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "faster"
+    },
+    {
+      "at": 3,
+      "onScreen": "Smarter.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#4A2B8C",
+      "motionNow": "Text cuts in. Background band expands further, colors shift to include more purple/pink.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "smarter"
+    },
+    {
+      "at": 3.5,
+      "onScreen": "Smarter.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#4A2B8C",
+      "motionNow": "Background band continues expanding and shifting colors.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "smarter"
+    },
+    {
+      "at": 4,
+      "onScreen": "Stronger.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#8C1A4B",
+      "motionNow": "Text cuts in. Background fills frame, colors shift to include more red/pink. White contour lines appear.",
+      "audioNow": "Drone continues, slight swell.",
+      "spokenNow": "stronger"
+    },
+    {
+      "at": 4.5,
+      "onScreen": "Stronger.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#8C1A4B",
+      "motionNow": "Background colors shift, contour lines undulate.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "stronger"
+    },
+    {
+      "at": 5,
+      "onScreen": "Stronger.",
+      "typeOnScreen": "Sans-serif, white, centered, approx 15% frame height.",
+      "dominantHex": "#8C1A4B",
+      "motionNow": "Background colors shift, contour lines undulate.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "stronger"
+    },
+    {
+      "at": 5.5,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Cut to black. A single white line begins drawing from bottom center.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "That push human capabilities"
+    },
+    {
+      "at": 6,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "White line continues drawing upwards, forming a profile.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "That push human capabilities"
+    },
+    {
+      "at": 6.5,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "White line continues drawing, forming a face profile.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "That push human capabilities"
+    },
+    {
+      "at": 7,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "White line completes face profile, begins rotating clockwise.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "to the next level."
+    },
+    {
+      "at": 7.5,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Face profile continues rotating clockwise.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "to the next level."
+    },
+    {
+      "at": 8,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Face profile continues rotating clockwise.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "to the next level."
+    },
+    {
+      "at": 8.5,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Face profile continues rotating clockwise, approaching horizontal.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "to the next level."
+    },
+    {
+      "at": 9,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Face profile reaches horizontal. A colorful gradient circle appears at top center, approx 20% frame width.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "That supercharge performance"
+    },
+    {
+      "at": 9.5,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Gradient circle expands downwards, revealing a brain-like structure.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "That supercharge performance"
+    },
+    {
+      "at": 10,
+      "onScreen": "",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "Gradient circle continues expanding downwards.",
+      "audioNow": "Drone continues.",
+      "spokenNow": "That supercharge performance"
+    },
+    {
+      "at": 10,
+      "onScreen": "That supercharge performance",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "White line drawing of a face at 50% frame height, 30% frame width. Glowing sphere at 10% frame height, 40% frame width.",
+      "audioNow": "Ambient synth pad at -18 LUFS.",
+      "spokenNow": "That supercharge performance"
+    },
+    {
+      "at": 10.5,
+      "onScreen": "at every level.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Face drawing fades out over 0.5s. Sphere descends to 50% frame height over 1.0s.",
+      "audioNow": "Ambient synth pad at -18 LUFS.",
+      "spokenNow": "at every level."
+    },
+    {
+      "at": 11,
+      "onScreen": "And break into what",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Sphere centered at 50% frame height. Two red glowing hands enter from left and right edges, moving towards sphere.",
+      "audioNow": "Ambient synth pad at -18 LUFS.",
+      "spokenNow": "And break into what"
+    },
+    {
+      "at": 11.5,
+      "onScreen": "evolution never delivered.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Red hands touch the sphere. Sphere glows brighter.",
+      "audioNow": "Ambient synth pad at -18 LUFS.",
+      "spokenNow": "evolution never delivered."
+    },
+    {
+      "at": 12,
+      "onScreen": "evolution never delivered.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Sphere and hands distort with a glitch effect over 0.2s.",
+      "audioNow": "Glitch sound effect at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 12.5,
+      "onScreen": "Robotics.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 50% frame height.",
+      "dominantHex": "#222222",
+      "motionNow": "Background fills with repeating 'ROBOTICS' text. Central image of a robotic arm touching a human hand appears in a rounded rectangle.",
+      "audioNow": "Upbeat electronic music starts at -14 LUFS.",
+      "spokenNow": "Robotics."
+    },
+    {
+      "at": 13,
+      "onScreen": "Neurotech.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 50% frame height.",
+      "dominantHex": "#222222",
+      "motionNow": "Background text changes to 'NEUROTECH'. Central image changes to a brain scan.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": "Neurotech."
+    },
+    {
+      "at": 13.5,
+      "onScreen": "Defense.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 50% frame height.",
+      "dominantHex": "#222222",
+      "motionNow": "Background text changes to 'DEFENSE'. Central image changes to robots.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": "Defense."
+    },
+    {
+      "at": 14,
+      "onScreen": "AI agents.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 50% frame height.",
+      "dominantHex": "#222222",
+      "motionNow": "Background text changes to 'AI AGENTS'. Central image changes to a wireframe car.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": "AI agents."
+    },
+    {
+      "at": 14.5,
+      "onScreen": "Longevity.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 50% frame height.",
+      "dominantHex": "#222222",
+      "motionNow": "Background text changes to 'LONGEVITY'. Central image changes to a close-up of an eye.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": "Longevity."
+    },
+    {
+      "at": 15,
+      "onScreen": "Longevity.",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 50% frame height.",
+      "dominantHex": "#222222",
+      "motionNow": "Eye image scales up to fill the frame over 0.5s.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 15.5,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Eye image fades to black. Text appears at bottom.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": "This is"
+    },
+    {
+      "at": 16,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 16.5,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 17,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 17.5,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 18,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 18.5,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 19,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 19.5,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 20,
+      "onScreen": "This is",
+      "typeOnScreen": "Sans-serif, white, 4% frame height, centered at 90% frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "Static black screen with text.",
+      "audioNow": "Upbeat electronic music at -14 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 20,
+      "onScreen": "ISN'T FUTURE TALK repeated vertically. Central rectangle with pink/purple fluid texture. White circle outline in center with text 'Not in the future.'",
+      "typeOnScreen": "ISN'T FUTURE TALK: 80px monospace, #FFFFFF. Not in the future.: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Background text scrolls vertically at 100px/s. Central rectangle scales up from 30% to 40% width. Fluid texture animates.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "future talk."
+    },
+    {
+      "at": 20.5,
+      "onScreen": "IT'S HAPPENING repeated vertically. Central rectangle with pink/purple fluid texture. White circle outline in center with text 'This is happenin'.",
+      "typeOnScreen": "IT'S HAPPENING: 80px monospace, #FFFFFF. This is happenin: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Background text scrolls vertically at 100px/s. Central rectangle scales up to 50% width. Fluid texture animates.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "This is happening."
+    },
+    {
+      "at": 21,
+      "onScreen": "NOW repeated vertically in a staggered pattern.",
+      "typeOnScreen": "NOW: 80px monospace, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Text 'NOW' appears in a staggered vertical column, scrolling upwards at 150px/s.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "NOW."
+    },
+    {
+      "at": 21.5,
+      "onScreen": "NOW repeated vertically in a staggered pattern.",
+      "typeOnScreen": "NOW: 80px monospace, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Text 'NOW' continues scrolling upwards at 150px/s.",
+      "audioNow": "Synth drone continues at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 22,
+      "onScreen": "NOW repeated vertically in a staggered pattern.",
+      "typeOnScreen": "NOW: 80px monospace, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Text 'NOW' continues scrolling upwards at 150px/s.",
+      "audioNow": "Synth drone continues at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 22.5,
+      "onScreen": "Pill shape with 'We build.' text and globe icon. Pink/purple fluid texture inside pill. Red and blue glow behind pill.",
+      "typeOnScreen": "We build.: 32px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Pill shape fades in and scales up from 0% to 20% width over 0.5s. Fluid texture animates.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "With those who build with obsession,"
+    },
+    {
+      "at": 23,
+      "onScreen": "Pill shape with 'We build.' text and globe icon. Pink/purple fluid texture inside pill. Red and blue glow behind pill.",
+      "typeOnScreen": "We build.: 32px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Pill shape holds at 20% width. Fluid texture animates.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "With those who build with obsession,"
+    },
+    {
+      "at": 23.5,
+      "onScreen": "Pill shape with 'We build.' text and globe icon. Pink/purple fluid texture inside pill. Red and blue glow behind pill.",
+      "typeOnScreen": "We build.: 32px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Pill shape holds at 20% width. Fluid texture animates.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "With those who build with obsession,"
+    },
+    {
+      "at": 24,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Additional pill shapes fade in and scale up, forming a vertical stack. The stack rotates slightly on the Y-axis.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "discipline,"
+    },
+    {
+      "at": 24.5,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Stack of pill shapes continues to rotate on the Y-axis and scale down slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "discipline,"
+    },
+    {
+      "at": 25,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Stack of pill shapes continues to rotate on the Y-axis and scale down slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "and"
+    },
+    {
+      "at": 25.5,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Stack of pill shapes continues to rotate on the Y-axis and scale down slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "raw ambition."
+    },
+    {
+      "at": 26,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Stack of pill shapes continues to rotate on the Y-axis and scale down slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "raw ambition."
+    },
+    {
+      "at": 26.5,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Stack of pill shapes continues to rotate on the Y-axis and scale down slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 27,
+      "onScreen": "Multiple pill shapes with various text and icons appear, arranged vertically. Each has a different fluid texture and glow.",
+      "typeOnScreen": "Various text: 24px sans-serif, #FFFFFF.",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Stack of pill shapes continues to rotate on the Y-axis and scale down slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 27.5,
+      "onScreen": "Horizontal line with blue glow on left and red glow on right.",
+      "typeOnScreen": "",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Pill shapes collapse into a single horizontal line. Line glows blue on left, red on right.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "Because human limits"
+    },
+    {
+      "at": 28,
+      "onScreen": "Horizontal line with blue glow on left and red glow on right.",
+      "typeOnScreen": "",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Horizontal line holds position. Glow pulses slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "Because human limits"
+    },
+    {
+      "at": 28.5,
+      "onScreen": "Horizontal line with blue glow on left and red glow on right.",
+      "typeOnScreen": "",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Horizontal line holds position. Glow pulses slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "aren't lines in the sand."
+    },
+    {
+      "at": 29,
+      "onScreen": "Horizontal line with blue glow on left and red glow on right.",
+      "typeOnScreen": "",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Horizontal line holds position. Glow pulses slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS. Voiceover at -18 LUFS.",
+      "spokenNow": "aren't lines in the sand."
+    },
+    {
+      "at": 29.5,
+      "onScreen": "Horizontal line with blue glow on left and red glow on right.",
+      "typeOnScreen": "",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Horizontal line holds position. Glow pulses slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 30,
+      "onScreen": "Horizontal line with blue glow on left and red glow on right.",
+      "typeOnScreen": "",
+      "dominantHex": "#1A1A1A",
+      "motionNow": "Horizontal line holds position. Glow pulses slightly.",
+      "audioNow": "Synth drone continues at -12 LUFS.",
+      "spokenNow": ""
+    },
+    {
+      "at": 30,
+      "onScreen": "A horizontal line spans 100% of the frame width at 50% of the frame height. The line is a gradient from blue (#0000FF) on the left to red (#FF0000) on the right. The background is black (#000000).",
+      "typeOnScreen": "Subtitle text 'aren't lines in the sand.' is centered at 90% of the frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "The horizontal line remains static.",
+      "audioNow": "A low, sustained synth note plays at -15 LUFS.",
+      "spokenNow": "aren't lines in the sand."
+    },
+    {
+      "at": 30.5,
+      "onScreen": "The horizontal line has expanded vertically to cover 30% of the frame height. The gradient colors are more intense, with purple (#800080) and pink (#FFC0CB) hues.",
+      "typeOnScreen": "Subtitle text 'They're the start' is centered at 90% of the frame height.",
+      "dominantHex": "#000000",
+      "motionNow": "The horizontal line expands vertically on an ease-in curve.",
+      "audioNow": "The synth note increases in volume to -10 LUFS.",
+      "spokenNow": "They're the start"
+    },
+    {
+      "at": 31,
+      "onScreen": "The gradient now fills 100% of the frame. The colors are a mix of purple (#800080), pink (#FFC0CB), and white (#FFFFFF).",
+      "typeOnScreen": "Subtitle text 'They're the start' is centered at 90% of the frame height.",
+      "dominantHex": "#DDA0DD",
+      "motionNow": "The gradient continues to expand and fill the frame.",
+      "audioNow": "The synth note reaches its peak volume at -5 LUFS.",
+      "spokenNow": "They're the start"
+    },
+    {
+      "at": 31.5,
+      "onScreen": "The gradient fills 100% of the frame. The colors are a mix of purple (#800080), pink (#FFC0CB), and white (#FFFFFF).",
+      "typeOnScreen": "Subtitle text 'of something bigger.' is centered at 90% of the frame height.",
+      "dominantHex": "#DDA0DD",
+      "motionNow": "The gradient colors shift slightly.",
+      "audioNow": "The synth note begins to fade.",
+      "spokenNow": "of something bigger."
+    },
+    {
+      "at": 32,
+      "onScreen": "The gradient fills 100% of the frame. The colors are a mix of purple (#800080), pink (#FFC0CB), and white (#FFFFFF).",
+      "typeOnScreen": "Subtitle text 'of something bigger.' is centered at 90% of the frame height.",
+      "dominantHex": "#DDA0DD",
+      "motionNow": "The gradient colors shift slightly.",
+      "audioNow": "The synth note continues to fade.",
+      "spokenNow": "of something bigger."
+    },
+    {
+      "at": 32.5,
+      "onScreen": "The frame is entirely black (#000000).",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "The screen cuts to black.",
+      "audioNow": "Silence.",
+      "spokenNow": ""
+    },
+    {
+      "at": 33,
+      "onScreen": "The frame is entirely black (#000000).",
+      "typeOnScreen": "None",
+      "dominantHex": "#000000",
+      "motionNow": "The screen remains black.",
+      "audioNow": "Silence.",
+      "spokenNow": ""
+    },
+    {
+      "at": 33.5,
+      "onScreen": "The word 'augment.' appears in the center of the frame. The letters are formed by a gradient of purple (#800080) and red (#FF0000). The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The letters of 'augment.' fade in and assemble themselves.",
+      "audioNow": "A low, rhythmic synth pulse begins at -20 LUFS.",
+      "spokenNow": "augment."
+    },
+    {
+      "at": 34,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The word 'augment.' remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": "augment."
+    },
+    {
+      "at": 34.5,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. Subtitle text 'a fund for those' is centered at 90% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The word 'augment.' remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": "a fund for those"
+    },
+    {
+      "at": 35,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. Subtitle text 'a fund for those' is centered at 90% of the frame height. The text 'A fund for those who rewrite human capab|' is being typed out below 'augment.' at 60% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text below 'augment.' is being typed out.",
+      "audioNow": "The synth pulse continues. Typing sound effects play at -15 LUFS.",
+      "spokenNow": "a fund for those"
+    },
+    {
+      "at": 35.5,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. Subtitle text 'who rewrite human capability.' is centered at 90% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text below 'augment.' is fully typed out.",
+      "audioNow": "The synth pulse continues. Typing sound effects stop.",
+      "spokenNow": "who rewrite human capability."
+    },
+    {
+      "at": 36,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. Subtitle text 'who rewrite human capability.' is centered at 90% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": "who rewrite human capability."
+    },
+    {
+      "at": 36.5,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 37,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' appears at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text 'www.augment.fund' fades in.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 37.5,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' is at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 38,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' is at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 38.5,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' is at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 39,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' is at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 39.5,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' is at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 40,
+      "onScreen": "The word 'augment.' is fully formed in the center of the frame. The background is a dark, mottled red (#330000).",
+      "typeOnScreen": "The word 'augment.' is centered at 50% of the frame height. The text 'A fund for those who rewrite human capability.' is fully typed out below 'augment.' at 60% of the frame height. The text 'www.augment.fund' is at 80% of the frame height.",
+      "dominantHex": "#330000",
+      "motionNow": "The text remains static.",
+      "audioNow": "The synth pulse continues.",
+      "spokenNow": ""
+    },
+    {
+      "at": 40,
+      "onScreen": "Display 'augment.' at 50% width, 45% height. Display 'A fund for those who rewrite human capability.' at 50% width, 55% height. Display 'www.augment.fund' at 50% width, 90% height.",
+      "typeOnScreen": "Set 'augment.' to 10% frame height, bold sans-serif, #7B32D9. Set subtitle to 3% frame height, regular sans-serif, #FFFFFF. Set URL to 2% frame height, regular sans-serif, #FFFFFF.",
+      "dominantHex": "#0A0A0A",
+      "motionNow": "Hold all elements static at 0px/s velocity.",
+      "audioNow": "Fade out synth pad from -24dB to -30dB.",
+      "spokenNow": "None.",
+      "confidence": "inferred"
+    },
+    {
+      "at": 40.5,
+      "onScreen": "Maintain 'augment.' at 50% width, 45% height. Maintain subtitle at 50% width, 55% height. Maintain URL at 50% width, 90% height.",
+      "typeOnScreen": "Keep 'augment.' at 10% frame height, #7B32D9. Keep subtitle at 3% frame height, #FFFFFF. Keep URL at 2% frame height, #FFFFFF.",
+      "dominantHex": "#0A0A0A",
+      "motionNow": "Hold all elements static at 0px/s velocity.",
+      "audioNow": "Fade out synth pad from -30dB to -40dB.",
+      "spokenNow": "None.",
+      "confidence": "inferred"
+    }
+  ]
+}
