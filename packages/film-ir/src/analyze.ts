@@ -186,19 +186,25 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
         return uploaded;
       }).catch(nonFatal('upload'))
     : null;
+  // Passes an earlier attempt of this run already made, completed or failed.
+  const earlierPasses = async (): Promise<Record<string, PassRecord>> => {
+    const earlier: Record<string, PassRecord> = {};
+    if (redo.has('passes')) return earlier;
+    for (const id of EXPECTED_PASSES) {
+      const record = await options.checkpoints.get<PassRecord>(`pass-${id}`);
+      if (record) earlier[id] = record;
+    }
+    return earlier;
+  };
   if (gemini && !file) {
-    // Nothing to watch: every pass is missing, and says why.
-    await options.onStage?.('passes', 'failed', 'Not run: the film could not be uploaded to the video model.');
+    // Nothing to watch, so nothing new is asked; what an earlier attempt learned from these same bytes stands.
+    passes = await earlierPasses();
+    const missing = EXPECTED_PASSES.filter((id) => passes[id]?.status !== 'completed');
+    await options.onStage?.('passes', 'failed', `Not run: the film could not be uploaded to the video model; ${missing.length} of ${EXPECTED_PASSES.length} passes missing.`);
   }
   if (gemini && file) {
     passes = await stage('passes', null, async () => {
-      const existing: Record<string, PassRecord> = {};
-      if (!redo.has('passes')) {
-        for (const id of EXPECTED_PASSES) {
-          const record = await options.checkpoints.get<PassRecord>(`pass-${id}`);
-          if (record) existing[id] = record;
-        }
-      }
+      const existing = await earlierPasses();
       return runGeminiPasses({
         provider: gemini,
         file,

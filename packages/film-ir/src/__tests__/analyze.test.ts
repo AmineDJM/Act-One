@@ -109,7 +109,7 @@ describe('analyzeFilm when a listener or the model is unavailable', () => {
     const { run, stages } = await analyze(memoryCheckpoints({ forensics: report }), report.input.sha256, { gemini: brokeGemini() });
     const result = await run;
     expect(stages).toContainEqual(['upload', 'failed', expect.stringMatching(/402/)]);
-    expect(stages).toContainEqual(['passes', 'failed', 'Not run: the film could not be uploaded to the video model.']);
+    expect(stages).toContainEqual(['passes', 'failed', `Not run: the film could not be uploaded to the video model; ${EXPECTED_PASSES.length} of ${EXPECTED_PASSES.length} passes missing.`]);
     expect(result.validation.status).toBe('PARTIAL');
     const byId = Object.fromEntries(result.validation.checks.map((check) => [check.id, check]));
     expect(byId['stages']).toMatchObject({ status: 'warn', count: 1, examples: [expect.stringMatching(/^upload: .*402/)] });
@@ -149,6 +149,18 @@ describe('analyzeFilm when a listener or the model is unavailable', () => {
     expect(state.calls).toEqual(['integrator']);
     expect(retry.stages).toContainEqual(['passes', 'completed', undefined]);
     expect(Object.values(complete.passes).every((record) => record.status === 'completed')).toBe(true);
+  });
+
+  it('keeps the passes an earlier attempt made when the model cannot be reached on a retry', async () => {
+    const checkpoints = memoryCheckpoints({ forensics: report });
+    const state = { integratorDown: true, calls: [] as string[] };
+    await (await analyze(checkpoints, report.input.sha256, { gemini: scriptedGemini(state) })).run;
+
+    const retry = await analyze(checkpoints, report.input.sha256, { gemini: brokeGemini() });
+    const result = await retry.run;
+    expect(retry.stages).toContainEqual(['passes', 'failed', `Not run: the film could not be uploaded to the video model; 1 of ${EXPECTED_PASSES.length} passes missing.`]);
+    expect(Object.values(result.passes).filter((record) => record.status === 'completed')).toHaveLength(EXPECTED_PASSES.length - 1);
+    expect(result.document.producers.filter((producer) => producer.kind === 'model_pass' && producer.status === 'completed')).toHaveLength(EXPECTED_PASSES.length - 1);
   });
 
   it('stops altogether when it is cancelled, rather than compile what it has', async () => {
