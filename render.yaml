@@ -97,8 +97,12 @@ services:
     # chrome-headless-shell for rendering, and Blender for the 3D shots. A
     # managed Node build has no root and therefore no package manager, so
     # Blender is the official self-contained build rather than an apt package.
-    # Without it every 3D shot quietly degrades to a flat capture.
-    buildCommand: npm ci --include=dev && npm run browsers && npm run blender
+    # Without it every 3D shot quietly degrades to a flat capture. The last
+    # step is the Benchmark Library's forensic analyzer: its pinned Python
+    # packages in an environment of their own under node_modules, for the
+    # same reason. A build that cannot install it still deploys; the worker
+    # logs why at startup, and only benchmark analyses fail until it is fixed.
+    buildCommand: npm ci --include=dev && npm run browsers && npm run blender && npm run forensics
     startCommand: npm run worker
     autoDeploy: true
     envVars:

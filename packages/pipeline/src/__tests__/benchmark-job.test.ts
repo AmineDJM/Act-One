@@ -160,6 +160,21 @@ describe('the benchmark job', () => {
     expect((await store.benchmarks.get(benchmark.id))!.status).toBe('failed');
   });
 
+  it('fails at once, before fetching the film, when this worker cannot run the analyzer', async () => {
+    const { store, deps, benchmark, runId } = await setup();
+    const queued = job(benchmark.id, runId);
+    await store.jobs.enqueue(queued);
+    const { analyze, seen } = playback();
+    const runtime = async () => ({ ok: false as const, reason: 'the analyzer\'s Python module "cv2" is not installed' });
+    const outcome = await runBenchmarkJob(deps, queued, undefined, { analyze, probe, ffmpeg: 'ffmpeg', runtime });
+    expect(outcome).toMatchObject({ status: 'failed', retryable: false });
+    const after = (await store.benchmarks.get(benchmark.id))!;
+    expect(after.status).toBe('failed');
+    expect(after.stages.probe).toMatchObject({ status: 'failed', detail: expect.stringMatching(/cannot run the forensic analyzer: .*"cv2".*npm run forensics/) });
+    expect(after.stages.validate.status).toBe('pending');
+    expect(seen).toHaveLength(0);
+  });
+
   it('is what the runner does with a platform job, which has no project to load', async () => {
     const { store, deps, benchmark, runId } = await setup();
     await store.benchmarks.delete(benchmark.id);

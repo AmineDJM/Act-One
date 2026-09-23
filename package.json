@@ -31,6 +31,7 @@
     "sound-library": "NODE_USE_ENV_PROXY=1 vite-node scripts/build-sound-library.ts",
     "browsers": "node --experimental-strip-types scripts/install-browsers.ts",
     "blender": "node --experimental-strip-types scripts/install-blender.ts",
+    "forensics": "node --experimental-strip-types scripts/install-forensics.ts",
     "higgsfield:example": "node --experimental-strip-types scripts/higgsfield-example.ts",
     "db:app-role": "node --experimental-strip-types packages/db/src/cli/app-role.ts",
     "prove:director": "NODE_USE_ENV_PROXY=1 vite-node scripts/prove-director.ts",

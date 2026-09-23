@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,8 +36,22 @@ export class ForensicsError extends Error {
   }
 }
 
+/**
+ * Where `npm run forensics` installs the analyzer's own Python, beside the
+ * other binaries a deploy carries under node_modules. A managed build has no
+ * root, so the pinned packages live in an environment of their own there.
+ */
+export const FORENSICS_PYTHON_HOME = path.resolve(FORENSICS_DIR, '../../../node_modules/.forensics-python');
+
+/**
+ * ACT_ONE_PYTHON for a host that ships its own, then the installed
+ * environment — only once its installer marked it ready, so a build that
+ * failed halfway is never used — then whatever `python3` is.
+ */
 export function pythonBinary(explicit?: string): string {
-  return explicit ?? process.env.ACT_ONE_PYTHON ?? 'python3';
+  if (explicit) return explicit;
+  if (process.env.ACT_ONE_PYTHON) return process.env.ACT_ONE_PYTHON;
+  return existsSync(path.join(FORENSICS_PYTHON_HOME, '.ready')) ? path.join(FORENSICS_PYTHON_HOME, 'bin', 'python') : 'python3';
 }
 
 /**

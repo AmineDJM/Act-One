@@ -1,4 +1,5 @@
 import { PLATFORM_ORGANIZATION_ID } from '@act-one/core';
+import { checkForensicsRuntime, pythonBinary } from '@act-one/film-ir';
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
 import { installProxyFromEnvironment , proxyConfigured, proxyMisconfiguration } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
@@ -174,6 +175,23 @@ async function preflight(config: WorkerConfig): Promise<void> {
   await checkCredentials(config);
   await checkStorage(config);
   await checkSoundLibrary(config);
+  await checkForensics();
+}
+
+/**
+ * Says whether this worker can read a reference film for the Benchmark Library.
+ *
+ * Not fatal: customer films never touch the analyzer, and an analysis asked
+ * of a worker without it fails at once with this same reason. Said here so
+ * the reason is in the deploy's log before anybody asks.
+ */
+async function checkForensics(): Promise<void> {
+  const runtime = await checkForensicsRuntime();
+  log(
+    runtime.ok
+      ? `forensic analyzer: ${pythonBinary()} (${Object.entries(runtime.versions).map(([name, version]) => `${name} ${version}`).join(', ')})`
+      : `forensic analyzer unavailable, benchmark analyses will fail: ${runtime.reason}`,
+  );
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   ForensicsError,
   analysisVersion,
   analyzeFilm,
+  checkForensicsRuntime,
   mediaFromDocument,
   mediaFromProbe,
   probeFilm,
@@ -53,7 +54,25 @@ export type BenchmarkJobOverrides = {
   analyze?: typeof analyzeFilm;
   probe?: typeof probeFilm;
   ffmpeg?: string;
+  /** Asked only when the real analyzer will run: a test that replaces it needs no Python. */
+  runtime?: typeof checkForensicsRuntime;
 };
+
+/**
+ * Whether this worker can run the analyzer, asked before a film's analysis
+ * rather than discovered twenty minutes into one. A missing runtime is an
+ * operator's problem that retrying will not fix, so it fails the job at once
+ * with the reason. Remembered once it is yes; a no is asked again next time,
+ * so an operator's fix needs no restart.
+ */
+const analyzerReady = new WeakSet<typeof checkForensicsRuntime>();
+
+async function requireAnalyzer(check: typeof checkForensicsRuntime): Promise<void> {
+  if (analyzerReady.has(check)) return;
+  const runtime = await check();
+  if (!runtime.ok) throw new ForensicsError(`This worker cannot run the forensic analyzer: ${runtime.reason}. Install it with "npm run forensics", then retry the analysis.`, false);
+  analyzerReady.add(check);
+}
 
 const STAGE_FOR: Record<AnalyzeStage, BenchmarkStageId> = {
   forensics: 'forensics',
@@ -151,6 +170,13 @@ export async function runBenchmarkJob(deps: RunnerDeps, job: Job, signal?: Abort
     const gemini = registry.videoOrNull();
     const recognizer = safely(() => registry.recognizer());
     const filmPath = path.join(workDir, `source.${started.source.container}`);
+
+    // ——— the analyzer can run here: asked before a gigabyte is fetched for it ———
+    const runtime = overrides.runtime ?? (overrides.probe && overrides.analyze ? null : checkForensicsRuntime);
+    if (runtime) {
+      current = 'probe';
+      await requireAnalyzer(runtime);
+    }
 
     // ——— validate: the bytes in storage are the bytes that were uploaded ———
     current = 'validate';
