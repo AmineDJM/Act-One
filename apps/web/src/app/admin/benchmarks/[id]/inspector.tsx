@@ -458,8 +458,8 @@ export function NarrationView({ doc }: { doc: Doc }) {
         ) : null}
         {withheld.length ? (
           <div className={styles.notice}>
-            Withheld — heard by the recogniser alone, with no voice activity measured there:
-            <ul>{withheld.map((entry) => <li key={entry.id}>{entry.claim}</li>)}</ul>
+            Withheld as unsupported, each with why:
+            <ul>{withheld.map((entry) => <li key={entry.id}>{entry.claim} — <span className="muted">{entry.reason}</span></li>)}</ul>
           </div>
         ) : null}
       </section>
