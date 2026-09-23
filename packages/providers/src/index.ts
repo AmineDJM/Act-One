@@ -47,3 +47,5 @@ export {
 export * from './storage/types.ts';
 export { LocalFsStorageProvider } from './storage/local.ts';
 export { SupabaseStorageProvider } from './storage/supabase.ts';
+
+export { GeminiVideoProvider, type GeminiConfig, type GeminiFile, type GenerateRequest as GeminiGenerateRequest, type GenerateResult as GeminiGenerateResult, type Part as GeminiPart } from './video/gemini.ts';

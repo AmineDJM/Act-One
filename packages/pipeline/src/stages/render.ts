@@ -62,6 +62,7 @@ import {
   mixArgs,
   muxArgs,
   posterArgs,
+  extractFrame,
   runFfmpeg,
   DEFAULT_LIBRARY,
 } from '@act-one/sound';
@@ -888,16 +889,15 @@ export async function runRender(
         : null;
 
     const posterPath = path.join(workDir, 'poster.jpg');
-    const poster = await runFfmpeg(
-      // Chosen from the cut rather than from the clock: a fixed 1.5s lands
-      // inside the opening animation, and the poster showed type still
-      // arriving. See posterMoment.
-      posterArgs(masterPath, posterMoment(current.scenes), posterPath),
-      { signal: context.signal, timeoutMs: 60_000 },
-    );
-    const posterAsset = poster.ok
+    // Chosen from the cut rather than from the clock: a fixed 1.5s lands
+    // inside the opening animation, and the poster showed type still
+    // arriving. See posterMoment.
+    const posterFrame = await extractFrame(masterPath, posterMoment(current.scenes), posterPath, {
+      ...(context.signal ? { signal: context.signal } : {}),
+    });
+    const posterAsset = posterFrame
       ? await storeAsset(context, {
-          data: new Uint8Array(await readFile(posterPath)),
+          data: posterFrame,
           kind: 'poster_frame',
           origin: 'rendered',
           rights: 'customer_owned',
@@ -2417,12 +2417,11 @@ async function askTheDirector(
     // Six tenths in: the motion has settled and the shot is not yet leaving.
     const timecodeStart = scene.startTime + scene.duration * 0.6;
     const framePath = path.join(params.workDir, `cut-${scene.id}.jpg`);
-    const extracted = await runFfmpeg(posterArgs(params.masterPath, timecodeStart, framePath), {
-      signal: context.signal,
-      timeoutMs: 60_000,
+    const data = await extractFrame(params.masterPath, timecodeStart, framePath, {
+      ...(context.signal ? { signal: context.signal } : {}),
     });
-    if (!extracted.ok) continue;
-    frames.push({ sceneId: scene.id, timecodeStart, data: new Uint8Array(await readFile(framePath)) });
+    if (!data) continue;
+    frames.push({ sceneId: scene.id, timecodeStart, data });
   }
   if (frames.length === 0) return null;
 

@@ -10,11 +10,11 @@
  *
  *   npm run watch:film -- path/to/master.mp4 [contact-sheet.png]
  */
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildContactSheet, masterFloor, readContainer, readMasterFacts } from '@act-one/qa';
-import { posterArgs, runFfmpeg } from '@act-one/sound';
+import { extractFrame } from '@act-one/sound';
 
 const file = process.argv[2];
 if (!file) {
@@ -51,9 +51,9 @@ try {
   for (let index = 0; index < count; index += 1) {
     const at = facts.durationSeconds * ((index + 0.5) / count);
     const framePath = path.join(work, `frame-${index}.jpg`);
-    const extracted = await runFfmpeg(posterArgs(file, at, framePath), { timeoutMs: 60_000 });
-    if (!extracted.ok) continue;
-    frames.push({ sceneId: `t${index}`, timecodeStart: at, data: new Uint8Array(await readFile(framePath)) });
+    const data = await extractFrame(file, at, framePath);
+    if (!data) continue;
+    frames.push({ sceneId: `t${index}`, timecodeStart: at, data });
   }
   if (frames.length === 0) {
     console.error('\n  No frame could be read out of this file.');

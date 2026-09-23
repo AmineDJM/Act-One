@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   AppError,
@@ -27,7 +26,7 @@ import {
 } from '@act-one/core';
 import { CriticPanel, DirectorBrain } from '@act-one/creative';
 import { buildContactSheet, reviewCut } from '@act-one/qa';
-import { runFfmpeg } from '@act-one/sound';
+import { extractFrame } from '@act-one/sound';
 import { runAnimatic } from './animatic.ts';
 import { runCreativeReplan } from './replan.ts';
 import type { StageContext } from '../context.ts';
@@ -338,12 +337,11 @@ async function contactSheetFor(
       // Six tenths in: the motion has settled and the shot is not yet leaving.
       const timecodeStart = scene.startTime + scene.duration * 0.6;
       const framePath = path.join(workDir, `shot-${scene.id}.jpg`);
-      const extracted = await runFfmpeg(
-        ['-nostdin', '-y', '-ss', timecodeStart.toFixed(3), '-i', filmPath, '-frames:v', '1', '-q:v', '3', framePath],
-        { ...(context.signal ? { signal: context.signal } : {}), timeoutMs: 60_000 },
-      );
-      if (!extracted.ok) continue;
-      frames.push({ sceneId: scene.id, timecodeStart, data: new Uint8Array(await readFile(framePath)) });
+      const data = await extractFrame(filmPath, timecodeStart, framePath, {
+        ...(context.signal ? { signal: context.signal } : {}),
+      });
+      if (!data) continue;
+      frames.push({ sceneId: scene.id, timecodeStart, data });
     }
     if (frames.length === 0) return null;
 

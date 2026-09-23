@@ -13,7 +13,7 @@
  * ACT_ONE_CHROME_HEADLESS_SHELL; without it the run stops after the storyboard
  * and says so.
  */
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { newId, storyboardDuration, visualMix } from '@act-one/core';
 import { MemoryStore } from '@act-one/db';
@@ -165,6 +165,19 @@ async function main(): Promise<void> {
       const asset = await store.assets.get(organization.id, render.masterAssetId);
       line('Master', asset ? path.join(outputDir, 'storage', asset.storageKey) : '—');
     }
+    /*
+     * What the film was made from, kept beside it: the delivered storyboard
+     * (after any repair), the render record and its QA. A film whose every cut,
+     * line and cue is known is the one film a reverse analysis can be scored
+     * against rather than only looked at.
+     */
+    const delivered = await store.storyboards.get(organization.id, render.storyboardId);
+    const voice = await store.assets.listForProject(organization.id, project.id, 'audio_voice');
+    await writeFile(
+      path.join(outputDir, 'ground-truth.json'),
+      JSON.stringify({ render, storyboard: delivered, qa, voice }, null, 1),
+    );
+    line('Ground truth', path.join(outputDir, 'ground-truth.json'));
   } else {
     heading('Rendering skipped');
     console.log('  Set ACT_ONE_CHROME_HEADLESS_SHELL to render the film.');

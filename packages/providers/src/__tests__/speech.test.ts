@@ -90,6 +90,10 @@ class FakeVendors {
             { word: 'Le', start: 0.1, end: 0.3 },
             { word: 'matin', start: 0.3, end: 0.8 },
           ],
+          segments: [
+            { start: 0, end: 2.4, text: ' Le matin, tout est déjà rapproché.', no_speech_prob: 0.02, avg_logprob: -0.21 },
+            { start: 2.4, end: 2.4, no_speech_prob: 0.9 },
+          ],
         }),
       );
       return;
@@ -339,7 +343,8 @@ describe('OpenAI voices', () => {
     const request = vendors.calls[0]!;
     expect(request.path).toBe('/v1/audio/transcriptions');
     expect(String(request.headers['content-type'])).toMatch(/^multipart\/form-data; boundary=/);
-    expect(request.fields).toEqual(['model', 'response_format', 'timestamp_granularities[]', 'file']);
+    // Words for the timing, segments for the recogniser's own doubt about each stretch of audio.
+    expect(request.fields).toEqual(['model', 'response_format', 'timestamp_granularities[]', 'timestamp_granularities[]', 'file']);
     expect(transcript).toMatchObject({
       language: 'fr',
       durationSeconds: 2.4,
@@ -349,6 +354,10 @@ describe('OpenAI voices', () => {
     expect(transcript.words).toEqual([
       { word: 'Le', start: 0.1, end: 0.3 },
       { word: 'matin', start: 0.3, end: 0.8 },
+    ]);
+    // A segment without text is dropped rather than turned into an empty one.
+    expect(transcript.segments).toEqual([
+      { start: 0, end: 2.4, text: 'Le matin, tout est déjà rapproché.', noSpeechProbability: 0.02, averageLogProbability: -0.21 },
     ]);
     expect(sink.records[0]).toMatchObject({ operation: 'speech.stt', unit: 'second', quantity: 2.4 });
   });

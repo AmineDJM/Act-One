@@ -12,3 +12,4 @@ export * from './master-facts.ts';
 export * from './invariants.ts';
 export * from './senses.ts';
 export * from './reference.ts';
+export * from './grammar-bands.ts';

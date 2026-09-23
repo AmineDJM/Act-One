@@ -22,6 +22,7 @@ export default defineConfig({
       '@act-one/queue': r('./packages/queue/src/index.ts'),
       '@act-one/research': r('./packages/research/src/index.ts'),
       '@act-one/ingestion': r('./packages/ingestion/src/index.ts'),
+      '@act-one/film-ir': r('./packages/film-ir/src/index.ts'),
       '@act-one/creative': r('./packages/creative/src/index.ts'),
       '@act-one/design': r('./packages/design/src/index.ts'),
       '@act-one/motion': r('./packages/motion/src/index.ts'),

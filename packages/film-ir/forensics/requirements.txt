@@ -1,0 +1,7 @@
+# The forensic analyzer's runtime. Pinned to what it was validated with:
+# a different OpenCV or FFmpeg can move a measurement, and the analyzer's
+# version is recorded in every document it produces.
+numpy==2.4.6
+opencv-python-headless==5.0.0.93
+av==18.1.0
+rapidocr_onnxruntime==1.4.4

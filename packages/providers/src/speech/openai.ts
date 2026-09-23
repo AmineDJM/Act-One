@@ -194,6 +194,7 @@ export class OpenAiSpeechProvider implements SpeechProvider, SpeechRecognizer {
     form.set('model', this.transcriptionModel);
     form.set('response_format', 'verbose_json');
     form.append('timestamp_granularities[]', 'word');
+    form.append('timestamp_granularities[]', 'segment');
     form.set(
       'file',
       new Blob([request.audio as BlobPart], { type: request.contentType }),
@@ -230,6 +231,15 @@ export class OpenAiSpeechProvider implements SpeechProvider, SpeechRecognizer {
       words: (raw?.words ?? [])
         .filter((word) => typeof word.word === 'string')
         .map((word) => ({ word: word.word, start: Number(word.start ?? 0), end: Number(word.end ?? 0) })),
+      segments: (raw?.segments ?? [])
+        .filter((segment) => typeof segment.text === 'string')
+        .map((segment) => ({
+          start: Number(segment.start ?? 0),
+          end: Number(segment.end ?? 0),
+          text: String(segment.text).trim(),
+          noSpeechProbability: typeof segment.no_speech_prob === 'number' ? segment.no_speech_prob : null,
+          averageLogProbability: typeof segment.avg_logprob === 'number' ? segment.avg_logprob : null,
+        })),
       model: this.transcriptionModel,
     };
   }
@@ -246,6 +256,7 @@ type WhisperResponse = {
   language?: string;
   duration?: number;
   words?: { word: string; start?: number; end?: number }[];
+  segments?: { start?: number; end?: number; text?: string; no_speech_prob?: number; avg_logprob?: number }[];
 };
 
 /** The register of a structured direction, in the terms of the six built-in voices. */

@@ -185,7 +185,22 @@ export type Transcript = {
   languageConfidence: number | null;
   durationSeconds: number | null;
   words: TranscriptWord[];
+  /**
+   * Segments, when the recogniser returns them, with its own estimate that a
+   * segment holds no speech at all. Recognisers write plausible sentences over
+   * music; this is the signal that tells a heard sentence from an invented one.
+   */
+  segments?: TranscriptSegment[];
   model: string;
+};
+
+export type TranscriptSegment = {
+  start: number;
+  end: number;
+  text: string;
+  /** 0..1: the recogniser's probability that there is no speech here. */
+  noSpeechProbability: number | null;
+  averageLogProbability: number | null;
 };
 
 export type TranscribeRequest = {

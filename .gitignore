@@ -15,3 +15,7 @@ renders/
 .vitest/
 .act-one-demo/
 .act-one-ingest/
+
+# Python bytecode (the forensic analyzer)
+__pycache__/
+*.pyc

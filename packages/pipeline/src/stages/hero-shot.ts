@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -18,7 +18,7 @@ import {
 import { HeroShotDirector } from '@act-one/creative';
 import { renderFilm } from '@act-one/motion';
 import { readUiStructure } from '@act-one/research';
-import { posterArgs, runFfmpeg } from '@act-one/sound';
+import { extractFrame } from '@act-one/sound';
 import { resolveAssetUrls, type StageContext } from '../context.ts';
 
 /**
@@ -360,9 +360,9 @@ async function renderShortlist(
     for (const [index] of usable.entries()) {
       const framePath = path.join(work, `hero-${index}.jpg`);
       const at = index * PREVIEW_SECONDS + PREVIEW_SECONDS * 0.6;
-      const extracted = await runFfmpeg(posterArgs(outputPath, at, framePath), { timeoutMs: 60_000 });
-      if (!extracted.ok) break;
-      frames.push(`data:image/jpeg;base64,${(await readFile(framePath)).toString('base64')}`);
+      const data = await extractFrame(outputPath, at, framePath);
+      if (!data) break;
+      frames.push(`data:image/jpeg;base64,${Buffer.from(data).toString('base64')}`);
     }
     return frames;
   } finally {
