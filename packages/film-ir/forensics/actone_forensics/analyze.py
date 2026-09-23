@@ -95,8 +95,13 @@ def respace(line, glyphs):
     return " ".join(words) if squeeze(" ".join(words)) == squeeze(line["text"]) else line["text"]
 
 
-def collect_references(path, lines, panel_frames, ocr_engine, width, height):
-    """Second decode: each line's settled appearance and glyphs, and each shot's middle frame for panels."""
+def collect_references(path, lines, panel_frames, ocr_engine, width, height, readings_by_frame):
+    """
+    Second decode: each line's settled appearance, and each shot's middle frame
+    for panels. A line's glyphs come from the first pass's reading of its
+    reference frame — which is always a frame that pass read — so nothing is
+    read twice.
+    """
     decoder = Decoder(path)
     refine_w, refine_h = _size_for(width, height, min(text.REFINE_WIDTH, width))
     ocr_w, ocr_h = _size_for(width, height, min(1280, width))
@@ -113,7 +118,9 @@ def collect_references(path, lines, panel_frames, ocr_engine, width, height):
         if frame_index in wanted:
             bgr = decoder.bgr(frame, refine_w, refine_h)
             grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-            read = ocr_engine.read_glyphs(decoder.bgr(frame, ocr_w, ocr_h), scale=width / float(ocr_w)) if ocr_engine else []
+            read = readings_by_frame.get(frame_index)
+            if read is None:
+                read = ocr_engine.read(decoder.bgr(frame, ocr_w, ocr_h), scale=width / float(ocr_w)) if ocr_engine else []
             for index in wanted[frame_index]:
                 line = lines[index]
                 glyphs = glyphs_for(line, read)
@@ -193,7 +200,8 @@ def main(argv=None):
     blocks = text.group_blocks(lines)
     panel_frames = {(a + b) // 2 for a, b in segmentation["shots"] if b - a >= 2}
     emit("tracks", 0.0, "collecting references")
-    references, panel_greys = collect_references(args.input, lines, panel_frames, ocr_engine, video["width"], video["height"])
+    readings_by_frame = {entry["frame"]: entry["lines"] for entry in video["ocrFrames"]}
+    references, panel_greys = collect_references(args.input, lines, panel_frames, ocr_engine, video["width"], video["height"], readings_by_frame)
     for line, reference in zip(lines, references):
         if reference and reference["glyphs"]:
             spaced = respace(line, reference["glyphs"])

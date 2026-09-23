@@ -41,21 +41,17 @@ class OcrEngine:
         self.engine = RapidOCR()
 
     def read(self, bgr, scale):
-        """Lines in native pixels: polygon, text, recogniser confidence."""
-        result, _ = self.engine(bgr)
-        lines = []
-        for box, text, score in result or []:
-            if float(score) < MIN_SCORE or not str(text).strip():
-                continue
-            lines.append({"poly": [[float(x) * scale, float(y) * scale] for x, y in box], "text": str(text), "score": float(score)})
-        return lines
-
-    def read_glyphs(self, bgr, scale):
-        """The same, with a box per character; used once per line, on its reference frame."""
+        """
+        Lines in native pixels: polygon, text, recogniser confidence, and a box
+        per character. The boxes cost nothing measurable on top of the reading,
+        and having them here means a line's glyphs never need a second read.
+        """
         result, _ = self.engine(bgr, return_word_box=True)
         lines = []
         for entry in result or []:
             box, text, score = entry[0], entry[1], entry[2]
+            if float(score) < MIN_SCORE or not str(text).strip():
+                continue
             char_boxes = entry[3] if len(entry) > 3 else []
             chars = entry[4] if len(entry) > 4 else []
             lines.append({
@@ -154,36 +150,79 @@ def merge_row_fragments(lines, stride):
     more than a word's gap between them, at the same size, and are on screen
     together. Words that arrive one after another stay one line: their own
     timing is measured per word, inside it.
+
+    One pass over the pairs that share frames, joined by union-find, so a row
+    read as three pieces becomes one line and a screen full of interface text
+    costs its neighbours, not every pair of lines in the film.
     """
     lines = list(lines)
-    merged = True
-    while merged:
-        merged = False
-        for i in range(len(lines)):
-            for j in range(len(lines)):
-                if i == j:
+    by_frame = {}
+    boxes = []
+    for index, line in enumerate(lines):
+        frames = {}
+        for reading in line["readings"]:
+            frames[reading["frame"]] = reading["box"]
+            by_frame.setdefault(reading["frame"], []).append(index)
+        boxes.append(frames)
+    parent = list(range(len(lines)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    needed = 1 if stride == 1 else 2
+    checked = set()
+    for members in by_frame.values():
+        for i in members:
+            for j in members:
+                if i == j or (i, j) in checked:
                     continue
-                left, right = lines[i], lines[j]
-                common = sorted({r["frame"] for r in left["readings"]} & {r["frame"] for r in right["readings"]})
-                if len(common) < 2 and not (common and stride == 1):
+                checked.add((i, j))
+                common = sorted(set(boxes[i]) & set(boxes[j]))
+                if len(common) < needed:
+                    continue
+                a, b = lines[i], lines[j]
+                # Pieces of one line arrive and leave together; interface text
+                # side by side on a screen does too, but is not read as one
+                # string of words with a word's gap between them.
+                if abs(a["firstRead"] - b["firstRead"]) > 2 * stride or abs(a["lastRead"] - b["lastRead"]) > 2 * stride:
+                    continue
+                if text_similarity(a["text"], b["text"]) >= 0.8:
                     continue
                 frame = common[len(common) // 2]
-                lb = next(r["box"] for r in left["readings"] if r["frame"] == frame)
-                rb = next(r["box"] for r in right["readings"] if r["frame"] == frame)
-                height = max(lb[3], rb[3])
-                if height <= 0 or max(lb[3], rb[3]) / max(1.0, min(lb[3], rb[3])) > 1.4:
-                    continue
-                vertical = min(lb[1] + lb[3], rb[1] + rb[3]) - max(lb[1], rb[1])
-                gap = rb[0] - (lb[0] + lb[2])
-                if vertical < 0.6 * min(lb[3], rb[3]) or not (-0.1 * height <= gap <= 1.2 * height):
-                    continue
-                lines[i] = _join(left, right, frame)
-                del lines[j]
-                merged = True
-                break
-            if merged:
-                break
-    return lines
+                if _row_neighbours(boxes[i][frame], boxes[j][frame]):
+                    parent[find(i)] = find(j)
+    groups = {}
+    for index in range(len(lines)):
+        groups.setdefault(find(index), []).append(index)
+    joined = []
+    for members in groups.values():
+        if len(members) == 1:
+            joined.append(lines[members[0]])
+            continue
+        common = set.intersection(*(set(boxes[m]) for m in members)) or set.union(*(set(boxes[m]) for m in members))
+        anchor = sorted(common)[len(common) // 2]
+        ordered = sorted(members, key=lambda m: boxes[m].get(anchor, lines[m]["referenceBox"])[0])
+        line = lines[ordered[0]]
+        for m in ordered[1:]:
+            shared = sorted({r["frame"] for r in line["readings"]} & set(boxes[m]))
+            line = _join(line, lines[m], shared[len(shared) // 2] if shared else lines[m]["referenceFrame"])
+        joined.append(line)
+    joined.sort(key=lambda line: (line["firstRead"], line["referenceBox"][1], line["referenceBox"][0]))
+    return joined
+
+
+def _row_neighbours(left, right):
+    """Two boxes on one row, the first to the left of the second by no more than a word's gap."""
+    height = max(left[3], right[3])
+    if height <= 0 or max(left[3], right[3]) / max(1.0, min(left[3], right[3])) > 1.25:
+        return False
+    vertical = min(left[1] + left[3], right[1] + right[3]) - max(left[1], right[1])
+    gap = right[0] - (left[0] + left[2])
+    # A word space is a quarter to half of the type's height; the detector splits at the wide ones.
+    return vertical >= 0.7 * min(left[3], right[3]) and -0.1 * height <= gap <= 0.8 * height
 
 
 def _join(left, right, frame):
@@ -202,7 +241,7 @@ def _join(left, right, frame):
             readings.append({"frame": index, "text": f'{a["text"]} {b["text"]}', "score": min(a["score"], b["score"]), "box": [x0, y0, x1 - x0, y1 - y0]})
         else:
             readings.append(next(iter(pair.values())))
-    reference = next(r for r in readings if r["frame"] == frame)
+    reference = next((r for r in readings if r["frame"] == frame), None) or max(readings, key=lambda r: r["box"][2])
     x, y, w, h = reference["box"]
     return {
         "text": f'{left["text"]} {right["text"]}',
