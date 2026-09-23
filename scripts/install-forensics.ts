@@ -96,16 +96,36 @@ if (existsSync(HOME) && !supported(version(PYTHON))) {
   await rm(HOME, { recursive: true, force: true });
 }
 
+const base = CANDIDATES.find((candidate) => supported(version(candidate)));
 if (!existsSync(PYTHON)) {
-  const base = CANDIDATES.find((candidate) => supported(version(candidate)));
   if (!base) giveUp(`no ${described} on this host (tried ${CANDIDATES.join(', ')}).`);
   console.log(`  making an environment with ${base} at ${HOME}`);
-  const made = run(base, ['-m', 'venv', HOME]);
+  /*
+   * Without pip first, on purpose. Debian — and so Render's native runtimes —
+   * ships `venv` but leaves `ensurepip` to a package that is not installed,
+   * so a plain `python3 -m venv` fails there; an environment without pip
+   * needs nothing but the standard library.
+   */
+  const made = run(base, ['-m', 'venv', '--without-pip', HOME]);
   if (!made.ok) giveUp(`${base} could not make a virtual environment: ${made.stderr.trim().split('\n').slice(-1)[0]}`);
 }
 
+/*
+ * The pip that installs into the environment: its own when it has one (an
+ * environment from a Python that ships pip, or an earlier build), otherwise
+ * the system's, pointed at it with --python. Debian marks its system Python
+ * as externally managed and refuses installs into it; into an environment
+ * of our own, it installs.
+ */
+const ownPip = run(PYTHON, ['-m', 'pip', '--version']).ok;
+const systemPip = base && run(base, ['-m', 'pip', '--version']).ok ? base : null;
+if (!ownPip && !systemPip) giveUp('neither the environment nor the system Python has pip; install python3-pip.');
+const pip = (args: string[], quiet = false) =>
+  ownPip ? run(PYTHON, ['-m', 'pip', ...args], quiet) : run(systemPip!, ['-m', 'pip', '--python', PYTHON, ...args], quiet);
+if (!ownPip) console.log(`  installing with ${systemPip}'s pip into the environment`);
+
 console.log(`  installing the pinned packages from ${path.relative(ROOT, REQUIREMENTS)}`);
-const installed = run(PYTHON, ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '-r', REQUIREMENTS], false);
+const installed = pip(['install', '--disable-pip-version-check', '--no-input', '-r', REQUIREMENTS]);
 if (!installed.ok) giveUp('pip could not install the analyzer\'s packages (see above).');
 
 /*
@@ -119,10 +139,10 @@ if (!installed.ok) giveUp('pip could not install the analyzer\'s packages (see a
  */
 const headless = /^opencv-python-headless==\S+/m.exec(readFileSync(REQUIREMENTS, 'utf8'))?.[0];
 if (!headless) giveUp('requirements.txt no longer pins opencv-python-headless; this script needs updating with it.');
-if (run(PYTHON, ['-m', 'pip', 'show', 'opencv-python']).ok) {
+if (pip(['show', 'opencv-python'], true).ok) {
   console.log('  replacing the desktop OpenCV RapidOCR pulled in with the pinned headless build');
-  const removed = run(PYTHON, ['-m', 'pip', 'uninstall', '--yes', 'opencv-python'], false);
-  const restored = removed.ok && run(PYTHON, ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--force-reinstall', '--no-deps', headless], false).ok;
+  const removed = pip(['uninstall', '--yes', 'opencv-python']);
+  const restored = removed.ok && pip(['install', '--disable-pip-version-check', '--no-input', '--force-reinstall', '--no-deps', headless]).ok;
   if (!restored) giveUp('could not put the headless OpenCV back in place (see above).');
 }
 
