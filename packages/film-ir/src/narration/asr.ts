@@ -268,8 +268,8 @@ export function buildNarration(input: {
   const spoken = words.length > 0;
   const narration: NarrationIR = {
     present: spoken
-      ? measured(true, 'asr.transcript', [pass], round(confidence, 3), { note: `${words.length} words recognised${discarded ? `, ${discarded} discarded as heard over silence or non-speech` : ''}${withheld.length ? `, ${withheld.length} run(s) withheld as heard by the recogniser alone` : ''}` })
-      : estimated(false, 'asr.transcript', [pass], 0.6, { note: `${words.length} word(s) kept; ${discarded} discarded over silence or non-speech, ${withheld.length} run(s) withheld as heard by the recogniser alone` }),
+      ? measured(true, 'asr.transcript', [pass], round(confidence, 3), { note: `${words.length} words recognised${discarded ? `, ${discarded} discarded as heard over silence or non-speech` : ''}${withheld.length ? `, ${withheld.length} run(s) withheld as unsupported` : ''}` })
+      : estimated(false, 'asr.transcript', [pass], 0.6, { note: `${words.length} word(s) kept; ${discarded} discarded over silence or non-speech, ${withheld.length} run(s) withheld as unsupported` }),
     language: transcript.language ? measured(transcript.language, 'asr.transcript', [pass], round(confidence, 3)) : unknown('asr.transcript', 'The recogniser did not report a language.'),
     transcript: spoken ? measured(words.map((word) => word.text).join(' '), 'asr.transcript', [pass], round(confidence, 3)) : unknown('asr.transcript', 'No speech was recognised.'),
     speakers: [],
