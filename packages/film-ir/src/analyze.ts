@@ -80,7 +80,13 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
       for (const name of CHECKPOINTED_STAGES) redo.add(name);
     }
   }
-  const stage = async <T>(name: AnalyzeStage, checkpoint: string | null, work: () => Promise<T>): Promise<T> => {
+  /**
+   * One stage, from its checkpoint when it has one. `shortfall` names what a
+   * stage that returned still failed to do (a pass that failed among ten):
+   * the stage is reported failed, so it can be retried, while the analysis
+   * carries on with what it has.
+   */
+  const stage = async <T>(name: AnalyzeStage, checkpoint: string | null, work: () => Promise<T>, shortfall?: (value: T) => string | null): Promise<T> => {
     if (checkpoint && !redo.has(name)) {
       const existing = await options.checkpoints.get<T>(checkpoint);
       if (existing !== null && existing !== undefined) {
@@ -92,7 +98,8 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
     try {
       const value = await work();
       if (checkpoint) await options.checkpoints.put(checkpoint, value);
-      await options.onStage?.(name, 'completed');
+      const missing = shortfall?.(value) ?? null;
+      await options.onStage?.(name, missing ? 'failed' : 'completed', missing?.slice(0, 600));
       return value;
     } catch (error) {
       await options.onStage?.(name, 'failed', (error as Error).message.slice(0, 600));
@@ -112,6 +119,19 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
   );
   const report = ForensicReport.parse(rawReport);
 
+  /*
+   * Stages that failed without stopping the analysis. The measurements stand
+   * without a listener or a model, so the document is still compiled — and
+   * the validator is told what is missing, so it is never called complete.
+   * A cancellation is not one of these: it stops everything.
+   */
+  const stageFailures: string[] = [];
+  const nonFatal = (name: AnalyzeStage) => (error: unknown): null => {
+    if (options.context.signal?.aborted) throw error;
+    stageFailures.push(`${name}: ${((error as Error).message ?? String(error)).slice(0, 300)}`);
+    return null;
+  };
+
   // 2. Transcription: what is said, by a dedicated recogniser.
   let asrProducer: Producer | null = null;
   const transcript = report.audio && options.recognizer
@@ -121,7 +141,7 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
         const bytes = new Uint8Array(await readFile(audioPath));
         const result = await options.recognizer!.transcribe({ audio: bytes, contentType: 'audio/mpeg', language: null }, options.context);
         return { text: result.text, language: result.language, words: result.words, segments: result.segments ?? [], model: result.model } satisfies TranscriptInput;
-      }).catch(() => null) // Transcription is one listener among two; without it the document is partial, not wrong.
+      }).catch(nonFatal('transcription')) // One listener among two: without it the document is partial, not wrong.
     : null;
   if (transcript) {
     asrProducer = {
@@ -153,18 +173,24 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
 
   // 3–4. Upload and passes.
   let passes: Record<string, PassRecord> = {};
-  if (options.gemini) {
-    const gemini = options.gemini;
-    const file = await stage('upload', null, async () => {
-      const cached = await options.checkpoints.get<GeminiFile>('gemini-file');
-      if (cached && !redo.has('upload')) {
-        const alive = await gemini.fileStatus(cached.name, options.context).catch(() => null);
-        if (alive) return alive;
-      }
-      const uploaded = await gemini.uploadVideo(options.filmPath, options.mimeType ?? 'video/mp4', `${options.id}`, options.context);
-      await options.checkpoints.put('gemini-file', uploaded);
-      return uploaded;
-    });
+  const gemini = options.gemini;
+  const file = gemini
+    ? await stage('upload', null, async () => {
+        const cached = await options.checkpoints.get<GeminiFile>('gemini-file');
+        if (cached && !redo.has('upload')) {
+          const alive = await gemini.fileStatus(cached.name, options.context).catch(() => null);
+          if (alive) return alive;
+        }
+        const uploaded = await gemini.uploadVideo(options.filmPath, options.mimeType ?? 'video/mp4', `${options.id}`, options.context);
+        await options.checkpoints.put('gemini-file', uploaded);
+        return uploaded;
+      }).catch(nonFatal('upload'))
+    : null;
+  if (gemini && !file) {
+    // Nothing to watch: every pass is missing, and says why.
+    await options.onStage?.('passes', 'failed', 'Not run: the film could not be uploaded to the video model.');
+  }
+  if (gemini && file) {
     passes = await stage('passes', null, async () => {
       const existing: Record<string, PassRecord> = {};
       if (!redo.has('passes')) {
@@ -185,6 +211,11 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
           options.onProgress?.('passes', Object.keys(existing).length / EXPECTED_PASSES.length, `${record.id} ${record.status}`);
         },
       });
+    }, (records) => {
+      const failed = Object.values(records).filter((record) => record.status !== 'completed');
+      return failed.length === 0
+        ? null
+        : `${failed.length} of ${EXPECTED_PASSES.length} passes failed; retrying runs only these: ${failed.map((record) => `${record.id} (${(record.error ?? 'failed').slice(0, 120)})`).join('; ')}`;
     });
   }
 
@@ -203,7 +234,7 @@ export async function analyzeFilm(options: AnalyzeOptions): Promise<AnalyzeResul
   );
 
   // 6. Validate.
-  const { report: validation } = validateFilmIR(compiled, { expectedPasses: options.gemini ? EXPECTED_PASSES : [] });
+  const { report: validation } = validateFilmIR(compiled, { expectedPasses: options.gemini ? EXPECTED_PASSES : [], stageFailures });
   const document: FilmIR = { ...compiled, validation };
   await options.checkpoints.put('filmir', document);
   await options.onStage?.('validate', 'completed', validation.status);

@@ -11,11 +11,17 @@ import { addTime, compareTime, isInt64String, maxTime, minTime, rt, sameTime, su
  * run backwards, references to objects that do not exist, an inference with
  * no evidence under it, a pass that returned nothing.
  */
-export const VALIDATOR_VERSION = '1.0.0';
+export const VALIDATOR_VERSION = '1.1.0';
 
 export type ValidationOptions = {
   /** Passes the pipeline intended to run, so a missing one is noticed rather than silently absent. */
   expectedPasses?: string[];
+  /**
+   * Stages that failed without stopping the analysis ("transcription: HTTP
+   * 500"). What they would have added is absent from the document, which
+   * cannot say so itself.
+   */
+  stageFailures?: string[];
   now?: () => string;
 };
 
@@ -228,6 +234,8 @@ export function validateFilmIR(input: unknown, options: ValidationOptions = {}):
   // ——— interpretation ———
   const contradictions = doc.contradictions.filter((c) => c.resolution === 'unresolved');
   check('contradictions', 'Contradictions resolved', false, contradictions.map((c) => `${c.id}: ${c.description}`), `${doc.contradictions.length} contradiction(s) found, all resolved in favour of the measurement or with reduced confidence.`, true);
+
+  check('stages', 'Every analysis stage ran', false, options.stageFailures ?? [], 'Every stage the pipeline started finished.', true);
 
   const passes = doc.producers.filter((producer) => producer.kind === 'model_pass' || producer.kind === 'integrator');
   const expected = options.expectedPasses ?? [];
