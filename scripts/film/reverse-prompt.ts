@@ -345,9 +345,21 @@ const put = await analyst.putFilm(film, context).catch(async (error: Error) => {
   return analyst.putFilm(film, context);
 });
 
-/** Twenty seconds: long enough to hold a whole move, short enough to answer whole. */
-const WINDOW = 20;
-/** Ten: what the half-second sampling can actually scan in one answer. */
+/*
+ * TEN SECONDS, FOR BOTH LISTS, AND THE NUMBER IS MEASURED RATHER THAN CHOSEN.
+ *
+ * Twenty was the first guess and it is a coin flip. The events pass over
+ * twenty seconds thinks for somewhere between 106 and 140 seconds depending on
+ * how much happens in them, the gateway cuts at about 135, and so the same
+ * pass failed once and succeeded on the next attempt with nothing else
+ * changed. A window that works half the time is not a window that works — it
+ * is a window that makes every run a negotiation.
+ *
+ * Ten halves the thinking and puts the whole distribution under the cut. It
+ * costs twice the calls at half the size each, which is the same tokens, and
+ * it is what the sampling pass already needed for exactly the same reason.
+ */
+const WINDOW = 10;
 const SAMPLE_WINDOW = 10;
 const windows: { from: number; to: number }[] = [];
 for (let at = 0; at < durationSeconds; at += WINDOW) {
@@ -418,7 +430,7 @@ async function run(
    * anything else changing.
    */
   let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
     const at = Date.now();
     try {
       const answer = await analyst.ask(
@@ -450,7 +462,7 @@ async function run(
         `    ${name.padEnd(18)} ${String(Math.round((Date.now() - at) / 1000)).padStart(3)}s  ` +
           `${lastError.message.slice(0, 60)} — attempt ${attempt} of 3`,
       );
-      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 8000));
+      if (attempt < 4) await new Promise((r) => setTimeout(r, attempt * 8000));
     }
   }
   throw lastError ?? new Error(`${name} failed without an error.`);
