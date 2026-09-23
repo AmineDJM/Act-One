@@ -10,6 +10,7 @@ import type { AttentionIR, CameraMove, CameraTrack, ProductIR, TrackColumn, Trac
 import { addTime, compareTime, rt, subtractTime } from '../time.ts';
 import { FrameClock, SampleClock } from './clock.ts';
 import { forensicMethods } from './methods.ts';
+import { blockTypeMetrics, lineGeometry } from './type-geometry.ts';
 
 /**
  * Everything in a FilmIR that can be measured, built from the analyzer's report.
@@ -663,6 +664,11 @@ function buildTypography(report: ForensicReport, lineIds: string[], clock: Frame
     const y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
     const text = lines.map(({ line }) => line.text).join('\n');
     const minScore = Math.min(...lines.map(({ line }) => line.score));
+    const lineGeometries = new Map(lines.map(({ line, index }) => [index, lineGeometry(line.geometry, [PRODUCER, `frame:${line.referenceFrame}`])]));
+    const typeMetrics = blockTypeMetrics(
+      lines.map(({ line, index }) => ({ geometry: line.geometry, measured: lineGeometries.get(index)!, box: line.referenceBox })),
+      refs,
+    );
     const lineIr = lines.map(({ line, index }) => ({
       id: `${id}.line.${String(lines.findIndex((entry) => entry.index === index) + 1).padStart(2, '0')}`,
       text: measured(line.text, 'text.ocr', [PRODUCER, `frame:${line.referenceFrame}`], clamp01(line.score), {
@@ -670,7 +676,7 @@ function buildTypography(report: ForensicReport, lineIds: string[], clock: Frame
       }),
       box: { x: line.referenceBox[0], y: line.referenceBox[1], width: line.referenceBox[2], height: line.referenceBox[3] },
       polygon: line.referencePoly.flat(),
-      baselineY: unknown<number>('text.glyphs', 'Glyph boxes span the whole line height, so the baseline cannot be read from them.'),
+      ...lineGeometries.get(index)!,
       words: line.words.map((word, w) => ({
         id: `${id}.line.${String(lines.findIndex((entry) => entry.index === index) + 1).padStart(2, '0')}.word.${String(w + 1).padStart(2, '0')}`,
         text: word.text,
@@ -684,7 +690,6 @@ function buildTypography(report: ForensicReport, lineIds: string[], clock: Frame
         })),
       })),
     }));
-    const lineSpacing = lines.length >= 2 ? median(lines.slice(1).map(({ line }, i) => line.referenceBox[1] - lines[i]!.line.referenceBox[1])) : null;
     const alignment = blockAlignment(boxes, report.video.width);
     const ink = first.inkColour;
     const enter = animation(id, refinements.map((r) => r.enter), lines, 'enter', clock, fps, refs);
@@ -700,19 +705,13 @@ function buildTypography(report: ForensicReport, lineIds: string[], clock: Frame
       box: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
       lines: lineIr,
       metrics: {
-        capHeightPx: unknown<number>('text.glyphs', 'Cap height needs glyph outlines; the recogniser\'s boxes span the line height.'),
-        approxSizePx: estimated(round(median(boxes.map((b) => b[3])) / 1.3, 1), 'compiler.derivation', refs, 0.4, {
-          lowerBound: round(median(boxes.map((b) => b[3])) / 1.6, 1),
-          upperBound: round(median(boxes.map((b) => b[3])) / 1.0, 1),
-          unit: 'px',
-          note: 'line box height over a typical 1.3 ratio of box to size; the bounds cover 1.0 to 1.6',
-        }),
-        approxWeight: unknown<number>('compiler.absent', 'Stroke width is not measured, so weight is not estimated.'),
+        capHeightPx: typeMetrics.capHeightPx,
+        xHeightPx: typeMetrics.xHeightPx,
+        stemPx: typeMetrics.stemPx,
+        approxSizePx: typeMetrics.approxSizePx,
+        approxWeight: typeMetrics.approxWeight,
         trackingEm: unknown<number>('compiler.absent', 'Letter-spacing needs the face\'s own metrics; not estimated.'),
-        lineSpacingPx:
-          lineSpacing === null
-            ? unknown<number>('text.blocks', 'A single line has no line spacing.')
-            : measured(round(lineSpacing, 1), 'text.blocks', refs, 0.9, { unit: 'px', note: 'distance between consecutive line box tops' }),
+        lineSpacingPx: typeMetrics.lineSpacingPx,
         alignment: alignment ? measured(alignment, 'text.blocks', refs, lines.length >= 2 ? 0.9 : 0.5) : unknown('text.blocks', 'The lines share no edge or centre closely enough to call an alignment.'),
         colour: ink ? measured(hex(ink), 'text.visibility', refs, 0.9, { note: 'median colour of the ink on the reference frame' }) : unknown('text.visibility', 'The ink colour could not be read.'),
         fontFamily: unknown('compiler.absent', 'No face identification is attempted; a face that looks like a known family is not evidence of it.'),
@@ -775,8 +774,12 @@ function animation(
 ): TextAnimation {
   const main = animations.find((a) => a.kind === 'measured') ?? animations[0]!;
   const absent = (what: string) => unknown<never>('text.visibility', `The ${which} ${what} could not be measured.`, refs);
-  if (main.kind === 'cut') {
-    const cut = measured({ from: 1, to: 1 }, 'text.visibility', refs, 1, { note: `the block is fully visible on the first frame of its window: it ${which === 'enter' ? 'arrives' : 'leaves'} with a boundary, not an animation` });
+  if (main.kind === 'cut' || main.kind === 'instant') {
+    const cut = measured({ from: 1, to: 1 }, 'text.visibility', main.kind === 'instant' && main.frames ? [...refs, framesRef(main.frames[0], main.frames[0])] : refs, 1, {
+      note: main.kind === 'cut'
+        ? `the block is fully visible on the first frame of its window: it ${which === 'enter' ? 'arrives' : 'leaves'} with a boundary, not an animation`
+        : `the block is whole on one frame and absent on the frame ${which === 'enter' ? 'before' : 'after'}, inside the shot: it ${which === 'enter' ? 'pops on' : 'pops off'} within a frame`,
+    });
     return {
       translation: measured({ dx: 0, dy: 0 }, 'text.visibility', refs, 1),
       scale: cut,

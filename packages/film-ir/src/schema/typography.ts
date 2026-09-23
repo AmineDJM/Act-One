@@ -42,6 +42,9 @@ export const TextLine = z.object({
   /** The polygon the detector returned: four corners, clockwise from top-left. */
   polygon: z.array(z.number()).length(8).nullable().default(null),
   baselineY: EvidencedNumber,
+  /** The line's own, where it is measured; a block can hold lines of more than one size. Absent before 1.1. */
+  capHeightPx: EvidencedNumber.optional(),
+  xHeightPx: EvidencedNumber.optional(),
   words: z.array(TextWord).default([]),
 });
 
@@ -90,6 +93,10 @@ export const TextBlock = z.object({
   lines: z.array(TextLine),
   metrics: z.object({
     capHeightPx: EvidencedNumber,
+    /** Absent before 1.1. */
+    xHeightPx: EvidencedNumber.optional(),
+    /** The width of the straight vertical strokes. Absent before 1.1. */
+    stemPx: EvidencedNumber.optional(),
     approxSizePx: EvidencedNumber,
     approxWeight: EvidencedNumber,
     trackingEm: EvidencedNumber,

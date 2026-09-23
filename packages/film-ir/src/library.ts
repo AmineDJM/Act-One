@@ -2,7 +2,7 @@ import type { BenchmarkCounts, BenchmarkMedia } from '@act-one/core';
 import type { StorageProvider } from '@act-one/providers';
 import type { Checkpoints } from './analyze.ts';
 import type { ForensicProbe } from './forensics/report.ts';
-import { FILM_IR_SCHEMA, FILM_IR_VERSION, type FilmIR, type ValidationReport } from './schema/document.ts';
+import { FILM_IR_SCHEMA, type FilmIR, type ValidationReport } from './schema/document.ts';
 import { toSeconds } from './time.ts';
 import { VALIDATOR_VERSION } from './validate.ts';
 
@@ -156,7 +156,7 @@ export function summarizeFilmIR(document: FilmIR, validation: ValidationReport):
 export function analysisVersion(document: FilmIR): string {
   const analyzer = document.producers.find((producer) => producer.kind === 'analyzer')?.version ?? 'none';
   const models = [...new Set(document.producers.filter((producer) => producer.kind === 'model_pass' || producer.kind === 'integrator').map((producer) => producer.model).filter(Boolean))];
-  return [`${FILM_IR_SCHEMA} ${FILM_IR_VERSION}`, `forensics ${analyzer}`, `validator ${VALIDATOR_VERSION}`, models.length ? `model ${models.join('+')}` : 'no model'].join(' · ').slice(0, 200);
+  return [`${FILM_IR_SCHEMA} ${document.version}`, `forensics ${analyzer}`, `validator ${VALIDATOR_VERSION}`, models.length ? `model ${models.join('+')}` : 'no model'].join(' · ').slice(0, 200);
 }
 
 function reduce(numerator: number, denominator: number): string {

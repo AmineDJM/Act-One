@@ -14,8 +14,9 @@ import { validateFilmIR } from '../validate.ts';
  *
  * The fixture is the analyzer's report on the synthetic film written by
  * `python3 -m actone_forensics.synthetic` (see that module for the truth:
- * a cut at frame 40, a fade to black over frames 80–89, "NEW FEATURE" fading
- * in over frames 50–59, a click at 1.6 s). Regenerate it with the analyzer
+ * a cut at frame 40, "NEW FEATURE" fading in over frames 50–59, "Deploy in
+ * minutes" cutting in at 65, a fade to black over frames 80–89, a cut to
+ * "SEARCH" at 100, a click at 1.6 s). Regenerate it with the analyzer
  * whenever the report format changes:
  *
  *   python3 -m actone_forensics.synthetic /tmp/film.mp4
@@ -36,7 +37,7 @@ const seconds = (time: { ticks: string; timescale: number } | null | undefined) 
 
 describe('compiling the synthetic film', () => {
   it('keeps the stream\'s own clock for every frame', () => {
-    expect(document.frames?.count).toBe(100);
+    expect(document.frames?.count).toBe(125);
     expect(document.frames?.timescale).toBe(12800);
     expect(document.frames?.pts.slice(0, 3)).toEqual(['0', '512', '1024']);
     expect(document.source?.frameTiming?.variableFrameRate).toBe(false);
@@ -56,12 +57,12 @@ describe('compiling the synthetic film', () => {
     // After frame 79 ends and before frame 90 begins: 3.2 s to 3.6 s.
     expect(sameTime(fade.range.start, at(80))).toBe(true);
     expect(sameTime(fade.range.end, at(90))).toBe(true);
-    expect(document.structure.shots.map((shot) => [shot.frames.first, shot.frames.last])).toEqual([[0, 39], [40, 79], [90, 99]]);
+    expect(document.structure.shots.map((shot) => [shot.frames.first, shot.frames.last])).toEqual([[0, 39], [40, 79], [90, 99], [100, 124]]);
   });
 
-  it('reads both lines of type whole, spaced, and times them to the frame', () => {
+  it('reads every line of type whole, spaced, and times it to the frame', () => {
     const texts = document.typography.blocks.map((block) => block.text.value);
-    expect(texts).toEqual(['LAUNCH DAY', 'NEW FEATURE']);
+    expect(texts).toEqual(['LAUNCH DAY', 'NEW FEATURE', 'Deploy in minutes', 'SEARCH']);
     const feature = document.typography.blocks[1]!;
     expect(seconds(feature.timing.firstVisible.value)).toBeCloseTo(2.0, 6);
     expect(seconds(feature.timing.p50.value)).toBeCloseTo(2.2, 6);
@@ -76,6 +77,46 @@ describe('compiling the synthetic film', () => {
     expect(feature.metrics.fontFamily.value).toBeNull();
   });
 
+  it('tells a line that pops on inside a shot from one that arrives with a cut', () => {
+    const [launch, , deploy, search] = document.typography.blocks;
+    expect(deploy!.enter.opacity).toMatchObject({ evidenceType: 'MEASURED', value: { from: 1, to: 1 } });
+    expect(deploy!.enter.opacity.note).toMatch(/whole on one frame and absent on the frame before, inside the shot/);
+    expect(seconds(deploy!.timing.firstVisible.value)).toBeCloseTo(2.6, 6);
+    for (const block of [launch!, search!]) expect(block.enter.opacity.note).toMatch(/arrives with a boundary/);
+  });
+
+  it('measures where the type sits to a fraction of a pixel, and bounds its size and weight', () => {
+    // The truth of the clean render, printed by the generator: baseline, cap height, x-height; size in px; weight class.
+    const truth = [
+      { baseline: 101, cap: 22, x: null, size: 30, weight: 700 },
+      { baseline: 100, cap: 20, x: null, size: 28, weight: 700 },
+      { baseline: 145, cap: 13, x: 10, size: 18, weight: 400 },
+      { baseline: 107, cap: 32, x: null, size: 44, weight: 700 },
+    ];
+    document.typography.blocks.forEach((block, i) => {
+      const want = truth[i]!;
+      const line = block.lines[0]!;
+      expect(line.baselineY.evidenceType).toBe('MEASURED');
+      expect(Math.abs(line.baselineY.value! - want.baseline)).toBeLessThan(0.15);
+      expect(Math.abs(block.metrics.capHeightPx.value! - want.cap)).toBeLessThan(0.15);
+      if (want.x === null) expect(block.metrics.xHeightPx!.evidenceType).toBe('UNKNOWN');
+      else expect(Math.abs(block.metrics.xHeightPx!.value! - want.x)).toBeLessThan(0.15);
+      const size = block.metrics.approxSizePx;
+      expect(size.evidenceType).toBe('ESTIMATED');
+      expect(size.lowerBound!).toBeLessThanOrEqual(want.size);
+      expect(size.upperBound!).toBeGreaterThanOrEqual(want.size);
+      const weight = block.metrics.approxWeight;
+      if (block.metrics.capHeightPx.value! < 16) {
+        // Stems of a pixel or two are not trusted to tell a weight.
+        expect(weight.evidenceType).toBe('UNKNOWN');
+      } else {
+        expect(weight.evidenceType).toBe('ESTIMATED');
+        expect(weight.lowerBound!).toBeLessThanOrEqual(want.weight);
+        expect(weight.upperBound!).toBeGreaterThanOrEqual(want.weight);
+      }
+    });
+  });
+
   it('hears the click on the cut, the tones\' starts and nothing at their ends', () => {
     const onsets = document.audio.events.filter((event) => event.kind === 'onset' || event.kind === 'transient').map((event) => toSeconds(event.at));
     expect(onsets).toHaveLength(3);
@@ -86,7 +127,9 @@ describe('compiling the synthetic film', () => {
 
   it('finds the silences to within a few milliseconds', () => {
     const silences = document.sound.silences.map((silence) => [toSeconds(silence.range.start), toSeconds(silence.range.end)]);
-    const expected = [[1.0, 1.6], [1.605, 2.0], [3.2, 4.0]];
+    // The last runs to the end of the decoded audio, which AAC pads out to a whole 1024-sample frame.
+    const end = report.audio!.samples / report.audio!.rate;
+    const expected = [[1.0, 1.6], [1.605, 2.0], [3.2, end]];
     expect(silences).toHaveLength(3);
     silences.forEach(([start, end], i) => {
       // The encoder's decay after a tone ends is real signal: up to 12 ms of it.
@@ -144,7 +187,7 @@ describe('compiling the synthetic film', () => {
     const { report: validation } = validateFilmIR(document, { now: () => '2026-09-23T00:00:00.000Z' });
     expect(validation.checks.filter((check) => check.status !== 'pass')).toEqual([]);
     expect(validation.status).toBe('READY');
-    expect(validation.coverage.frames).toEqual({ expected: 100, analyzed: 100 });
+    expect(validation.coverage.frames).toEqual({ expected: 125, analyzed: 125 });
     expect(validation.evidenceMix['MEASURED']).toBeGreaterThan(50);
     expect(validation.evidenceMix['INFERRED'] ?? 0).toBe(0);
   });

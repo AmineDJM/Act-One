@@ -15,6 +15,6 @@ describe('summarizeFilmIR', () => {
     const records = Object.values(report.evidenceMix).reduce((sum, count) => sum + count, 0);
     expect(records).toBeGreaterThan(values);
     expect((report.evidenceMix['UNKNOWN'] ?? 0) / records).toBeLessThan((summary.evidenceMix['UNKNOWN'] ?? 0) / values);
-    expect(summary.counts).toMatchObject({ shots: 3, boundaries: 2 });
+    expect(summary.counts).toMatchObject({ shots: 4, boundaries: 3 });
   });
 });

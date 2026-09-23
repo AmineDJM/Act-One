@@ -14,8 +14,9 @@ import { TypographyIR } from './typography.ts';
 import { AttentionIR, CameraTrack, DepthIR, ProductIR, TrackedObject } from './visual.ts';
 
 export const FILM_IR_SCHEMA = 'actone.film-ir' as const;
-/** Major versions break readers; minor versions only add optional fields. */
-export const FILM_IR_VERSION = '1.0' as const;
+/** Major versions break readers; minor versions only add optional fields, so a reader takes every minor version up to its own. */
+export const FILM_IR_VERSION = '1.1' as const;
+export const FILM_IR_READABLE_VERSIONS = ['1.0', FILM_IR_VERSION] as const;
 
 export const ValidationCheck = z.object({
   id: z.string(),
@@ -67,7 +68,7 @@ export type ValidationReport = z.infer<typeof ValidationReport>;
  */
 export const FilmIR = z.object({
   schema: z.literal(FILM_IR_SCHEMA),
-  version: z.literal(FILM_IR_VERSION),
+  version: z.enum(FILM_IR_READABLE_VERSIONS),
   id: z.string().min(1).max(120),
   mode: z.enum(['reconstruction', 'plan']),
   title: z.string().max(300).nullable(),

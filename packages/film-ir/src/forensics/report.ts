@@ -13,6 +13,7 @@ import { Int64String } from '../schema/primitives.ts';
 const Num = z.number();
 const NumOrNull = z.number().nullable();
 const FrameIndex = z.number().int().nonnegative();
+const Count = z.number().int().nonnegative();
 const Fraction = z.object({ num: z.number().int().positive(), den: z.number().int().positive() });
 const Rational = z.object({ ticks: Int64String, timescale: z.number().int().positive() });
 const BoxTuple = z.tuple([Num, Num, Num, Num]);
@@ -32,7 +33,8 @@ export type ForensicFit = z.infer<typeof Fit>;
 const Phase = z.object({ kind: z.string(), frame: FrameIndex, value: NumOrNull });
 
 const Animation = z.object({
-  kind: z.enum(['cut', 'measured', 'unmeasured']),
+  // cut: whole on the first frame of its window, which a boundary opens; instant: whole on one frame and absent on the one beside it, inside the shot.
+  kind: z.enum(['cut', 'instant', 'measured', 'unmeasured']),
   frames: z.tuple([FrameIndex, FrameIndex]).nullable(),
   durationMs: NumOrNull.optional(),
   translation: z.object({ dx: Num, dy: Num, fromFrame: FrameIndex, toFrame: FrameIndex }).nullable().optional(),
@@ -82,6 +84,24 @@ const Refinement = z.union([
 
 const Glyph = z.object({ char: z.string(), box: BoxTuple });
 
+/** Where a line's type sits and how it is drawn, on its reference frame; see type_geometry in text.py. */
+const Geometry = z.object({
+  baselineY: Num,
+  capHeightPx: NumOrNull,
+  xHeightPx: NumOrNull,
+  ascenderPx: NumOrNull,
+  descenderPx: NumOrNull,
+  stemPx: NumOrNull,
+  samples: z.object({ baseline: Count, cap: Count, x: Count, stems: Count }),
+  /** How many glyphs of each class agree on the edge reported: one is enough where it was read from its own ink. */
+  agreeing: z.object({ baseline: Count, cap: Count, x: Count, ascender: Count, descender: Count }),
+  spread: z.record(z.string(), Num),
+  /** Of the line's letters, how many were read from their own ink rather than from the middle of the recogniser's box. */
+  lettersFromInk: Count,
+  letters: Count,
+});
+export type ForensicGeometry = z.infer<typeof Geometry>;
+
 const TextLine = z.object({
   text: z.string(),
   score: Num,
@@ -95,6 +115,8 @@ const TextLine = z.object({
   refinement: Refinement.nullable(),
   glyphs: z.array(Glyph),
   words: z.array(z.object({ text: z.string(), box: BoxTuple, glyphs: z.array(Glyph) })),
+  /** Null where the type could not be measured; absent from reports older than 1.3.0. */
+  geometry: Geometry.nullable().optional(),
 });
 export type ForensicTextLine = z.infer<typeof TextLine>;
 

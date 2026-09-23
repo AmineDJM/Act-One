@@ -3,23 +3,32 @@ A film whose every fact is known, for testing the analyzer against the truth.
 
     python3 -m actone_forensics.synthetic OUT.mp4
 
-Writes a four-second 320x180 film at exactly 25 frames per second with a
+Writes a five-second 320x180 film at exactly 25 frames per second with a
 48 kHz mono soundtrack, and prints the ground truth as JSON. Everything in it
 is placed on a frame or a sample by construction, so a measurement can be
 checked to the frame rather than eyeballed:
 
-    frames  0–39   dark blue field, "LAUNCH DAY" in white, fully visible
+    frames  0–39   dark blue field, "LAUNCH DAY" in white bold, fully visible
     frame   40     hard cut to an orange field
-    frames 50–59   "NEW FEATURE" fades in, linearly, fully visible from 60
+    frames 50–59   "NEW FEATURE" (bold) fades in, linearly, fully visible from 60
+    frame   65     "Deploy in minutes" (regular weight) cuts in below it
     frames 80–89   the picture fades linearly to black; black from 90 to 99
+    frame  100     hard cut to a slate field, "SEARCH" in white bold, tracked
+                   out by 0.3 em, until the end at frame 124
 
     0.0–1.0 s      440 Hz tone
     1.0–1.6 s      digital silence
     1.6 s          a 5 ms click, on the cut
     2.0–3.2 s      880 Hz tone
-    3.2–4.0 s      digital silence
+    3.2–5.0 s      digital silence
+
+The type is set in DejaVu Sans, shipped beside this module so the film is the
+same film on every machine. Its geometry — baseline, cap height, x-height —
+is taken from the clean render, before the film is encoded, so the truth
+does not depend on how the analyzer measures it.
 """
 import json
+import os
 import sys
 from fractions import Fraction
 
@@ -27,15 +36,138 @@ import av
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-WIDTH, HEIGHT, FPS, FRAMES = 320, 180, 25, 100
+WIDTH, HEIGHT, FPS, FRAMES = 320, 180, 25, 125
 RATE = 48000
 BLUE = (20, 32, 92)
 ORANGE = (236, 118, 36)
-FONT_PATHS = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
-    "/Library/Fonts/Arial Bold.ttf",
-]
+SLATE = (38, 44, 54)
+FONTS = {
+    "bold": (os.path.join(os.path.dirname(__file__), "fonts", "DejaVuSans-Bold.ttf"), 700),
+    "book": (os.path.join(os.path.dirname(__file__), "fonts", "DejaVuSans.ttf"), 400),
+}
+# Where each line sits: its text, face, size in pixels, the vertical centre
+# of its ink, and the space added after every letter (tracking), in pixels.
+LINES = {
+    "launch": ("LAUNCH DAY", "bold", 30, HEIGHT / 2, 0),
+    "feature": ("NEW FEATURE", "bold", 28, HEIGHT / 2, 0),
+    "deploy": ("Deploy in minutes", "book", 18, 140, 0),
+    "search": ("SEARCH", "bold", 44, HEIGHT / 2, 13),
+}
+# Glyphs whose tops sit on the cap line or the x-height without overshoot,
+# and whose bottoms sit on the baseline.
+FLAT_CAPS = set("BDEFHIKLMNPRTUVWXYZ")
+FLAT_X = set("mnruvwxz")
+ON_BASELINE = set("ABDEFHIKLMNPRTXZhiklmnrxz")
+
+
+def _font(face, size):
+    path, _ = FONTS[face]
+    if not os.path.exists(path):
+        raise SystemExit(f"the synthetic film's font is missing: {path}")
+    return ImageFont.truetype(path, size)
+
+
+def _starts(draw, font, text, tracking):
+    """Where each letter is drawn from, left to right, with the tracking after every letter."""
+    starts = []
+    for index, char in enumerate(text):
+        starts.append(round(draw.textlength(text[:index], font=font) + index * tracking))
+    return starts
+
+
+def place(spec, canvas=(WIDTH, HEIGHT)):
+    """
+    A line of type drawn alone on a canvas: its coverage layer, and each
+    letter with the columns it was drawn from and to and its own ink.
+
+    `spec` is (text, face, size in pixels, vertical centre of its ink,
+    tracking in pixels); the line is centred across the canvas. Each letter
+    is drawn by itself at the whole pixel its pen position rounds to, so the
+    hinted outlines sit on the pixel grid, and the layer is their union: the
+    picture is exactly its letters, and each letter's ink is known apart from
+    its neighbours' — an i's dot can overhang the next letter's advance.
+    Each letter's ink is (left, top, coverage) of its own drawing, or None
+    for a space.
+    """
+    text, face, size, centre, tracking = spec
+    width, height = canvas
+    font = _font(face, size)
+    draw = ImageDraw.Draw(Image.new("L", (1, 1)))
+    starts = _starts(draw, font, text, tracking)
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    x = int(round((width - (right - left) - tracking * (len(text) - 1)) / 2 - left))
+    y = int(round(centre - (bottom - top) / 2 - top))
+    layer = np.zeros((height, width), np.float32)
+    letters = []
+    for char, start in zip(text, starts):
+        ink = None
+        if not char.isspace():
+            l, t, r, b = draw.textbbox((x + start, y), char, font=font)
+            # A pixel of margin about the box the face gives, for the anti-aliased edge.
+            l, t, r, b = max(0, l - 2), max(0, t - 2), min(width, r + 2), min(height, b + 2)
+            if r > l and b > t:
+                piece = Image.new("L", (r - l, b - t), 0)
+                ImageDraw.Draw(piece).text((x + start - l, y - t), char, fill=255, font=font)
+                own = np.asarray(piece, dtype=np.float32) / 255.0
+                layer[t:b, l:r] = np.maximum(layer[t:b, l:r], own)
+                ink = (l, t, own)
+        letters.append((char, x + start, x + start + draw.textlength(char, font=font), ink))
+    return layer, letters, font
+
+
+_LAYERS = {}
+
+
+def _layer(key):
+    if key not in _LAYERS:
+        _LAYERS[key] = place(LINES[key])[0]
+    return _LAYERS[key]
+
+
+def geometry(spec, canvas=(WIDTH, HEIGHT)):
+    """
+    Where the line's type actually is in the clean render: the rows its
+    flat-topped capitals and lowercase reach, and the row its baseline
+    glyphs stand on, each read from the letter's own drawing and to a
+    fraction of a pixel from the coverage of its edge row. The truth the
+    analyzer's measurements are checked against.
+    """
+    text, face, size, _, _ = spec
+    _, letters, font = place(spec, canvas)
+    tops_cap, tops_x, bottoms = [], [], []
+    for char, _, _, ink in letters:
+        if ink is None:
+            continue
+        _, offset, own = ink
+        rows = own.max(axis=1)
+        inked = np.nonzero(rows > 0.02)[0]
+        if len(inked) == 0:
+            continue
+        first, last = int(inked[0]), int(inked[-1])
+        # A top edge lies inside its first inked row by the share of that row left uncovered.
+        top, bottom = offset + first + (1.0 - rows[first]), offset + last + rows[last]
+        if char in FLAT_CAPS:
+            tops_cap.append(top)
+        if char in FLAT_X:
+            tops_x.append(top)
+        if char in ON_BASELINE:
+            bottoms.append(bottom)
+    baseline = float(np.median(bottoms)) if bottoms else None
+    _, weight = FONTS[face]
+    cap_design = (font.getbbox("H")[3] - font.getbbox("H")[1])
+    return {
+        "face": font.getname()[0] + " " + font.getname()[1],
+        "weightClass": weight,
+        "sizePx": size,
+        "baselineY": round(baseline, 3) if baseline is not None else None,
+        "capHeightPx": round(baseline - float(np.median(tops_cap)), 3) if tops_cap and baseline is not None else None,
+        "xHeightPx": round(baseline - float(np.median(tops_x)), 3) if tops_x and baseline is not None else None,
+        # The face's own proportions: DejaVu Sans's cap height is 0.729 of the em, its x-height 0.547.
+        "capHeightDesignPx": round(0.729 * size, 3),
+        "xHeightDesignPx": round(0.547 * size, 3),
+        "hintedCapHeightPx": int(cap_design),
+    }
+
 
 TRUTH = {
     "frames": FRAMES,
@@ -47,39 +179,24 @@ TRUTH = {
     "texts": [
         {"text": "LAUNCH DAY", "firstVisible": 0, "lastVisible": 39},
         {"text": "NEW FEATURE", "fadeIn": [50, 59], "fullyVisible": 60, "lastVisible": 89},
+        {"text": "Deploy in minutes", "firstVisible": 65, "fullyVisible": 65, "lastVisible": 89},
+        {"text": "SEARCH", "firstVisible": 100, "fullyVisible": 100, "lastVisible": 124, "trackingPx": 13},
     ],
+    "cut2": {"lastOutgoing": 99, "firstIncoming": 100},
     "audio": {
         "rate": RATE,
         "tones": [{"hz": 440, "start": 0.0, "end": 1.0}, {"hz": 880, "start": 2.0, "end": 3.2}],
-        "silences": [[1.0, 1.6], [3.2, 4.0]],
+        "silences": [[1.0, 1.6], [3.2, 5.0]],
         "click": 1.6,
     },
 }
 
 
-def _font(size):
-    for path in FONT_PATHS:
-        try:
-            return ImageFont.truetype(path, size)
-        except OSError:
-            continue
-    # Pillow's own face, scalable since 10.1: always present, less pretty, still legible.
-    return ImageFont.load_default(size=size)
-
-
-def _text_layer(text, size):
-    """White type on transparent, centred: an alpha mask and its colour."""
-    layer = Image.new("L", (WIDTH, HEIGHT), 0)
-    draw = ImageDraw.Draw(layer)
-    font = _font(size)
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-    draw.text(((WIDTH - (right - left)) / 2 - left, (HEIGHT - (bottom - top)) / 2 - top), text, fill=255, font=font)
-    return np.asarray(layer, dtype=np.float32) / 255.0
-
-
 def frame_rgb(index):
-    launch = _text_layer("LAUNCH DAY", 30)
-    feature = _text_layer("NEW FEATURE", 28)
+    launch, feature, deploy = _layer("launch"), _layer("feature"), _layer("deploy")
+    if index >= 100:
+        picture = np.array(SLATE, np.float32)[None, None, :] * (1 - _layer("search")[..., None]) + 255.0 * _layer("search")[..., None]
+        return np.clip(np.rint(picture), 0, 255).astype(np.uint8)
     if index < 40:
         field, alpha = np.array(BLUE, np.float32), launch
     else:
@@ -90,6 +207,8 @@ def frame_rgb(index):
             alpha = feature * ((index - 49) / 11.0)
         else:
             alpha = feature
+        if index >= 65:
+            alpha = np.maximum(alpha, deploy)
     picture = field[None, None, :] * (1 - alpha[..., None]) + 255.0 * alpha[..., None]
     if index >= 80:
         picture = picture * max(0.0, 1 - (index - 79) / 11.0) if index < 90 else picture * 0
@@ -147,7 +266,8 @@ def main(argv=None):
     if len(argv) != 1:
         raise SystemExit("usage: python3 -m actone_forensics.synthetic OUT.mp4")
     write(argv[0])
-    print(json.dumps(TRUTH))
+    truth = dict(TRUTH, texts=[dict(entry, geometry=geometry(LINES[key])) for entry, key in zip(TRUTH["texts"], LINES)])
+    print(json.dumps(truth))
 
 
 if __name__ == "__main__":

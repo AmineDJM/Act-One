@@ -284,6 +284,7 @@ export function TypographyView({ doc }: { doc: Doc }) {
               <th>Exit</th>
               <th>Last visible</th>
               <th>Enter</th>
+              <th>Type</th>
               <th>Speech</th>
             </tr>
           </thead>
@@ -309,6 +310,9 @@ export function TypographyView({ doc }: { doc: Doc }) {
                   {block.enter.translation.value ? ` · moves ${block.enter.translation.value.dx.toFixed(0)},${block.enter.translation.value.dy.toFixed(0)} px` : ''}
                   {block.enter.stagger.value ? ` · ${block.enter.stagger.value.unit} stagger ${block.enter.stagger.value.intervalsMs.map((ms) => ms.toFixed(0)).join('/')} ms` : ''}
                 </td>
+                <td className={styles.sub} style={{ whiteSpace: 'normal', minWidth: 190 }}>
+                  <TypeMetrics metrics={block.metrics} />
+                </td>
                 <td>
                   {show(block.speech.relation.value)} <Tag value={block.speech.relation} />
                 </td>
@@ -317,6 +321,40 @@ export function TypographyView({ doc }: { doc: Doc }) {
           </tbody>
         </table>
       </div>
+    </>
+  );
+}
+
+type Metric = Evidenced & { value: number | null; lowerBound?: number | undefined; upperBound?: number | undefined };
+
+/**
+ * A block's type in a few words: its estimated size and weight with the
+ * range the faces measured allow, and the heights and stem they rest on.
+ * What was not measured is left out rather than shown as nothing.
+ */
+function TypeMetrics({ metrics }: { metrics: Doc['typography']['blocks'][number]['metrics'] }) {
+  const range = (metric: Metric, unit: string) =>
+    metric.lowerBound !== undefined && metric.upperBound !== undefined && metric.lowerBound !== metric.upperBound ? ` (${metric.lowerBound}–${metric.upperBound}${unit})` : '';
+  const parts: [string, Metric | undefined, string][] = [
+    ['size', metrics.approxSizePx, ' px'],
+    ['weight', metrics.approxWeight, ''],
+    ['cap', metrics.capHeightPx, ' px'],
+    ['x', metrics.xHeightPx, ' px'],
+    ['stem', metrics.stemPx, ' px'],
+    ['leading', metrics.lineSpacingPx, ' px'],
+  ];
+  const known = parts.filter(([, metric]) => metric && metric.evidenceType !== 'UNKNOWN' && metric.value !== null);
+  if (known.length === 0) return <>not measured</>;
+  return (
+    <>
+      {known.map(([label, metric, unit]) => (
+        <div key={label} title={`${metric!.method}${metric!.note ? ` — ${metric!.note}` : ''}`}>
+          {label} {metric!.evidenceType === 'ESTIMATED' ? '≈' : ''}
+          {show(metric!.value)}
+          {unit}
+          {metric!.evidenceType === 'ESTIMATED' ? range(metric!, unit) : ''} <Tag value={metric} />
+        </div>
+      ))}
     </>
   );
 }

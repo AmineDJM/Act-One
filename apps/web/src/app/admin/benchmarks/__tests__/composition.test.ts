@@ -9,7 +9,8 @@ import { composeWindow } from '../[id]/composition.ts';
  * A window of film told as a composition, on the synthetic film whose every
  * fact was placed by construction: "LAUNCH DAY" on a blue field, a hard cut
  * from frame 39 to 40 with a click on it, "NEW FEATURE" fading in over
- * frames 50–59 on orange, and a fade to black over frames 80–89.
+ * frames 50–59 on orange, "Deploy in minutes" cutting in at 65, a fade to
+ * black over frames 80–89, and a hard cut to "SEARCH" at frame 100.
  */
 const here = path.dirname(fileURLToPath(import.meta.url));
 const report = ForensicReport.parse(JSON.parse(readFileSync(path.join(here, '../../../../../../../packages/film-ir/src/__tests__/fixtures/synthetic-report.json'), 'utf8')));
@@ -30,7 +31,14 @@ describe('composeWindow', () => {
   it('counts the mixed frames of a fade, and the type that goes with it', () => {
     const story = composeWindow(document, 3.0, 4.0);
     expect(story).toContainEqual(expect.stringMatching(/^boundary\.002: a fade_out \(measured\) — frame 79 is the last untouched, frame 90 the first complete, 10 mixed frame\(s\) between; luma 0\.\d+ → 0\.000\./));
-    expect(story).toContain('1 line(s) of type leave with boundary.002: text.0002 “NEW FEATURE”.');
+    expect(story).toContain('2 line(s) of type leave with boundary.002: text.0002 “NEW FEATURE”, text.0003 “Deploy in minutes”.');
+  });
+
+  it('tells type that arrives with a cut apart from type that holds', () => {
+    const story = composeWindow(document, 3.9, 4.2);
+    expect(story).toContainEqual(expect.stringMatching(/^boundary\.003: a hard_cut \(measured\) — frame 99 is the last untouched, frame 100 the first complete; luma 0\.000 → 0\.\d+\./));
+    expect(story).toContain('1 line(s) of type arrive with boundary.003: text.0004 “SEARCH”.');
+    expect(composeWindow(document, 2.5, 2.7)).toContain('1 line(s) hold throughout: text.0002 “NEW FEATURE”.');
   });
 
   it('says that type holds, rather than listing it, where nothing changes', () => {

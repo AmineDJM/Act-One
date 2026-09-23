@@ -46,8 +46,8 @@ def measured_rate(table, timescale_den, timebase_num):
     return {"num": rate.numerator, "den": rate.denominator, "distinct": [{"ticks": str(int(v)), "count": int(c)} for v, c in zip(values, counts)]}
 
 
-def words_from_glyphs(glyphs):
-    words = text.spaced_words(glyphs)
+def words_from_glyphs(glyphs, spaces=None):
+    words = text.spaced_words(glyphs, spaces)
     out = []
     for word in words:
         xs = [g["box"][0] for g in word] + [g["box"][0] + g["box"][2] for g in word]
@@ -78,17 +78,30 @@ def glyphs_for(line, read):
         return []
     glyphs = []
     for k, candidate in enumerate(inside):
-        if k > 0 and glyphs and candidate["glyphs"]:
-            before, after = glyphs[-1]["box"], candidate["glyphs"][0]["box"]
+        pieces = candidate["glyphs"]
+        if glyphs and pieces:
+            # Fragments whose boxes overlap read the letters under the overlap twice: keep the first reading.
+            edge = glyphs[-1]["box"][0] + glyphs[-1]["box"][2]
+            pieces = [g for g in pieces if g["box"][0] + g["box"][2] / 2.0 > edge]
+        if k > 0 and glyphs and pieces:
+            before, after = glyphs[-1]["box"], pieces[0]["box"]
             gap_x = before[0] + before[2]
             glyphs.append({"char": " ", "box": [gap_x, before[1], max(0.0, after[0] - gap_x), before[3]]})
-        glyphs.extend(candidate["glyphs"])
+        glyphs.extend(pieces)
     return glyphs
 
 
-def respace(line, glyphs):
-    """The line's text with the spaces its glyphs show, when the letters are the same letters."""
-    words = ["".join(g["char"] for g in word) for word in text.spaced_words(glyphs)]
+def respace(line, glyphs, spaces=None):
+    """
+    The line's text with the spaces its pixels show, when the letters are the same letters.
+
+    Where the pixels could not be measured, the recogniser's own consensus
+    stands: re-spacing from its glyph boxes, which are narrower than the ink
+    in type set wide, is what once wrote "M O NITO RS" for "MONITORS".
+    """
+    if spaces is None:
+        return line["text"]
+    words = ["".join(g["char"] for g in word) for word in text.spaced_words(glyphs, spaces)]
     if not words:
         return line["text"]
     squeeze = lambda value: "".join(value.split())
@@ -118,17 +131,22 @@ def collect_references(path, lines, panel_frames, ocr_engine, width, height, rea
         if frame_index in wanted:
             bgr = decoder.bgr(frame, refine_w, refine_h)
             grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+            # Type is measured on the frame as it was made, not the working copy: a pixel is the finest the film has.
+            full = cv2.cvtColor(decoder.bgr(frame, width, height), cv2.COLOR_BGR2GRAY) if (refine_w, refine_h) != (width, height) else grey
             read = readings_by_frame.get(frame_index)
             if read is None:
                 read = ocr_engine.read(decoder.bgr(frame, ocr_w, ocr_h), scale=width / float(ocr_w)) if ocr_engine else []
             for index in wanted[frame_index]:
                 line = lines[index]
                 glyphs = glyphs_for(line, read)
+                spaces = text.pixel_spaces(full, line["referenceBox"], glyphs, line["text"]) if glyphs else None
                 references[index] = {
                     "grey": grey,
                     "bgr": bgr,
-                    "words": words_from_glyphs(glyphs),
+                    "words": words_from_glyphs(glyphs, spaces),
                     "glyphs": glyphs,
+                    "spaces": spaces,
+                    "geometry": text.type_geometry(full, line["referenceBox"], glyphs) if glyphs else None,
                 }
         if frame_index >= last:
             break
@@ -204,7 +222,7 @@ def main(argv=None):
     references, panel_greys = collect_references(args.input, lines, panel_frames, ocr_engine, video["width"], video["height"], readings_by_frame)
     for line, reference in zip(lines, references):
         if reference and reference["glyphs"]:
-            spaced = respace(line, reference["glyphs"])
+            spaced = respace(line, reference["glyphs"], reference.get("spaces"))
             if spaced != line["text"]:
                 line["variants"] = sorted(set(line["variants"]) | {line["text"]})[:8]
                 line["text"] = spaced
@@ -286,7 +304,7 @@ def main(argv=None):
         "text": {
             "stride": stride,
             "framesRead": len(video["ocrFrames"]),
-            "lines": [dict(line, refinement=result, glyphs=(ref or {}).get("glyphs", []), words=(ref or {}).get("words", []))
+            "lines": [dict(line, refinement=result, glyphs=(ref or {}).get("glyphs", []), words=(ref or {}).get("words", []), geometry=(ref or {}).get("geometry"))
                       for line, result, ref in zip(kept_lines, refined, kept_references)],
             "blocks": [[line_index[id(lines[k])] for k in block if id(lines[k]) in line_index] for block in blocks],
         },
