@@ -79,7 +79,7 @@ Voice: Baritone, 120 wpm, median pause 0.8s, leading the bed by 4 LU.
 
 **Sync rule.** Snap visual cuts and UI element reveals to the quarter-note grid of the music track. Tolerance 0.04s. Cut to a full-screen white flash at 31.00s and instantly mute all rhythmic audio stems.
 
-## What it never does
+## What it does every single time
 
 - Center all primary text blocks at 50% frame width and 50% frame height.
 - Hold ground saturation at 0% and push accent saturation to 95%.
@@ -99,99 +99,203 @@ Voice: Baritone, 120 wpm, median pause 0.8s, leading the bed by 4 LU.
 
 ## The timeline
 
-- **0.00s–2.50s** · type · Type on '{We invest in technologies that make humans}' at 50% x, 50% y over 1.50s. Hold for 0.70s. Fade opacity to 0% over 0.30s.  
-  *xPercent 50, yPercent 50, durationSeconds 1.50, opacityPercent 0*  
-  Establishes core premise at 130 WPM.
-- **0.00s–2.50s** · voice · Speak 'We invest in technologies that make humans' at 130 WPM. Peak level at -14 LUFS.  
-  *wpm 130, peakLUFS -14*  
-  Delivers primary narrative.  *(inferred)*
-- **2.50s–3.10s** · ui · Reveal a horizontal container at 50% y, 100% width, 25% height. Fill with #0033FF gradient. Render 'Faster.' at 50% x, 50% y.  
-  *heightPercent 25, widthPercent 100, hex #0033FF*  
-  Accelerates pacing with 0.60s cuts.
-- **3.10s–4.05s** · ui · Shift gradient to include #FF0055. Replace text with 'Smarter.' at 50% x, 50% y.  
-  *hex #FF0055, durationSeconds 0.95*  
-  Builds visual intensity via color shift.
-- **4.05s–5.00s** · ui · Shift gradient to include #8800FF. Replace text with 'Stronger.' Expand container height to 100% over 0.95s on ease_out_cubic. Overlay 1px white sine waves.  
-  *hex #8800FF, heightPercent 100, waveStrokePx 1*  
-  Maximizes visual weight before a hard cut.
-- **5.00s–8.50s** · motion · Draw a 2px #FFFFFF path starting from 50% x, 100% y. Trace a human profile ending at 50% x, 40% y over 3.50s on linear easing.  
-  *strokePx 2, startXPercent 50, endYPercent 40, durationSeconds 3.50*  
-  Connects human element to abstract space.
-- **8.50s–10.00s** · camera · Tilt camera down 50% over 1.50s on ease_out_cubic to reveal a 30% width spherical gradient orb at 50% x, 20% y.  
-  *tiltPercent 50, durationSeconds 1.50, orbWidthPercent 30*  
-  Introduces the technological catalyst.  *(inferred)*
-- **10.00s–13.50s** · motion · Translate two #FF0055 hand vectors from 0% x and 100% x to intersect the orb at 50% x over 2.00s. Trigger 1.50s of RGB split and horizontal displacement glitch at 12.00s.  
-  *durationSeconds 2.00, glitchDurationSeconds 1.50, hex #FF0055*  
-  Visualizes human-tech synthesis via 15% frame distortion.
-- **13.50s–14.50s** · layout · Tile 'ROBOTICS' in mono font at 10% height across background. Center a 60% width, 40% height video container at 50% x, 50% y. Overlay 'Robotics.' and a 20% width 1px circle.  
-  *bgTextHeightPercent 10, containerWidthPercent 60, containerHeightPercent 40*  
-  Establishes 1.00s montage rhythm.
-- **14.50s–15.50s** · layout · Update background text to 'NEUROTECH'. Update video container content. Update overlay text to 'Neurotech.'  
-  *durationSeconds 1.00*  
-  Maintains 1.00s montage rhythm.
-- **15.50s–16.50s** · layout · Update background text to 'DEFENSE'. Update video container content. Update overlay text to 'Defense.'  
-  *durationSeconds 1.00*  
-  Maintains 1.00s montage rhythm.
-- **16.50s–17.50s** · layout · Update background text to 'AI AGENTS'. Update video container content. Update overlay text to 'AI agents.'  
-  *durationSeconds 1.00*  
-  Maintains 1.00s montage rhythm.
-- **17.50s–20.00s** · camera · Update background text to 'LONGEVITY'. Update video to eye macro. Update text to 'Longevity.' Zoom camera 20% into the video container over 2.50s on linear easing.  
-  *zoomPercent 20, durationSeconds 2.50*  
-  Breaks the 1.00s rhythm to signal section end.
-- **20.00s–20.50s** · type · Display the string 'ISN'T FUTURE TALK' in a repeating grid layout covering 100% of the frame.  
-  *fontSize 15% of frame height, opacity 100%*  
-  Establishes the initial textual context before a rapid transition.
-- **20.00s–21.20s** · motion · Scale the central gradient mask from 40% to 100% of frame width and height.  
-  *scaleStart 40%, scaleEnd 100%, duration 1.20s*  
-  Creates a visual expansion that overtakes the background text.
-- **20.50s–21.20s** · type · Replace the repeating grid text with the string 'IT'S HAPPENING'.  
-  *fontSize 15% of frame height, opacity 100%*  
-  Accelerates the pacing through rapid copy changes.
-- **21.20s–22.00s** · type · Replace the text with the string 'NOW' arranged in a staggered vertical column, offset by 10% of frame width per line.  
-  *fontSize 15% of frame height, xOffsetPerLine 10% of frame width*  
-  Focuses attention on a single, urgent word before a scene cut.
-- **22.00s–23.00s** · ui · Fade in a pill-shaped container at 50% width, 50% height. Render the string 'We build.' and a globe vector icon inside. Apply a gradient background to the container.  
-  *containerWidth 30% of frame width, containerHeight 10% of frame height, fadeDuration 1.00s*  
-  Introduces the core visual motif for the next sequence.
-- **23.00s–27.00s** · camera · Orbit the camera 180 degrees around the central container while translating backward on the Z-axis to reveal an array of 20 identical containers spaced evenly.  
-  *orbitAngle 180 degrees, zTranslation 500% of frame width, containerCount 20*  
-  Demonstrates scale and multiplicity of the subject matter.
-- **27.00s–28.00s** · transition · Scale the Y-axis of all containers to 1% of frame height, merging them into a single horizontal line spanning 100% of frame width.  
-  *targetHeight 1% of frame height, duration 1.00s*  
-  Condenses complex 3D geometry into a simple 2D graphic element.
-- **28.00s–31.00s** · motion · Scale the horizontal line on the Y-axis from 1% to 100% of frame height, filling the screen with the gradient colors.  
-  *scaleYStart 1%, scaleYEnd 100%, duration 3.00s*  
-  Washes the screen with color to act as a transitional wipe.
-- **31.00s–33.00s** · transition · Fade the screen opacity from 100% to 0%, revealing a black background.  
-  *opacityStart 100%, opacityEnd 0%, duration 2.00s*  
-  Provides a visual reset before the final logo reveal.
-- **33.00s–34.00s** · type · Reveal the string 'augment.' at 50% width, 50% height. Morph the vector paths of the characters from abstract curves to standard neo-grotesque letterforms.  
-  *fontSize 15% of frame height, morphDuration 1.00s*  
-  Introduces the brand identity with a custom typographic animation.
-- **33.00s–40.00s** · picture · Render a radial gradient glow behind the 'augment.' text. Shift the hue of the gradient continuously through the accent palette.  
-  *glowRadius 25% of frame height, hueShiftDuration 7.00s*  
-  Adds visual interest and ties the logo back to the film's color system.
-- **34.00s–38.00s** · type · Type on the string 'A fund for those who rewrite human capability.' at 50% width, 60% height.  
-  *fontSize 6% of frame height, charactersPerSecond 12*  
-  Delivers the primary proposition statement clearly.
-- **38.00s–40.00s** · type · Type on the string 'www.augment.fund' at 50% width, 90% height.  
-  *fontSize 3% of frame height, charactersPerSecond 15*  
-  Provides the call to action and destination URL.
-- **40.00s–40.98s** · type · Hold the word 'augment.' at 50% of frame width and 45% of frame height. Hold the sentence 'A fund for those who rewrite human capability.' at 50% of frame width and 55% of frame height. Hold the URL 'www.augment.fund' at 50% of frame width and 90% of frame height.  
-  *augmentYPercent 45%, subheadYPercent 55%, urlYPercent 90%*  
-  Provides time to read the final brand lockup.
-- **40.00s–40.98s** · picture · Hold the background spotlight at 50% of frame width and 50% of frame height with 80% radial falloff over a #0A0A0A ground.  
-  *spotlightXPercent 50%, spotlightYPercent 50%, falloffPercent 80%*  
-  Maintains visual focus on the center text.
-- **40.00s–40.98s** · sound · Fade the low-frequency synth drone from -24 LUFS to -60 LUFS over 0.98s on a linear curve.  
-  *startLevelLUFS -24 LUFS, endLevelLUFS -60 LUFS, durationSeconds 0.98s*  
-  Concludes the audio track.  *(inferred)*
-- **40.00s–40.98s** · motion · Hold all elements at 0 pixels per second velocity.  
-  *velocityPixelsPerSecond 0*  
-  Creates a static end frame.
-- **40.00s–40.98s** · camera · Hold camera position at 0% amplitude.  
-  *amplitudePercent 0%*  
-  Keeps the frame stable.
+- **0.00s–10.00s** · sound · Play a continuous low-frequency synth drone at -18 LUFS.  
+  *level -18 LUFS*  
+  Provides audio bed.  *(inferred)*
+- **0.00s–10.00s** · type · Display closed captions at 3% of frame height, bottom center, synced to voiceover.  
+  *fontSize 3%h*  
+  Ensures accessibility.
+- **0.00s–1.50s** · type · Reveal '{We invest in technologies that make humans}' character by character at 12% of frame height, centered.  
+  *fontSize 12%h, duration 1.50s*  
+  Introduces premise.
+- **0.00s–1.50s** · motion · Scale the text layer from 100% to 60% and rotate Y-axis from 0 to -20 degrees on out_expo.  
+  *scaleStart 100%, scaleEnd 60%, rotationY -20deg*  
+  Adds depth.  *(inferred)*
+- **0.00s–1.50s** · voice · Speak 'We invest in technologies' at 120 WPM.  
+  *wpm 120*  
+  Delivers narrative.
+- **1.50s–2.00s** · transition · Crossfade to 'that make humans' scaling from 80% to 100% at 12% of frame height.  
+  *duration 0.50s, scaleStart 80%, scaleEnd 100%*  
+  Advances text.
+- **2.50s–2.50s** · transition · Hard cut to a horizontal mask occupying 30% of frame height.  
+  *maskHeight 30%h*  
+  Shifts visual style.
+- **2.50s–3.50s** · type · Display 'Faster.' at 12% of frame height, centered.  
+  *fontSize 12%h*  
+  Highlights keyword.
+- **2.50s–3.50s** · threeD · Render a flowing abstract shape using #0033FF and #8800FF inside the mask. Expand mask height from 30% to 100% over 1.00s on linear.  
+  *startHeight 30%h, endHeight 100%h, duration 1.00s*  
+  Introduces color.
+- **2.50s–2.50s** · sfx · Play a synthetic impact sound at -12 dB.  
+  *level -12 dB*  
+  Accents cut.  *(inferred)*
+- **3.50s–3.50s** · transition · Hard cut to full-screen 3D shape.  
+  Maintains pace.
+- **3.50s–4.50s** · type · Display 'Smarter.' at 12% of frame height, centered.  
+  *fontSize 12%h*  
+  Highlights keyword.
+- **3.50s–4.50s** · threeD · Render a flowing abstract shape using #0033FF, #FF0055, and #8800FF.  
+  Evolves background.
+- **3.50s–3.50s** · sfx · Play a synthetic impact sound at -12 dB.  
+  *level -12 dB*  
+  Accents cut.  *(inferred)*
+- **4.50s–4.50s** · transition · Hard cut to full-screen 3D shape with contour lines.  
+  Maintains pace.
+- **4.50s–5.50s** · type · Display 'Stronger.' at 12% of frame height, centered.  
+  *fontSize 12%h*  
+  Highlights keyword.
+- **4.50s–5.50s** · threeD · Render a flowing abstract shape using #8800FF and #FF0055, overlaid with 2px #FFFFFF contour lines.  
+  *lineWidth 2px*  
+  Adds texture.
+- **4.50s–4.50s** · sfx · Play a synthetic impact sound at -12 dB.  
+  *level -12 dB*  
+  Accents cut.  *(inferred)*
+- **5.50s–5.50s** · transition · Hard cut to #0A0A0A ground.  
+  Resets visual space.
+- **5.50s–9.00s** · motion · Animate a 2px #FFFFFF stroke along a path forming a human profile, from 0% to 100% trim path over 3.50s on linear.  
+  *lineWidth 2px, duration 3.50s*  
+  Illustrates human element.
+- **5.50s–8.00s** · voice · Speak 'That push human capabilities' at 120 WPM.  
+  *wpm 120*  
+  Continues narrative.
+- **8.00s–9.00s** · voice · Speak 'to the next level.' at 120 WPM.  
+  *wpm 120*  
+  Completes sentence.
+- **9.00s–10.00s** · threeD · Reveal a 3D shape at the top 20% of the frame, casting a volumetric light downwards onto the line drawing.  
+  *shapeHeight 20%h*  
+  Introduces new element.
+- **9.00s–10.00s** · voice · Speak 'That supercharge performance' at 120 WPM.  
+  *wpm 120*  
+  Starts new sentence.
+- **10.00s–11.50s** · motion · Translate the continuous line drawing of the face downwards from 50% to 80% of frame height, while the glowing orb descends from -20% to 50% of frame height.  
+  *faceStartY 50%, faceEndY 80%, orbStartY -20%, orbEndY 50%*  
+  Shifts focus to the orb.
+- **10.00s–11.50s** · voice · Speak 'performance at every level.' at 120 WPM.  
+  *wpm 120*  
+  Continues the narrative.
+- **11.50s–13.50s** · voice · Speak 'And break into what evolution never delivered.' at 120 WPM.  
+  *wpm 120*  
+  Sets up the transition.
+- **11.50s–13.50s** · motion · Animate two red hands reaching from the left and right edges towards the center orb, stopping at 40% and 60% of frame width.  
+  *leftHandEndX 40%, rightHandEndX 60%*  
+  Creates anticipation.
+- **13.50s–14.00s** · transition · Apply a digital glitch effect with horizontal displacement up to 20% of frame width, accompanied by a white flash.  
+  *displacement 20%*  
+  Signals a shift in topic.
+- **13.50s–14.00s** · sfx · Play a digital glitch sound effect peaking at -6 dB.  
+  *level -6 dB*  
+  Reinforces the visual glitch.
+- **14.00s–15.00s** · picture · Display a central image of a robotic hand touching a human hand, scaled to 60% of frame width, with a repeating text background of 'ROBOTICS'.  
+  *imageWidth 60%*  
+  Introduces the first topic.
+- **14.00s–15.00s** · voice · Speak 'Robotics.' at 120 WPM.  
+  *wpm 120*  
+  Names the topic.
+- **15.00s–16.00s** · picture · Display a central image of a robotic head, scaled to 60% of frame width, with a repeating text background of 'DEFENSE'.  
+  *imageWidth 60%*  
+  Introduces the second topic.
+- **15.00s–16.00s** · voice · Speak 'Neurotech, defense.' at 120 WPM.  
+  *wpm 120*  
+  Names the topics.
+- **16.00s–17.00s** · picture · Display a central image of a wireframe car, scaled to 60% of frame width, with a repeating text background of 'AI AGENTS'.  
+  *imageWidth 60%*  
+  Introduces the third topic.
+- **16.00s–17.00s** · voice · Speak 'AI agents.' at 120 WPM.  
+  *wpm 120*  
+  Names the topic.
+- **17.00s–18.50s** · picture · Display a central image of an eye, scaled to 60% of frame width, with a repeating text background of 'LONGEVITY'.  
+  *imageWidth 60%*  
+  Introduces the fourth topic.
+- **17.00s–18.50s** · voice · Speak 'Longevity.' at 120 WPM.  
+  *wpm 120*  
+  Names the topic.
+- **18.50s–19.50s** · motion · Scale the central eye image from 60% to 150% of frame width, filling the screen.  
+  *startScale 60%, endScale 150%*  
+  Transitions to the next scene.
+- **19.50s–20.00s** · voice · Speak 'This is' at 120 WPM.  
+  *wpm 120*  
+  Starts the next sentence.
+- **20.00s–21.00s** · type · Scroll the background text 'ISN'T FUTURE TALK' horizontally at 10% of frame width per second.  
+  *scrollSpeed 10% frame width/s*  
+  Creates continuous background motion.  *(inferred)*
+- **20.00s–21.00s** · voice · Deliver the phrase 'future talk.' at 120 words per minute.  
+  *speechRate 120 wpm*  
+  Completes the previous sentence.
+- **21.00s–22.00s** · type · Cut to background text 'HAPPENING IT'S HAPPENING' scrolling vertically at 15% of frame height per second.  
+  *scrollSpeed 15% frame height/s*  
+  Shifts visual rhythm and direction.  *(inferred)*
+- **21.00s–22.00s** · voice · Deliver the phrase 'This is happening' at 120 words per minute.  
+  *speechRate 120 wpm*  
+  Introduces the next concept.
+- **22.00s–23.00s** · type · Cut to a staggered arrangement of the word 'NOW' in #FFFFFF (type) on #0A0A0A (ground).  
+  *wordCount 15*  
+  Emphasizes immediacy.
+- **22.00s–23.00s** · voice · Deliver the word 'NOW.' with emphasis.  
+  *speechRate 120 wpm*  
+  Punctuation of the visual message.
+- **23.00s–24.00s** · ui · Reveal a pill-shaped UI element containing 'We build.' and a globe icon, glowing with #FF0055 (accent) and #0033FF (accent).  
+  *pillWidth 30% frame width, pillHeight 10% frame height*  
+  Introduces the core action.  *(inferred)*
+- **23.00s–27.00s** · voice · Deliver the phrase 'With those who build with obsession, discipline, and raw ambition.' at 120 words per minute.  
+  *speechRate 120 wpm*  
+  Describes the target audience.
+- **24.00s–27.00s** · ui · Duplicate the pill UI element, creating a cascading trail that recedes into 3D space along the Z-axis.  
+  *trailCount 20+, zDepth 500px*  
+  Suggests scale and multiplicity.  *(inferred)*
+- **24.00s–27.00s** · camera · Pan the camera upwards and slightly right, following the receding trail of UI elements.  
+  *panY 20% frame height, panX 5% frame width*  
+  Guides the eye through the 3D space.  *(inferred)*
+- **27.00s–28.00s** · transition · Compress the trail of UI elements into a single horizontal line spanning the frame width.  
+  *lineWidth 100% frame width, lineHeight 1% frame height*  
+  Transforms complex elements into a simple graphic.  *(inferred)*
+- **27.00s–30.00s** · voice · Deliver the phrase 'Because human limits aren't lines in the sand.' at 120 words per minute.  
+  *speechRate 120 wpm*  
+  Connects the visual line to the narrative.
+- **28.00s–30.00s** · motion · Hold the horizontal line, glowing with #0033FF (accent) on the left and #FF0055 (accent) on the right.  
+  *glowIntensity 50%*  
+  Provides a visual anchor for the voiceover.  *(inferred)*
+- **30.00s–31.50s** · motion · Scale the horizontal line vertically from 1% to 100% of frame height on out_expo.  
+  *startScale 1%, endScale 100%, duration 1.50s*  
+  Expands the line into a full-screen gradient.
+- **30.00s–31.50s** · picture · Expand the gradient colors (#0033FF, #FF0055, #8800FF) to fill the screen as the line scales.  
+  *colors #0033FF, #FF0055, #8800FF*  
+  Transitions from a line to a full-screen color field.
+- **30.00s–32.50s** · voice · Deliver the line 'They're the start of something bigger.' at 120 WPM.  
+  *wpm 120*  
+  Provides narrative context for the visual expansion.
+- **31.50s–32.50s** · picture · Fade the full-screen gradient to #0A0A0A (ground) over 1.00s on linear.  
+  *color #0A0A0A, duration 1.00s*  
+  Clears the screen for the final logo reveal.
+- **32.50s–33.50s** · type · Reveal the logo 'augment.' at 15% of frame height, centered, using a glitch/morph effect from abstract shapes to the final wordmark over 1.00s.  
+  *size 15%, duration 1.00s*  
+  Introduces the brand name with a technological feel.
+- **32.50s–33.50s** · picture · Apply a subtle, shifting gradient glow (#0033FF, #FF0055, #8800FF) behind the logo text.  
+  *colors #0033FF, #FF0055, #8800FF*  
+  Connects the logo to the established color palette.
+- **33.50s–34.50s** · voice · Deliver the word 'augment.' at 120 WPM.  
+  *wpm 120*  
+  Reinforces the brand name audibly.
+- **34.50s–36.50s** · type · Type out the tagline 'A fund for those who rewrite human capability.' at 8% of frame height, centered below the logo, over 2.00s.  
+  *size 8%, duration 2.00s*  
+  Provides the brand's mission statement.
+- **34.50s–37.00s** · voice · Deliver the line 'a fund for those who rewrite human capability.' at 120 WPM.  
+  *wpm 120*  
+  Audibly reinforces the tagline.
+- **37.00s–37.50s** · type · Fade in the URL 'www.augment.fund' at 3% of frame height, centered at the bottom of the screen, over 0.50s.  
+  *size 3%, duration 0.50s*  
+  Provides a call to action.
+- **37.50s–40.00s** · picture · Hold the final composition (logo, tagline, URL, background glow) static.  
+  *duration 2.50s*  
+  Allows the viewer to read and absorb the final information.
+- **40.00s–40.98s** · picture · Hold background at #0A0A0A. Render 'augment.' at 50% width, 45% height in #8800FF at 12% frame height. Render subtitle at 50% width, 55% height in #FFFFFF at 3% frame height. Render URL at 50% width, 90% height in #FFFFFF at 3% frame height.  
+  *title_y 45%, title_size 12%, subtitle_y 55%, subtitle_size 3%, url_y 90%, url_size 3%*  
+  Final brand lockup.
+- **40.00s–40.98s** · sound · Fade bass drone from -12 LUFS to -48 LUFS over 0.98s on linear curve.  
+  *start_level -12 LUFS, end_level -48 LUFS, duration 0.98s*  
+  Audio conclusion.  *(inferred)*
+- **40.00s–40.98s** · motion · Maintain 0px movement and 0deg rotation for all elements and camera.  
+  *movement 0px, rotation 0deg*  
+  Static resolution.
 
 ## Every half second
 

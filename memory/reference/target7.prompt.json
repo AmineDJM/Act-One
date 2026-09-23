@@ -5,8 +5,8 @@
     "durationSeconds": 40.98
   },
   "model": "gemini-3.1-pro-preview",
-  "analysedAt": "2026-09-23T15:33:20.148Z",
-  "windowSeconds": 20,
+  "analysedAt": "2026-09-23T15:53:19.008Z",
+  "windowSeconds": 10,
   "system": {
     "identity": {
       "durationSeconds": 41,
@@ -468,386 +468,762 @@
   "events": [
     {
       "atSeconds": 0,
-      "untilSeconds": 2.5,
-      "domain": "type",
-      "instruction": "Type on '{We invest in technologies that make humans}' at 50% x, 50% y over 1.50s. Hold for 0.70s. Fade opacity to 0% over 0.30s.",
+      "untilSeconds": 10,
+      "domain": "sound",
+      "instruction": "Play a continuous low-frequency synth drone at -18 LUFS.",
       "quantities": {
-        "xPercent": "50",
-        "yPercent": "50",
-        "durationSeconds": "1.50",
-        "opacityPercent": "0"
+        "level": "-18 LUFS"
       },
-      "whyItReads": "Establishes core premise at 130 WPM.",
+      "whyItReads": "Provides audio bed.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 0,
+      "untilSeconds": 10,
+      "domain": "type",
+      "instruction": "Display closed captions at 3% of frame height, bottom center, synced to voiceover.",
+      "quantities": {
+        "fontSize": "3%h"
+      },
+      "whyItReads": "Ensures accessibility.",
       "confidence": "observed"
     },
     {
       "atSeconds": 0,
-      "untilSeconds": 2.5,
-      "domain": "voice",
-      "instruction": "Speak 'We invest in technologies that make humans' at 130 WPM. Peak level at -14 LUFS.",
+      "untilSeconds": 1.5,
+      "domain": "type",
+      "instruction": "Reveal '{We invest in technologies that make humans}' character by character at 12% of frame height, centered.",
       "quantities": {
-        "wpm": "130",
-        "peakLUFS": "-14"
+        "fontSize": "12%h",
+        "duration": "1.50s"
       },
-      "whyItReads": "Delivers primary narrative.",
+      "whyItReads": "Introduces premise.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 0,
+      "untilSeconds": 1.5,
+      "domain": "motion",
+      "instruction": "Scale the text layer from 100% to 60% and rotate Y-axis from 0 to -20 degrees on out_expo.",
+      "quantities": {
+        "scaleStart": "100%",
+        "scaleEnd": "60%",
+        "rotationY": "-20deg"
+      },
+      "whyItReads": "Adds depth.",
       "confidence": "inferred"
+    },
+    {
+      "atSeconds": 0,
+      "untilSeconds": 1.5,
+      "domain": "voice",
+      "instruction": "Speak 'We invest in technologies' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Delivers narrative.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 1.5,
+      "untilSeconds": 2,
+      "domain": "transition",
+      "instruction": "Crossfade to 'that make humans' scaling from 80% to 100% at 12% of frame height.",
+      "quantities": {
+        "duration": "0.50s",
+        "scaleStart": "80%",
+        "scaleEnd": "100%"
+      },
+      "whyItReads": "Advances text.",
+      "confidence": "observed"
     },
     {
       "atSeconds": 2.5,
-      "untilSeconds": 3.1,
-      "domain": "ui",
-      "instruction": "Reveal a horizontal container at 50% y, 100% width, 25% height. Fill with #0033FF gradient. Render 'Faster.' at 50% x, 50% y.",
+      "untilSeconds": 2.5,
+      "domain": "transition",
+      "instruction": "Hard cut to a horizontal mask occupying 30% of frame height.",
       "quantities": {
-        "heightPercent": "25",
-        "widthPercent": "100",
-        "hex": "#0033FF"
+        "maskHeight": "30%h"
       },
-      "whyItReads": "Accelerates pacing with 0.60s cuts.",
+      "whyItReads": "Shifts visual style.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 3.1,
-      "untilSeconds": 4.05,
-      "domain": "ui",
-      "instruction": "Shift gradient to include #FF0055. Replace text with 'Smarter.' at 50% x, 50% y.",
+      "atSeconds": 2.5,
+      "untilSeconds": 3.5,
+      "domain": "type",
+      "instruction": "Display 'Faster.' at 12% of frame height, centered.",
       "quantities": {
-        "hex": "#FF0055",
-        "durationSeconds": "0.95"
+        "fontSize": "12%h"
       },
-      "whyItReads": "Builds visual intensity via color shift.",
+      "whyItReads": "Highlights keyword.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 4.05,
-      "untilSeconds": 5,
-      "domain": "ui",
-      "instruction": "Shift gradient to include #8800FF. Replace text with 'Stronger.' Expand container height to 100% over 0.95s on ease_out_cubic. Overlay 1px white sine waves.",
+      "atSeconds": 2.5,
+      "untilSeconds": 3.5,
+      "domain": "threeD",
+      "instruction": "Render a flowing abstract shape using #0033FF and #8800FF inside the mask. Expand mask height from 30% to 100% over 1.00s on linear.",
       "quantities": {
-        "hex": "#8800FF",
-        "heightPercent": "100",
-        "waveStrokePx": "1"
+        "startHeight": "30%h",
+        "endHeight": "100%h",
+        "duration": "1.00s"
       },
-      "whyItReads": "Maximizes visual weight before a hard cut.",
+      "whyItReads": "Introduces color.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 5,
-      "untilSeconds": 8.5,
-      "domain": "motion",
-      "instruction": "Draw a 2px #FFFFFF path starting from 50% x, 100% y. Trace a human profile ending at 50% x, 40% y over 3.50s on linear easing.",
+      "atSeconds": 2.5,
+      "untilSeconds": 2.5,
+      "domain": "sfx",
+      "instruction": "Play a synthetic impact sound at -12 dB.",
       "quantities": {
-        "strokePx": "2",
-        "startXPercent": "50",
-        "endYPercent": "40",
-        "durationSeconds": "3.50"
+        "level": "-12 dB"
       },
-      "whyItReads": "Connects human element to abstract space.",
-      "confidence": "observed"
-    },
-    {
-      "atSeconds": 8.5,
-      "untilSeconds": 10,
-      "domain": "camera",
-      "instruction": "Tilt camera down 50% over 1.50s on ease_out_cubic to reveal a 30% width spherical gradient orb at 50% x, 20% y.",
-      "quantities": {
-        "tiltPercent": "50",
-        "durationSeconds": "1.50",
-        "orbWidthPercent": "30"
-      },
-      "whyItReads": "Introduces the technological catalyst.",
+      "whyItReads": "Accents cut.",
       "confidence": "inferred"
     },
     {
+      "atSeconds": 3.5,
+      "untilSeconds": 3.5,
+      "domain": "transition",
+      "instruction": "Hard cut to full-screen 3D shape.",
+      "quantities": {},
+      "whyItReads": "Maintains pace.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 3.5,
+      "untilSeconds": 4.5,
+      "domain": "type",
+      "instruction": "Display 'Smarter.' at 12% of frame height, centered.",
+      "quantities": {
+        "fontSize": "12%h"
+      },
+      "whyItReads": "Highlights keyword.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 3.5,
+      "untilSeconds": 4.5,
+      "domain": "threeD",
+      "instruction": "Render a flowing abstract shape using #0033FF, #FF0055, and #8800FF.",
+      "quantities": {},
+      "whyItReads": "Evolves background.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 3.5,
+      "untilSeconds": 3.5,
+      "domain": "sfx",
+      "instruction": "Play a synthetic impact sound at -12 dB.",
+      "quantities": {
+        "level": "-12 dB"
+      },
+      "whyItReads": "Accents cut.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 4.5,
+      "untilSeconds": 4.5,
+      "domain": "transition",
+      "instruction": "Hard cut to full-screen 3D shape with contour lines.",
+      "quantities": {},
+      "whyItReads": "Maintains pace.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 4.5,
+      "untilSeconds": 5.5,
+      "domain": "type",
+      "instruction": "Display 'Stronger.' at 12% of frame height, centered.",
+      "quantities": {
+        "fontSize": "12%h"
+      },
+      "whyItReads": "Highlights keyword.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 4.5,
+      "untilSeconds": 5.5,
+      "domain": "threeD",
+      "instruction": "Render a flowing abstract shape using #8800FF and #FF0055, overlaid with 2px #FFFFFF contour lines.",
+      "quantities": {
+        "lineWidth": "2px"
+      },
+      "whyItReads": "Adds texture.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 4.5,
+      "untilSeconds": 4.5,
+      "domain": "sfx",
+      "instruction": "Play a synthetic impact sound at -12 dB.",
+      "quantities": {
+        "level": "-12 dB"
+      },
+      "whyItReads": "Accents cut.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 5.5,
+      "untilSeconds": 5.5,
+      "domain": "transition",
+      "instruction": "Hard cut to #0A0A0A ground.",
+      "quantities": {},
+      "whyItReads": "Resets visual space.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 5.5,
+      "untilSeconds": 9,
+      "domain": "motion",
+      "instruction": "Animate a 2px #FFFFFF stroke along a path forming a human profile, from 0% to 100% trim path over 3.50s on linear.",
+      "quantities": {
+        "lineWidth": "2px",
+        "duration": "3.50s"
+      },
+      "whyItReads": "Illustrates human element.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 5.5,
+      "untilSeconds": 8,
+      "domain": "voice",
+      "instruction": "Speak 'That push human capabilities' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Continues narrative.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 8,
+      "untilSeconds": 9,
+      "domain": "voice",
+      "instruction": "Speak 'to the next level.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Completes sentence.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 9,
+      "untilSeconds": 10,
+      "domain": "threeD",
+      "instruction": "Reveal a 3D shape at the top 20% of the frame, casting a volumetric light downwards onto the line drawing.",
+      "quantities": {
+        "shapeHeight": "20%h"
+      },
+      "whyItReads": "Introduces new element.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 9,
+      "untilSeconds": 10,
+      "domain": "voice",
+      "instruction": "Speak 'That supercharge performance' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Starts new sentence.",
+      "confidence": "observed"
+    },
+    {
       "atSeconds": 10,
+      "untilSeconds": 11.5,
+      "domain": "motion",
+      "instruction": "Translate the continuous line drawing of the face downwards from 50% to 80% of frame height, while the glowing orb descends from -20% to 50% of frame height.",
+      "quantities": {
+        "faceStartY": "50%",
+        "faceEndY": "80%",
+        "orbStartY": "-20%",
+        "orbEndY": "50%"
+      },
+      "whyItReads": "Shifts focus to the orb.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 10,
+      "untilSeconds": 11.5,
+      "domain": "voice",
+      "instruction": "Speak 'performance at every level.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Continues the narrative.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 11.5,
+      "untilSeconds": 13.5,
+      "domain": "voice",
+      "instruction": "Speak 'And break into what evolution never delivered.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Sets up the transition.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 11.5,
       "untilSeconds": 13.5,
       "domain": "motion",
-      "instruction": "Translate two #FF0055 hand vectors from 0% x and 100% x to intersect the orb at 50% x over 2.00s. Trigger 1.50s of RGB split and horizontal displacement glitch at 12.00s.",
+      "instruction": "Animate two red hands reaching from the left and right edges towards the center orb, stopping at 40% and 60% of frame width.",
       "quantities": {
-        "durationSeconds": "2.00",
-        "glitchDurationSeconds": "1.50",
-        "hex": "#FF0055"
+        "leftHandEndX": "40%",
+        "rightHandEndX": "60%"
       },
-      "whyItReads": "Visualizes human-tech synthesis via 15% frame distortion.",
+      "whyItReads": "Creates anticipation.",
       "confidence": "observed"
     },
     {
       "atSeconds": 13.5,
-      "untilSeconds": 14.5,
-      "domain": "layout",
-      "instruction": "Tile 'ROBOTICS' in mono font at 10% height across background. Center a 60% width, 40% height video container at 50% x, 50% y. Overlay 'Robotics.' and a 20% width 1px circle.",
+      "untilSeconds": 14,
+      "domain": "transition",
+      "instruction": "Apply a digital glitch effect with horizontal displacement up to 20% of frame width, accompanied by a white flash.",
       "quantities": {
-        "bgTextHeightPercent": "10",
-        "containerWidthPercent": "60",
-        "containerHeightPercent": "40"
+        "displacement": "20%"
       },
-      "whyItReads": "Establishes 1.00s montage rhythm.",
+      "whyItReads": "Signals a shift in topic.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 14.5,
-      "untilSeconds": 15.5,
-      "domain": "layout",
-      "instruction": "Update background text to 'NEUROTECH'. Update video container content. Update overlay text to 'Neurotech.'",
+      "atSeconds": 13.5,
+      "untilSeconds": 14,
+      "domain": "sfx",
+      "instruction": "Play a digital glitch sound effect peaking at -6 dB.",
       "quantities": {
-        "durationSeconds": "1.00"
+        "level": "-6 dB"
       },
-      "whyItReads": "Maintains 1.00s montage rhythm.",
+      "whyItReads": "Reinforces the visual glitch.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 15.5,
-      "untilSeconds": 16.5,
-      "domain": "layout",
-      "instruction": "Update background text to 'DEFENSE'. Update video container content. Update overlay text to 'Defense.'",
+      "atSeconds": 14,
+      "untilSeconds": 15,
+      "domain": "picture",
+      "instruction": "Display a central image of a robotic hand touching a human hand, scaled to 60% of frame width, with a repeating text background of 'ROBOTICS'.",
       "quantities": {
-        "durationSeconds": "1.00"
+        "imageWidth": "60%"
       },
-      "whyItReads": "Maintains 1.00s montage rhythm.",
+      "whyItReads": "Introduces the first topic.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 16.5,
-      "untilSeconds": 17.5,
-      "domain": "layout",
-      "instruction": "Update background text to 'AI AGENTS'. Update video container content. Update overlay text to 'AI agents.'",
+      "atSeconds": 14,
+      "untilSeconds": 15,
+      "domain": "voice",
+      "instruction": "Speak 'Robotics.' at 120 WPM.",
       "quantities": {
-        "durationSeconds": "1.00"
+        "wpm": "120"
       },
-      "whyItReads": "Maintains 1.00s montage rhythm.",
+      "whyItReads": "Names the topic.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 17.5,
-      "untilSeconds": 20,
-      "domain": "camera",
-      "instruction": "Update background text to 'LONGEVITY'. Update video to eye macro. Update text to 'Longevity.' Zoom camera 20% into the video container over 2.50s on linear easing.",
+      "atSeconds": 15,
+      "untilSeconds": 16,
+      "domain": "picture",
+      "instruction": "Display a central image of a robotic head, scaled to 60% of frame width, with a repeating text background of 'DEFENSE'.",
       "quantities": {
-        "zoomPercent": "20",
-        "durationSeconds": "2.50"
+        "imageWidth": "60%"
       },
-      "whyItReads": "Breaks the 1.00s rhythm to signal section end.",
+      "whyItReads": "Introduces the second topic.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 20,
-      "untilSeconds": 20.5,
-      "domain": "type",
-      "instruction": "Display the string 'ISN'T FUTURE TALK' in a repeating grid layout covering 100% of the frame.",
+      "atSeconds": 15,
+      "untilSeconds": 16,
+      "domain": "voice",
+      "instruction": "Speak 'Neurotech, defense.' at 120 WPM.",
       "quantities": {
-        "fontSize": "15% of frame height",
-        "opacity": "100%"
+        "wpm": "120"
       },
-      "whyItReads": "Establishes the initial textual context before a rapid transition.",
+      "whyItReads": "Names the topics.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 20,
-      "untilSeconds": 21.2,
+      "atSeconds": 16,
+      "untilSeconds": 17,
+      "domain": "picture",
+      "instruction": "Display a central image of a wireframe car, scaled to 60% of frame width, with a repeating text background of 'AI AGENTS'.",
+      "quantities": {
+        "imageWidth": "60%"
+      },
+      "whyItReads": "Introduces the third topic.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 16,
+      "untilSeconds": 17,
+      "domain": "voice",
+      "instruction": "Speak 'AI agents.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Names the topic.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 17,
+      "untilSeconds": 18.5,
+      "domain": "picture",
+      "instruction": "Display a central image of an eye, scaled to 60% of frame width, with a repeating text background of 'LONGEVITY'.",
+      "quantities": {
+        "imageWidth": "60%"
+      },
+      "whyItReads": "Introduces the fourth topic.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 17,
+      "untilSeconds": 18.5,
+      "domain": "voice",
+      "instruction": "Speak 'Longevity.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Names the topic.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 18.5,
+      "untilSeconds": 19.5,
       "domain": "motion",
-      "instruction": "Scale the central gradient mask from 40% to 100% of frame width and height.",
+      "instruction": "Scale the central eye image from 60% to 150% of frame width, filling the screen.",
       "quantities": {
-        "scaleStart": "40%",
-        "scaleEnd": "100%",
-        "duration": "1.20s"
+        "startScale": "60%",
+        "endScale": "150%"
       },
-      "whyItReads": "Creates a visual expansion that overtakes the background text.",
+      "whyItReads": "Transitions to the next scene.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 20.5,
-      "untilSeconds": 21.2,
+      "atSeconds": 19.5,
+      "untilSeconds": 20,
+      "domain": "voice",
+      "instruction": "Speak 'This is' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Starts the next sentence.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 20,
+      "untilSeconds": 21,
       "domain": "type",
-      "instruction": "Replace the repeating grid text with the string 'IT'S HAPPENING'.",
+      "instruction": "Scroll the background text 'ISN'T FUTURE TALK' horizontally at 10% of frame width per second.",
       "quantities": {
-        "fontSize": "15% of frame height",
-        "opacity": "100%"
+        "scrollSpeed": "10% frame width/s"
       },
-      "whyItReads": "Accelerates the pacing through rapid copy changes.",
+      "whyItReads": "Creates continuous background motion.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 20,
+      "untilSeconds": 21,
+      "domain": "voice",
+      "instruction": "Deliver the phrase 'future talk.' at 120 words per minute.",
+      "quantities": {
+        "speechRate": "120 wpm"
+      },
+      "whyItReads": "Completes the previous sentence.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 21.2,
+      "atSeconds": 21,
       "untilSeconds": 22,
       "domain": "type",
-      "instruction": "Replace the text with the string 'NOW' arranged in a staggered vertical column, offset by 10% of frame width per line.",
+      "instruction": "Cut to background text 'HAPPENING IT'S HAPPENING' scrolling vertically at 15% of frame height per second.",
       "quantities": {
-        "fontSize": "15% of frame height",
-        "xOffsetPerLine": "10% of frame width"
+        "scrollSpeed": "15% frame height/s"
       },
-      "whyItReads": "Focuses attention on a single, urgent word before a scene cut.",
+      "whyItReads": "Shifts visual rhythm and direction.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 21,
+      "untilSeconds": 22,
+      "domain": "voice",
+      "instruction": "Deliver the phrase 'This is happening' at 120 words per minute.",
+      "quantities": {
+        "speechRate": "120 wpm"
+      },
+      "whyItReads": "Introduces the next concept.",
       "confidence": "observed"
     },
     {
       "atSeconds": 22,
       "untilSeconds": 23,
-      "domain": "ui",
-      "instruction": "Fade in a pill-shaped container at 50% width, 50% height. Render the string 'We build.' and a globe vector icon inside. Apply a gradient background to the container.",
+      "domain": "type",
+      "instruction": "Cut to a staggered arrangement of the word 'NOW' in #FFFFFF (type) on #0A0A0A (ground).",
       "quantities": {
-        "containerWidth": "30% of frame width",
-        "containerHeight": "10% of frame height",
-        "fadeDuration": "1.00s"
+        "wordCount": "15"
       },
-      "whyItReads": "Introduces the core visual motif for the next sequence.",
+      "whyItReads": "Emphasizes immediacy.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 22,
+      "untilSeconds": 23,
+      "domain": "voice",
+      "instruction": "Deliver the word 'NOW.' with emphasis.",
+      "quantities": {
+        "speechRate": "120 wpm"
+      },
+      "whyItReads": "Punctuation of the visual message.",
       "confidence": "observed"
     },
     {
       "atSeconds": 23,
+      "untilSeconds": 24,
+      "domain": "ui",
+      "instruction": "Reveal a pill-shaped UI element containing 'We build.' and a globe icon, glowing with #FF0055 (accent) and #0033FF (accent).",
+      "quantities": {
+        "pillWidth": "30% frame width",
+        "pillHeight": "10% frame height"
+      },
+      "whyItReads": "Introduces the core action.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 23,
+      "untilSeconds": 27,
+      "domain": "voice",
+      "instruction": "Deliver the phrase 'With those who build with obsession, discipline, and raw ambition.' at 120 words per minute.",
+      "quantities": {
+        "speechRate": "120 wpm"
+      },
+      "whyItReads": "Describes the target audience.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 24,
+      "untilSeconds": 27,
+      "domain": "ui",
+      "instruction": "Duplicate the pill UI element, creating a cascading trail that recedes into 3D space along the Z-axis.",
+      "quantities": {
+        "trailCount": "20+",
+        "zDepth": "500px"
+      },
+      "whyItReads": "Suggests scale and multiplicity.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 24,
       "untilSeconds": 27,
       "domain": "camera",
-      "instruction": "Orbit the camera 180 degrees around the central container while translating backward on the Z-axis to reveal an array of 20 identical containers spaced evenly.",
+      "instruction": "Pan the camera upwards and slightly right, following the receding trail of UI elements.",
       "quantities": {
-        "orbitAngle": "180 degrees",
-        "zTranslation": "500% of frame width",
-        "containerCount": "20"
+        "panY": "20% frame height",
+        "panX": "5% frame width"
       },
-      "whyItReads": "Demonstrates scale and multiplicity of the subject matter.",
-      "confidence": "observed"
+      "whyItReads": "Guides the eye through the 3D space.",
+      "confidence": "inferred"
     },
     {
       "atSeconds": 27,
       "untilSeconds": 28,
       "domain": "transition",
-      "instruction": "Scale the Y-axis of all containers to 1% of frame height, merging them into a single horizontal line spanning 100% of frame width.",
+      "instruction": "Compress the trail of UI elements into a single horizontal line spanning the frame width.",
       "quantities": {
-        "targetHeight": "1% of frame height",
-        "duration": "1.00s"
+        "lineWidth": "100% frame width",
+        "lineHeight": "1% frame height"
       },
-      "whyItReads": "Condenses complex 3D geometry into a simple 2D graphic element.",
+      "whyItReads": "Transforms complex elements into a simple graphic.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 27,
+      "untilSeconds": 30,
+      "domain": "voice",
+      "instruction": "Deliver the phrase 'Because human limits aren't lines in the sand.' at 120 words per minute.",
+      "quantities": {
+        "speechRate": "120 wpm"
+      },
+      "whyItReads": "Connects the visual line to the narrative.",
       "confidence": "observed"
     },
     {
       "atSeconds": 28,
-      "untilSeconds": 31,
+      "untilSeconds": 30,
       "domain": "motion",
-      "instruction": "Scale the horizontal line on the Y-axis from 1% to 100% of frame height, filling the screen with the gradient colors.",
+      "instruction": "Hold the horizontal line, glowing with #0033FF (accent) on the left and #FF0055 (accent) on the right.",
       "quantities": {
-        "scaleYStart": "1%",
-        "scaleYEnd": "100%",
-        "duration": "3.00s"
+        "glowIntensity": "50%"
       },
-      "whyItReads": "Washes the screen with color to act as a transitional wipe.",
+      "whyItReads": "Provides a visual anchor for the voiceover.",
+      "confidence": "inferred"
+    },
+    {
+      "atSeconds": 30,
+      "untilSeconds": 31.5,
+      "domain": "motion",
+      "instruction": "Scale the horizontal line vertically from 1% to 100% of frame height on out_expo.",
+      "quantities": {
+        "startScale": "1%",
+        "endScale": "100%",
+        "duration": "1.50s"
+      },
+      "whyItReads": "Expands the line into a full-screen gradient.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 31,
-      "untilSeconds": 33,
-      "domain": "transition",
-      "instruction": "Fade the screen opacity from 100% to 0%, revealing a black background.",
+      "atSeconds": 30,
+      "untilSeconds": 31.5,
+      "domain": "picture",
+      "instruction": "Expand the gradient colors (#0033FF, #FF0055, #8800FF) to fill the screen as the line scales.",
       "quantities": {
-        "opacityStart": "100%",
-        "opacityEnd": "0%",
+        "colors": "#0033FF, #FF0055, #8800FF"
+      },
+      "whyItReads": "Transitions from a line to a full-screen color field.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 30,
+      "untilSeconds": 32.5,
+      "domain": "voice",
+      "instruction": "Deliver the line 'They're the start of something bigger.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Provides narrative context for the visual expansion.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 31.5,
+      "untilSeconds": 32.5,
+      "domain": "picture",
+      "instruction": "Fade the full-screen gradient to #0A0A0A (ground) over 1.00s on linear.",
+      "quantities": {
+        "color": "#0A0A0A",
+        "duration": "1.00s"
+      },
+      "whyItReads": "Clears the screen for the final logo reveal.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 32.5,
+      "untilSeconds": 33.5,
+      "domain": "type",
+      "instruction": "Reveal the logo 'augment.' at 15% of frame height, centered, using a glitch/morph effect from abstract shapes to the final wordmark over 1.00s.",
+      "quantities": {
+        "size": "15%",
+        "duration": "1.00s"
+      },
+      "whyItReads": "Introduces the brand name with a technological feel.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 32.5,
+      "untilSeconds": 33.5,
+      "domain": "picture",
+      "instruction": "Apply a subtle, shifting gradient glow (#0033FF, #FF0055, #8800FF) behind the logo text.",
+      "quantities": {
+        "colors": "#0033FF, #FF0055, #8800FF"
+      },
+      "whyItReads": "Connects the logo to the established color palette.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 33.5,
+      "untilSeconds": 34.5,
+      "domain": "voice",
+      "instruction": "Deliver the word 'augment.' at 120 WPM.",
+      "quantities": {
+        "wpm": "120"
+      },
+      "whyItReads": "Reinforces the brand name audibly.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 34.5,
+      "untilSeconds": 36.5,
+      "domain": "type",
+      "instruction": "Type out the tagline 'A fund for those who rewrite human capability.' at 8% of frame height, centered below the logo, over 2.00s.",
+      "quantities": {
+        "size": "8%",
         "duration": "2.00s"
       },
-      "whyItReads": "Provides a visual reset before the final logo reveal.",
+      "whyItReads": "Provides the brand's mission statement.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 33,
-      "untilSeconds": 34,
-      "domain": "type",
-      "instruction": "Reveal the string 'augment.' at 50% width, 50% height. Morph the vector paths of the characters from abstract curves to standard neo-grotesque letterforms.",
+      "atSeconds": 34.5,
+      "untilSeconds": 37,
+      "domain": "voice",
+      "instruction": "Deliver the line 'a fund for those who rewrite human capability.' at 120 WPM.",
       "quantities": {
-        "fontSize": "15% of frame height",
-        "morphDuration": "1.00s"
+        "wpm": "120"
       },
-      "whyItReads": "Introduces the brand identity with a custom typographic animation.",
+      "whyItReads": "Audibly reinforces the tagline.",
       "confidence": "observed"
     },
     {
-      "atSeconds": 33,
+      "atSeconds": 37,
+      "untilSeconds": 37.5,
+      "domain": "type",
+      "instruction": "Fade in the URL 'www.augment.fund' at 3% of frame height, centered at the bottom of the screen, over 0.50s.",
+      "quantities": {
+        "size": "3%",
+        "duration": "0.50s"
+      },
+      "whyItReads": "Provides a call to action.",
+      "confidence": "observed"
+    },
+    {
+      "atSeconds": 37.5,
       "untilSeconds": 40,
       "domain": "picture",
-      "instruction": "Render a radial gradient glow behind the 'augment.' text. Shift the hue of the gradient continuously through the accent palette.",
+      "instruction": "Hold the final composition (logo, tagline, URL, background glow) static.",
       "quantities": {
-        "glowRadius": "25% of frame height",
-        "hueShiftDuration": "7.00s"
+        "duration": "2.50s"
       },
-      "whyItReads": "Adds visual interest and ties the logo back to the film's color system.",
-      "confidence": "observed"
-    },
-    {
-      "atSeconds": 34,
-      "untilSeconds": 38,
-      "domain": "type",
-      "instruction": "Type on the string 'A fund for those who rewrite human capability.' at 50% width, 60% height.",
-      "quantities": {
-        "fontSize": "6% of frame height",
-        "charactersPerSecond": "12"
-      },
-      "whyItReads": "Delivers the primary proposition statement clearly.",
-      "confidence": "observed"
-    },
-    {
-      "atSeconds": 38,
-      "untilSeconds": 40,
-      "domain": "type",
-      "instruction": "Type on the string 'www.augment.fund' at 50% width, 90% height.",
-      "quantities": {
-        "fontSize": "3% of frame height",
-        "charactersPerSecond": "15"
-      },
-      "whyItReads": "Provides the call to action and destination URL.",
-      "confidence": "observed"
-    },
-    {
-      "atSeconds": 40,
-      "untilSeconds": 40.98,
-      "domain": "type",
-      "instruction": "Hold the word 'augment.' at 50% of frame width and 45% of frame height. Hold the sentence 'A fund for those who rewrite human capability.' at 50% of frame width and 55% of frame height. Hold the URL 'www.augment.fund' at 50% of frame width and 90% of frame height.",
-      "quantities": {
-        "augmentYPercent": "45%",
-        "subheadYPercent": "55%",
-        "urlYPercent": "90%"
-      },
-      "whyItReads": "Provides time to read the final brand lockup.",
+      "whyItReads": "Allows the viewer to read and absorb the final information.",
       "confidence": "observed"
     },
     {
       "atSeconds": 40,
       "untilSeconds": 40.98,
       "domain": "picture",
-      "instruction": "Hold the background spotlight at 50% of frame width and 50% of frame height with 80% radial falloff over a #0A0A0A ground.",
+      "instruction": "Hold background at #0A0A0A. Render 'augment.' at 50% width, 45% height in #8800FF at 12% frame height. Render subtitle at 50% width, 55% height in #FFFFFF at 3% frame height. Render URL at 50% width, 90% height in #FFFFFF at 3% frame height.",
       "quantities": {
-        "spotlightXPercent": "50%",
-        "spotlightYPercent": "50%",
-        "falloffPercent": "80%"
+        "title_y": "45%",
+        "title_size": "12%",
+        "subtitle_y": "55%",
+        "subtitle_size": "3%",
+        "url_y": "90%",
+        "url_size": "3%"
       },
-      "whyItReads": "Maintains visual focus on the center text.",
+      "whyItReads": "Final brand lockup.",
       "confidence": "observed"
     },
     {
       "atSeconds": 40,
       "untilSeconds": 40.98,
       "domain": "sound",
-      "instruction": "Fade the low-frequency synth drone from -24 LUFS to -60 LUFS over 0.98s on a linear curve.",
+      "instruction": "Fade bass drone from -12 LUFS to -48 LUFS over 0.98s on linear curve.",
       "quantities": {
-        "startLevelLUFS": "-24 LUFS",
-        "endLevelLUFS": "-60 LUFS",
-        "durationSeconds": "0.98s"
+        "start_level": "-12 LUFS",
+        "end_level": "-48 LUFS",
+        "duration": "0.98s"
       },
-      "whyItReads": "Concludes the audio track.",
+      "whyItReads": "Audio conclusion.",
       "confidence": "inferred"
     },
     {
       "atSeconds": 40,
       "untilSeconds": 40.98,
       "domain": "motion",
-      "instruction": "Hold all elements at 0 pixels per second velocity.",
+      "instruction": "Maintain 0px movement and 0deg rotation for all elements and camera.",
       "quantities": {
-        "velocityPixelsPerSecond": "0"
+        "movement": "0px",
+        "rotation": "0deg"
       },
-      "whyItReads": "Creates a static end frame.",
-      "confidence": "observed"
-    },
-    {
-      "atSeconds": 40,
-      "untilSeconds": 40.98,
-      "domain": "camera",
-      "instruction": "Hold camera position at 0% amplitude.",
-      "quantities": {
-        "amplitudePercent": "0%"
-      },
-      "whyItReads": "Keeps the frame stable.",
+      "whyItReads": "Static resolution.",
       "confidence": "observed"
     }
   ],
