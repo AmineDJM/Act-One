@@ -55,7 +55,8 @@
     "ingest:references": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/ingest-references.ts",
     "ab:voice": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/ab-voice.ts",
     "compare": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/compare.ts",
-    "captions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/caption-sheet.ts"
+    "captions": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/caption-sheet.ts",
+    "reverse": "NODE_USE_ENV_PROXY=1 vite-node scripts/film/reverse-prompt.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

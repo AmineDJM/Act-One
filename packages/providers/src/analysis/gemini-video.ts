@@ -412,6 +412,106 @@ export class GeminiVideoAnalyst implements VideoAnalyst {
     return { uri: file.uri, mimeType: file.mimeType ?? 'video/mp4' };
   }
 
+  /**
+   * One question about one or more films, streamed, answered as raw text.
+   *
+   * `analyse` asks the question this provider was written around and validates
+   * the answer against a fixed schema, which is right for a reading and wrong
+   * for everything else. Two callers already need something else — our film
+   * beside a reference, and a film transcribed back into the prompt that would
+   * rebuild it — and the first of them hand-rolled its own `generateContent`
+   * request because there was nowhere to put the question.
+   *
+   * That copy is why this exists. It posts UNSTREAMED, so it inherits the
+   * failure the streaming path was built to avoid: a close pass thinks for
+   * minutes before it writes, this deployment's egress proxy cuts about ninety
+   * seconds of silence, and it answers 502 rather than a timeout, which reads
+   * like the vendor being down. A second copy of that mistake was about to be
+   * written, so the streaming path is exposed instead.
+   *
+   * A window may be given per film. The Files API keeps one upload for the
+   * whole film, so asking about 0-20s and then 20-40s costs one upload and two
+   * questions rather than two uploads — which is what makes a second-by-second
+   * pass affordable at all.
+   */
+  async ask(
+    request: {
+      prompt: string;
+      films: readonly {
+        uri: string;
+        mimeType: string;
+        /** Text placed immediately before this film, e.g. "FILM A — ours:". */
+        label?: string;
+        window?: { startSeconds: number; endSeconds: number };
+        fps?: number;
+      }[];
+      depth?: AnalysisDepth;
+      maxOutputTokens?: number;
+      temperature?: number;
+    },
+    context: CallContext,
+  ): Promise<{ text: string; model: string; finishReason?: string; tokens: number }> {
+    if (!this.isConfigured()) {
+      throw new ProviderError(this.name, 'No Gemini credential is configured.', { retryable: false });
+    }
+    const depth: AnalysisDepth = request.depth ?? 'deep';
+    const model = await this.modelFor(depth);
+    const startedAt = Date.now();
+
+    const parts: Record<string, unknown>[] = [{ text: request.prompt }];
+    for (const film of request.films) {
+      if (film.label) parts.push({ text: film.label });
+      const metadata: Record<string, unknown> = {};
+      if (film.window) {
+        metadata['startOffset'] = `${film.window.startSeconds}s`;
+        metadata['endOffset'] = `${film.window.endSeconds}s`;
+      }
+      if (film.fps) metadata['fps'] = film.fps;
+      const fileData = { fileUri: film.uri, mimeType: film.mimeType };
+      parts.push(Object.keys(metadata).length > 0 ? { fileData, videoMetadata: metadata } : { fileData });
+    }
+
+    const answer = await this.generate(
+      model,
+      {
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          maxOutputTokens: request.maxOutputTokens ?? (depth === 'deep' ? 65_536 : 32_768),
+          temperature: request.temperature ?? 0.2,
+        },
+      },
+      depth,
+      context,
+    );
+
+    const candidate = answer.candidates[0];
+    const text = (candidate?.content?.parts ?? []).map((p) => p.text ?? '').join('');
+    const tokens = answer.usageMetadata?.totalTokenCount ?? 0;
+
+    await this.costSink?.record({
+      provider: this.name,
+      model,
+      operation: 'llm.vision',
+      estimatedCostUsd: 0,
+      actualCostUsd: 0,
+      costBasis: 'unknown_price',
+      quantity: tokens,
+      unit: 'token',
+      succeeded: Boolean(text.trim()),
+      metadata: { depth, latencyMs: Date.now() - startedAt, films: request.films.length },
+    });
+
+    if (!text.trim()) {
+      throw new ProviderError(
+        this.name,
+        `The analyst returned nothing${candidate?.finishReason ? ` (${candidate.finishReason})` : ''}.`,
+        { retryable: true },
+      );
+    }
+    return { text, model, ...(candidate?.finishReason ? { finishReason: candidate.finishReason } : {}), tokens };
+  }
+
   private async upload(filePath: string, context: CallContext): Promise<FileResource> {
     const resolved = path.resolve(filePath);
     const info = await stat(resolved).catch(() => null);
