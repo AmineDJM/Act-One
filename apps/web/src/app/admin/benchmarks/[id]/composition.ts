@@ -31,7 +31,9 @@ export function composeWindow(doc: FilmIR, from: number, to: number): string[] {
     return `“${flat.length > max ? `${flat.slice(0, max - 1)}…` : flat}”`;
   };
   // The largest type first: in a film of interface footage, what the eye reads is the headline, not the menu.
-  const bySize = (blocks: typeof blocksHere) => [...blocks].sort((a, b) => (Number(b.metrics.capHeightPx.value) || 0) - (Number(a.metrics.capHeightPx.value) || 0));
+  // By the estimated size, which every line has; a cap height needs glyph outlines and is almost always unknown.
+  const size = (block: (typeof blocksHere)[number]) => Number(block.metrics.approxSizePx.value) || 0;
+  const bySize = (blocks: typeof blocksHere) => [...blocks].sort((a, b) => size(b) - size(a));
   const named = (blocks: typeof blocksHere, count = 3) => {
     const top = bySize(blocks).slice(0, count).map((block) => `${block.id} ${quote(block.text.value)}`);
     return `${top.join(', ')}${blocks.length > count ? ` and ${blocks.length - count} more` : ''}`;
