@@ -294,6 +294,8 @@ const put = await analyst.putFilm(film, context).catch(async (error: Error) => {
 
 /** Twenty seconds: long enough to hold a whole move, short enough to answer whole. */
 const WINDOW = 20;
+/** Ten: what the half-second sampling can actually scan in one answer. */
+const SAMPLE_WINDOW = 10;
 const windows: { from: number; to: number }[] = [];
 for (let at = 0; at < durationSeconds; at += WINDOW) {
   windows.push({ from: at, to: Math.min(durationSeconds, at + WINDOW) });
@@ -386,14 +388,35 @@ console.log(`  the timeline, in ${windows.length} window(s)`);
 const events: unknown[] = [];
 const seconds: unknown[] = [];
 for (const w of windows) {
-  const e = (await run(`events-${w.from}`, windowEvents(w.from, w.to, system), 16_384, w)) as {
+  const e = (await run(`events-${w.from}-${w.to}`, windowEvents(w.from, w.to, system), 16_384, w)) as {
     events?: unknown[];
   };
-  const t = (await run(`seconds-${w.from}`, windowSeconds(w.from, w.to), 12_288, w)) as {
-    seconds?: unknown[];
-  };
   events.push(...(e.events ?? []));
-  seconds.push(...(t.seconds ?? []));
+
+  /*
+   * THE SAMPLING RUNS ON HALF-WINDOWS, AND THAT NUMBER IS MEASURED.
+   *
+   * Asked for twenty seconds at a time it failed three times running at 134s,
+   * 134s and 137s — the same number, which is not a flaky network, it is a
+   * budget. Every other pass over the same window answers in well under that.
+   * The difference is what the question demands: events are things that
+   * happened and the model already knows them, while sampling every half
+   * second REQUIRES IT TO LOOK AT EVERY HALF SECOND, including the ones where
+   * nothing happens, which is the whole point of asking and also the whole
+   * cost. Forty rows of that is more scanning than one answer has room for.
+   *
+   * So ten seconds, twenty rows, and a ceiling small enough that the thinking
+   * cannot outrun the gateway. Twice the calls, each of them cheap, and the
+   * record is continuous — which is what makes it possible to say "nothing
+   * moved here" as a fact rather than as an absence of notes.
+   */
+  for (let from = w.from; from < w.to; from += SAMPLE_WINDOW) {
+    const to = Math.min(w.to, from + SAMPLE_WINDOW);
+    const t = (await run(`seconds-${from}-${to}`, windowSeconds(from, to), 6_144, { from, to })) as {
+      seconds?: unknown[];
+    };
+    seconds.push(...(t.seconds ?? []));
+  }
 }
 
 const at = (x: unknown, key: string) => Number((x as Record<string, number>)[key] ?? 0);
