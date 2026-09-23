@@ -28,6 +28,27 @@ describe('buildNarration', () => {
     expect(built.withheld).toEqual([{ text: 'Thanks for watching', startSeconds: 2.1, endSeconds: 2.9, reason: expect.stringMatching(/heard only by the recogniser/) }]);
   });
 
+  it('withholds a lone word the recogniser itself doubted, even where a voice-like sound was measured', () => {
+    // The Plasma 5.25 benchmark's music outro: Whisper heard "You" and put the chance of no speech at 0.82.
+    const voiced = { ...audio, voiceSpans: [{ startSample: Math.round(2.0 * audio.rate), endSample: Math.round(2.9 * audio.rate), meanProbability: 0.9 }] };
+    const input = { ...transcript([['You', 2.1, 2.8]]), segments: [{ start: 2.1, end: 2.8, text: 'You', noSpeechProbability: 0.82, averageLogProbability: -0.91 }] };
+    const built = buildNarration({ transcript: input, audio: voiced, samples, producer: ASR_PRODUCER });
+    expect(built.narration.words).toEqual([]);
+    expect(built.narration.phrases).toEqual([]);
+    expect(built.narration.present).toMatchObject({ evidenceType: 'ESTIMATED', value: false });
+    expect(built.narration.transcript.evidenceType).toBe('UNKNOWN');
+    expect(built.withheld).toEqual([{ text: 'You', startSeconds: 2.1, endSeconds: 2.8, reason: expect.stringMatching(/only 1 word\(s\) in the whole film, and the recogniser itself put the chance of no speech at 0\.82/) }]);
+  });
+
+  it('keeps a short line the recogniser was sure of, where a voice was measured', () => {
+    const voiced = { ...audio, voiceSpans: [{ startSample: Math.round(2.0 * audio.rate), endSample: Math.round(2.9 * audio.rate), meanProbability: 0.9 }] };
+    const built = buildNarration({ transcript: transcript([['Plasma', 2.1, 2.8]]), audio: voiced, samples, producer: ASR_PRODUCER });
+    expect(built.withheld).toEqual([]);
+    expect(built.narration.words.map((word) => word.text)).toEqual(['Plasma']);
+    expect(built.narration.present).toMatchObject({ evidenceType: 'MEASURED', value: true });
+    expect(built.narration.transcript.value).toBe('Plasma');
+  });
+
   it('keeps a phrase a voice was measured in, and moves its start onto the measured onset', () => {
     const voiced = { ...audio, voiceSpans: [{ startSample: Math.round(2.2 * audio.rate), endSample: Math.round(2.7 * audio.rate), meanProbability: 0.8 }] };
     const built = buildNarration({ transcript: transcript([['The', 2.02, 2.2], ['new', 2.2, 2.45], ['feature', 2.45, 2.9]]), audio: voiced, samples, producer: ASR_PRODUCER });

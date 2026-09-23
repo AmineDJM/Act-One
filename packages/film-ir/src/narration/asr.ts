@@ -85,6 +85,15 @@ const PAUSE_S = 0.25;
 const SNAP_S = 0.12;
 /** Voice activity a run of words must overlap to be heard by two listeners: 100 ms, or a tenth of a shorter run. */
 const CORROBORATION_S = 0.1;
+/**
+ * A film's whole narration in fewer words than this is the size of what a
+ * recogniser most often invents over music ("You", "Thank you."), and a
+ * voice detector fooled by a lead instrument can seem to confirm it. So such
+ * words are kept only where the recogniser itself judged its segment to be
+ * speech: its no-speech probability under this.
+ */
+const FEW_WORDS = 3;
+const JUDGED_SPEECH = 0.5;
 
 export function buildNarration(input: {
   transcript: TranscriptInput;
@@ -107,7 +116,7 @@ export function buildNarration(input: {
   });
   const voice = audio.voiceSpans.map((span) => [span.startSample / audio.rate - BOUNDS_S, span.endSample / audio.rate + BOUNDS_S] as const);
   const withheld: WithheldSpeech[] = [];
-  const kept = runsOf(audible).flatMap((run) => {
+  const corroborated = runsOf(audible).flatMap((run) => {
     const from = run[0]!.start;
     const to = run[run.length - 1]!.end;
     const overlap = voice.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, to) - Math.max(a, from)), 0);
@@ -120,6 +129,24 @@ export function buildNarration(input: {
     });
     return [];
   });
+  const segmentOf = (word: { start: number; end: number }) => {
+    const middle = (word.start + word.end) / 2;
+    return (transcript.segments ?? []).find((segment) => middle >= segment.start && middle <= segment.end) ?? null;
+  };
+  const doubted = corroborated.length > 0 && corroborated.length < FEW_WORDS
+    && corroborated.some((word) => (segmentOf(word)?.noSpeechProbability ?? 1) >= JUDGED_SPEECH);
+  if (doubted) {
+    for (const run of runsOf(corroborated)) {
+      const judged = segmentOf(run[0]!)?.noSpeechProbability;
+      withheld.push({
+        text: run.map((word) => word.word.trim()).join(' ').slice(0, 600),
+        startSeconds: round(run[0]!.start, 3),
+        endSeconds: round(run[run.length - 1]!.end, 3),
+        reason: `only ${corroborated.length} word(s) in the whole film, and the recogniser itself ${judged === null || judged === undefined ? 'gave no judgement that it was speech' : `put the chance of no speech at ${round(judged, 2)}`}: the size and kind of what it invents over music`,
+      });
+    }
+  }
+  const kept = doubted ? [] : corroborated;
 
   const hop = audio.hop / audio.rate;
   const series = (name: string) => audio.series[name] ?? [];
@@ -237,7 +264,8 @@ export function buildNarration(input: {
   const confidence = transcript.segments && transcript.segments.length > 0
     ? mean(transcript.segments.map((segment) => Math.exp(Math.min(0, segment.averageLogProbability ?? -1))))
     : 0.6;
-  const spoken = words.length >= 3;
+  // Every word left was heard by both listeners and, if the film has only a few, judged speech by the recogniser too.
+  const spoken = words.length > 0;
   const narration: NarrationIR = {
     present: spoken
       ? measured(true, 'asr.transcript', [pass], round(confidence, 3), { note: `${words.length} words recognised${discarded ? `, ${discarded} discarded as heard over silence or non-speech` : ''}${withheld.length ? `, ${withheld.length} run(s) withheld as heard by the recogniser alone` : ''}` })
