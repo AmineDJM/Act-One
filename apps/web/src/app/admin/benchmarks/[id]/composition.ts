@@ -31,7 +31,7 @@ export function composeWindow(doc: FilmIR, from: number, to: number): string[] {
     return `“${flat.length > max ? `${flat.slice(0, max - 1)}…` : flat}”`;
   };
   // The largest type first: in a film of interface footage, what the eye reads is the headline, not the menu.
-  // By the estimated size, which every line has; a cap height needs glyph outlines and is almost always unknown.
+  // By the estimated size, which every block has: from its measured cap height or x-height where one was measured, else its box.
   const size = (block: (typeof blocksHere)[number]) => Number(block.metrics.approxSizePx.value) || 0;
   const bySize = (blocks: typeof blocksHere) => [...blocks].sort((a, b) => size(b) - size(a));
   const named = (blocks: typeof blocksHere, count = 3) => {

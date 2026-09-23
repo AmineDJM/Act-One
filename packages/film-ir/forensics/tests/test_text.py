@@ -10,6 +10,7 @@ so what is measured can be checked against where the ink was put.
 """
 import unittest
 
+import cv2
 import numpy as np
 
 from actone_forensics import synthetic, text
@@ -247,6 +248,109 @@ class FragmentsTest(unittest.TestCase):
         ]
         glyphs = glyphs_for(line, read)
         self.assertEqual("".join(g["char"] for g in glyphs), "LAUNCH DAY")
+
+
+class TrackingTest(unittest.TestCase):
+    """
+    A list lifting into place, as windows do into an overview: 90 px in 30
+    frames, far beyond the line's fixed search window (±21 px down here), then
+    held. The line is read on frames 30–39 and its reference frame is 35.
+    """
+    SIZE = (480, 270)
+    FRAMES = 40
+    SETTLED = 110
+
+    def centre(self, frame):
+        return self.SETTLED + 3 * max(0, 30 - frame)
+
+    def film(self, rows):
+        """Each frame: the rows (text, offset from the tracked line) drawn around where the tracked line is."""
+        frames = []
+        for frame in range(self.FRAMES):
+            alphas = [synthetic.place((words, "book", 16, self.centre(frame) + offset, 0), self.SIZE)[0] for words, offset in rows]
+            frames.append(np.clip(np.rint(picture(*alphas)), 0, 255).astype(np.uint8))
+        return frames
+
+    def refine(self, frames, words):
+        alpha, letters, _ = synthetic.place((words, "book", 16, self.SETTLED, 0), self.SIZE)
+        _, box = recognised(alpha, letters)
+        reference = frames[35]
+        line = {"referenceBox": box, "firstRead": 30, "lastRead": 39, "referenceFrame": 35}
+        refiner = text.Refiner([line], [{"grey": reference, "bgr": np.dstack([reference] * 3), "words": []}], *self.SIZE, 25.0, self.FRAMES, [])
+        for index, grey in enumerate(frames):
+            refiner.measure(index, grey)
+        refiner.results()
+        return refiner.state[0]
+
+    def assertFollowed(self, state, frame):
+        sample = next(s for s in state["samples"] if s["frame"] == frame)
+        self.assertTrue(sample["trusted"])
+        self.assertEqual((sample["x"], sample["y"]), (state["origin"][0], state["origin"][1] + self.centre(frame) - self.SETTLED))
+
+    def test_a_line_that_lifts_in_from_beyond_its_search_is_followed_back_from_its_reference_frame(self):
+        state = self.refine(self.film([("Network Rates", 0)]), "Network Rates")
+        self.assertEqual([s["frame"] for s in state["samples"]], list(range(self.FRAMES)))
+        self.assertLess(state["search"][1], 90)
+        for frame in range(self.FRAMES):
+            with self.subTest(frame=frame):
+                self.assertFollowed(state, frame)
+
+    def test_a_look_alike_where_the_line_settles_does_not_take_its_place(self):
+        # "20:48" sits a row above "20:42": on frame 20, exactly where "20:42" will settle.
+        state = self.refine(self.film([("20:42", 0), ("20:48", -30)]), "20:42")
+        for frame in range(self.FRAMES):
+            with self.subTest(frame=frame):
+                self.assertFollowed(state, frame)
+
+    def test_a_blurred_copy_walking_away_is_not_followed_off_the_screen(self):
+        # Before the line cuts in on frame 30, a blurred copy of it (a match of 0.69, trusted but not followed)
+        # walks right 60 px a frame from where the line will be: out of the fixed window's reach (±240 px
+        # across, a quarter of the width) on frame 24.
+        size = (960, 270)
+        alpha, letters, _ = synthetic.place(("Network Rates", "book", 16, self.SETTLED, 0), size)
+        crisp = np.clip(np.rint(picture(alpha)), 0, 255).astype(np.uint8)
+        blurred = cv2.GaussianBlur(crisp, (0, 0), 1.5)
+        frames = []
+        for frame in range(self.FRAMES):
+            if frame >= 30:
+                frames.append(crisp)
+            else:
+                shifted = np.full_like(blurred, int(GROUND))
+                step = 60 * (29 - frame)
+                if step < size[0]:
+                    shifted[:, step:] = blurred[:, : size[0] - step]
+                frames.append(shifted)
+        _, box = recognised(alpha, letters)
+        line = {"referenceBox": box, "firstRead": 30, "lastRead": 39, "referenceFrame": 35}
+        refiner = text.Refiner([line], [{"grey": crisp, "bgr": np.dstack([crisp] * 3), "words": []}], *size, 25.0, self.FRAMES, [])
+        for index, grey in enumerate(frames):
+            refiner.measure(index, grey)
+        refiner.results()
+        state = refiner.state[0]
+        (ox, oy), (sx, sy) = state["origin"], state["search"]
+        copy = next(s for s in state["samples"] if s["frame"] == 29)
+        self.assertTrue(text.MATCH_TRUSTED <= copy["match"] < text.MATCH_FOLLOW)
+        for s in state["samples"]:
+            if s.get("trusted"):
+                with self.subTest(frame=s["frame"]):
+                    self.assertLessEqual(abs(s["x"] - ox), sx)
+                    self.assertLessEqual(abs(s["y"] - oy), sy)
+
+    def test_frames_past_the_cap_are_read_from_the_fixed_window_as_they_came(self):
+        cap = text.TRACK_BUFFER_FRAMES
+        text.TRACK_BUFFER_FRAMES = 5
+        try:
+            state = self.refine(self.film([("Network Rates", 0)]), "Network Rates")
+        finally:
+            text.TRACK_BUFFER_FRAMES = cap
+        self.assertEqual([s["frame"] for s in state["samples"]], list(range(self.FRAMES)))
+        reach = state["search"][1]
+        for frame in range(self.FRAMES):
+            with self.subTest(frame=frame):
+                # The five frames held, and every frame the fixed window reaches, are placed; frame 0, 90 px off, is not.
+                if frame >= 30 or self.centre(frame) - self.SETTLED <= reach:
+                    self.assertFollowed(state, frame)
+        self.assertFalse(state["samples"][0]["trusted"])
 
 
 if __name__ == "__main__":

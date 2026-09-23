@@ -28,6 +28,14 @@ REFINE_WIDTH = 960
 INK_THRESHOLD = 28
 # Below this normalised cross-correlation the best match is not the line.
 MATCH_TRUSTED = 0.6
+# A line is followed from where it matched only at this or better. Between the two, a blurred line and a
+# patch of something else match alike, and following them walks the search off across the screen: on the
+# Plasma film, "Add" behind a blurred title card was carried 1,200 px in five frames.
+MATCH_FOLLOW = 0.8
+# Frames held back so a line can be tracked back from its reference frame: 10 s at 25 fps, 130 MB of grey at
+# the refining width. On the Plasma film no line needed more than 174. Where a line's window starts further
+# back, the frames that do not fit are measured from its fixed search window alone, as they arrive.
+TRACK_BUFFER_FRAMES = 250
 # In place, below this correlation the ink there belongs to something else.
 IN_PLACE_FLOOR = 0.15
 MIN_SCORE = 0.5
@@ -871,7 +879,21 @@ def group_blocks(lines):
 
 
 class Refiner:
-    """Measures every text line on every frame of its window, in one sequential decode."""
+    """
+    Measures every text line on every frame of its window, in one sequential decode.
+
+    A line is tracked outward from its reference frame, the frame its template
+    was cut from and so the one frame where it is known to be: back to the
+    start of its window, then on to the end. Each frame is searched over the
+    line's fixed window around its reference position and, where the line
+    matched well on the neighbouring frame, over the same window around there;
+    the best match of either wins. The fixed window alone loses a line that
+    moves further than it reaches, as windows lifting into an overview do;
+    following alone carries a look-alike found once from frame to frame. On
+    the Plasma film, against the whole frame's best match where that was 0.95
+    or better, the fixed window alone placed 75% of the samples of the lines
+    this changes, and this 98%.
+    """
 
     def __init__(self, lines, references, width, height, fps, frame_count, cuts):
         self.scale = min(REFINE_WIDTH, width) / float(width)
@@ -879,6 +901,8 @@ class Refiner:
         self.fps = fps
         self.lines = lines
         self.state = []
+        # Frames kept for tracking back from reference frames not yet decoded.
+        self.held = {}
         look = int(round(LOOK_SECONDS * fps))
         # Only a hard cut ends a line's window: across a fade or a dissolve the
         # line may be part of the transition itself.
@@ -927,7 +951,9 @@ class Refiner:
                 "sharpness": sharpness,
                 "inkColour": [float(ink_colour[2]), float(ink_colour[1]), float(ink_colour[0])] if ink_colour is not None else None,
                 "window": (int(window_start), int(window_end)),
+                "reference": int(min(max(line["referenceFrame"], window_start), window_end)),
                 "search": (max(int(2 * h), int(0.25 * self.width * self.scale)), max(int(1.5 * h), int(0.06 * self.height * self.scale))),
+                "near": None,
                 "words": words,
                 "samples": [],
             })
@@ -935,110 +961,135 @@ class Refiner:
     def windows(self):
         return [state["window"] for state in self.state if state is not None]
 
-    @staticmethod
-    def _near_last(state, grey, template):
-        """
-        The line where it was on the frame before, when it is still there.
-
-        The full search spans a quarter of the frame's width either side, for
-        a line that moves; most lines, most of the time, hold still, and are
-        found within half their height of where they were. That match is
-        taken only when it is trusted and not at the edge of the small window
-        — a line moving further than that is looked for across the whole
-        search, as before. Near where it was, too, a line is not mistaken for
-        the same words elsewhere on the screen.
-        """
-        last = state.get("last")
-        if last is None:
-            return None
-        th, tw = template.shape
-        margin_x, margin_y = max(4, th // 2), max(3, th // 2)
-        lx, ly = last
-        x0, y0 = max(0, lx - margin_x), max(0, ly - margin_y)
-        x1, y1 = min(grey.shape[1], lx + tw + margin_x), min(grey.shape[0], ly + th + margin_y)
-        region = grey[y0:y1, x0:x1]
-        if region.shape[0] < th or region.shape[1] < tw:
-            return None
-        scores = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
-        _, best, _, (mx, my) = cv2.minMaxLoc(scores)
-        at_edge = (mx == 0 and x0 > 0) or (my == 0 and y0 > 0) or (mx == scores.shape[1] - 1 and x1 < grey.shape[1]) or (my == scores.shape[0] - 1 and y1 < grey.shape[0])
-        if best < MATCH_TRUSTED or at_edge:
-            return None
-        return region, x0, y0, best, (mx, my)
-
     def measure(self, frame_index, grey):
+        """
+        One decoded frame, in order. A line's frames before its reference frame
+        are held until that frame comes, and then read back from it, nearest
+        first; from there on, each frame is read as it comes.
+        """
+        waiting = False
         for state in self.state:
             if state is None:
                 continue
             start, end = state["window"]
             if frame_index < start or frame_index > end:
                 continue
-            template = state["template"]
-            th, tw = template.shape
-            ox, oy = state["origin"]
-            found = self._near_last(state, grey, template)
-            if found is None:
-                sx, sy = state["search"]
-                x0, y0 = max(0, ox - sx), max(0, oy - sy)
-                x1, y1 = min(grey.shape[1], ox + tw + sx), min(grey.shape[0], oy + th + sy)
-                region = grey[y0:y1, x0:x1]
-                if region.shape[0] < th or region.shape[1] < tw:
-                    state["samples"].append({"frame": frame_index, "match": None})
-                    continue
-                scores = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
-                _, best, _, location = cv2.minMaxLoc(scores)
+            reference = state["reference"]
+            if frame_index < reference:
+                waiting = True
+            elif frame_index == reference:
+                near = state["near"] = self._sample(state, frame_index, grey, None)
+                for past in range(frame_index - 1, start - 1, -1):
+                    if past not in self.held:
+                        # Let go before this frame came, and read then as it stood.
+                        break
+                    near = self._sample(state, past, self.held[past], near)
+                state["anchored"] = True
+                state["samples"].sort(key=lambda sample: sample["frame"])
             else:
-                region, x0, y0, best, location = found
-            mx, my = location
-            matched = best >= MATCH_TRUSTED
-            state["last"] = (x0 + mx, y0 + my) if matched else None
-            # Where the line is measured: where it matches, when the match can be
-            # trusted; otherwise where it will settle. Never the best match of a
-            # template that matches nothing, which lands on whatever else is there.
-            if matched:
-                crop = region[my: my + th, mx: mx + tw].astype(np.float32)
+                state["near"] = self._sample(state, frame_index, grey, state["near"])
+        if waiting:
+            self.held[frame_index] = grey
+        self._let_go(frame_index)
+
+    def _let_go(self, current):
+        """
+        Drops the frames no line waits for. Past the cap, the oldest held frame
+        is read from each waiting line's fixed window as it stands, then dropped.
+        """
+        if not self.held:
+            return
+        waiting = [state for state in self.state if state is not None and not state.get("anchored") and state["window"][0] <= current]
+        oldest = min((state["window"][0] for state in waiting), default=None)
+        for frame in sorted(self.held):
+            if oldest is None or frame < oldest:
+                del self.held[frame]
+            elif len(self.held) > TRACK_BUFFER_FRAMES:
+                for state in waiting:
+                    if state["window"][0] <= frame:
+                        self._sample(state, frame, self.held[frame], None)
+                del self.held[frame]
             else:
-                py, px = oy - y0, ox - x0
-                crop = region[py: py + th, px: px + tw].astype(np.float32)
-                if crop.shape != template.shape:
-                    state["samples"].append({"frame": frame_index, "match": float(best)})
-                    continue
-            border = np.concatenate([crop[0], crop[-1], crop[:, 0], crop[:, -1]])
-            background = float(np.median(border))
-            contrast = float(np.abs(crop - background)[state["ink"]].mean())
-            if not matched:
-                # In place, the ink counts only as far as it still looks like this
-                # line: a line half wiped on correlates with its template, another
-                # line set in the same place does not.
-                similarity = float(cv2.matchTemplate(crop.astype(np.uint8), template, cv2.TM_CCOEFF_NORMED)[0, 0])
-                contrast *= max(0.0, min(1.0, (similarity - IN_PLACE_FLOOR) / (MATCH_TRUSTED - IN_PLACE_FLOOR)))
-            sharpness = float(cv2.Laplacian(crop.astype(np.uint8), cv2.CV_64F).var())
-            words = []
-            for word in state["words"]:
-                wy0, wy1, wx0, wx1 = word["slice"]
-                patch = crop[wy0:wy1, wx0:wx1]
-                word_ink = state["ink"][wy0:wy1, wx0:wx1]
-                words.append(float(np.abs(patch - background)[word_ink].mean()) / word["contrast"] if word["contrast"] > 0 else None)
-            ink_box = None
-            if matched:
-                window = np.abs(crop - background) > INK_THRESHOLD
-                if window.any():
-                    ys, xs = np.nonzero(window)
-                    ink_box = [(x0 + mx + float(xs.min())) / self.scale, (y0 + my + float(ys.min())) / self.scale,
-                               float(xs.max() - xs.min() + 1) / self.scale, float(ys.max() - ys.min() + 1) / self.scale]
-            state["samples"].append({
-                "frame": frame_index,
-                "match": float(best),
-                "trusted": bool(matched),
-                "x": (x0 + mx) / self.scale if matched else None,
-                "y": (y0 + my) / self.scale if matched else None,
-                "opacity": contrast / state["contrast"] if state["contrast"] > 0 else None,
-                "blur": sharpness / state["sharpness"] if state["sharpness"] > 0 else None,
-                "inkBox": ink_box,
-                "words": words,
-            })
+                break
+
+    def _sample(self, state, frame_index, grey, near):
+        """
+        The line on one frame, searched over its fixed window and, given where
+        it was on the neighbouring frame, over the same window around there.
+        Returns where it matched, when that match is good enough to follow.
+        """
+        template = state["template"]
+        th, tw = template.shape
+        ox, oy = state["origin"]
+        sx, sy = state["search"]
+        left, top, right, bottom = ox, oy, ox, oy
+        if near is not None:
+            left, top, right, bottom = min(ox, near[0]), min(oy, near[1]), max(ox, near[0]), max(oy, near[1])
+        x0, y0 = max(0, left - sx), max(0, top - sy)
+        x1, y1 = min(grey.shape[1], right + tw + sx), min(grey.shape[0], bottom + th + sy)
+        region = grey[y0:y1, x0:x1]
+        if region.shape[0] < th or region.shape[1] < tw:
+            state["samples"].append({"frame": frame_index, "match": None})
+            return None
+        scores = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
+        _, best, _, (mx, my) = cv2.minMaxLoc(scores)
+        matched = best >= MATCH_TRUSTED
+        # Where the line is measured: where it matches, when the match can be
+        # trusted; otherwise where it will settle. Never the best match of a
+        # template that matches nothing, which lands on whatever else is there.
+        if matched:
+            crop = region[my: my + th, mx: mx + tw].astype(np.float32)
+        else:
+            py, px = oy - y0, ox - x0
+            crop = region[py: py + th, px: px + tw].astype(np.float32)
+            if crop.shape != template.shape:
+                state["samples"].append({"frame": frame_index, "match": float(best)})
+                return None
+        border = np.concatenate([crop[0], crop[-1], crop[:, 0], crop[:, -1]])
+        background = float(np.median(border))
+        contrast = float(np.abs(crop - background)[state["ink"]].mean())
+        if not matched:
+            # In place, the ink counts only as far as it still looks like this
+            # line: a line half wiped on correlates with its template, another
+            # line set in the same place does not.
+            similarity = float(cv2.matchTemplate(crop.astype(np.uint8), template, cv2.TM_CCOEFF_NORMED)[0, 0])
+            contrast *= max(0.0, min(1.0, (similarity - IN_PLACE_FLOOR) / (MATCH_TRUSTED - IN_PLACE_FLOOR)))
+        sharpness = float(cv2.Laplacian(crop.astype(np.uint8), cv2.CV_64F).var())
+        words = []
+        for word in state["words"]:
+            wy0, wy1, wx0, wx1 = word["slice"]
+            patch = crop[wy0:wy1, wx0:wx1]
+            word_ink = state["ink"][wy0:wy1, wx0:wx1]
+            words.append(float(np.abs(patch - background)[word_ink].mean()) / word["contrast"] if word["contrast"] > 0 else None)
+        ink_box = None
+        if matched:
+            window = np.abs(crop - background) > INK_THRESHOLD
+            if window.any():
+                ys, xs = np.nonzero(window)
+                ink_box = [(x0 + mx + float(xs.min())) / self.scale, (y0 + my + float(ys.min())) / self.scale,
+                           float(xs.max() - xs.min() + 1) / self.scale, float(ys.max() - ys.min() + 1) / self.scale]
+        state["samples"].append({
+            "frame": frame_index,
+            "match": float(best),
+            "trusted": bool(matched),
+            "x": (x0 + mx) / self.scale if matched else None,
+            "y": (y0 + my) / self.scale if matched else None,
+            "opacity": contrast / state["contrast"] if state["contrast"] > 0 else None,
+            "blur": sharpness / state["sharpness"] if state["sharpness"] > 0 else None,
+            "inkBox": ink_box,
+            "words": words,
+        })
+        return (x0 + mx, y0 + my) if best >= MATCH_FOLLOW else None
 
     def results(self):
+        # A decode that ended before a line's reference frame leaves its held frames: read as they stand.
+        for state in self.state:
+            if state is not None and not state.get("anchored"):
+                for frame in sorted(self.held):
+                    if state["window"][0] <= frame <= state["window"][1]:
+                        self._sample(state, frame, self.held[frame], None)
+                state["samples"].sort(key=lambda sample: sample["frame"])
+        self.held.clear()
         out = []
         for line, state in zip(self.lines, self.state):
             if state is None:
