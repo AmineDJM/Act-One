@@ -21,6 +21,12 @@ export type GeminiConfig = {
   baseUrl?: string;
   model?: string;
   costSink?: CostSink;
+  /**
+   * The egress proxy adds the key to every request bound for the vendor, so
+   * this process legitimately holds none. Defaults to
+   * `ACT_ONE_GEMINI_KEY_FROM_PROXY=1`.
+   */
+  keyFromProxy?: boolean;
 };
 
 export type GeminiFile = { name: string; uri: string; mimeType: string; expiresAt: string | null };
@@ -75,13 +81,19 @@ export class GeminiVideoProvider {
   private readonly baseUrl: string;
   readonly model: string;
   private readonly costSink: CostSink | undefined;
+  private readonly keyFromProxy: boolean;
 
   constructor(config: GeminiConfig = {}) {
-    // The key may be empty: an egress proxy that injects it is a supported deployment.
-    this.apiKey = config.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? '';
+    this.apiKey = (config.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? '').trim();
     this.baseUrl = (config.baseUrl ?? process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
     this.model = config.model ?? process.env.ACT_ONE_GEMINI_MODEL ?? DEFAULT_MODEL;
     this.costSink = config.costSink;
+    this.keyFromProxy = config.keyFromProxy ?? process.env.ACT_ONE_GEMINI_KEY_FROM_PROXY === '1';
+  }
+
+  /** A key of its own, or an egress proxy the operator says adds one. */
+  isConfigured(): boolean {
+    return this.apiKey.length > 0 || this.keyFromProxy;
   }
 
   async health(): Promise<ProviderHealth> {

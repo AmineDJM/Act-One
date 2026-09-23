@@ -44,6 +44,7 @@ export * from './domain/handover.ts';
 export * from './domain/replan.ts';
 export * from './domain/project.ts';
 export * from './domain/job.ts';
+export * from './domain/benchmark.ts';
 export * from './domain/progress.ts';
 export * from './domain/activity.ts';
 export * from './domain/voice.ts';

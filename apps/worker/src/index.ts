@@ -228,6 +228,7 @@ async function checkCredentials(config: WorkerConfig): Promise<void> {
     'higgsfield',
     'supabase',
     'elevenlabs',
+    'gemini',
   ]);
   const unreadable = audited.filter((entry) => entry.state === 'unreadable');
   if (unreadable.length > 0) {

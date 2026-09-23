@@ -37,6 +37,7 @@ import type {
   Referral,
   Article,
   ArticleTopic,
+  Benchmark,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -78,7 +79,7 @@ import type {
   User,
   Variant,
 } from '@act-one/core';
-import type { ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
+import type { ArticleQuery, AssetProjectLink, BenchmarkQuery, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 /**
  * In-memory Store.
@@ -117,6 +118,7 @@ export class MemoryStore implements Store {
     referrals: new Map<string, Referral>(),
     articles: new Map<string, Article>(),
     topics: new Map<string, ArticleTopic>(),
+    benchmarks: new Map<string, Benchmark>(),
     renders: new Map<string, Render>(),
     variants: new Map<string, Variant & { organizationId: string }>(),
     qaReports: new Map<string, QaReport & { organizationId: string }>(),
@@ -320,6 +322,50 @@ export class MemoryStore implements Store {
     countByStatus: async () => {
       const counts: Record<string, number> = {};
       for (const article of this.tables.articles.values()) counts[article.status] = (counts[article.status] ?? 0) + 1;
+      return counts;
+    },
+  };
+
+  readonly benchmarks = {
+    create: async (benchmark: Benchmark) => {
+      for (const existing of this.tables.benchmarks.values()) {
+        if (existing.source.sha256 === benchmark.source.sha256) throw new AppError('conflict', 'That film is already in the library.');
+      }
+      this.tables.benchmarks.set(benchmark.id, structuredClone(benchmark));
+      return benchmark;
+    },
+    get: async (id: string) => {
+      const found = this.tables.benchmarks.get(id);
+      return found ? structuredClone(found) : null;
+    },
+    getBySha256: async (sha256: string) => {
+      const found = [...this.tables.benchmarks.values()].find((benchmark) => benchmark.source.sha256 === sha256);
+      return found ? structuredClone(found) : null;
+    },
+    list: async (query: BenchmarkQuery = {}) =>
+      matchingBenchmarks([...this.tables.benchmarks.values()], query)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+        .slice(query.offset ?? 0, (query.offset ?? 0) + Math.min(Math.max(query.limit ?? 100, 1), 500))
+        .map((benchmark) => structuredClone(benchmark)),
+    count: async (query: Omit<BenchmarkQuery, 'limit' | 'offset'> = {}) => matchingBenchmarks([...this.tables.benchmarks.values()], query).length,
+    update: async (id: string, patch: Partial<Benchmark>) => {
+      const existing = this.require(this.tables.benchmarks.get(id), 'Benchmark');
+      const next: Benchmark = { ...structuredClone(existing), ...structuredClone(patch), id, updatedAt: new Date().toISOString() };
+      this.tables.benchmarks.set(id, next);
+      return structuredClone(next);
+    },
+    mutate: async (id: string, change: (current: Benchmark) => Benchmark) => {
+      const existing = this.require(this.tables.benchmarks.get(id), 'Benchmark');
+      const next: Benchmark = { ...change(structuredClone(existing)), id, updatedAt: new Date().toISOString() };
+      this.tables.benchmarks.set(id, next);
+      return structuredClone(next);
+    },
+    delete: async (id: string) => {
+      this.tables.benchmarks.delete(id);
+    },
+    countByStatus: async () => {
+      const counts: Record<string, number> = {};
+      for (const benchmark of this.tables.benchmarks.values()) counts[benchmark.status] = (counts[benchmark.status] ?? 0) + 1;
       return counts;
     },
   };
@@ -1711,4 +1757,14 @@ function haystack(asset: Asset): string {
   return [asset.name, asset.description, asset.category, asset.source, asset.sourceUrl ?? '', ...asset.tags, asset.contentType]
     .join(' ')
     .toLowerCase();
+}
+
+function matchingBenchmarks(all: Benchmark[], query: Omit<BenchmarkQuery, 'limit' | 'offset'>): Benchmark[] {
+  const statuses = query.status === undefined ? null : Array.isArray(query.status) ? query.status : [query.status];
+  const needle = query.search?.trim().toLowerCase() ?? '';
+  return all.filter((benchmark) =>
+    (!statuses || statuses.includes(benchmark.status)) &&
+    (!query.retrieval || benchmark.retrieval === query.retrieval) &&
+    (!needle || benchmark.title.toLowerCase().includes(needle) || benchmark.source.fileName.toLowerCase().includes(needle)),
+  );
 }

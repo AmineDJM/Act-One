@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ForensicReport } from './report.ts';
+import { ForensicProbe, ForensicReport } from './report.ts';
 
 /**
  * Running the forensic analyzer.
@@ -109,6 +109,41 @@ export async function runForensics(filmPath: string, options: ForensicsRunOption
   if (!parsed.success) {
     const first = parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
     throw new ForensicsError(`The analyzer's report is not what this version reads: ${first}`, false);
+  }
+  return parsed.data;
+}
+
+/**
+ * The container's own account of a film: streams, codecs, declared rates and
+ * durations. Seconds, not minutes, so the library can say what a film is
+ * before its analysis has started. A file the container library cannot open
+ * is not a film, and trying again will not make it one.
+ */
+export async function probeFilm(filmPath: string, options: { python?: string; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<ForensicProbe> {
+  const result = await run(pythonBinary(options.python), ['-m', 'actone_forensics.probe', filmPath], {
+    cwd: FORENSICS_DIR,
+    env: { ...process.env, PYTHONPATH: FORENSICS_DIR },
+    timeoutMs: options.timeoutMs ?? 120_000,
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+  if (result.killedBy === 'abort') throw new ForensicsError('The probe was cancelled.', false);
+  if (result.killedBy === 'timeout') throw new ForensicsError('The probe took longer than two minutes.', true);
+  if (result.code !== 0) {
+    const tail = result.stderr.trim().split('\n').slice(-2).join(' | ');
+    const unreadable = /Invalid data|moov atom not found|could not find codec|no video stream|StopIteration|'NoneType'/i.test(result.stderr);
+    throw new ForensicsError(unreadable ? `The file is not a film the analyzer can read: ${tail.slice(0, 400)}` : `The probe stopped (exit ${result.code}): ${tail.slice(0, 400)}`, !unreadable);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(result.stdout.trim().split('\n').pop() ?? '');
+  } catch {
+    throw new ForensicsError('The probe did not answer in JSON.', true);
+  }
+  const parsed = ForensicProbe.safeParse(raw);
+  if (!parsed.success) {
+    // Most often: no video stream at all, which the schema requires.
+    const first = parsed.error.issues.slice(0, 2).map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+    throw new ForensicsError(`The file has no video stream the analyzer can use (${first}).`, false);
   }
   return parsed.data;
 }

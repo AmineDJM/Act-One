@@ -71,7 +71,7 @@ export async function buildRegistry(
   const parsed = ProviderConfig.safeParse(settings.providerConfig);
   const providerConfig = parsed.success ? parsed.data : DEFAULT_PROVIDER_CONFIG;
 
-  const credentials = await readAll(config, ['openai', 'browserbase', 'higgsfield', 'supabase', 'elevenlabs']);
+  const credentials = await readAll(config, ['openai', 'browserbase', 'higgsfield', 'supabase', 'elevenlabs', 'gemini']);
   const costSink = new DbCostSink(config.store, scope);
 
   const {
@@ -83,6 +83,7 @@ export async function buildRegistry(
     ElevenLabsProvider,
     SupabaseStorageProvider,
     LocalFsStorageProvider,
+    GeminiVideoProvider,
   } = await import('@act-one/providers');
 
   const browserbase = credentials['browserbase'] ?? {};
@@ -90,6 +91,7 @@ export async function buildRegistry(
   const supabase = credentials['supabase'] ?? {};
   const openai = credentials['openai'] ?? {};
   const elevenlabs = credentials['elevenlabs'] ?? {};
+  const gemini = new GeminiVideoProvider({ apiKey: credentials['gemini']?.['apiKey'] ?? '', costSink });
 
   return new ProviderRegistry({
     config: providerConfig,
@@ -133,6 +135,8 @@ export async function buildRegistry(
               })
           : null,
       }),
+      // The benchmark library's reader; without a key its films are read by the measurements alone.
+      video: gemini.isConfigured() ? gemini : null,
       storage:
         supabase['url'] && supabase['serviceKey']
           ? new SupabaseStorageProvider({
@@ -235,6 +239,8 @@ function fromEnv(provider: string): Record<string, string> {
       });
     case 'elevenlabs':
       return clean({ apiKey: pick('ELEVENLABS_API_KEY') });
+    case 'gemini':
+      return clean({ apiKey: pick('GEMINI_API_KEY') ?? pick('GOOGLE_API_KEY') });
     default:
       return {};
   }

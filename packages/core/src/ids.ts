@@ -57,7 +57,10 @@ export type IdPrefix =
   | 'ddn'
   | 'cev'
   | 'cpf'
-  | 'sig';
+  | 'sig'
+  /* The benchmark library: a reference film, and one analysis run of it. */
+  | 'bmk'
+  | 'bmr';
 
 /**
  * Prefixed, sortable-ish ids. The timestamp prefix keeps ids roughly ordered by

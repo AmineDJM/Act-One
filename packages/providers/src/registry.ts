@@ -15,6 +15,7 @@ import type { MusicComposer, SoundEffectEngine, SpeechAligner, SpeechProvider, S
 import { LocalFsStorageProvider } from './storage/local.ts';
 import { SupabaseStorageProvider } from './storage/supabase.ts';
 import type { StorageProvider } from './storage/types.ts';
+import { GeminiVideoProvider } from './video/gemini.ts';
 
 /**
  * Runtime provider configuration, owned by Super Admin.
@@ -156,6 +157,8 @@ export type RegistryOptions = {
     soundEffects: SoundEffectEngine;
     aligner: SpeechAligner;
     storage: StorageProvider;
+    /** Watches films for the benchmark library; null says there is none. */
+    video: GeminiVideoProvider | null;
   }>;
 };
 
@@ -328,6 +331,20 @@ export class ProviderRegistry {
       if (elevenlabs.isConfigured()) return elevenlabs;
     }
     return new OpenAiSpeechProvider({ costSink: this.costSink });
+  }
+
+  /**
+   * The multimodal model that watches and listens to a film, for the
+   * benchmark library — or nothing, when no key is configured. Null rather
+   * than a failure: a benchmark read without it is still read, by the
+   * measurements, and its FilmIR says which passes did not run.
+   */
+  videoOrNull(): GeminiVideoProvider | null {
+    if (this.overrides && 'video' in this.overrides) return this.overrides.video ?? null;
+    return this.memo('video', () => {
+      const gemini = new GeminiVideoProvider({ costSink: this.costSink });
+      return gemini.isConfigured() ? gemini : null;
+    });
   }
 
   storage(): StorageProvider {

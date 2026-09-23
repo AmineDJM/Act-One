@@ -115,3 +115,18 @@ def probe(path):
         return info
     finally:
         container.close()
+
+
+def main(argv=None):
+    """python3 -m actone_forensics.probe FILM — the container's own account of the file, as JSON."""
+    import json
+    import sys
+
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1:
+        raise SystemExit("usage: python3 -m actone_forensics.probe FILM")
+    print(json.dumps(probe(args[0])))
+
+
+if __name__ == "__main__":
+    main()

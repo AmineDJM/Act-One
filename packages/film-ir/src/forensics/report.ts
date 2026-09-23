@@ -222,6 +222,19 @@ const StreamAudio = z.object({
   bitRate: z.number().int().nonnegative().nullable(),
 });
 
+/** What the container says about the file, before a single frame is decoded. */
+export const ForensicProbe = z.object({
+  formatName: z.string(),
+  formatLongName: z.string().nullable(),
+  containerDuration: Rational.nullable(),
+  containerBitRate: z.number().int().nullable(),
+  tags: z.record(z.string(), z.string()),
+  video: StreamVideo,
+  audio: z.array(StreamAudio),
+  other: z.array(z.object({ index: z.number().int(), kind: z.string(), codec: z.string().nullable() })),
+});
+export type ForensicProbe = z.infer<typeof ForensicProbe>;
+
 export const ForensicReport = z
   .object({
     analyzer: z.object({
@@ -236,16 +249,7 @@ export const ForensicReport = z
       seconds: Num,
     }),
     input: z.object({ sha256: z.string().regex(/^[0-9a-f]{64}$/), bytes: z.number().int().positive(), filename: z.string() }),
-    probe: z.object({
-      formatName: z.string(),
-      formatLongName: z.string().nullable(),
-      containerDuration: Rational.nullable(),
-      containerBitRate: z.number().int().nullable(),
-      tags: z.record(z.string(), z.string()),
-      video: StreamVideo,
-      audio: z.array(StreamAudio),
-      other: z.array(z.object({ index: z.number().int(), kind: z.string(), codec: z.string().nullable() })),
-    }),
+    probe: ForensicProbe,
     video: z.object({
       width: z.number().int().positive(),
       height: z.number().int().positive(),

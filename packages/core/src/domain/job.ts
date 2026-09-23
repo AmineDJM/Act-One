@@ -44,8 +44,17 @@ export const JobKind = z.enum([
   'generate_copy',
   'produce_audio',
   'localise_film',
+  /*
+   * A reference film in the benchmark library, read into a FilmIR. A platform
+   * job: it belongs to no project, runs under the platform's own workspace
+   * and never touches a customer's work.
+   */
+  'analyze_benchmark',
 ]);
 export type JobKind = z.infer<typeof JobKind>;
+
+/** Jobs that belong to the platform rather than to a project. */
+export const PLATFORM_JOBS: readonly JobKind[] = ['analyze_benchmark'];
 
 export const Job = z.object({
   id: z.string(),
@@ -100,7 +109,7 @@ export function jobIsTerminal(state: JobState): boolean {
 export const SIDE_ERRAND_JOBS: readonly JobKind[] = ['render_animatic', 'generate_copy', 'localise_film'];
 
 export function jobAdvancesProject(kind: JobKind): boolean {
-  return !SIDE_ERRAND_JOBS.includes(kind);
+  return !SIDE_ERRAND_JOBS.includes(kind) && !PLATFORM_JOBS.includes(kind);
 }
 
 /** Exponential backoff with jitter, capped. Keeps a bad provider from hammering us. */

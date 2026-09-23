@@ -96,6 +96,16 @@ export const PROVIDER_SLOTS = [
     docsUrl: 'https://elevenlabs.io/app/settings/api-keys',
   },
   {
+    id: 'gemini',
+    label: 'Google Gemini',
+    purpose:
+      'Watches and listens to the films in the Benchmark Library: ten focused passes and an integration over each reference film, kept in its FilmIR only where they cite what was measured. Optional. Without it a benchmark is read by the measurements alone and its FilmIR is marked partial.',
+    required: false,
+    fields: [{ key: 'apiKey', label: 'API key', placeholder: 'AIza…', secret: true, envVar: 'GEMINI_API_KEY' }],
+    envFallback: 'GEMINI_API_KEY',
+    docsUrl: 'https://aistudio.google.com/app/apikey',
+  },
+  {
     id: 'stripe',
     label: 'Stripe',
     purpose: 'Subscriptions, credits and the customer billing portal.',
@@ -297,6 +307,7 @@ export async function testProvider(id: ProviderSlotId): Promise<ProviderHealth> 
     HiggsfieldProvider,
     ElevenLabsProvider,
     SupabaseStorageProvider,
+    GeminiVideoProvider,
   } = await import('@act-one/providers');
 
   switch (id) {
@@ -322,6 +333,8 @@ export async function testProvider(id: ProviderSlotId): Promise<ProviderHealth> 
       }).health();
     case 'elevenlabs':
       return new ElevenLabsProvider({ apiKey: credentials['apiKey'] }).health();
+    case 'gemini':
+      return new GeminiVideoProvider({ apiKey: credentials['apiKey'] ?? '' }).health();
     case 'stripe': {
       const { testStripe } = await import('./stripe.ts');
       return testStripe(credentials['secretKey']);

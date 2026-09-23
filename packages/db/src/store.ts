@@ -14,6 +14,9 @@ import type {
   Article,
   ArticleStatus,
   ArticleTopic,
+  Benchmark,
+  BenchmarkRetrieval,
+  BenchmarkStatus,
   InviteCode,
   InviteCodeKind,
   InviteRedemption,
@@ -114,6 +117,7 @@ export interface Store {
   readonly referrals: ReferralRepo;
   readonly articles: ArticleRepo;
   readonly topics: ArticleTopicRepo;
+  readonly benchmarks: BenchmarkRepo;
   readonly brandVoices: BrandVoiceRepo;
   readonly voiceConsents: VoiceConsentRepo;
   readonly voiceSettings: VoiceSettingsRepo;
@@ -727,6 +731,37 @@ export interface ReferralRepo {
   /** How many of this person's referrals have ever been rewarded. */
   countRewardedFor(inviterUserId: string): Promise<number>;
   countByStage(): Promise<Record<string, number>>;
+}
+
+/**
+ * The benchmark library: reference films and the state of their analysis.
+ *
+ * Platform-only, like the journal. `mutate` is the worker's way in: it reads,
+ * changes and writes one benchmark under a row lock, so a stage finishing
+ * while an operator disables retrieval loses neither change.
+ */
+export type BenchmarkQuery = {
+  status?: BenchmarkStatus | BenchmarkStatus[];
+  retrieval?: BenchmarkRetrieval;
+  /** Matched against the title and the file name, case-insensitively. */
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export interface BenchmarkRepo {
+  /** A second film with the same bytes is a conflict: the library holds each film once. */
+  create(benchmark: Benchmark): Promise<Benchmark>;
+  get(id: string): Promise<Benchmark | null>;
+  getBySha256(sha256: string): Promise<Benchmark | null>;
+  /** Newest first. */
+  list(query?: BenchmarkQuery): Promise<Benchmark[]>;
+  count(query?: Omit<BenchmarkQuery, 'limit' | 'offset'>): Promise<number>;
+  update(id: string, patch: Partial<Benchmark>): Promise<Benchmark>;
+  /** Read, change and write one benchmark atomically. Throws not_found if it is gone. */
+  mutate(id: string, change: (current: Benchmark) => Benchmark): Promise<Benchmark>;
+  delete(id: string): Promise<void>;
+  countByStatus(): Promise<Record<string, number>>;
 }
 
 /** The journal: articles, and the topics waiting to become one. */

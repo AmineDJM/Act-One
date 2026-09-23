@@ -5,7 +5,7 @@ import {
   CriticReview,
   DirectorDecision,
 } from '@act-one/core';
-import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, Referral as ReferralSchema } from '@act-one/core';
+import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, Benchmark as BenchmarkSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
   AppError,
@@ -22,6 +22,7 @@ import {
   type RateLimitRule,
 } from '@act-one/core';
 import type {
+  Benchmark,
   CreativeReplan,
   CopyKit,
   Invitation,
@@ -81,7 +82,7 @@ import type {
   VoiceSettings,
 } from '@act-one/core';
 import { Database, type QueryClient } from './client.ts';
-import type { ArticleQuery, AssetProjectLink, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
+import type { ArticleQuery, AssetProjectLink, BenchmarkQuery, CollectionQuery, JobQuery, LibraryFilter, PlatformSettings, ReferralQuery, Store } from './store.ts';
 
 type Row = Record<string, unknown>;
 
@@ -3126,6 +3127,79 @@ export class PgStore implements Store {
       }),
   };
 
+  readonly benchmarks = {
+    create: async (benchmark: Benchmark) =>
+      this.asPlatform(async (c) => {
+        try {
+          await c.query(
+            `INSERT INTO benchmarks (id, sha256, title, status, retrieval, created_at, updated_at, data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [benchmark.id, benchmark.source.sha256, benchmark.title, benchmark.status, benchmark.retrieval, benchmark.createdAt, benchmark.updatedAt, benchmark],
+          );
+        } catch (error) {
+          if ((error as { code?: string }).code === '23505') throw new AppError('conflict', 'That film is already in the library.');
+          throw error;
+        }
+        return benchmark;
+      }),
+
+    get: async (id: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM benchmarks WHERE id = $1', [id]);
+        return r.rows[0] ? benchmarkFromRow(r.rows[0]['data']) : null;
+      }),
+
+    getBySha256: async (sha256: string) =>
+      this.asPlatform(async (c) => {
+        const r = await c.query('SELECT data FROM benchmarks WHERE sha256 = $1', [sha256]);
+        return r.rows[0] ? benchmarkFromRow(r.rows[0]['data']) : null;
+      }),
+
+    list: async (query: BenchmarkQuery = {}) =>
+      this.asPlatform(async (c) => {
+        const { where, params } = benchmarkWhere(query);
+        const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
+        const offset = Math.max(query.offset ?? 0, 0);
+        const r = await c.query(
+          `SELECT data FROM benchmarks ${where} ORDER BY created_at DESC, id DESC LIMIT ${limit} OFFSET ${offset}`,
+          params,
+        );
+        return r.rows.map((row) => benchmarkFromRow(row['data']));
+      }),
+
+    count: async (query: Omit<BenchmarkQuery, 'limit' | 'offset'> = {}) =>
+      this.asPlatform(async (c) => {
+        const { where, params } = benchmarkWhere(query);
+        const r = await c.query<{ count: number }>(`SELECT COUNT(*)::int AS count FROM benchmarks ${where}`, params);
+        return num(r.rows[0]?.count ?? 0);
+      }),
+
+    update: async (id: string, patch: Partial<Benchmark>) =>
+      this.benchmarks.mutate(id, (current) => ({ ...current, ...patch })),
+
+    mutate: async (id: string, change: (current: Benchmark) => Benchmark) =>
+      this.asPlatform(async (c) => {
+        const current = await c.query('SELECT data FROM benchmarks WHERE id = $1 FOR UPDATE', [id]);
+        if (!current.rows[0]) throw notFound('Benchmark');
+        const next: Benchmark = BenchmarkSchema.parse({ ...change(benchmarkFromRow(current.rows[0]['data'])), id, updatedAt: new Date().toISOString() });
+        await c.query(
+          `UPDATE benchmarks SET title = $2, status = $3, retrieval = $4, data = $5, updated_at = now() WHERE id = $1`,
+          [id, next.title, next.status, next.retrieval, next],
+        );
+        return next;
+      }),
+
+    delete: async (id: string) =>
+      this.asPlatform(async (c) => {
+        await c.query('DELETE FROM benchmarks WHERE id = $1', [id]);
+      }),
+
+    countByStatus: async () =>
+      this.asPlatform(async (c) => {
+        const r = await c.query<{ status: string; count: number }>('SELECT status, COUNT(*)::int AS count FROM benchmarks GROUP BY status');
+        return Object.fromEntries(r.rows.map((row) => [row.status, num(row.count)]));
+      }),
+  };
+
   readonly topics = {
     create: async (topic: ArticleTopic) =>
       this.asPlatform(async (c) => {
@@ -3595,6 +3669,29 @@ function brandFromRow(data: unknown): BrandSystem {
 /** An entry as stored, brought up to the current shape. */
 function articleFromRow(data: unknown): Article {
   return ArticleSchema.parse(data);
+}
+
+function benchmarkFromRow(data: unknown): Benchmark {
+  return BenchmarkSchema.parse(data);
+}
+
+/** Filters as SQL, every value a parameter. */
+function benchmarkWhere(query: Omit<BenchmarkQuery, 'limit' | 'offset'>): { where: string; params: unknown[] } {
+  const params: unknown[] = [];
+  const clauses: string[] = [];
+  if (query.status !== undefined) {
+    const statuses = Array.isArray(query.status) ? query.status : [query.status];
+    clauses.push(`status = ANY($${params.push(statuses)}::text[])`);
+  }
+  if (query.retrieval) clauses.push(`retrieval = $${params.push(query.retrieval)}`);
+  const needle = query.search?.trim();
+  if (needle) {
+    // LIKE's own wildcards in the search are matched literally.
+    const pattern = `%${needle.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+    const index = params.push(pattern);
+    clauses.push(`(title ILIKE $${index} OR data -> 'source' ->> 'fileName' ILIKE $${index})`);
+  }
+  return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
 }
 
 function topicFromRow(data: unknown): ArticleTopic {

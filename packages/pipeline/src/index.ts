@@ -25,3 +25,4 @@ export { runSceneAssets, type AssetResult } from './stages/assets.ts';
 export { narrate, seedFor, type NarrationOptions, type NarrationPassage, type NarrationResult, type NarrationTrack, type NarrationUsage } from './narration.ts';
 export { runAudioEdition } from './stages/audio-edition.ts';
 export { discoverTopics, rewriteSection, runEditorialTick, writeArticle, type EditorialDeps, type TopicIdea, type WriteArticleInput } from './editorial/write-article.ts';
+export { runBenchmarkJob, type BenchmarkJobOverrides, type BenchmarkJobPayload } from './benchmark.ts';

@@ -34,6 +34,7 @@ import { runAudioEdition } from './stages/audio-edition.ts';
 import { runRevision } from './stages/revision.ts';
 import { runSceneAssets } from './stages/assets.ts';
 import { runCreativeReplan } from './stages/replan.ts';
+import { runBenchmarkJob } from './benchmark.ts';
 
 /**
  * The job runner.
@@ -76,10 +77,14 @@ const RUNNING_STATE: Record<JobKind, JobState> = {
   generate_copy: 'writing_copy',
   produce_audio: 'sound',
   localise_film: 'rendering_motion',
+  analyze_benchmark: 'researching',
 };
 
 export async function runJob(deps: RunnerDeps, job: Job, signal?: AbortSignal): Promise<JobOutcome> {
   const { store } = deps;
+
+  // The platform's own work has no project to load, and keeps its own record of how it went.
+  if (job.kind === 'analyze_benchmark') return runBenchmarkJob(deps, job, signal);
 
   if (!job.projectId) {
     await store.jobs.complete(job.id, 'failed', 'Job has no project.');
