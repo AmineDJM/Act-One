@@ -513,7 +513,16 @@ export class OpenAiLlmProvider implements LlmProvider {
         if (answered === null) throw error;
         streamed = answered;
       } else {
-        if (!refusedTemperature(error) || FIXED_TEMPERATURE.has(model)) throw error;
+        /*
+         * Retried whenever THIS request carried a temperature, not only when
+         * the model was unknown. Calls sent together all go out with one
+         * before the first refusal is learned, and the ones that heard back
+         * second used to see the model already in the set and give up on a
+         * request that would have succeeded — five scenes of six, measured,
+         * when a film's scenes were written in parallel. Without the field
+         * the retry cannot be refused for it again, so this cannot loop.
+         */
+        if (!refusedTemperature(error) || !('temperature' in body)) throw error;
         FIXED_TEMPERATURE.add(model);
         delete body['temperature'];
         streamed = await send();
