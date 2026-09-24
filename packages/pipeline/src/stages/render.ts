@@ -1355,11 +1355,13 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
 
   const settings = context.registry.config.render;
   let llm: ReturnType<StageContext['registry']['llm']> | null = null;
-  try {
-    llm = context.registry.llm();
-  } catch (error) {
-    // Without a model every scene is the engine's port of the Remotion component: still the film, and said so.
-    console.error(`[render:hyperframes] no scene author (${(error as Error).message}); the engine draws every scene`);
+  if (agentWritesScenes(settings, render.kind)) {
+    try {
+      llm = context.registry.llm();
+    } catch (error) {
+      // Without a model every scene is the engine's port of the Remotion component: still the film, and said so.
+      console.error(`[render:hyperframes] no scene author (${(error as Error).message}); the engine draws every scene`);
+    }
   }
   const result = await renderFilmWithHyperFrames({
     ...options,
@@ -1390,6 +1392,16 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
 }
 
 export { filmEngine };
+
+/**
+ * Whether a model is paid to write this render's HyperFrames scenes.
+ *
+ * Only when the operator asked for it, and never for an animatic: a preview
+ * the review may send back is the last place to spend a call per scene.
+ */
+export function agentWritesScenes(settings: { sceneAuthor: 'engine' | 'agent' }, kind: Render['kind']): boolean {
+  return settings.sceneAuthor === 'agent' && kind !== 'animatic';
+}
 
 /** What a render drawn by the Remotion engine records about it. */
 export function remotionEngineRecord(): RenderEngine {

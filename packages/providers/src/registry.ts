@@ -127,15 +127,22 @@ export type SpeechConfig = z.infer<typeof SpeechConfig>;
  * Which engine draws the film.
  *
  * Remotion is the reference: every scene is one of Act One's own components.
- * HyperFrames has an agent write each scene as a composition from the same
- * brief, checks it, and renders it with the pinned HyperFrames CLI; a scene
- * the agent cannot get right is drawn by the engine's port of the Remotion
- * component, so a film always comes back. Only the film itself moves: the
- * hero shortlist and every other internal preview stay on Remotion.
+ * HyperFrames draws the same scenes with its port of those components and
+ * renders them with the pinned HyperFrames CLI; the hero shortlist is drawn by
+ * the same engine as the film. It can instead have a model write each scene
+ * from the brief, which costs a call per scene and, measured against the
+ * Remotion render, comes out no closer to it than the port does.
  */
 const RenderConfig = z.object({
   engine: z.enum(['remotion', 'hyperframes']).default('remotion'),
-  /** The tier of model that writes HyperFrames scenes. */
+  /**
+   * Who writes a HyperFrames scene: the engine's port of the Remotion
+   * component, for nothing, or a model, paid per scene. An animatic is drawn
+   * by the engine either way: it is a preview, and paying a model for scenes
+   * a review may send back is money spent before anyone has said yes.
+   */
+  sceneAuthor: z.enum(['engine', 'agent']).default('engine'),
+  /** The tier of model that writes HyperFrames scenes, when a model writes them. */
   sceneAuthorTier: z.enum(['fast', 'balanced', 'deep']).default('deep'),
   /** Model calls per scene before the engine draws it itself. */
   maxSceneAttempts: z.number().int().min(0).max(5).default(3),

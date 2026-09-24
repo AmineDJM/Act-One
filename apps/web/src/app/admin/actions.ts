@@ -190,6 +190,7 @@ export async function saveRoutingAction(
     render: {
       ...current.providers.render,
       engine: String(formData.get('render.engine') ?? current.providers.render.engine),
+      sceneAuthor: String(formData.get('render.sceneAuthor') ?? current.providers.render.sceneAuthor),
       sceneAuthorTier: String(formData.get('render.sceneAuthorTier') ?? current.providers.render.sceneAuthorTier),
     },
     media: {

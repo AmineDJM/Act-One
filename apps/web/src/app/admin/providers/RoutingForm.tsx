@@ -21,7 +21,7 @@ export function RoutingForm({
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
     speech: { primary: string; preview: string; recognizer: string };
-    render: { engine: string; sceneAuthorTier: string };
+    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -216,22 +216,32 @@ export function RoutingForm({
               <label htmlFor="render-engine">Film engine</label>
               <select id="render-engine" name="render.engine" className="input" defaultValue={routing.render.engine}>
                 <option value="remotion">Remotion (Act One&rsquo;s own components)</option>
-                <option value="hyperframes">HyperFrames (each scene written by an agent)</option>
+                <option value="hyperframes">HyperFrames (the same components, another renderer)</option>
               </select>
               <span className="hint">
-                The same storyboard, sound and checks either way. HyperFrames asks the scene author below for
-                every scene, keeps what it wrote for the master, and draws a scene itself when the agent&rsquo;s
-                does not pass. Previews made to choose a hero shot stay on Remotion.
+                The same storyboard, sound and checks either way, and the hero shot&rsquo;s shortlist is drawn by the
+                same engine as the film.
               </span>
             </div>
             <div className="field">
-              <label htmlFor="render-author">HyperFrames scene author</label>
+              <label htmlFor="render-scene-author">Who writes HyperFrames scenes</label>
+              <select id="render-scene-author" name="render.sceneAuthor" className="input" defaultValue={routing.render.sceneAuthor}>
+                <option value="engine">The engine (free, the Remotion components&rsquo; own port)</option>
+                <option value="agent">A model (paid per scene)</option>
+              </select>
+              <span className="hint">
+                A model costs a call per scene on a first render and, measured against the Remotion render, comes out
+                no closer to it than the engine does. Animatics are drawn by the engine either way.
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-author">Model that writes them</label>
               <select id="render-author" name="render.sceneAuthorTier" className="input" defaultValue={routing.render.sceneAuthorTier}>
                 <option value="deep">Deep tier</option>
                 <option value="balanced">Balanced tier</option>
                 <option value="fast">Fast tier</option>
               </select>
-              <span className="hint">One call per scene on a first render, none on a re-render of the same brief.</span>
+              <span className="hint">Used only when a model writes the scenes: one call per scene on a first render, none on a re-render of the same brief.</span>
             </div>
             <div className="field">
               <label htmlFor="media-cost">Max spend per generated shot</label>

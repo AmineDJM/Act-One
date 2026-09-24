@@ -3,7 +3,7 @@ import { ProviderConfig, ProviderRegistry } from '@act-one/providers';
 import type { StageContext } from '../context.ts';
 import { RenderEngine } from '@act-one/core';
 import { SCENE_CONTRACT_VERSION, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
-import { filmEngine, hyperframesEngineRecord, remotionEngineRecord } from '../stages/render.ts';
+import { agentWritesScenes, filmEngine, hyperframesEngineRecord, remotionEngineRecord } from '../stages/render.ts';
 
 /**
  * Which engine draws the film.
@@ -24,7 +24,7 @@ afterEach(() => {
 describe('the film engine', () => {
   it('is Remotion unless the operator chose otherwise', () => {
     expect(filmEngine(contextWith())).toBe('remotion');
-    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
+    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthor: 'engine', sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
     expect(filmEngine(contextWith('hyperframes'))).toBe('hyperframes');
   });
 
@@ -43,6 +43,27 @@ describe('the film engine', () => {
   it('refuses an engine the platform does not have', () => {
     expect(ProviderConfig.safeParse({ render: { engine: 'after-effects' } }).success).toBe(false);
     expect(ProviderConfig.safeParse({ render: { maxSceneAttempts: 9 } }).success).toBe(false);
+    expect(ProviderConfig.safeParse({ render: { sceneAuthor: 'intern' } }).success).toBe(false);
+  });
+});
+
+/**
+ * Who is paid to write HyperFrames scenes.
+ *
+ * Nobody, unless the operator asks: the engine's port of the Remotion
+ * components came out closer to the Remotion render than any model did, for
+ * nothing. And never for an animatic, which a review may send back.
+ */
+describe('a model writing HyperFrames scenes', () => {
+  it('is not paid for unless the operator asked for it', () => {
+    const settings = ProviderConfig.parse({ render: { engine: 'hyperframes' } }).render;
+    for (const kind of ['film', 'cut', 'animatic', 'localised'] as const) expect(agentWritesScenes(settings, kind), kind).toBe(false);
+  });
+
+  it('is never paid for an animatic', () => {
+    const settings = ProviderConfig.parse({ render: { engine: 'hyperframes', sceneAuthor: 'agent' } }).render;
+    expect(agentWritesScenes(settings, 'film')).toBe(true);
+    expect(agentWritesScenes(settings, 'animatic')).toBe(false);
   });
 });
 

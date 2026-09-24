@@ -193,12 +193,26 @@ async function main(): Promise<void> {
     console.log('  Set ACT_ONE_CHROME_HEADLESS_SHELL to render the film.');
   }
 
+}
+
+/**
+ * What the run spent, by provider and by operation.
+ *
+ * Printed whether the run finished or not: a run the review stopped has
+ * still paid for everything before the stop, and that is exactly the spend
+ * nobody looks at when the only cost line is on the success path.
+ */
+function printCost(): void {
   heading('Cost');
-  const byProvider = new Map<string, number>();
+  const byOperation = new Map<string, { cost: number; calls: number }>();
   for (const record of costSink.records) {
-    byProvider.set(record.provider, (byProvider.get(record.provider) ?? 0) + record.actualCostUsd);
+    const key = `${record.provider} ${record.operation}`;
+    const entry = byOperation.get(key) ?? { cost: 0, calls: 0 };
+    byOperation.set(key, { cost: entry.cost + record.actualCostUsd, calls: entry.calls + 1 });
   }
-  for (const [provider, cost] of byProvider) line(provider, `$${cost.toFixed(4)}`);
+  for (const [key, { cost, calls }] of [...byOperation].sort((a, b) => b[1].cost - a[1].cost)) {
+    line(key, `$${cost.toFixed(4)} (${calls} call${calls === 1 ? '' : 's'})`);
+  }
   line('Total', `$${costSink.records.reduce((sum, r) => sum + r.actualCostUsd, 0).toFixed(4)}`);
   line('Elapsed', `${((Date.now() - started) / 1000).toFixed(1)}s`);
 }
@@ -207,7 +221,10 @@ function pct(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-main().catch((error: unknown) => {
-  console.error('\n\x1b[31mDemo failed:\x1b[0m', error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+main()
+  .then(() => printCost())
+  .catch((error: unknown) => {
+    console.error('\n\x1b[31mDemo failed:\x1b[0m', error instanceof Error ? error.message : error);
+    printCost();
+    process.exit(1);
+  });
