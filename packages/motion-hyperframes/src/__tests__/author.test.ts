@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
+import { isolateLayers, UiRegion, UiSequence } from '@act-one/core';
 import { ProviderError, ScriptedLlmProvider, type LlmMessage } from '@act-one/providers';
-import { authorScene, authorScenes, isEngineScene, type SceneAuthorOptions } from '../author.ts';
+import { authorScene, authorScenes, isConstruction, isEngineScene, type SceneAuthorOptions } from '../author.ts';
 import { SYSTEM_PROMPT, sceneMessages } from '../prompt.ts';
 import { MemorySceneStore, sceneKey } from '../scene-store.ts';
 import { image, packet, packetsFor, scene, sceneTokens, storyboard } from './helpers.ts';
@@ -41,6 +42,7 @@ function options(llm: ScriptedLlmProvider | null, overrides: Partial<SceneAuthor
     maxAttempts: 3,
     concurrency: 2,
     showPictures: false,
+    constructions: 'engine',
     log: () => undefined,
     ...overrides,
   };
@@ -238,5 +240,48 @@ describe('the brief', () => {
     // A volume's light is the accent with an alpha appended, which a CSS variable cannot carry.
     expect(brief.tokens.accent).toMatch(/^#[0-9a-f]{6}$/i);
     for (const named of ['space "flat"', 'space "volume"', 'knockout', 'wordsBehind', 'tokens.accent', 'onUpdate']) expect(SYSTEM_PROMPT).toContain(named);
+  });
+});
+
+describe('a scene whose capture is taken apart or hung in a volume', () => {
+  const region = UiRegion.parse({ x: 0.34, y: 0.16, width: 0.29, height: 0.34, weight: 0.2, density: 0.4 });
+  const whole = { x: 0, y: 0, width: 1, height: 0.9 };
+  function filmed(layered: boolean) {
+    const board = storyboard([scene(0, { recipe: 'product_sequence', text: ['Every signal in one place.'], assets: ['ast_img'], duration: 3 })]);
+    board.scenes[0]!.uiSequence = UiSequence.parse({
+      sourceWidth: 1600, sourceHeight: 1000, background: { r: 16, g: 20, b: 29 },
+      framings: [{ role: 'subject', move: 'push', from: whole, to: { x: 0.2, y: 0.05, width: 0.6, height: 0.54 }, seconds: 3, layers: layered ? isolateLayers(region, 3) : [] }],
+    });
+    return packetsFor(board, { staged: [image('ast_img')] })[0]!;
+  }
+
+  it('is drawn by the engine, without asking the model, even over a scene the agent once wrote for it', async () => {
+    const target = filmed(true);
+    expect(isConstruction(target)).toBe(true);
+    const llm = new ScriptedLlmProvider([{ respond: { html: goodScene(target.frameId, 'Every signal in one place.'), notes: '' } }]);
+    const tokens = sceneTokens();
+    const store = new MemorySceneStore();
+    await store.put(sceneKey(target, tokens.film, 'deep'), goodScene(target.frameId, 'Every signal in one place.'));
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-construction-'));
+    const drawn = await authorScene(target, tokens, dir, options(llm, { store }));
+    expect(llm.calls).toHaveLength(0);
+    expect(isEngineScene(drawn.html)).toBe(true);
+    expect(drawn.report).toMatchObject({ source: 'fallback', attempts: 0, costUsd: 0 });
+    expect(drawn.report.fallbackReason).toContain('taken apart or hung in a volume');
+  });
+
+  it('is written by the agent when asked to, and a plain filmed capture always is', async () => {
+    const tokens = sceneTokens();
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-construction-'));
+    const layered = filmed(true);
+    const asked = new ScriptedLlmProvider([{ respond: { html: goodScene(layered.frameId, 'Every signal in one place.'), notes: '' } }]);
+    await authorScene(layered, tokens, dir, options(asked, { constructions: 'agent' }));
+    expect(asked.calls).toHaveLength(1);
+
+    const plain = filmed(false);
+    expect(isConstruction(plain)).toBe(false);
+    const writes = new ScriptedLlmProvider([{ respond: { html: goodScene(plain.frameId, 'Every signal in one place.'), notes: '' } }]);
+    await authorScene(plain, tokens, dir, options(writes));
+    expect(writes.calls).toHaveLength(1);
   });
 });

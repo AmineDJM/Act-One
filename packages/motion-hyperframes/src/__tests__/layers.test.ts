@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { isolateLayers, operateLayers, UiRegion, UiSequence, volumeLayers, type FramingRect, type UiFraming, type UiLayer } from '@act-one/core';
 import { EASINGS, progress } from '@act-one/motion';
 import { layerProgress, plateGeometry } from '../../../motion/src/components/UiLayers.tsx';
-import { validationContextFor } from '../author.ts';
+import { validationContextFor, type AuthoredScene } from '../author.ts';
+import type { EngineFinding } from '../checks.ts';
 import { fallbackScene } from '../fallback.ts';
 import { motionRuntimeSource } from '../motion-runtime.ts';
+import { setBehindByDesign } from '../render.ts';
 import type { ScenePacket } from '../types.ts';
 import { validateScene } from '../validate.ts';
 import { design, image, packetsFor, scene, storyboard } from './helpers.ts';
@@ -267,5 +269,31 @@ describe('a framing set in a volume', () => {
     expect(errorsOf(html, packet)).toEqual([]);
     expect(html).toContain('id="scene-01-f1-panel-3-image" class="scene-01-plate" src="assets/ast_img.png"');
     expect(html).not.toContain('ast_other');
+  });
+});
+
+describe('occluded words the storyboard asked for', () => {
+  const whole = { x: 0, y: 0, width: 1, height: 0.9 };
+  const volume = (wordsBehind: boolean) => ({ role: 'context', move: 'settle', from: whole, to: whole, seconds: 4, space: 'volume', wordsBehind, layers: volumeLayers([{ rect: panel(0) }, { rect: panel(4) }], 4) });
+  const finding = (code: string, frameIds: string[]): EngineFinding => ({
+    section: 'layout', code, severity: 'error', message: 'Text is covered by another element', frameIds, file: null, selector: '#scene-01-f1-behind', against: null, atSeconds: 1, fixHint: null,
+  });
+  const scenesOf = (packet: ScenePacket): ReadonlyMap<string, AuthoredScene> =>
+    new Map([[packet.frameId, { packet, key: 'k', html: '<template></template>', report: { frameId: packet.frameId, sceneId: packet.sceneId, source: 'agent', attempts: 1, costUsd: 0, findings: [], fallbackReason: null } }]]);
+
+  it('are not a refusal when a volume sets the line behind the product', () => {
+    const { packet } = filmed([volume(true)], [image('ast_img')], ['Three views, one truth.']);
+    expect(setBehindByDesign(finding('text_occluded', ['scene-01']), scenesOf(packet))).toBe(true);
+  });
+
+  it('are still refused anywhere else', () => {
+    const behind = filmed([volume(true)], [image('ast_img')], ['Three views, one truth.']).packet;
+    const inFront = filmed([volume(false)], [image('ast_img')], ['Three views, one truth.']).packet;
+    const silent = filmed([volume(true)], [image('ast_img')], []).packet;
+    expect(setBehindByDesign(finding('text_occluded', ['scene-01']), scenesOf(inFront))).toBe(false);
+    expect(setBehindByDesign(finding('text_occluded', ['scene-01']), scenesOf(silent))).toBe(false);
+    expect(setBehindByDesign(finding('content_overlap', ['scene-01']), scenesOf(behind))).toBe(false);
+    expect(setBehindByDesign(finding('text_occluded', []), scenesOf(behind))).toBe(false);
+    expect(setBehindByDesign(finding('text_occluded', ['scene-02']), scenesOf(behind))).toBe(false);
   });
 });

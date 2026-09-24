@@ -1,7 +1,7 @@
 /** The engine's name as it appears in render records and logs. */
 export const ENGINE_NAME = 'hyperframes' as const;
 
-export const ENGINE_VERSION = '1.3.1';
+export const ENGINE_VERSION = '1.4.0';
 
 /**
  * The scene contract: what a scene is told and what it must return.

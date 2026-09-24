@@ -29,6 +29,7 @@ import { filmTokens, tokenCss } from './tokens.ts';
 import { resolveTools, runCli, type HyperFramesTools, type ToolOptions } from './tools.ts';
 import type { AuthoredSceneStore, ScenePacket, SceneReport } from './types.ts';
 import type { ValidationFinding } from './validate.ts';
+import { filmedSequence } from './ui-sequence.ts';
 import { ENGINE_NAME, ENGINE_VERSION } from './version.ts';
 
 /**
@@ -61,6 +62,14 @@ export type SceneAuthorConfig = {
   concurrency?: number;
   /** Show the model the scene's pictures, small. */
   showPictures?: boolean;
+  /**
+   * Who draws a scene whose capture is taken apart or hung in a volume.
+   *
+   * The engine by default: it reproduces the Remotion construction exactly,
+   * for nothing, and the agent measurably does not. `agent` sends those
+   * scenes to the model like any other, for comparison.
+   */
+  constructions?: 'engine' | 'agent';
 };
 
 export type HyperFramesRenderOptions = RenderFilmOptions & {
@@ -458,6 +467,7 @@ function sceneAuthorOptions(options: HyperFramesRenderOptions, log: (line: strin
     maxAttempts: Math.max(0, Math.floor(author?.maxAttempts ?? 3)),
     concurrency: Math.max(1, Math.floor(author?.concurrency ?? 4)),
     showPictures: author?.showPictures ?? true,
+    constructions: author?.constructions ?? 'engine',
     log,
     breaker: { reason: null },
   };
@@ -500,6 +510,23 @@ type CheckLoopInput = {
  */
 const ENGINE_BUG_SECTIONS: ReadonlySet<EngineFinding['section']> = new Set<EngineFinding['section']>(['lint', 'runtime']);
 
+/**
+ * A finding the storyboard asked for.
+ *
+ * A volume can set the scene's line behind the product, and the panels pass
+ * in front of it: that is the shot, as the Remotion engine sets it, and
+ * HyperFrames calls it occluded text. Refusing it sent the agent off to move
+ * the line out from behind the panels, which is a different shot.
+ */
+export function setBehindByDesign(finding: EngineFinding, scenes: ReadonlyMap<string, AuthoredScene>): boolean {
+  if (finding.code !== 'text_occluded' || finding.frameIds.length === 0) return false;
+  return finding.frameIds.every((frameId) => {
+    const packet = scenes.get(frameId)?.packet;
+    if (!packet || packet.onScreenText.join(' ').length === 0) return false;
+    return (filmedSequence(packet.uiSequence)?.framings ?? []).some((framing) => framing.space === 'volume' && framing.layers.length > 0 && framing.wordsBehind);
+  });
+}
+
 async function checkUntilClean(input: CheckLoopInput): Promise<{ passes: number; rewritten: string[]; findings: EngineFinding[] }> {
   const rewritten = new Set<string>();
   let enginePassUsed = false;
@@ -513,13 +540,13 @@ async function checkUntilClean(input: CheckLoopInput): Promise<{ passes: number;
         const scene = input.scenes.get(frameId);
         return scene !== undefined && isEngineScene(scene.html);
       });
-    const errors = blocking(report.findings).filter((finding) => !drawnByEngine(finding));
+    const errors = blocking(report.findings).filter((finding) => !drawnByEngine(finding) && !setBehindByDesign(finding, input.scenes));
     if (errors.length === 0) {
-      const findings = report.findings.map((finding) =>
-        finding.severity === 'error' && drawnByEngine(finding)
-          ? { ...finding, severity: 'warning' as const, message: `Drawn as the Remotion engine draws it: ${finding.message}` }
-          : finding,
-      );
+      const findings = report.findings.map((finding) => {
+        if (finding.severity !== 'error') return finding;
+        if (drawnByEngine(finding)) return { ...finding, severity: 'warning' as const, message: `Drawn as the Remotion engine draws it: ${finding.message}` };
+        return { ...finding, severity: 'warning' as const, message: `Set behind the product by design, as the Remotion engine sets it: ${finding.message}` };
+      });
       return { passes: pass, rewritten: [...rewritten].sort(), findings };
     }
     input.log(`check pass ${pass}: ${errors.length} blocking finding(s): ${errors.map((finding) => `${finding.code}@${finding.frameIds.join('+') || 'film'}`).join(', ')}`);

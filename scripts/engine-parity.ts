@@ -42,6 +42,8 @@ const { values } = parseArgs({
     variants: { type: 'string', default: 'engine' },
     out: { type: 'string', default: path.resolve('.act-one-demo/engine-parity') },
     tier: { type: 'string', default: 'deep' },
+    // Who draws a scene whose capture is taken apart or hung in a volume, when an agent writes the others.
+    constructions: { type: 'string', default: 'engine' },
     'skip-remotion': { type: 'boolean', default: false },
     'skip-forensics': { type: 'boolean', default: false },
   },
@@ -99,6 +101,7 @@ try {
                 store: new DirectorySceneStore(path.join(OUT, 'scenes', film.slug)),
                 tier: values.tier as LlmTier,
                 concurrency: 6,
+                constructions: values.constructions === 'agent' ? 'agent' : 'engine',
               },
             }
           : {}),

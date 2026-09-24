@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { z } from 'zod';
 import type { DesignTokens } from '@act-one/design';
 import { ProviderError, type CallContext, type ImageInput, type LlmProvider, type LlmTier } from '@act-one/providers';
-import { fallbackScene } from './fallback.ts';
+import { fallbackScene, shotOf } from './fallback.ts';
 import { sceneMessages } from './prompt.ts';
 import { sceneKey } from './scene-store.ts';
 import type { FilmTokens } from './tokens.ts';
@@ -31,6 +31,8 @@ export type SceneAuthorOptions = {
   concurrency: number;
   /** Show the model the scene's pictures, small, so it can compose around them. */
   showPictures: boolean;
+  /** Who draws a scene whose capture is taken apart or hung in a volume (see `isConstruction`). */
+  constructions: 'engine' | 'agent';
   log: (line: string) => void;
   /**
    * Shared by every scene of a render. Set when the model answers in a way no
@@ -42,6 +44,25 @@ export type SceneAuthorOptions = {
 };
 
 export type AuthoredScene = { packet: ScenePacket; key: string; html: string; report: SceneReport };
+
+/**
+ * A scene whose capture is taken apart into layers or hung in a volume.
+ *
+ * These are constructions rather than compositions: dozens of values per
+ * frame — the crop, the shell's recession, each layer's travel, the holes cut
+ * under them, the panels' depth and turn — that the Remotion components
+ * compute from the plan. The engine's own composition computes the same
+ * numbers (SSIM 0.996 to 0.999 against the Remotion render); the agent,
+ * working from their description, came to 0.96 to 0.98 on the same shots,
+ * and a written scene cannot be told apart from a faithful one until it has
+ * been rendered and compared.
+ */
+export function isConstruction(packet: ScenePacket): boolean {
+  const shot = shotOf(packet);
+  return shot.kind === 'ui' && shot.sequence.framings.some((framing) => framing.layers.length > 0);
+}
+
+const CONSTRUCTION_REASON = 'a capture taken apart or hung in a volume is drawn by the engine, whose construction is the Remotion engine’s own';
 
 /**
  * The tokens a scene is made with: the agent's flattened copy, which is part
@@ -90,6 +111,11 @@ export async function authorScene(
 ): Promise<AuthoredScene> {
   const key = sceneKey(packet, tokens.film, options.tier);
   const context = validationContextFor(packet);
+
+  // Ahead of the store: a construction the agent wrote under the other setting is not what this one asks for.
+  if (!feedback && options.constructions === 'engine' && isConstruction(packet)) {
+    return engineScene(packet, tokens.design, key, 0, 0, CONSTRUCTION_REASON);
+  }
 
   if (!feedback) {
     const cached = await options.store.get(key).catch((error: unknown) => {
