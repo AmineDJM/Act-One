@@ -1,8 +1,9 @@
 import { PLATFORM_ORGANIZATION_ID } from '@act-one/core';
 import { checkForensicsRuntime, pythonBinary } from '@act-one/film-ir';
 import { runJob, type RunnerDeps } from '@act-one/pipeline';
-import { installProxyFromEnvironment , proxyConfigured, proxyMisconfiguration } from '@act-one/providers';
+import { installProxyFromEnvironment , ProviderConfig, proxyConfigured, proxyMisconfiguration } from '@act-one/providers';
 import { bundleFilm } from '@act-one/motion';
+import { resolveTools } from '@act-one/motion-hyperframes';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -171,11 +172,34 @@ async function preflight(config: WorkerConfig): Promise<void> {
     log(`motion bundle unavailable, render jobs will fail: ${(error as Error).message}`);
   }
 
+  await checkHyperFrames(config);
   checkEgress();
   await checkCredentials(config);
   await checkStorage(config);
   await checkSoundLibrary(config);
   await checkForensics();
+}
+
+/**
+ * Says whether this worker can draw a film with HyperFrames.
+ *
+ * Only asked when the platform is set to that engine, or this worker is pinned
+ * to it. Not fatal: every other job runs without it, and a render asked of a
+ * worker that cannot draw fails at once with the same reason — said here so it
+ * is in the deploy's log before anybody asks.
+ */
+async function checkHyperFrames(config: WorkerConfig): Promise<void> {
+  const settings = await config.store.platform.getSettings().catch(() => null);
+  const parsed = ProviderConfig.safeParse(settings?.providerConfig ?? {});
+  const pinned = process.env['ACT_ONE_FILM_ENGINE'];
+  const engine = pinned === 'remotion' || pinned === 'hyperframes' ? pinned : parsed.success ? parsed.data.render.engine : 'remotion';
+  if (engine !== 'hyperframes') return;
+  try {
+    const tools = await resolveTools();
+    log(`hyperframes ${tools.cliVersion}: browser ${tools.browserPath}, ffprobe ${tools.ffprobePath}`);
+  } catch (error) {
+    log(`hyperframes unavailable, film renders will fail: ${(error as Error).message}`);
+  }
 }
 
 /**

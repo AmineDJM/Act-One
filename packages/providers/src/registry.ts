@@ -123,6 +123,25 @@ const SpeechConfig = z.object({
 });
 export type SpeechConfig = z.infer<typeof SpeechConfig>;
 
+/**
+ * Which engine draws the film.
+ *
+ * Remotion is the reference: every scene is one of Act One's own components.
+ * HyperFrames has an agent write each scene as a composition from the same
+ * brief, checks it, and renders it with the pinned HyperFrames CLI; a scene
+ * the agent cannot get right is drawn by the engine's port of the Remotion
+ * component, so a film always comes back. Only the film itself moves: the
+ * hero shortlist and every other internal preview stay on Remotion.
+ */
+const RenderConfig = z.object({
+  engine: z.enum(['remotion', 'hyperframes']).default('remotion'),
+  /** The tier of model that writes HyperFrames scenes. */
+  sceneAuthorTier: z.enum(['fast', 'balanced', 'deep']).default('deep'),
+  /** Model calls per scene before the engine draws it itself. */
+  maxSceneAttempts: z.number().int().min(0).max(5).default(3),
+});
+export type RenderConfig = z.infer<typeof RenderConfig>;
+
 const StorageConfig = z.object({
   primary: z.enum(['supabase-storage', 'local-fs']).default('supabase-storage'),
   enabled: z.boolean().default(true),
@@ -134,6 +153,7 @@ export const ProviderConfig = z.object({
   media: MediaConfig.default(() => MediaConfig.parse({})),
   speech: SpeechConfig.default(() => SpeechConfig.parse({})),
   storage: StorageConfig.default(() => StorageConfig.parse({})),
+  render: RenderConfig.default(() => RenderConfig.parse({})),
 });
 export type ProviderConfig = z.infer<typeof ProviderConfig>;
 

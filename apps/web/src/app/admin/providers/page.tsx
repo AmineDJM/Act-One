@@ -131,6 +131,10 @@ export default async function ProvidersPage() {
               preview: config.providers.speech.preview,
               recognizer: config.providers.speech.recognizer,
             },
+            render: {
+              engine: config.providers.render.engine,
+              sceneAuthorTier: config.providers.render.sceneAuthorTier,
+            },
             media: {
               enabled: config.providers.media.enabled,
               maxCostPerRequestUsd: config.providers.media.maxCostPerRequestUsd,

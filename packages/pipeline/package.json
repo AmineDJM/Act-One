@@ -20,6 +20,7 @@
     "zod": "^4.0.0",
     "@act-one/qa": "*",
     "@act-one/motion": "*",
+    "@act-one/motion-hyperframes": "*",
     "@act-one/three-d": "*",
     "@act-one/film-ir": "*"
   }

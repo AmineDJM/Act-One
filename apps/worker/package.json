@@ -13,6 +13,7 @@
     "@act-one/db": "*",
     "@act-one/film-ir": "*",
     "@act-one/motion": "*",
+    "@act-one/motion-hyperframes": "*",
     "@act-one/pipeline": "*",
     "@act-one/providers": "*",
     "@act-one/qa": "*",

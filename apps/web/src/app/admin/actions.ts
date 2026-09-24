@@ -187,6 +187,11 @@ export async function saveRoutingAction(
       preview: String(formData.get('speech.preview') ?? current.providers.speech.preview),
       recognizer: String(formData.get('speech.recognizer') ?? current.providers.speech.recognizer),
     },
+    render: {
+      ...current.providers.render,
+      engine: String(formData.get('render.engine') ?? current.providers.render.engine),
+      sceneAuthorTier: String(formData.get('render.sceneAuthorTier') ?? current.providers.render.sceneAuthorTier),
+    },
     media: {
       ...current.providers.media,
       enabled: formData.get('media.enabled') === 'on',

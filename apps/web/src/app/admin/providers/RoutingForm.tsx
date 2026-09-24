@@ -21,6 +21,7 @@ export function RoutingForm({
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
     speech: { primary: string; preview: string; recognizer: string };
+    render: { engine: string; sceneAuthorTier: string };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -210,6 +211,27 @@ export function RoutingForm({
                 Every passage is transcribed back and compared with the script: language, words, numbers.
                 A different ear from the voice that spoke.
               </span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-engine">Film engine</label>
+              <select id="render-engine" name="render.engine" className="input" defaultValue={routing.render.engine}>
+                <option value="remotion">Remotion (Act One&rsquo;s own components)</option>
+                <option value="hyperframes">HyperFrames (each scene written by an agent)</option>
+              </select>
+              <span className="hint">
+                The same storyboard, sound and checks either way. HyperFrames asks the scene author below for
+                every scene, keeps what it wrote for the master, and draws a scene itself when the agent&rsquo;s
+                does not pass. Previews made to choose a hero shot stay on Remotion.
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-author">HyperFrames scene author</label>
+              <select id="render-author" name="render.sceneAuthorTier" className="input" defaultValue={routing.render.sceneAuthorTier}>
+                <option value="deep">Deep tier</option>
+                <option value="balanced">Balanced tier</option>
+                <option value="fast">Fast tier</option>
+              </select>
+              <span className="hint">One call per scene on a first render, none on a re-render of the same brief.</span>
             </div>
             <div className="field">
               <label htmlFor="media-cost">Max spend per generated shot</label>

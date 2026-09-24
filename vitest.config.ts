@@ -26,6 +26,7 @@ export default defineConfig({
       '@act-one/creative': r('./packages/creative/src/index.ts'),
       '@act-one/design': r('./packages/design/src/index.ts'),
       '@act-one/motion': r('./packages/motion/src/index.ts'),
+      '@act-one/motion-hyperframes': r('./packages/motion-hyperframes/src/index.ts'),
       '@act-one/three-d': r('./packages/three-d/src/index.ts'),
       '@act-one/sound': r('./packages/sound/src/index.ts'),
       '@act-one/qa': r('./packages/qa/src/index.ts'),

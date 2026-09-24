@@ -51,7 +51,8 @@ import {
   releaseDecision,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
-import { renderFilm } from '@act-one/motion';
+import { renderFilm, type RenderFilmOptions, type RenderFilmResult } from '@act-one/motion';
+import { renderFilmWithHyperFrames, StorageSceneStore } from '@act-one/motion-hyperframes';
 import { resolveTokens } from '@act-one/design';
 import {
   bedReductionDb,
@@ -1331,6 +1332,66 @@ function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
+/**
+ * The engine that draws this film.
+ *
+ * The operator's setting, unless the environment pins one — a worker set up
+ * to compare engines, or one without the other engine's tooling installed.
+ */
+export function filmEngine(context: StageContext): 'remotion' | 'hyperframes' {
+  const pinned = process.env['ACT_ONE_FILM_ENGINE'];
+  if (pinned === 'remotion' || pinned === 'hyperframes') return pinned;
+  return context.registry.config.render.engine;
+}
+
+/**
+ * The picture, drawn by whichever engine the platform is set to.
+ *
+ * Both take the same props and hand back the same silent master; everything
+ * after this — sound, mix, QA, repair — is the same code for both. The
+ * HyperFrames engine is given the tenant's model to write scenes with, and a
+ * place in the tenant's own storage to keep them, so the animatic's scenes are
+ * the master's and a re-render after a repair only rewrites what changed.
+ */
+async function drawFilm(context: StageContext, render: Render, options: RenderFilmOptions): Promise<RenderFilmResult> {
+  const engine = filmEngine(context);
+  if (engine === 'remotion') return renderFilm(options);
+
+  const settings = context.registry.config.render;
+  let llm: ReturnType<StageContext['registry']['llm']> | null = null;
+  try {
+    llm = context.registry.llm();
+  } catch (error) {
+    // Without a model every scene is the engine's port of the Remotion component: still the film, and said so.
+    console.error(`[render:hyperframes] no scene author (${(error as Error).message}); the engine draws every scene`);
+  }
+  const result = await renderFilmWithHyperFrames({
+    ...options,
+    author: {
+      llm,
+      call: {
+        organizationId: context.organizationId,
+        projectId: context.project.id,
+        renderId: render.id,
+        ...(context.signal ? { signal: context.signal } : {}),
+      },
+      store: new StorageSceneStore(context.registry.storage(), `org/${context.organizationId}/project/${context.project.id}/hyperframes-scenes`),
+      tier: settings.sceneAuthorTier,
+      maxAttempts: settings.maxSceneAttempts,
+    },
+    log: (line) => console.log(`[render:hyperframes] ${render.id} ${line}`),
+  });
+  const bySource = result.scenes.reduce<Record<string, number>>((counts, scene) => ({ ...counts, [scene.source]: (counts[scene.source] ?? 0) + 1 }), {});
+  console.log(
+    `[render:hyperframes] ${render.id}: ${JSON.stringify(bySource)} scenes, ${result.checks.passes} check pass(es), ` +
+      `rewritten ${JSON.stringify(result.checks.rewritten)}, $${result.costUsd.toFixed(4)} writing scenes, timings ${JSON.stringify(result.timingsMs)}`,
+  );
+  for (const scene of result.scenes.filter((candidate) => candidate.fallbackReason && candidate.source === 'fallback')) {
+    console.log(`[render:hyperframes] ${render.id} ${scene.frameId} (${scene.sceneId}) drawn by the engine: ${scene.fallbackReason}`);
+  }
+  return result;
+}
+
 async function renderOnce(
   context: StageContext,
   params: {
@@ -1725,7 +1786,7 @@ async function renderOnce(
   })];
 
   const silentPath = path.join(params.workDir, `film-${params.attempt}.mp4`);
-  const drawn = await renderFilm({
+  const drawn = await drawFilm(context, params.render, {
     props: {
       storyboard,
       brand,
