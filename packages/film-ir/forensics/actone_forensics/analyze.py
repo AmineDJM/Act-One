@@ -24,7 +24,7 @@ import numpy as np
 from . import audio as audio_module
 from . import camera, objects, shots, text
 from .common import ANALYZER_NAME, ANALYZER_VERSION, emit, r, rl
-from .video import WORK_WIDTH, Decoder, _size_for, analyze_video, dominant_hex
+from .video import OCR_WIDTH, WORK_WIDTH, Decoder, _size_for, analyze_video, dominant_hex
 
 
 def sha256_of(path):
@@ -117,7 +117,7 @@ def collect_references(path, lines, panel_frames, ocr_engine, width, height, rea
     """
     decoder = Decoder(path)
     refine_w, refine_h = _size_for(width, height, min(text.REFINE_WIDTH, width))
-    ocr_w, ocr_h = _size_for(width, height, min(1280, width))
+    ocr_w, ocr_h = _size_for(width, height, min(OCR_WIDTH, width))
     work_w, work_h = _size_for(width, height, WORK_WIDTH)
     wanted = {}
     for index, line in enumerate(lines):
@@ -276,6 +276,7 @@ def main(argv=None):
             "measuredRate": rate,
             "ocrStride": stride if ocr_engine else None,
             "ocrFrames": len(video["ocrFrames"]),
+            "ocrSize": video["ocrSize"] if ocr_engine else None,
         },
         "frames": {
             "count": n,

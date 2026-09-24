@@ -24,6 +24,10 @@ WORK_WIDTH = 480
 FLOW_WIDTH = 320
 COLOUR_WIDTH = 160
 SALIENCY_SIZE = 64
+# Type is read at this width. Reading Plasma at its own 1920 was tried: letters improved ("April" for
+# "Apnil", "file" for "fle"), but the recogniser ran the words of body text together ("No
+# locationsconfigured"), read more icons as characters (30 lines against 10), left fewer lines' type
+# measurable (913 against 931) and took 39% longer over the film (1,018 s against 730 s).
 OCR_WIDTH = 1280
 DOMINANT_K = 5
 GRID_COLS, GRID_ROWS = 8, 6

@@ -23,7 +23,7 @@ export const BENCHMARK_STAGES = ['validate', 'probe', 'forensics', 'transcriptio
  * packages/film-ir/forensics/actone_forensics/common.py, which a test holds
  * it to. An analysis measured by another version says so in the console.
  */
-export const BENCHMARK_ANALYZER_VERSION = '1.5.0';
+export const BENCHMARK_ANALYZER_VERSION = '1.6.0';
 
 /** The analyzer version an analysis was measured with, read back from its version string; null when it does not say. */
 export function measuredWith(analysisVersion: string | null | undefined): string | null {

@@ -3,9 +3,11 @@ Where the picture is replaced, and how.
 
 A hard cut is a single-frame discontinuity that three independent signals
 agree on: the colour histogram, the pixels, and the edges (Zabih's edge
-change ratio). A one-frame flash that returns to the picture before it is not
-a cut, and neither is the same picture brightening or changing colour: its
-edges stay where they were and its features track. A cut whose first frame is
+change ratio). A new picture in the old one's colours moves the histogram and
+the pixels less, and is a cut where every edge is replaced and nothing tracks.
+A one-frame flash that returns to the picture before it is not a cut, and
+neither is the same picture brightening or changing colour: its edges stay
+where they were and its features track. A cut whose first frame is
 still part the outgoing picture and part the incoming is a wipe completed
 within a frame. A fade is a ramp into or out of a nearly uniform field; a
 dissolve is a run of frames that are, measurably, a linear mix of the frames
@@ -21,8 +23,8 @@ UNIFORM_STD = 0.02
 # Mean absolute luma change between frames above which the picture is still moving.
 RAMP_CHANGE = 0.002
 # The edge change ratio, at working resolution, below which the frames either side of a change
-# are the same picture. On the Plasma 5.25 film, its 21 cuts replaced 58–100% of their edges;
-# its wallpaper cross-fading behind unchanged windows, 3–38%.
+# are the same picture. On the Plasma 5.25 film, its cuts replaced 58–100% of their edges; its
+# wallpaper cross-fading behind unchanged windows, 7–44% from one end of each mix to the other.
 KEPT_STRUCTURE = 0.5
 
 
@@ -41,6 +43,7 @@ def detect_cuts(features, repeat_of, small_grey):
     pd = _values(features["pixel_difference"])
     ecr = _values(features["edge_change_ratio"])
     tracked = _values(features["gm_tracked_ratio"])
+    spread = _values(features["luma_std"])
     n = len(hd)
     candidates = []
     for i in range(1, n):
@@ -48,8 +51,18 @@ def detect_cuts(features, repeat_of, small_grey):
             continue
         hd_base = _local_median(hd, i)
         pd_base = _local_median(pd, i)
-        strong = hd[i] >= max(0.3, 3 * hd_base + 0.05) and pd[i] >= max(0.05, 3 * pd_base + 0.02)
-        if not strong:
+        above_surroundings = hd[i] >= 3 * hd_base + 0.05 and pd[i] >= 3 * pd_base + 0.02
+        strong = above_surroundings and hd[i] >= 0.3 and pd[i] >= 0.05
+        # A new picture in the same colours changes its histogram and pixels far beyond what they do
+        # around it, but under the floors above. Where every edge is replaced, nothing tracks and there
+        # is a picture on both sides, it is a cut: on the Plasma film, the blurred "OVERVIEW" card giving
+        # way to the footage (frame 163: edges 0.87 replaced, nothing tracked, histogram 0.215 against
+        # 0.028 around it). An element appearing on or leaving an empty canvas is not: one side is empty.
+        restructured = (
+            above_surroundings and np.isfinite(ecr[i]) and ecr[i] >= 0.8 and np.isfinite(tracked[i]) and tracked[i] <= 0.1
+            and np.isfinite(spread[i - 1]) and np.isfinite(spread[i]) and min(spread[i - 1], spread[i]) >= UNIFORM_STD
+        )
+        if not (strong or restructured):
             continue
         # The same picture brightening or changing colour: its edges stay where they were and its features track.
         same_picture = np.isfinite(ecr[i]) and ecr[i] < 0.3 and np.isfinite(tracked[i]) and tracked[i] >= 0.7

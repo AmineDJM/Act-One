@@ -298,6 +298,8 @@ export const ForensicReport = z
         .nullable(),
       ocrStride: z.number().int().positive().nullable(),
       ocrFrames: z.number().int().nonnegative(),
+      /** The size frames were read at. Absent before analyzer 1.6.0; those read at 1280 px wide too. */
+      ocrSize: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }).nullable().optional(),
     }),
     frames: z.object({
       count: z.number().int().nonnegative(),

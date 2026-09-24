@@ -36,6 +36,39 @@ def features_for(frames):
     return {"pixel_difference": change}
 
 
+class CutTest(unittest.TestCase):
+    """The cut rule on the signals measured on the Plasma film, around one frame that changes."""
+
+    def cuts(self, changed, before_spread=0.149, after_spread=0.1, quiet=None):
+        n, at = 30, 15
+        quiet = quiet or {"histogram_distance": 0.028, "pixel_difference": 0.003, "edge_change_ratio": 0.02, "gm_tracked_ratio": 1.0}
+        features = {name: [None] + [value] * (n - 1) for name, value in quiet.items()}
+        for name, value in changed.items():
+            features[name][at] = value
+        features["luma_std"] = [before_spread] * at + [after_spread] * (n - at)
+        frames = [texture(8)] * at + [texture(9)] * (n - at)
+        return [c["frame"] for c in shots.detect_cuts(features, [None] * n, frames)]
+
+    def test_a_new_picture_in_the_same_colours_is_a_cut(self):
+        # Frame 163: the blurred "OVERVIEW" card giving way to the footage it was made from.
+        found = self.cuts({"histogram_distance": 0.215, "pixel_difference": 0.042, "edge_change_ratio": 0.868, "gm_tracked_ratio": 0.0})
+        self.assertEqual(found, [15])
+
+    def test_an_element_appearing_on_an_empty_canvas_is_not(self):
+        # Frame 388: a magnifying glass drawn on an empty white card.
+        found = self.cuts({"histogram_distance": 0.116, "pixel_difference": 0.021, "edge_change_ratio": 1.0, "gm_tracked_ratio": 0.0},
+                          before_spread=0.0, after_spread=0.05, quiet={"histogram_distance": 0.002, "pixel_difference": 0.0, "edge_change_ratio": 0.0, "gm_tracked_ratio": 0.0})
+        self.assertEqual(found, [])
+
+    def test_a_change_that_keeps_most_edges_needs_the_histogram_and_the_pixels_to_say_so(self):
+        found = self.cuts({"histogram_distance": 0.215, "pixel_difference": 0.042, "edge_change_ratio": 0.6, "gm_tracked_ratio": 0.0})
+        self.assertEqual(found, [])
+
+    def test_a_change_the_histogram_and_the_pixels_agree_on_is_a_cut_as_before(self):
+        found = self.cuts({"histogram_distance": 0.919, "pixel_difference": 0.28, "edge_change_ratio": 1.0, "gm_tracked_ratio": 0.0})
+        self.assertEqual(found, [15])
+
+
 class SplitFrameTest(unittest.TestCase):
     def test_a_frame_that_is_part_one_picture_and_part_the_next_is_a_wipe(self):
         before, after = texture(1), texture(2)
