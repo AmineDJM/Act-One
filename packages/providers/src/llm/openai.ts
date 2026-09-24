@@ -60,26 +60,38 @@ const DEFAULT_ROUTING: OpenAiModelRouting = {
  * that overstates is a report somebody double-checks and one that understates
  * is one they act on.
  */
-const BUILT_IN_PRICING: Record<string, { input: number; output: number }> = {
+export type ModelRate = {
+  input: number;
+  output: number;
+  /**
+   * Input the provider served from its prompt cache, which it bills at a
+   * fraction of the input rate. A scene agent resends the same long system
+   * prompt for every scene, so most of its input is cached, and charging it
+   * as fresh input overstated what a film's scenes cost several times over.
+   * Absent, cached input is charged as input: over rather than under.
+   */
+  cachedInput?: number;
+};
+
+const BUILT_IN_PRICING: Record<string, ModelRate> = {
   /*
    * The models the default routing sends work to, at OpenAI's standard rates
    * for prompts under 272K tokens, as developers.openai.com/api/docs/pricing
    * listed them on 24 September 2026. Before they were here every call to them
    * was charged at the dearest rate below — gpt-4o's — which is under half of
    * gpt-5.5's, so the ledger understated the deep tier by two to three times.
-   * Cached input is charged as input: over rather than under.
    */
-  'gpt-5.5': { input: 5.0, output: 30.0 },
-  'gpt-5.4': { input: 2.5, output: 15.0 },
-  'gpt-5.4-mini': { input: 0.75, output: 4.5 },
-  'gpt-5.2': { input: 1.75, output: 14.0 },
-  'gpt-5.1': { input: 1.25, output: 10.0 },
-  'gpt-5': { input: 1.25, output: 10.0 },
-  'gpt-5-mini': { input: 0.25, output: 2.0 },
-  'gpt-4.1': { input: 2.0, output: 8.0 },
-  'gpt-4.1-mini': { input: 0.4, output: 1.6 },
-  'gpt-4o': { input: 2.5, output: 10.0 },
-  'gpt-4o-mini': { input: 0.15, output: 0.6 },
+  'gpt-5.5': { input: 5.0, cachedInput: 0.5, output: 30.0 },
+  'gpt-5.4': { input: 2.5, cachedInput: 0.25, output: 15.0 },
+  'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.5 },
+  'gpt-5.2': { input: 1.75, cachedInput: 0.175, output: 14.0 },
+  'gpt-5.1': { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  'gpt-5': { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  'gpt-5-mini': { input: 0.25, cachedInput: 0.025, output: 2.0 },
+  'gpt-4.1': { input: 2.0, cachedInput: 0.5, output: 8.0 },
+  'gpt-4.1-mini': { input: 0.4, cachedInput: 0.1, output: 1.6 },
+  'gpt-4o': { input: 2.5, cachedInput: 1.25, output: 10.0 },
+  'gpt-4o-mini': { input: 0.15, cachedInput: 0.075, output: 0.6 },
 };
 
 /**
@@ -93,9 +105,9 @@ const BUILT_IN_PRICING: Record<string, { input: number; output: number }> = {
  * but the operator can now put the real number in without a deploy and the
  * console says which models are still guesses.
  */
-let PRICING: Record<string, { input: number; output: number }> = { ...BUILT_IN_PRICING };
+let PRICING: Record<string, ModelRate> = { ...BUILT_IN_PRICING };
 
-export function setModelPrices(prices: Record<string, { input: number; output: number }>): void {
+export function setModelPrices(prices: Record<string, ModelRate>): void {
   PRICING = { ...BUILT_IN_PRICING, ...prices };
   // A model that has just been given a price is no longer a model we warned
   // about, and an operator who fixed it should stop being told off for it.
@@ -103,7 +115,7 @@ export function setModelPrices(prices: Record<string, { input: number; output: n
 }
 
 /** The dearest rate on record, for a model nobody has priced. Guessing high is safe. */
-function unpriced(): { input: number; output: number } {
+function unpriced(): ModelRate {
   return Object.values(PRICING).reduce(
     (dearest, rate) => ({
       input: Math.max(dearest.input, rate.input),
@@ -153,6 +165,8 @@ export type StreamedCompletion = {
   model: string | undefined;
   inputTokens: number | undefined;
   outputTokens: number | undefined;
+  /** How much of the input the provider served from its prompt cache. */
+  cachedInputTokens: number | undefined;
 };
 
 export type Collector = {
@@ -162,12 +176,13 @@ export type Collector = {
   model: string | undefined;
   inputTokens: number | undefined;
   outputTokens: number | undefined;
+  cachedInputTokens: number | undefined;
   /** Set when the model stopped for a reason the caller should know about. */
   finish: string | null;
 };
 
 export function newCollector(): Collector {
-  return { pending: '', parts: [], model: undefined, inputTokens: undefined, outputTokens: undefined, finish: null };
+  return { pending: '', parts: [], model: undefined, inputTokens: undefined, outputTokens: undefined, cachedInputTokens: undefined, finish: null };
 }
 
 /**
@@ -205,6 +220,7 @@ export function consumeSse(text: string, into: Collector): void {
     if (parsed.data.usage) {
       into.inputTokens = parsed.data.usage.prompt_tokens ?? into.inputTokens;
       into.outputTokens = parsed.data.usage.completion_tokens ?? into.outputTokens;
+      into.cachedInputTokens = parsed.data.usage.prompt_tokens_details?.cached_tokens ?? into.cachedInputTokens;
     }
     for (const choice of parsed.data.choices ?? []) {
       const delta = choice.delta?.content;
@@ -220,6 +236,7 @@ export function finishCollector(collector: Collector): StreamedCompletion {
     model: collector.model,
     inputTokens: collector.inputTokens,
     outputTokens: collector.outputTokens,
+    cachedInputTokens: collector.cachedInputTokens,
   };
 }
 
@@ -234,7 +251,11 @@ const StreamEvent = z.object({
     )
     .optional(),
   usage: z
-    .object({ prompt_tokens: z.number().optional(), completion_tokens: z.number().optional() })
+    .object({
+      prompt_tokens: z.number().optional(),
+      completion_tokens: z.number().optional(),
+      prompt_tokens_details: z.object({ cached_tokens: z.number().optional() }).nullable().optional(),
+    })
     .nullable()
     .optional(),
 });
@@ -333,6 +354,7 @@ export class OpenAiLlmProvider implements LlmProvider {
     let totalCost = 0;
     let totalIn = 0;
     let totalOut = 0;
+    let totalCached = 0;
 
     // Structured outputs where the schema can express them: the model is then
     // constrained by the API rather than asked nicely, and the repair loop
@@ -347,6 +369,7 @@ export class OpenAiLlmProvider implements LlmProvider {
       totalCost += result.usage.costUsd;
       totalIn += result.usage.inputTokens;
       totalOut += result.usage.outputTokens;
+      totalCached += result.usage.cachedInputTokens ?? 0;
 
       const parsedJson = tryParseJson(result.value);
       if (parsedJson !== undefined) {
@@ -357,6 +380,7 @@ export class OpenAiLlmProvider implements LlmProvider {
             usage: {
               inputTokens: totalIn,
               outputTokens: totalOut,
+              ...(totalCached > 0 ? { cachedInputTokens: totalCached } : {}),
               costUsd: totalCost,
               model: result.usage.model,
             },
@@ -547,7 +571,8 @@ export class OpenAiLlmProvider implements LlmProvider {
     const content = streamed.content;
     const inputTokens = streamed.inputTokens ?? estimateTokens(messages);
     const outputTokens = streamed.outputTokens ?? Math.ceil(content.length / 4);
-    const priced = priceCall(model, inputTokens, outputTokens);
+    const cachedInputTokens = Math.min(inputTokens, Math.max(0, streamed.cachedInputTokens ?? 0));
+    const priced = priceCall(model, inputTokens, outputTokens, cachedInputTokens);
     const costUsd = priced.costUsd;
 
     await this.costSink?.record({
@@ -561,7 +586,7 @@ export class OpenAiLlmProvider implements LlmProvider {
       // Carried so the console can separate what was measured from what was
       // guessed, rather than presenting one total that is partly fiction.
       costBasis: priced.basis,
-      metadata: { tier, projectId: context.projectId, sceneId: context.sceneId },
+      metadata: { tier, projectId: context.projectId, sceneId: context.sceneId, cachedInputTokens },
     });
 
     return {
@@ -569,6 +594,7 @@ export class OpenAiLlmProvider implements LlmProvider {
       usage: {
         inputTokens,
         outputTokens,
+        ...(cachedInputTokens > 0 ? { cachedInputTokens } : {}),
         costUsd,
         model: streamed.model ?? model,
         ...(reducedEffort ? { reducedEffort } : {}),
@@ -626,6 +652,7 @@ export function priceCall(
   model: string,
   inputTokens: number,
   outputTokens: number,
+  cachedInputTokens = 0,
 ): { costUsd: number; basis: 'listed' | 'unknown_price' } {
   const known = PRICING[model];
   if (!known && !warned.has(model)) {
@@ -636,15 +663,19 @@ export function priceCall(
     );
   }
   const pricing = known ?? unpriced();
+  const cached = Math.min(inputTokens, Math.max(0, cachedInputTokens));
   return {
-    costUsd: (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output,
+    costUsd:
+      ((inputTokens - cached) / 1_000_000) * pricing.input +
+      (cached / 1_000_000) * (pricing.cachedInput ?? pricing.input) +
+      (outputTokens / 1_000_000) * pricing.output,
     basis: known ? 'listed' : 'unknown_price',
   };
 }
 
 /** The cost alone, for callers that only need the number. */
-export function priceFor(model: string, inputTokens: number, outputTokens: number): number {
-  return priceCall(model, inputTokens, outputTokens).costUsd;
+export function priceFor(model: string, inputTokens: number, outputTokens: number, cachedInputTokens = 0): number {
+  return priceCall(model, inputTokens, outputTokens, cachedInputTokens).costUsd;
 }
 
 /** What the table holds, for a test and for the console. */

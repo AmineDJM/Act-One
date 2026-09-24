@@ -59,6 +59,17 @@ describe('a completion, reassembled from its stream', () => {
     expect(result).toMatchObject({ model: 'gpt-5.4-2026-03-05', inputTokens: 120, outputTokens: 8 });
   });
 
+  it('takes how much of the input was served from the prompt cache', () => {
+    const result = stream([
+      delta('x'),
+      event({ choices: [], usage: { prompt_tokens: 9000, completion_tokens: 40, prompt_tokens_details: { cached_tokens: 8192 } } }),
+      'data: [DONE]\n',
+    ]);
+    expect(result).toMatchObject({ inputTokens: 9000, outputTokens: 40, cachedInputTokens: 8192 });
+    // A gateway that sends no details leaves the count unknown rather than zero-filled into a price.
+    expect(stream([event({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 1 } })]).cachedInputTokens).toBeUndefined();
+  });
+
   it('leaves the counts unknown when no gateway sent them', () => {
     // Estimated by the caller, exactly as it was when responses came back whole.
     const result = stream([delta('x'), 'data: [DONE]\n']);

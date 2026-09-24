@@ -40,6 +40,8 @@ export type CompleteJsonOptions<T> = CompleteOptions & {
 export type LlmUsage = {
   inputTokens: number;
   outputTokens: number;
+  /** The part of the input the provider served from its prompt cache, billed at its cached rate. */
+  cachedInputTokens?: number;
   costUsd: number;
   model: string;
   /**

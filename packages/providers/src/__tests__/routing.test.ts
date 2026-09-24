@@ -98,6 +98,26 @@ describe('what a model costs, set by whoever pays the bill', () => {
     expect(unpricedModels()).not.toContain('gpt-5.5');
   });
 
+  it('bills input served from the prompt cache at the cached rate', () => {
+    /*
+     * A scene agent resends one long system prompt for every scene, so most of
+     * its input comes back from the provider's cache at a tenth of the price.
+     * Charged as fresh input, a film's scenes looked several times dearer than
+     * the bill: $0.50 per million cached against $5 fresh for gpt-5.5.
+     */
+    expect(priceFor('gpt-5.5', 1_000_000, 0, 800_000)).toBeCloseTo(0.2 * 5 + 0.8 * 0.5);
+    // Never more cached than was sent, and never a negative count.
+    expect(priceFor('gpt-5.5', 1_000_000, 0, 5_000_000)).toBeCloseTo(0.5);
+    expect(priceFor('gpt-5.5', 1_000_000, 0, -10)).toBeCloseTo(5);
+  });
+
+  it('bills cached input as input where no cached rate is known: over rather than under', () => {
+    setModelPrices({ 'gpt-5.4': { input: 3, output: 10 } });
+    expect(priceFor('gpt-5.4', 1_000_000, 0, 1_000_000)).toBeCloseTo(3);
+    const dearestInput = Math.max(...pricedModels().map((model) => priceFor(model, 1_000_000, 0)));
+    expect(priceFor('a-model-from-next-year', 1_000_000, 0, 1_000_000)).toBe(dearestInput);
+  });
+
   it('keeps guessing high for a model nobody has priced', () => {
     /*
      * The safe direction. A price list compiled into a build goes stale the

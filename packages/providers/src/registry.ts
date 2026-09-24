@@ -64,7 +64,7 @@ const LlmConfig = z.object({
    * dearest rate it knew and was quietly wrong about what the business spends.
    */
   prices: z
-    .record(z.string(), z.object({ input: z.number().min(0), output: z.number().min(0) }))
+    .record(z.string(), z.object({ input: z.number().min(0), output: z.number().min(0), cachedInput: z.number().min(0).optional() }))
     .default({}),
 });
 
