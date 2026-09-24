@@ -231,4 +231,12 @@ describe('the brief', () => {
     for (const named of ['productWindow', 'typeset', 'uiSequence', 'inFrameWords', 'timing.beatStart', 'timing.leaves']) expect(SYSTEM_PROMPT).toContain(named);
     expect(brief).toHaveProperty('inFrameWords');
   });
+
+  it('gives the agent what a taken-apart or volume framing is drawn from', () => {
+    const target = packet({ recipe: 'product_window', assets: ['ast_img'] }, { staged: [image('ast_img')] });
+    const brief = JSON.parse(String(sceneMessages(target, sceneTokens().film)[1]!.content).split('\n\n').slice(1).join('\n\n')) as { tokens: { accent: string } };
+    // A volume's light is the accent with an alpha appended, which a CSS variable cannot carry.
+    expect(brief.tokens.accent).toMatch(/^#[0-9a-f]{6}$/i);
+    for (const named of ['space "flat"', 'space "volume"', 'knockout', 'wordsBehind', 'tokens.accent', 'onUpdate']) expect(SYSTEM_PROMPT).toContain(named);
+  });
 });

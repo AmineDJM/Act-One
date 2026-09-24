@@ -126,7 +126,7 @@ export function fontStack(family: string, generic: string): string {
  */
 const SAFE_CSS_VALUE = /^[#a-zA-Z0-9(),.%\s-]+$/;
 
-function cssColour(value: string): string {
+export function cssColour(value: string): string {
   if (!SAFE_CSS_VALUE.test(value)) throw new Error(`Refusing an unsafe colour value in the design tokens: ${JSON.stringify(value)}`);
   return value;
 }

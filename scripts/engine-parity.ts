@@ -1,7 +1,7 @@
 /**
  * The HyperFrames engine against the Remotion engine, measured.
  *
- *   npm run engine-parity -- --films halyard,northwind,meridian,fixture --variants engine,agent
+ *   npm run engine-parity -- --films halyard,northwind,meridian,fixture,layers --variants engine,agent
  *
  * Each film is rendered by the Remotion engine (the reference), by the
  * HyperFrames engine drawing every scene itself (`engine`), and by the
@@ -19,8 +19,10 @@
  * in its window and then filmed as a sequence of framings, a photograph, a
  * clip with its timecode burned in, an inline SVG logo — with joins between
  * its scenes, so the parts of the engines the reference films never
- * exercise are measured too. Every film here is a demonstration for a
- * fictional company, labelled as such.
+ * exercise are measured too. `layers` is a shorter one made the same way
+ * whose captures are taken apart and hung in a volume, framed by production's
+ * own planners. Every film here is a demonstration for a fictional company,
+ * labelled as such.
  */
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -31,12 +33,12 @@ import { renderFilm, type FilmProps } from '@act-one/motion';
 import { DirectorySceneStore, renderFilmWithHyperFrames, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
 import { OpenAiLlmProvider, type LlmTier } from '@act-one/providers';
 import { resolveFfmpeg, runFfmpeg } from '@act-one/sound';
-import { fixtureFilm, startFixtureServer } from './engine-parity-fixture.ts';
+import { fixtureFilm, layersFilm, startFixtureServer } from './engine-parity-fixture.ts';
 import { FILMS } from './reference-films-data.ts';
 
 const { values } = parseArgs({
   options: {
-    films: { type: 'string', default: 'halyard,northwind,meridian,fixture' },
+    films: { type: 'string', default: 'halyard,northwind,meridian,fixture,layers' },
     variants: { type: 'string', default: 'engine' },
     out: { type: 'string', default: path.resolve('.act-one-demo/engine-parity') },
     tier: { type: 'string', default: 'deep' },
@@ -58,6 +60,7 @@ try {
   const films: Film[] = [];
   for (const slug of values.films!.split(',').filter(Boolean)) {
     if (slug === 'fixture') films.push({ slug, props: fixtureFilm(fixtures.baseUrl) });
+    else if (slug === 'layers') films.push({ slug, props: layersFilm(fixtures.baseUrl) });
     else {
       const film = FILMS.find((candidate) => candidate.slug === slug);
       if (!film) throw new Error(`No reference film called ${slug}.`);

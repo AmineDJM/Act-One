@@ -13,6 +13,23 @@ export const FILMED_RECIPES: ReadonlySet<MotionRecipeName> = new Set<MotionRecip
 ]);
 
 export type Rect = { x: number; y: number; width: number; height: number };
+
+/** A part of the interface that moves on its own: the Remotion `UiLayer`, with its capture named by path. */
+export type FilmedLayer = {
+  role: string;
+  motion: string;
+  rect: Rect;
+  depth: number;
+  delaySeconds: number;
+  durationSeconds: number;
+  from: string;
+  knockout: boolean;
+  /** Another capture's project path; null for the shot's own capture. */
+  source: string | null;
+  sourceWidth: number | null;
+  sourceHeight: number | null;
+};
+
 export type Framing = {
   move: string;
   from: Rect;
@@ -21,21 +38,30 @@ export type Framing = {
   cut: boolean;
   lift: Rect | null;
   words: 'none' | 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right';
-  layers: { role: string; motion: string; delaySeconds: number; durationSeconds: number }[];
+  layers: FilmedLayer[];
+  space: 'flat' | 'volume';
+  wordsBehind: boolean;
 };
 export type FilmedSequence = { sourceWidth: number; sourceHeight: number; background: { r: number; g: number; b: number }; framings: Framing[] };
+
+/** What a staged file's path looks like; anything else named as a layer's capture is not placed. */
+const STAGED_PATH = /^assets\/[A-Za-z0-9._-]+$/;
+
+/*
+ * The names a layer can carry, as the storyboard schema defines them. They end
+ * up in the scene's script, so a value outside them is read as the quietest
+ * name rather than written anywhere.
+ */
+const LAYER_ROLES = ['shell', 'panel', 'overlay', 'control', 'navigation'] as const;
+const LAYER_MOTIONS = ['hold', 'recede', 'advance', 'emerge', 'parallax', 'press'] as const;
+const LAYER_EDGES = ['below', 'above', 'left', 'right', 'behind'] as const;
 
 /** The planned sequence, read defensively: the brief carries it as data, and a malformed one is not filmed. */
 export function filmedSequence(value: unknown): FilmedSequence | null {
   const sequence = value as Partial<FilmedSequence> | null;
   if (!sequence || !Array.isArray(sequence.framings) || sequence.framings.length === 0) return null;
-  const finite = (...numbers: unknown[]) => numbers.every((number) => typeof number === 'number' && Number.isFinite(number));
-  const rect = (candidate: unknown): candidate is Rect => {
-    const r = candidate as Rect | null;
-    return Boolean(r) && finite(r!.x, r!.y, r!.width, r!.height) && r!.width > 0 && r!.height > 0;
-  };
   if (!finite(sequence.sourceWidth, sequence.sourceHeight) || !sequence.background || !finite(sequence.background.r, sequence.background.g, sequence.background.b)) return null;
-  const framings = sequence.framings.filter((framing) => rect(framing.from) && rect(framing.to) && finite(framing.seconds) && framing.seconds > 0);
+  const framings = sequence.framings.filter((framing) => isRect(framing.from) && isRect(framing.to) && finite(framing.seconds) && framing.seconds > 0);
   if (framings.length === 0) return null;
   return {
     sourceWidth: sequence.sourceWidth!,
@@ -47,11 +73,47 @@ export function filmedSequence(value: unknown): FilmedSequence | null {
       to: framing.to,
       seconds: framing.seconds,
       cut: framing.cut !== false,
-      lift: rect(framing.lift) ? framing.lift : null,
+      lift: isRect(framing.lift) ? framing.lift : null,
       words: (['top_left', 'top_right', 'bottom_left', 'bottom_right'] as const).find((corner) => corner === framing.words) ?? 'none',
-      layers: Array.isArray(framing.layers) ? framing.layers.map((layer) => ({ role: String(layer.role), motion: String(layer.motion), delaySeconds: Number(layer.delaySeconds) || 0, durationSeconds: Number(layer.durationSeconds) || 0.8 })) : [],
+      layers: Array.isArray(framing.layers) ? framing.layers.flatMap((layer) => filmedLayer(layer)) : [],
+      space: framing.space === 'volume' ? 'volume' : 'flat',
+      wordsBehind: framing.wordsBehind === true,
     })),
   };
+}
+
+function filmedLayer(value: unknown): FilmedLayer[] {
+  const layer = value as Partial<FilmedLayer> | null;
+  // Without its rectangle a layer has no pixels to move; the Remotion schema never lets one through.
+  if (!layer || !isRect(layer.rect)) return [];
+  const source = typeof layer.source === 'string' && STAGED_PATH.test(layer.source) ? layer.source : null;
+  const dimension = (candidate: unknown) => (finite(candidate) && (candidate as number) > 0 ? (candidate as number) : null);
+  return [{
+    role: oneOf(LAYER_ROLES, layer.role, 'panel'),
+    motion: oneOf(LAYER_MOTIONS, layer.motion, 'hold'),
+    rect: layer.rect,
+    depth: finite(layer.depth) ? layer.depth! : 0,
+    delaySeconds: finite(layer.delaySeconds) ? Math.max(0, layer.delaySeconds!) : 0,
+    durationSeconds: finite(layer.durationSeconds) && layer.durationSeconds! > 0 ? layer.durationSeconds! : 0.8,
+    from: oneOf(LAYER_EDGES, layer.from, 'below'),
+    knockout: layer.knockout === true,
+    source,
+    sourceWidth: dimension(layer.sourceWidth),
+    sourceHeight: dimension(layer.sourceHeight),
+  }];
+}
+
+function oneOf<T extends string>(names: readonly T[], value: unknown, otherwise: T): T {
+  return names.find((name) => name === value) ?? otherwise;
+}
+
+function finite(...numbers: unknown[]): boolean {
+  return numbers.every((number) => typeof number === 'number' && Number.isFinite(number));
+}
+
+function isRect(candidate: unknown): candidate is Rect {
+  const rect = candidate as Rect | null;
+  return Boolean(rect) && finite(rect!.x, rect!.y, rect!.width, rect!.height) && rect!.width > 0 && rect!.height > 0;
 }
 
 function channel(value: number): number {

@@ -134,6 +134,16 @@ async function main(): Promise<void> {
   await run('build_storyboard', { conceptId: chosen.id });
 
   const storyboard = (await store.storyboards.listForProject(organization.id, project.id))[0]!;
+  /*
+   * Kept before anything is drawn: a render the creative review stops still
+   * leaves a storyboard of a real product, with its captures in storage, that
+   * either engine can be pointed at.
+   */
+  const assets = await store.assets.listForProject(organization.id, project.id);
+  await writeFile(
+    path.join(outputDir, 'storyboard.json'),
+    JSON.stringify({ storyboard, brand, assets: assets.map((asset) => ({ id: asset.id, kind: asset.kind, storageKey: asset.storageKey })) }, null, 1),
+  );
   const mix = visualMix(storyboard);
   line('Chosen', chosen.name);
   line('Scenes', String(storyboard.scenes.length));
