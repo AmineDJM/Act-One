@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MotionRecipeName } from '@act-one/core';
+import { UiSequence, type MotionRecipeName } from '@act-one/core';
 import { stageProduct } from '@act-one/design';
 import { validationContextFor } from '../author.ts';
 import { fallbackScene, shotOf } from '../fallback.ts';
@@ -124,6 +124,31 @@ describe('the engine composition is the Remotion component', () => {
     expect(shot('product_window', 'none')).toBe('words');
     expect(shot('cta_end_card', 'image')).toBe('end_card');
     expect(shot('logo_reveal', 'none')).toBe('logo');
+  });
+
+  it('films a planned capture as its framings, the Remotion UiCinema', () => {
+    const board = storyboard([scene(0, { recipe: 'product_sequence', text: ['Every signal in one place.'], assets: ['ast_img'], duration: 4 })]);
+    board.scenes[0]!.uiSequence = UiSequence.parse({
+      sourceWidth: 1600,
+      sourceHeight: 1000,
+      background: { r: 16, g: 20, b: 29 },
+      framings: [
+        { role: 'establish', move: 'settle', from: { x: 0, y: 0, width: 1, height: 0.9 }, to: { x: 0.05, y: 0.05, width: 0.9, height: 0.81 }, seconds: 1.8 },
+        { role: 'subject', move: 'push', from: { x: 0.02, y: 0.1, width: 0.6, height: 0.54 }, to: { x: 0.05, y: 0.15, width: 0.45, height: 0.405 }, seconds: 3, lift: { x: 0.06, y: 0.2, width: 0.28, height: 0.2 }, words: 'bottom_right' },
+      ],
+    });
+    const [target] = packetsFor(board, { staged: [image('ast_img')] });
+    expect(shotOf(target!).kind).toBe('ui');
+    const html = fallbackScene(target!, design());
+    expect(errorsOf(html, target!)).toEqual([]);
+    // Each framing is a clip on the scene's own clock; the second is held to the scene's end.
+    expect(html).toContain('id="scene-01-f1" class="clip scene-01-framing" data-start="0" data-duration="1.8"');
+    expect(html).toContain('id="scene-01-f2" class="clip scene-01-framing" data-start="1.8" data-duration="2.2"');
+    expect(html).toContain('background: rgb(16, 20, 29)');
+    expect(html).toContain('id="scene-01-f2-lift"');
+    expect(html).toContain('id="scene-01-f2-words"');
+    // The last framing clears over 0.3 s at its own end, as the Remotion component does.
+    expect(html).toContain('tl.fromTo("#scene-01-f2-ground", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "none", immediateRender: false }, 4.5);');
   });
 
   it('counts a figure the way it was written, starting from zero', () => {

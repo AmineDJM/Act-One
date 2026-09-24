@@ -50,6 +50,23 @@ describe('HyperFrames’ verdict, read', () => {
     expect(blocking(report.findings).map((finding) => finding.code)).toEqual(['console_error']);
   });
 
+  it('says a scene’s words crossing the watermark or a caption, without blocking the film on it', () => {
+    const check = JSON.stringify({
+      ok: false,
+      layout: {
+        ok: false,
+        findings: [
+          { code: 'content_overlap', severity: 'error', selector: '#scene-02-line-1', containerSelector: '#ao-watermark > svg:nth-of-type(1) > text:nth-of-type(1)', sourceFile: 'compositions/scene-02.html', message: 'Two text blocks overlap and may render unreadable.' },
+          { code: 'content_overlap', severity: 'error', selector: '#scene-02-line-1', containerSelector: '#scene-02-caption', sourceFile: 'compositions/scene-02.html', message: 'Two text blocks overlap and may render unreadable.' },
+        ],
+      },
+    });
+    const report = parseCheckOutput(check, projectDir, frameIds);
+    expect(report.findings.map((finding) => finding.severity)).toEqual(['warning', 'error']);
+    expect(report.findings[0]!.message).toMatch(/^Crosses the film's own overlay \(#ao-watermark/);
+    expect(report.findings[0]!.against).toContain('#ao-watermark');
+  });
+
   it('never reads the engine’s own host elements as a scene', () => {
     expect(scenesNamed({ selector: '#host-scene-02', message: 'overflows' }, 'index.html', frameIds)).toEqual([]);
     expect(scenesNamed({ selector: '#scene-02-title' }, 'index.html', frameIds)).toEqual(['scene-02']);

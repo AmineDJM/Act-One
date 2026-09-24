@@ -1,5 +1,5 @@
 import type { MotionRecipeName } from '@act-one/core';
-import type { DesignTokens } from '@act-one/design';
+import { applyCase, fitToLines, type DesignTokens } from '@act-one/design';
 import type { StagedAsset } from './assets.ts';
 import { escapeHtml } from './captions.ts';
 import { PLACEMENT_CLASS, type ProductWindowBox } from './studio.ts';
@@ -26,6 +26,7 @@ type Parts = { styles: string[]; markup: string[]; tweens: string[] };
 type Shot =
   | { kind: 'words' }
   | { kind: 'product'; picture: StagedAsset; box: ProductWindowBox }
+  | { kind: 'ui'; picture: StagedAsset; sequence: FilmedSequence }
   | { kind: 'photo'; picture: StagedAsset }
   | { kind: 'footage'; clip: StagedAsset }
   | { kind: 'logo' }
@@ -54,6 +55,9 @@ export function shotOf(packet: ScenePacket): Shot {
   if (recipe === 'logo_reveal') return { kind: 'logo' };
   if (recipe === 'footage' && packet.clip) return { kind: 'footage', clip: packet.clip };
   if ((recipe === 'footage' || recipe === 'photo_hold') && image) return { kind: 'photo', picture: image };
+  const sequence = FILMED_RECIPES.has(recipe) ? filmedSequence(packet.uiSequence) : null;
+  const capture = packet.assets[0];
+  if (sequence && capture?.kind === 'image') return { kind: 'ui', picture: capture, sequence };
   if (packet.productWindow && image) return { kind: 'product', picture: image, box: packet.productWindow };
   return { kind: 'words' };
 }
@@ -70,6 +74,9 @@ export function fallbackScene(packet: ScenePacket, design: DesignTokens): string
       break;
     case 'product':
       productShot(packet, design, shot.picture, shot.box, parts, ease);
+      break;
+    case 'ui':
+      filmedShot(packet, design, shot.picture, shot.sequence, parts);
       break;
     case 'photo':
       pictureShot(packet, design, shot.picture, parts, ease, 0.9);
@@ -121,6 +128,9 @@ function tailOf(packet: ScenePacket, shot: Shot): number {
       return WORDS_TAIL[packet.recipe.name] ?? DEFAULT_TAIL;
     case 'product':
       return PRODUCT_TAIL[packet.recipe.name] ?? DEFAULT_TAIL;
+    case 'ui':
+      // The Remotion UiCinema clears inside its last framing, which this shot does itself.
+      return 0;
     case 'logo':
       return 0.5;
     case 'end_card':
@@ -332,6 +342,202 @@ function productShot(packet: ScenePacket, design: DesignTokens, picture: StagedA
     `tl.fromTo("#${id}-camera", { x: ${num(camera.fromX * width * 0.08)}, y: ${num(camera.fromY * height * 0.08)}, scale: ${num(camera.fromScale)}${blur > 0 ? `, filter: "blur(${num(blur)}px)"` : ''} }, { x: ${num(camera.toX * width * 0.08)}, y: ${num(camera.toY * height * 0.08)}, scale: ${num(camera.toScale)}${blur > 0 ? ', filter: "blur(0px)"' : ''}, duration: ${num(packet.timing.beatDuration)}, ease: ActOne.ease(${JSON.stringify(camera.easing)}) }, 0);`,
     `tl.fromTo("#${id}-surface", { y: ${num(height * 0.025)}, scale: 0.965, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 1, ease: ${ease} }, ${num(packet.recipe.delaySeconds)});`,
   );
+}
+
+/** The recipes the Remotion engine films as a sequence of framings when production planned one. */
+const FILMED_RECIPES: ReadonlySet<MotionRecipeName> = new Set<MotionRecipeName>([
+  'product_window', 'product_sequence', 'floating_ui', 'feature_stack', 'product_zoom',
+]);
+
+type Rect = { x: number; y: number; width: number; height: number };
+type Framing = {
+  move: string;
+  from: Rect;
+  to: Rect;
+  seconds: number;
+  cut: boolean;
+  lift: Rect | null;
+  words: 'none' | 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right';
+  layers: { role: string; motion: string; delaySeconds: number; durationSeconds: number }[];
+};
+type FilmedSequence = { sourceWidth: number; sourceHeight: number; background: { r: number; g: number; b: number }; framings: Framing[] };
+
+/** The planned sequence, read defensively: the brief carries it as data, and a malformed one is not filmed. */
+function filmedSequence(value: unknown): FilmedSequence | null {
+  const sequence = value as Partial<FilmedSequence> | null;
+  if (!sequence || !Array.isArray(sequence.framings) || sequence.framings.length === 0) return null;
+  const finite = (...numbers: unknown[]) => numbers.every((number) => typeof number === 'number' && Number.isFinite(number));
+  const rect = (candidate: unknown): candidate is Rect => {
+    const r = candidate as Rect | null;
+    return Boolean(r) && finite(r!.x, r!.y, r!.width, r!.height) && r!.width > 0 && r!.height > 0;
+  };
+  if (!finite(sequence.sourceWidth, sequence.sourceHeight) || !sequence.background || !finite(sequence.background.r, sequence.background.g, sequence.background.b)) return null;
+  const framings = sequence.framings.filter((framing) => rect(framing.from) && rect(framing.to) && finite(framing.seconds) && framing.seconds > 0);
+  if (framings.length === 0) return null;
+  return {
+    sourceWidth: sequence.sourceWidth!,
+    sourceHeight: sequence.sourceHeight!,
+    background: { r: channel(sequence.background.r), g: channel(sequence.background.g), b: channel(sequence.background.b) },
+    framings: framings.map((framing) => ({
+      move: String(framing.move ?? 'settle'),
+      from: framing.from,
+      to: framing.to,
+      seconds: framing.seconds,
+      cut: framing.cut !== false,
+      lift: rect(framing.lift) ? framing.lift : null,
+      words: (['top_left', 'top_right', 'bottom_left', 'bottom_right'] as const).find((corner) => corner === framing.words) ?? 'none',
+      layers: Array.isArray(framing.layers) ? framing.layers.map((layer) => ({ role: String(layer.role), motion: String(layer.motion), delaySeconds: Number(layer.delaySeconds) || 0, durationSeconds: Number(layer.durationSeconds) || 0.8 })) : [],
+    })),
+  };
+}
+
+function channel(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+/**
+ * The capture filmed as its sequence of framings: the Remotion `UiCinema`.
+ *
+ * Each framing is the camera on the still, moving from one crop to another
+ * so the crop exactly fills the frame, cutting in with a hair of settle,
+ * lifting a region off the interface where production found one, and setting
+ * the scene's words in the corner the planner chose. A framing the Remotion
+ * engine takes apart into layers or builds a volume around is filmed here as
+ * the same camera on the same crops: the framing holds, the construction does
+ * not, and the render record says the scene was the engine's.
+ */
+function filmedShot(packet: ScenePacket, design: DesignTokens, picture: StagedAsset, sequence: FilmedSequence, parts: Parts): void {
+  const id = packet.frameId;
+  const token = idVar(id);
+  const { width: W, height: H } = design.frame;
+  const recipeEase = packet.recipe.easing;
+  const words = packet.onScreenText.join(' ').trim();
+  const mounted = packet.timing.mountedSeconds;
+  const leavesByCut = packet.timing.leaves === null;
+
+  parts.styles.push(
+    `.${id}-framing { position: absolute; inset: 0; }`,
+    `.${id}-ground { position: absolute; inset: 0; overflow: hidden; background: rgb(${sequence.background.r}, ${sequence.background.g}, ${sequence.background.b}); }`,
+    `.${id}-move { position: absolute; inset: 0; transform-origin: 50% 50%; }`,
+    `.${id}-plate { position: absolute; max-width: none; display: block; }`,
+    `.${id}-lift { position: absolute; overflow: hidden; border-radius: var(--ao-radius-md); transform-origin: 50% 50%; }`,
+    // A lens falls off at the corners; nothing else is added to the picture.
+    `.${id}-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 110% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.26) 100%); }`,
+  );
+  parts.tweens.push(
+    `function ${token}Place(plate, lift, liftImage, from, to, cut, t) {`,
+    `  var x = from[0] + (to[0] - from[0]) * t, y = from[1] + (to[1] - from[1]) * t, w = from[2] + (to[2] - from[2]) * t, h = from[3] + (to[3] - from[3]) * t;`,
+    `  var iw = ${W} / Math.max(0.02, w), ih = iw * ${num(sequence.sourceHeight / sequence.sourceWidth)};`,
+    `  plate.style.left = (-x * iw) + "px"; plate.style.top = (-y * ih) + "px"; plate.style.width = iw + "px"; plate.style.height = ih + "px";`,
+    `  if (!lift) return;`,
+    `  lift.style.left = ((cut[0] - x) / w) * ${W} + "px"; lift.style.top = ((cut[1] - y) / h) * ${H} + "px"; lift.style.width = (cut[2] / w) * ${W} + "px"; lift.style.height = (cut[3] / h) * ${H} + "px";`,
+    `  liftImage.style.left = (-cut[0] * iw) + "px"; liftImage.style.top = (-cut[1] * ih) + "px"; liftImage.style.width = iw + "px"; liftImage.style.height = ih + "px";`,
+    `}`,
+  );
+
+  let cursor = 0;
+  sequence.framings.forEach((framing, index) => {
+    const start = cursor;
+    cursor += framing.seconds;
+    if (start >= mounted - 0.001) return;
+    const seconds = Math.min(framing.seconds, mounted - start);
+    const last = index === sequence.framings.length - 1;
+    const key = `${id}-f${index + 1}`;
+    const rects = (rect: Rect) => `[${num(rect.x)}, ${num(rect.y)}, ${num(rect.width)}, ${num(rect.height)}]`;
+
+    const markup: string[] = [
+      `<div id="${key}-move" class="${id}-move"><img id="${key}-plate" class="${id}-plate" src="${picture.path}" alt=""></div>`,
+    ];
+    if (framing.lift) {
+      markup.push(`<div id="${key}-lift" class="${id}-lift"><img id="${key}-lift-image" class="${id}-plate" src="${picture.path}" alt=""></div>`);
+    }
+    markup.push(`<div class="${id}-vignette"></div>`);
+
+    // The camera: on the subject's own timing when the product brings something on screen, else across the framing.
+    const arriving =
+      framing.layers.find((layer) => layer.role === 'overlay' && layer.motion !== 'hold') ??
+      framing.layers.find((layer) => layer.role === 'control' && layer.motion !== 'hold');
+    const curve = arriving ? 'out_expo' : framing.move === 'lateral' || framing.move === 'hold' ? 'linear' : recipeEase;
+    const cameraDelay = arriving ? arriving.delaySeconds : 0;
+    const cameraSeconds = arriving ? arriving.durationSeconds : framing.seconds;
+    const at = (seconds: number) => num(start + seconds);
+    parts.tweens.push(
+      `var ${token}F${index + 1} = { t: 0 };`,
+      `var ${token}F${index + 1}Place = function () { ${token}Place(document.getElementById(${JSON.stringify(`${key}-plate`)}), ${framing.lift ? `document.getElementById(${JSON.stringify(`${key}-lift`)}), document.getElementById(${JSON.stringify(`${key}-lift-image`)})` : 'null, null'}, ${rects(framing.from)}, ${rects(framing.to)}, ${framing.lift ? rects(framing.lift) : 'null'}, ${token}F${index + 1}.t); };`,
+      `${token}F${index + 1}Place();`,
+      `tl.fromTo(${token}F${index + 1}, { t: 0 }, { t: 1, duration: ${num(cameraSeconds)}, ease: ActOne.ease(${JSON.stringify(curve)}), onUpdate: ${token}F${index + 1}Place }, ${at(cameraDelay)});`,
+    );
+    if (framing.cut) {
+      // A cut lands: the picture arrives a hair wide and settles, in under a quarter of a second.
+      parts.tweens.push(`tl.fromTo("#${key}-move", { scale: 1.02 }, { scale: 1, duration: 0.22, ease: ActOne.ease("out_quint") }, ${at(0)});`);
+    }
+    if (framing.lift) {
+      const shadow = (alpha: number) => `0px ${num(H * 0.02)}px ${num(H * 0.055)}px rgba(0,0,0,${alpha})`;
+      parts.tweens.push(
+        `tl.fromTo("#${key}-move", { filter: "brightness(1) blur(0px)" }, { filter: "brightness(0.72) blur(2.4px)", duration: 0.5, ease: ActOne.ease("out_expo") }, ${at(0.12)});`,
+        `tl.fromTo("#${key}-lift", { scale: 1, y: ${num(H * 0.012)}, boxShadow: ${JSON.stringify(shadow(0))} }, { scale: 1.05, y: 0, boxShadow: ${JSON.stringify(shadow(0.42))}, duration: 0.5, ease: ActOne.ease("out_expo") }, ${at(0.12)});`,
+      );
+      if (framing.cut) parts.tweens.push(`tl.fromTo("#${key}-lift", { opacity: 0 }, { opacity: 1, duration: 0.22, ease: ActOne.ease("out_quint") }, ${at(0)});`);
+    }
+    if (words && framing.words !== 'none') markup.push(wordsInFrame(packet, design, key, framing.words, words, start, framing.seconds, parts));
+    if (last && leavesByCut) {
+      parts.tweens.push(`tl.fromTo("#${key}-ground", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "none", immediateRender: false }, ${at(Math.max(0, framing.seconds - 0.3))});`);
+    }
+
+    parts.markup.push(
+      `<div id="${key}" class="clip ${id}-framing" data-start="${num(start)}" data-duration="${num(seconds)}" data-track-index="1"><div id="${key}-ground" class="${id}-ground">${markup.join('')}</div></div>`,
+    );
+  });
+}
+
+/** The scene's words in the quiet corner of a framing, over a scrim anchored to it: the Remotion `WordsInFrame`. */
+function wordsInFrame(
+  packet: ScenePacket,
+  design: DesignTokens,
+  key: string,
+  corner: Exclude<Framing['words'], 'none'>,
+  words: string,
+  start: number,
+  seconds: number,
+  parts: Parts,
+): string {
+  const { width: W, height: H } = design.frame;
+  const top = corner === 'top_left' || corner === 'top_right';
+  const leftSide = corner === 'top_left' || corner === 'bottom_left';
+  const margin = design.grid.safe.x;
+  const blockWidth = Math.min(design.grid.safe.width * 0.46, W * 0.42);
+  const statement = design.type.statement;
+  const fitted = fitToLines(applyCase(words, statement), {
+    family: statement.family,
+    fontSizePx: statement.sizePx,
+    tracking: statement.tracking,
+    weight: statement.weight,
+    maxWidthPx: blockWidth,
+    maxLines: 3,
+  });
+  const lineHeight = fitted.fontSizePx * statement.lineHeight;
+  const at = (offset: number) => num(start + offset);
+
+  parts.styles.push(
+    `#${key}-scrim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(84% 68% at ${leftSide ? '6%' : '94%'} ${top ? '8%' : '92%'}, rgba(6,6,10,0.86) 0%, rgba(6,6,10,0.62) 34%, rgba(6,6,10,0.18) 66%, rgba(6,6,10,0) 100%); }`,
+    `#${key}-words { position: absolute; ${top ? 'top' : 'bottom'}: ${px(margin)}; ${leftSide ? 'left' : 'right'}: ${px(margin)}; width: ${px(blockWidth)}; display: flex; flex-direction: column; align-items: ${leftSide ? 'flex-start' : 'flex-end'}; gap: ${px(Math.round(statement.sizePx * 0.42))}; }`,
+    `#${key}-rule { width: ${px(Math.round(W * 0.036))}; height: 3px; background: var(--ao-accent); border-radius: 2px; }`,
+    `#${key}-shadow { text-shadow: 0 ${Math.round(H * 0.004)}px ${Math.round(H * 0.02)}px rgba(0,0,0,0.55); }`,
+    `#${key}-lines { font-family: var(--ao-statement-family); font-size: ${px(fitted.fontSizePx)}; font-weight: ${statement.weight}; line-height: ${statement.lineHeight}; letter-spacing: ${statement.tracking}em; color: #FFFFFF; text-align: ${leftSide ? 'left' : 'right'}; text-transform: none; font-kerning: normal; font-feature-settings: "kern" 1, "liga" 1, "calt" 1; text-rendering: geometricPrecision; margin: 0; }`,
+    `.${key}-mask { overflow: hidden; height: ${px(lineHeight)}; }`,
+  );
+  parts.tweens.push(
+    `tl.fromTo("#${key}-scrim", { opacity: 0 }, { opacity: 1, duration: 0.7, ease: ActOne.ease("out_quint") }, ${at(0.18)});`,
+    `tl.fromTo("#${key}-words", { opacity: 0, y: ${num(H * 0.018)} }, { opacity: 1, y: 0, duration: 0.7, ease: ActOne.ease("out_quint") }, ${at(0.18)});`,
+    ...fitted.lines.map(
+      (_, index) =>
+        `tl.fromTo("#${key}-line-${index + 1}", { y: ${num(lineHeight * 0.92)}, opacity: 0 }, { y: 0, opacity: 1, duration: 0.72, ease: ActOne.ease(${JSON.stringify(packet.recipe.easing)}) }, ${at(0.25 + index * 0.06)});`,
+    ),
+    // The words clear at the end of their framing, as the Remotion WordReveal inside it does.
+    `tl.fromTo("#${key}-lines", { opacity: 1 }, { opacity: 0, duration: ${DEFAULT_TAIL}, ease: "none", immediateRender: false }, ${at(Math.max(0, seconds - DEFAULT_TAIL))});`,
+  );
+  const lines = fitted.lines.map((line, index) => `<div class="${key}-mask"><div id="${key}-line-${index + 1}">${escapeHtml(line)}</div></div>`).join('');
+  return `<div id="${key}-scrim"></div><div id="${key}-words"><div id="${key}-rule"></div><div id="${key}-shadow"><div id="${key}-lines">${lines}</div></div></div>`;
 }
 
 /** A photograph or a clip filling the frame under its camera: the Remotion `PhotoHold` and `Footage`. */

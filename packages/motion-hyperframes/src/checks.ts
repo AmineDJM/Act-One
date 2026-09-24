@@ -23,6 +23,8 @@ export type EngineFinding = {
   /** Project-relative file, when the finding names one. */
   file: string | null;
   selector: string | null;
+  /** The other element, when the finding is about two: what the selector collides with or escapes. */
+  against: string | null;
   atSeconds: number | null;
   fixHint: string | null;
 };
@@ -95,20 +97,39 @@ function findingFrom(
   frameIds: ReadonlySet<string>,
 ): EngineFinding {
   const file = relativeFile(text(raw.file) ?? text(raw.sourceFile), projectDir);
-  const severity = raw.severity === 'error' || raw.severity === 'warning' ? raw.severity : 'info';
+  const code = text(raw.code) ?? 'unknown';
+  const selector = text(raw.selector);
+  const against = text(raw.containerSelector);
+  let severity: EngineFinding['severity'] = raw.severity === 'error' || raw.severity === 'warning' ? raw.severity : 'info';
+  let message = (text(raw.message) ?? '').slice(0, 600);
+  /*
+   * The film's own overlays are layered over every scene on purpose: the
+   * watermark a plan pays to remove, the captions a vertical cut is watched
+   * by. A scene's words crossing one is worth knowing — the Remotion engine
+   * draws the same collision — but it is not the scene's fault and no rewrite
+   * of the scene is owed for it, so it is said, not blocked on.
+   */
+  if (severity === 'error' && code === 'content_overlap' && [selector, against].some((candidate) => candidate !== null && ENGINE_OVERLAY.test(candidate))) {
+    severity = 'warning';
+    message = `Crosses the film's own overlay (${against ?? selector}): ${message}`;
+  }
   const time = Number(raw.time ?? raw.firstSeen);
   return {
     section,
-    code: text(raw.code) ?? 'unknown',
+    code,
     severity,
-    message: (text(raw.message) ?? '').slice(0, 600),
+    message,
     frameIds: scenesNamed(raw, file, frameIds),
     file,
-    selector: text(raw.selector),
+    selector,
+    against,
     atSeconds: Number.isFinite(time) ? time : null,
     fixHint: text(raw.fixHint)?.slice(0, 400) ?? null,
   };
 }
+
+/** The engine's own layers over the scenes: the watermark and the burned-in captions. */
+const ENGINE_OVERLAY = /#ao-watermark\b|#ao-caption-\d+|\.ao-caption(-line|-block)?\b/;
 
 /**
  * The scenes a finding is about.
