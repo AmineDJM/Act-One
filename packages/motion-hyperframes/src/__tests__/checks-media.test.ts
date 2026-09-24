@@ -6,7 +6,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runFfmpeg } from '@act-one/sound';
 import { blocking, CheckOutputError, parseCheckOutput, parseLintOutput, scenesNamed } from '../checks.ts';
-import { deliver, deliveryProblems, factsFrom, isDeliveryColour, normaliseClip, probeMedia, type MediaFacts } from '../media.ts';
+import { assumedColourMatrix, deliver, deliveryProblems, factsFrom, isDeliveryColour, normaliseClip, probeMedia, type MediaFacts } from '../media.ts';
 
 const projectDir = '/work/project';
 const frameIds = new Set(['scene-01', 'scene-02', 'scene-03']);
@@ -110,6 +110,26 @@ describe('the delivery', () => {
   });
 });
 
+describe('a clip that does not name its colour matrix', () => {
+  it('is read the way the Remotion engine reads it: BT.709 from 720 lines up, BT.601 below', () => {
+    for (const colorSpace of [null, '', 'unknown', 'unspecified']) {
+      expect(assumedColourMatrix({ colorSpace, height: 720 }), String(colorSpace)).toBe('bt709');
+      expect(assumedColourMatrix({ colorSpace, height: 718 }), String(colorSpace)).toBe('smpte170m');
+    }
+    expect(assumedColourMatrix({ colorSpace: null, height: 2160 })).toBe('bt709');
+    // A vertical clip goes by its height too: 540×960 is read as BT.709.
+    expect(assumedColourMatrix({ colorSpace: null, height: 960 })).toBe('bt709');
+    expect(assumedColourMatrix({ colorSpace: null, height: 360 })).toBe('smpte170m');
+    expect(assumedColourMatrix({ colorSpace: null, height: null })).toBe('smpte170m');
+  });
+
+  it('keeps its own when it names one', () => {
+    expect(assumedColourMatrix({ colorSpace: 'bt709', height: 360 })).toBeNull();
+    expect(assumedColourMatrix({ colorSpace: 'bt470bg', height: 1080 })).toBeNull();
+    expect(assumedColourMatrix({ colorSpace: 'bt2020nc', height: 2160 })).toBeNull();
+  });
+});
+
 const ffprobe = [path.resolve('node_modules/@remotion/compositor-linux-x64-gnu/ffprobe'), process.env.ACT_ONE_FFPROBE_PATH]
   .find((candidate): candidate is string => Boolean(candidate) && existsSync(candidate!));
 
@@ -130,6 +150,26 @@ describe.skipIf(!ffprobe)('a clip, made seekable', () => {
     const keyframes = spawnSync(ffprobe!, ['-v', 'error', '-select_streams', 'v:0', '-skip_frame', 'nokey', '-show_entries', 'frame=pts_time', '-of', 'csv=p=0', output], { encoding: 'utf8' })
       .stdout.trim().split('\n').map((line) => Number.parseFloat(line));
     expect(keyframes).toEqual([0, 1, 2]);
+  });
+
+  it('is labelled with the matrix it will be read with, and a clip that names its own keeps it', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-matrix-'));
+    const clip = async (name: string, size: string, tags: string[]) => {
+      const file = path.join(dir, name);
+      const made = await runFfmpeg(['-y', '-v', 'error', '-f', 'lavfi', '-i', `testsrc=size=${size}:rate=30:duration=1`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', ...tags, file], { timeoutMs: 60_000 });
+      expect(made.ok).toBe(true);
+      return file;
+    };
+    const untaggedHd = await clip('hd.mp4', '1280x720', []);
+    const untaggedSd = await clip('sd.mp4', '640x360', []);
+    const taggedPal = await clip('pal.mp4', '1280x720', ['-colorspace', 'bt470bg']);
+
+    for (const [source, expected] of [[untaggedHd, 'bt709'], [untaggedSd, 'smpte170m'], [taggedPal, 'bt470bg']] as const) {
+      const facts = await probeMedia(ffprobe!, source);
+      const output = `${source}.seekable.mp4`;
+      await normaliseClip(source, output, 30, { describeMatrixAs: assumedColourMatrix(facts) });
+      expect((await probeMedia(ffprobe!, output)).colorSpace, path.basename(source)).toBe(expected);
+    }
   });
 
   it('is moved into place untouched when it is already the delivery, and scaled when it is not', async () => {

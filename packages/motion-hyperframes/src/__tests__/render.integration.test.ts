@@ -9,7 +9,7 @@ import { ScriptedLlmProvider } from '@act-one/providers';
 import { probeMedia, deliveryProblems } from '../media.ts';
 import { HyperFramesRenderError, renderFilmWithHyperFrames } from '../render.ts';
 import { browserCandidates, resolveTools } from '../tools.ts';
-import { brand, scene, storyboard } from './helpers.ts';
+import { brand, design, image, packet, scene, storyboard } from './helpers.ts';
 
 /**
  * Real renders, through the pinned HyperFrames CLI, in a real browser.
@@ -125,5 +125,37 @@ window.__timelines["scene-01"] = tl;
     // By 1.2 s the headline has arrived: the frame is not the empty canvas.
     const stats = await sharp(outputPath).stats();
     expect(Math.max(...stats.channels.map((channel) => channel.max))).toBeGreaterThan(200);
+  }, 180_000);
+
+  it('sets a lower third where the Remotion engine does, lifted inside the safe area', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-lower-third-'));
+    const picture = path.join(dir, 'shot.png');
+    await sharp({ create: { width: 1920, height: 1080, channels: 3, background: '#101010' } }).png().toFile(picture);
+    const outputPath = path.join(dir, 'poster.png');
+    const spec = { recipe: 'photo_hold' as const, text: ['Then none.'], assets: ['ast_shot'], duration: 2 };
+    await renderFilmWithHyperFrames({
+      props: { storyboard: storyboard([scene(0, spec)]), brand, assetUrls: { ast_shot: pathToFileURL(picture).href } },
+      aspect: '16:9',
+      quality: 'hd',
+      outputPath,
+      stillAtSeconds: 1.5,
+      ...(browser ? { browserExecutable: browser } : {}),
+      log: () => undefined,
+    });
+
+    const { data, info } = await sharp(outputPath).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    let lowestWhiteRow = -1;
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        const at = (y * info.width + x) * 3;
+        if (data[at]! > 200 && data[at + 1]! > 200 && data[at + 2]! > 200) lowestWhiteRow = y;
+      }
+    }
+    // The Remotion `Framed` lower third is the safe area with 8% of its height as padding at the foot, inside the box.
+    const { safe } = design().grid;
+    const foot = safe.y + safe.height * 0.92;
+    const fontSizePx = packet(spec, { staged: [image('ast_shot')] }).typeset!.blocks[0]!.fontSizePx;
+    expect(lowestWhiteRow).toBeLessThanOrEqual(Math.ceil(foot));
+    expect(lowestWhiteRow).toBeGreaterThan(foot - fontSizePx);
   }, 180_000);
 });

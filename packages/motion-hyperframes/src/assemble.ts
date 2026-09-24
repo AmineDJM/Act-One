@@ -168,6 +168,8 @@ function indexHtml(input: ProjectInput, hosts: ReadonlyMap<string, HostTiming>):
 <style>
 ${input.fontCss}
 ${input.tokenCss}
+/* The Remotion engine's render page sets every element border-box; a padded or bordered box here keeps the size it has there. */
+* { box-sizing: border-box; }
 ${input.studioCss}
 html, body { margin: 0; padding: 0; width: ${width}px; height: ${height}px; overflow: hidden; background: #000; }
 #root { position: relative; width: ${width}px; height: ${height}px; overflow: hidden; background: var(--ao-canvas); }

@@ -321,6 +321,7 @@ function productShot(packet: ScenePacket, design: DesignTokens, picture: StagedA
   const { width, height } = design.frame;
 
   parts.styles.push(
+    `#${id}-fade { position: absolute; inset: 0; }`,
     `#${id}-camera { position: absolute; left: ${px(box.x)}; top: ${px(box.y)}; width: ${px(box.width)}; height: ${px(box.height)}; transform-origin: 50% 50%; }`,
     `#${id}-surface { position: absolute; inset: 0; border-radius: var(--ao-radius-lg); overflow: hidden; background: var(--ao-surface); box-shadow: var(--ao-shadow-soft); transform-origin: 50% 50%; }`,
     `#${id}-picture { width: 100%; height: calc(100% - ${px(chromeHeight)}); object-fit: cover; object-position: top center; display: block; }`,
@@ -334,13 +335,17 @@ function productShot(packet: ScenePacket, design: DesignTokens, picture: StagedA
     bar = `<div id="${id}-bar"><div class="${id}-dot"></div><div class="${id}-dot"></div><div class="${id}-dot"></div></div>`;
   }
   parts.markup.push(
-    `<div id="${id}-camera"><div id="${id}-surface">${bar}<img id="${id}-picture" src="${picture.path}" alt=""></div></div>`,
+    `<div id="${id}-fade"><div id="${id}-camera"><div id="${id}-surface">${bar}<img id="${id}-picture" src="${picture.path}" alt=""></div></div></div>`,
   );
 
   const blur = camera.depthOfField > 0 ? camera.depthOfField * 3 : 0;
+  const delay = num(packet.recipe.delaySeconds);
   parts.tweens.push(
     `tl.fromTo("#${id}-camera", { x: ${num(camera.fromX * width * 0.08)}, y: ${num(camera.fromY * height * 0.08)}, scale: ${num(camera.fromScale)}${blur > 0 ? `, filter: "blur(${num(blur)}px)"` : ''} }, { x: ${num(camera.toX * width * 0.08)}, y: ${num(camera.toY * height * 0.08)}, scale: ${num(camera.toScale)}${blur > 0 ? ', filter: "blur(0px)"' : ''}, duration: ${num(packet.timing.beatDuration)}, ease: ActOne.ease(${JSON.stringify(camera.easing)}) }, 0);`,
-    `tl.fromTo("#${id}-surface", { y: ${num(height * 0.025)}, scale: 0.965, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 1, ease: ${ease} }, ${num(packet.recipe.delaySeconds)});`,
+    // The Remotion component blurs and then fades one element, so the fade wraps the blur: faded inside it,
+    // the surface would be blurred from a nearly transparent 8-bit copy and come out darker.
+    `tl.fromTo("#${id}-fade", { opacity: 0 }, { opacity: 1, duration: 1, ease: ${ease} }, ${delay});`,
+    `tl.fromTo("#${id}-surface", { y: ${num(height * 0.025)}, scale: 0.965 }, { y: 0, scale: 1, duration: 1, ease: ${ease} }, ${delay});`,
   );
 }
 

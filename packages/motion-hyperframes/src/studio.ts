@@ -26,8 +26,8 @@ export const PLACEMENT_CLASS: Record<Placement, string> = {
 export function studioCss(design: DesignTokens): string {
   const { safe } = design.grid;
   return [
-    // Content-box, as a Remotion element is: the lower third's padding sits below the box, not inside it.
-    `.ao-frame { position: absolute; box-sizing: content-box; left: ${px(safe.x)}; top: ${px(safe.y)}; width: ${px(safe.width)}; height: ${px(safe.height)}; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }`,
+    // Border-box, as every element on a Remotion render page is: the lower third's padding lifts its words inside the safe area.
+    `.ao-frame { position: absolute; box-sizing: border-box; left: ${px(safe.x)}; top: ${px(safe.y)}; width: ${px(safe.width)}; height: ${px(safe.height)}; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }`,
     `.ao-frame--center { align-items: center; }`,
     `.ao-frame--lower-third { justify-content: flex-end; padding-bottom: ${px(safe.height * 0.08)}; }`,
     `.ao-frame--end-card { align-items: stretch; }`,

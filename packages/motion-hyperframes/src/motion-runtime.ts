@@ -89,6 +89,9 @@ ${table}
     return Object.prototype.hasOwnProperty.call(EASES, name) ? EASES[name] : EASES.out_quint;
   }
   window.ActOne = Object.freeze({ ease: ease, names: Object.freeze(Object.keys(EASES)) });
+  // Plain 2D transforms, as the Remotion engine writes them: GSAP's default translate3d
+  // moves an element onto a compositor layer, which filters and resamples it a hair differently.
+  if (window.gsap && typeof window.gsap.config === 'function') window.gsap.config({ force3D: false });
 })();
 `;
 }

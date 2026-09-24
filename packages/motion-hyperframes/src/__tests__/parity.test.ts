@@ -31,6 +31,12 @@ describe('the easing curves in the browser', () => {
     }
   });
 
+  it('move elements with 2D transforms, as the Remotion engine does, once GSAP is loaded', () => {
+    const settings: unknown[] = [];
+    vm.runInNewContext(motionRuntimeSource(), { window: { gsap: { config: (value: unknown) => settings.push(value) } } });
+    expect(settings).toEqual([{ force3D: false }]);
+  });
+
   it('name every curve the storyboard can name, and nothing else', () => {
     expect([...runtime.names].sort()).toEqual(Object.keys(EASINGS).sort());
     expect(Object.keys(EASING_CURVES).sort()).toEqual(Object.keys(EASINGS).sort());

@@ -163,7 +163,9 @@ describe('the assembled project', () => {
     expect(CONTENT_SECURITY_POLICY).toContain("default-src 'none'");
     expect(CONTENT_SECURITY_POLICY).toContain("connect-src 'self'");
     expect(index).toContain('<html lang="fr">');
-    expect(index).toContain(`.ao-frame { position: absolute; box-sizing: content-box; left: ${tokens.design.grid.safe.x}px;`);
+    // The box model of the Remotion engine's render page, so a lower third's padding stays inside the safe area.
+    expect(index).toContain('* { box-sizing: border-box; }');
+    expect(index).toContain(`.ao-frame { position: absolute; box-sizing: border-box; left: ${tokens.design.grid.safe.x}px;`);
     expect(index).toContain('data-composition-id="film" data-start="0" data-duration="6"');
     expect(index).toContain('id="host-scene-01" class="ao-scene" data-composition-id="scene-01" data-composition-src="compositions/scene-01.html" data-start="0" data-duration="3.5999"');
     expect(index).toContain('data-track-index="1"');

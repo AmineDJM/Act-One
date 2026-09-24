@@ -98,6 +98,13 @@ describe('the engine composition is the Remotion component', () => {
     expect(html).toContain('class="scene-01-dot"');
   });
 
+  it('fades around the blur, as the Remotion component blurs and then fades one element', () => {
+    const html = fallbackScene(packet({ recipe: 'product_window', assets: ['ast_img'] }, { staged: [image('ast_img')] }), design());
+    expect(html).toContain('<div id="scene-01-fade"><div id="scene-01-camera"><div id="scene-01-surface">');
+    expect(html).toContain('tl.fromTo("#scene-01-fade", { opacity: 0 }, { opacity: 1, duration: 1, ');
+    expect(html).not.toMatch(/tl\.fromTo\("#scene-01-(surface|camera)", \{[^}]*opacity/);
+  });
+
   it('leaves the bar off a bare frame and a 3D surface', () => {
     const bare = packet({ recipe: 'product_window', assets: ['ast_img'], params: { frame: 'bare' } }, { staged: [image('ast_img')] });
     expect(fallbackScene(bare, design())).not.toContain('scene-01-dot');

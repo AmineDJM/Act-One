@@ -112,6 +112,25 @@ export function factsFrom(probe: ProbeJson): MediaFacts {
   };
 }
 
+export type ColourMatrix = 'bt709' | 'smpte170m';
+
+/**
+ * The matrix a clip's colours are read with when the file does not name one.
+ *
+ * The Remotion engine reads such a clip as BT.709 from 720 lines up and as
+ * BT.601 below, whatever its width: measured on its renders of test patterns,
+ * 960×720, 1280×720, 540×960 and 720×1280 read as BT.709, 1280×718,
+ * 1280×544, 1138×640, 1024×576 and 640×360 as BT.601. HyperFrames reads every
+ * such file as BT.601, so an untagged HD clip would come out in other colours
+ * than in the other engine. Its proxy is labelled with the matrix the other
+ * engine assumes instead; a clip that names its own keeps it.
+ */
+export function assumedColourMatrix(facts: Pick<MediaFacts, 'colorSpace' | 'height'>): ColourMatrix | null {
+  const named = facts.colorSpace !== null && facts.colorSpace !== '' && facts.colorSpace !== 'unknown' && facts.colorSpace !== 'unspecified';
+  if (named) return null;
+  return (facts.height ?? 0) >= 720 ? 'bt709' : 'smpte170m';
+}
+
 /**
  * A clip, re-encoded into the form the renderer seeks reliably.
  *
@@ -122,8 +141,14 @@ export function factsFrom(probe: ProbeJson): MediaFacts {
  * H.264 at the film's rate with a keyframe every second, 4:2:0, and no sound,
  * because a clip's own sound is never part of an Act One mix.
  */
-export async function normaliseClip(input: string, output: string, fps: number, signal?: AbortSignal): Promise<void> {
+export async function normaliseClip(
+  input: string,
+  output: string,
+  fps: number,
+  options: { describeMatrixAs?: ColourMatrix | null; signal?: AbortSignal } = {},
+): Promise<void> {
   const gop = String(Math.max(1, Math.round(fps)));
+  const { describeMatrixAs, signal } = options;
   const result = await runFfmpeg(
     [
       '-y', '-v', 'error',
@@ -138,6 +163,8 @@ export async function normaliseClip(input: string, output: string, fps: number, 
       '-g', gop,
       '-keyint_min', gop,
       '-sc_threshold', '0',
+      // A description only: the pixels are the source's, now labelled with the matrix they will be read with.
+      ...(describeMatrixAs ? ['-colorspace', describeMatrixAs] : []),
       '-movflags', '+faststart',
       output,
     ],

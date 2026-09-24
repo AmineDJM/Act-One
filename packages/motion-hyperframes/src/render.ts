@@ -21,7 +21,7 @@ import { authoringCanvas, outputPlan } from './canvas.ts';
 import { captionsMarkup } from './captions.ts';
 import { blocking, CheckOutputError, parseCheckOutput, type CheckReport, type EngineFinding } from './checks.ts';
 import { bundleFonts } from './fonts.ts';
-import { deliver, deliveryProblems, MediaError, normaliseClip, probeMedia } from './media.ts';
+import { assumedColourMatrix, deliver, deliveryProblems, MediaError, normaliseClip, probeMedia } from './media.ts';
 import { buildPackets, referencedAssetIds } from './packets.ts';
 import { MemorySceneStore } from './scene-store.ts';
 import { studioCss } from './studio.ts';
@@ -408,7 +408,8 @@ async function seekableClips(
     const temporary = path.join(projectDir, 'assets', `${stem}.seekable.mp4`);
     const finalPath = `assets/${stem}.mp4`;
     try {
-      await normaliseClip(source, temporary, fps, signal);
+      const sourceFacts = await probeMedia(tools.ffprobePath, source, signal);
+      await normaliseClip(source, temporary, fps, { describeMatrixAs: assumedColourMatrix(sourceFacts), ...(signal ? { signal } : {}) });
       await rm(source, { force: true });
       await rename(temporary, path.join(projectDir, finalPath));
       const facts = await probeMedia(tools.ffprobePath, path.join(projectDir, finalPath), signal);
