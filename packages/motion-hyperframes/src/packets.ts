@@ -3,7 +3,8 @@ import type { DesignTokens } from '@act-one/design';
 import type { StagedAsset } from './assets.ts';
 import type { Canvas } from './canvas.ts';
 import { isProductRecipe, productWindowBox } from './studio.ts';
-import { typesetScene } from './typeset.ts';
+import { inFrameWords, typesetScene } from './typeset.ts';
+import { FILMED_RECIPES, filmedSequence } from './ui-sequence.ts';
 import type { ScenePacket, SceneTiming } from './types.ts';
 
 export type PacketInput = {
@@ -79,6 +80,11 @@ export function buildPackets(input: PacketInput): ScenePacket[] {
       productWindow:
         isProductRecipe(scene.motionRecipe.name) && hasImage
           ? productWindowBox({ recipe: scene.motionRecipe.name, visualType: scene.visualType, params: scene.motionRecipe.params }, input.design)
+          : null,
+      // Filmed exactly when the engine's composition would film it: a usable plan over a capture.
+      inFrameWords:
+        FILMED_RECIPES.has(scene.motionRecipe.name) && assets[0]?.kind === 'image' && filmedSequence(scene.uiSequence ?? null) !== null
+          ? inFrameWords(scene.onScreenText, input.design)
           : null,
       brand: { name: input.brandName, logo: input.logo, cta: input.cta, tagline: input.tagline },
       isFinalScene: position === scenes.length - 1,

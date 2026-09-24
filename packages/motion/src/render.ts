@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
+import { VERSION } from 'remotion/version';
 import { DEFAULT_FPS, dimensionsFor, type AspectRatio, type RenderQuality } from '@act-one/core';
 import { compositionId, filmDurationInFrames, type FilmProps } from './composition.ts';
 
@@ -48,6 +49,9 @@ export function resolveBrowserExecutable(explicit?: string): string | undefined 
     process.env.ACT_ONE_CHROME_HEADLESS_SHELL ?? process.env.REMOTION_BROWSER_EXECUTABLE;
   return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
 }
+
+/** The Remotion release this engine draws with, as a render records it. */
+export const REMOTION_VERSION: string = VERSION;
 
 export type RenderFilmOptions = {
   props: FilmProps;
@@ -151,6 +155,14 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
      */
     pixelFormat: 'yuv420p',
     colorSpace: 'bt709',
+    /*
+     * Lossless frames, so the BT.709 the file is labelled with is what its
+     * pixels are. The renderer's default JPEG frames carry BT.601 YCbCr, which
+     * the encoder only moved to limited range before labelling it BT.709:
+     * every colour came out shifted — the brand green #39d98a as
+     * (41, 194, 134). From RGB, the same zscale filter converts properly.
+     */
+    imageFormat: 'png',
     concurrency: options.concurrency ?? null,
     ...(browserExecutable ? { browserExecutable } : {}),
     onProgress: options.onProgress

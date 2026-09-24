@@ -66,6 +66,38 @@ export type AudioStem = z.infer<typeof AudioStem>;
 export const RenderKind = z.enum(['film', 'cut', 'animatic', 'localised']);
 export type RenderKind = z.infer<typeof RenderKind>;
 
+/**
+ * Which engine drew the film's picture, and how.
+ *
+ * Two engines take the same storyboard to the same silent master, and a film
+ * that looks wrong is first a question of which one drew it. For HyperFrames
+ * the record also says who drew each scene — the agent, the scene store, or
+ * the engine's own port of the Remotion component when the agent's version
+ * would not pass — what the scene writing cost, and what HyperFrames noted
+ * about the film without refusing it.
+ */
+export const RenderEngine = z.object({
+  name: z.enum(['remotion', 'hyperframes']),
+  version: z.string().max(80),
+  /** The scene contract the scenes were written to; null for Remotion. */
+  sceneContract: z.number().int().min(1).nullable().default(null),
+  scenes: z
+    .array(
+      z.object({
+        sceneId: z.string(),
+        source: z.enum(['agent', 'cache', 'fallback']),
+        attempts: z.number().int().min(0),
+        costUsd: z.number().min(0),
+        fallbackReason: z.string().max(400).nullable().default(null),
+      }),
+    )
+    .max(200)
+    .default([]),
+  warnings: z.array(z.string().max(400)).max(50).default([]),
+  costUsd: z.number().min(0).default(0),
+});
+export type RenderEngine = z.infer<typeof RenderEngine>;
+
 export const Render = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -108,6 +140,8 @@ export const Render = z.object({
   creativeVerdict: z.enum(['pass', 'pass_with_concerns', 'revise', 'block']).nullable().default(null),
   /** What the creative gate said, in the director's words. */
   creativeReason: z.string().max(800).default(''),
+  /** Null for a film drawn before engines were recorded, and until this one is drawn. */
+  engine: RenderEngine.nullable().default(null),
   error: z.string().nullable().default(null),
   startedAt: z.string().nullable().default(null),
   completedAt: z.string().nullable().default(null),

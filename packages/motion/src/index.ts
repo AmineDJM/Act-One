@@ -12,4 +12,4 @@ export {
   type FilmProps,
 } from './composition.ts';
 export { PLACEHOLDER_FILM_PROPS } from './placeholder.ts';
-export { renderFilm, bundleFilm, type RenderFilmOptions, type RenderFilmResult } from './render.ts';
+export { renderFilm, bundleFilm, REMOTION_VERSION, type RenderFilmOptions, type RenderFilmResult } from './render.ts';

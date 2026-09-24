@@ -4,6 +4,7 @@ import type { DesignTokens } from '@act-one/design';
 import { applyCase, breakLines, fitTextToBox } from '@act-one/design';
 import type { EasingName } from '@act-one/core';
 import { ease, exitProgress, interpolate, progress, staggered } from '../easing.ts';
+import { useSceneClock } from '../clock.tsx';
 
 /**
  * Brand lockups and endings.
@@ -24,9 +25,10 @@ export const LogoReveal: React.FC<{
   easing?: EasingName;
 }> = ({ logoUrl, wordmark, tokens, durationSeconds, easing }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const t = ease(easing ?? 'out_expo', progress(frame, fps, { durationSeconds: 1.1 }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.5);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.5, clock);
 
   // Optical sizing: a wordmark and an icon at the same pixel height look
   // wildly different in weight, so the mark is sized against cap height.
@@ -85,8 +87,9 @@ export const CtaEndCard: React.FC<{
   easing?: EasingName;
 }> = ({ headline, cta, logoUrl, wordmark, tokens, durationSeconds, easing }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
-  const exit = exitProgress(frame, fps, durationSeconds, 0.4);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.4, clock);
   const { grid } = tokens;
 
   /*

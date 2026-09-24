@@ -25,6 +25,7 @@ function render(organizationId: string, projectId: string, over: Partial<Render>
     productionVerdict: null,
     creativeVerdict: null,
     creativeReason: '',
+    engine: null,
     error: null,
     startedAt: now,
     completedAt: now,

@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { ProviderError, ScriptedLlmProvider, type LlmMessage } from '@act-one/providers';
 import { authorScene, authorScenes, isEngineScene, type SceneAuthorOptions } from '../author.ts';
+import { SYSTEM_PROMPT, sceneMessages } from '../prompt.ts';
 import { MemorySceneStore, sceneKey } from '../scene-store.ts';
 import { image, packet, packetsFor, scene, sceneTokens, storyboard } from './helpers.ts';
 
@@ -216,5 +217,18 @@ describe('a film’s scenes', () => {
     const written = await authorScenes(packets, tokens, '/nowhere', options(null));
     expect(written.every((result) => result.report.source === 'fallback')).toBe(true);
     expect(written[0]!.report.fallbackReason).toBe('no scene author is configured for this render');
+  });
+});
+
+describe('the brief', () => {
+  it('carries every part of the packet the instructions tell the agent to use', () => {
+    const target = packet({ recipe: 'product_window', assets: ['ast_img'], params: { aspect: 1.6 }, visualType: 'product_ui' }, { staged: [image('ast_img')] });
+    const brief = JSON.parse(String(sceneMessages(target, sceneTokens().film)[1]!.content).split('\n\n').slice(1).join('\n\n')) as Record<string, unknown>;
+    // The instructions place a product shot in "the box productWindow gives", with its bar.
+    expect(brief['productWindow']).toEqual(target.productWindow);
+    expect(target.productWindow!.barHeightPx).toBeGreaterThan(0);
+    for (const field of ['timing', 'typeset', 'recipe', 'camera', 'uiSequence', 'assets', 'brand', 'isFinalScene', 'tokens']) expect(brief, field).toHaveProperty(field);
+    for (const named of ['productWindow', 'typeset', 'uiSequence', 'inFrameWords', 'timing.beatStart', 'timing.leaves']) expect(SYSTEM_PROMPT).toContain(named);
+    expect(brief).toHaveProperty('inFrameWords');
   });
 });

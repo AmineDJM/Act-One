@@ -66,7 +66,7 @@ function render(organizationId: string, projectId: string, storyboardId: string)
     id: newId('rnd'), projectId, storyboardId, organizationId, kind: 'film', version: 1,
     aspect: '16:9', quality: 'hd', fps: 30, status: 'completed', masterAssetId: null,
     posterAssetId: null, captionsAssetId: null, watermarked: false, durationSeconds: 30,
-    costUsd: 0, qaReportId: null, productionVerdict: null, creativeVerdict: null, creativeReason: '',
+    costUsd: 0, qaReportId: null, productionVerdict: null, creativeVerdict: null, creativeReason: '', engine: null,
     error: null, startedAt: now, completedAt: now, createdAt: now,
   };
 }
@@ -192,6 +192,39 @@ describe.each(storeCases())('qa reports ($name)', ({ open, close }) => {
       expect(await store.qaReports.get(acme.organization.id, theirs.id)).toBeNull();
       expect(await store.qaReports.getForRender(acme.organization.id, theirs.renderId)).toBeNull();
       expect(await store.qaReports.get(rival.organization.id, theirs.id)).toMatchObject({ id: theirs.id });
+    } finally {
+      await close(store);
+    }
+  });
+});
+
+/**
+ * Which engine drew a film, read back.
+ *
+ * Kept with the render, in the store production runs on as well as the
+ * convenient one: a film that looks wrong is first a question of which engine
+ * drew it, and for HyperFrames of who drew each scene.
+ */
+describe.each(storeCases())('the engine a render records ($name)', ({ open, close }) => {
+  it('is kept whole, and not wiped by an update that does not mention it', async () => {
+    const store = await open();
+    try {
+      const { organization, render: film } = await filmed(store, 'Lumen');
+      expect(film.engine).toBeNull();
+      const engine = {
+        name: 'hyperframes' as const,
+        version: '1.2.0 (HyperFrames 0.8.70)',
+        sceneContract: 4,
+        scenes: [
+          { sceneId: 'scn_0', source: 'agent' as const, attempts: 1, costUsd: 0.04, fallbackReason: null },
+          { sceneId: 'scn_1', source: 'fallback' as const, attempts: 3, costUsd: 0.11, fallbackReason: 'HyperFrames refused the written scene: contrast_aa_failure' },
+        ],
+        warnings: ['contrast/contrast_aa_failure (scene-02): Drawn as the Remotion engine draws it: Contrast is 4.33:1'],
+        costUsd: 0.15,
+      };
+      await store.renders.update(organization.id, film.id, { engine });
+      await store.renders.update(organization.id, film.id, { status: 'completed' });
+      expect((await store.renders.get(organization.id, film.id))!.engine).toEqual(engine);
     } finally {
       await close(store);
     }

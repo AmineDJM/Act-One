@@ -4,6 +4,7 @@ import type { DesignTokens, TypeToken } from '@act-one/design';
 import { applyCase, breakLines, fitToLines, measureText } from '@act-one/design';
 import type { EasingName } from '@act-one/core';
 import { ease, exitProgress, interpolate, staggered } from '../easing.ts';
+import { useSceneClock } from '../clock.tsx';
 
 /**
  * Typography components.
@@ -81,10 +82,11 @@ function baseStyle(props: TypeProps, sizePx?: number): React.CSSProperties {
  */
 export const WordReveal: React.FC<TypeProps> = (props) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const { lines, sizePx } = useFitted(props);
   const lineHeightPx = sizePx * props.token.lineHeight;
-  const exit = exitProgress(frame, fps, props.durationSeconds);
+  const exit = exitProgress(frame, fps, props.durationSeconds, 0.35, clock);
 
   return (
     <div style={{ ...baseStyle(props, sizePx), opacity: 1 - exit }}>
@@ -117,9 +119,10 @@ export const WordReveal: React.FC<TypeProps> = (props) => {
 /** Word-by-word, on the beat. The kinetic systems' signature. */
 export const KineticHeadline: React.FC<TypeProps> = (props) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const { lines, sizePx } = useFitted(props);
-  const exit = exitProgress(frame, fps, props.durationSeconds, 0.18);
+  const exit = exitProgress(frame, fps, props.durationSeconds, 0.18, clock);
 
   let wordIndex = -1;
 
@@ -162,6 +165,7 @@ export const KineticHeadline: React.FC<TypeProps> = (props) => {
  */
 export const EditorialHeadline: React.FC<TypeProps & { rule?: boolean }> = (props) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const { lines, sizePx } = useFitted(props);
   const t = ease(
@@ -172,7 +176,7 @@ export const EditorialHeadline: React.FC<TypeProps & { rule?: boolean }> = (prop
       staggerSeconds: 0,
     }),
   );
-  const exit = exitProgress(frame, fps, props.durationSeconds, 0.4);
+  const exit = exitProgress(frame, fps, props.durationSeconds, 0.4, clock);
 
   return (
     <div style={{ opacity: 1 - exit }}>
@@ -206,12 +210,13 @@ export const MetricReveal: React.FC<{
   align?: 'left' | 'center' | 'right';
 }> = ({ value, caption, tokens, durationSeconds, easing, delaySeconds, align }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const t = ease(
     easing ?? 'out_quint',
     staggered(0, frame, fps, { delaySeconds: delaySeconds ?? 0, durationSeconds: 1.1, staggerSeconds: 0 }),
   );
-  const exit = exitProgress(frame, fps, durationSeconds, 0.3);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.3, clock);
 
   // Count up only when the figure is genuinely numeric. Animating "Enterprise"
   // to "Enterprise" is the kind of detail that looks broken.
@@ -270,9 +275,10 @@ export const QuoteScene: React.FC<{
   delaySeconds?: number;
 }> = ({ quote, attribution, tokens, maxWidth, durationSeconds, delaySeconds }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const t = ease('out_expo', staggered(0, frame, fps, { delaySeconds: delaySeconds ?? 0, durationSeconds: 1, staggerSeconds: 0 }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.4);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.4, clock);
   const lines = breakLines(quote, {
     family: tokens.type.statement.family,
     fontSizePx: tokens.type.statement.sizePx,

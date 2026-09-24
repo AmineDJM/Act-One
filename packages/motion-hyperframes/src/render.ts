@@ -21,7 +21,7 @@ import { authoringCanvas, outputPlan } from './canvas.ts';
 import { captionsMarkup } from './captions.ts';
 import { blocking, CheckOutputError, parseCheckOutput, type CheckReport, type EngineFinding } from './checks.ts';
 import { bundleFonts } from './fonts.ts';
-import { assumedColourMatrix, deliver, deliveryProblems, MediaError, normaliseClip, probeMedia } from './media.ts';
+import { assumedColourMatrix, deliver, deliveryProblems, encodeFrames, MediaError, normaliseClip, probeMedia } from './media.ts';
 import { buildPackets, referencedAssetIds } from './packets.ts';
 import { MemorySceneStore } from './scene-store.ts';
 import { studioCss } from './studio.ts';
@@ -269,16 +269,14 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
       return { ...common, outputPath: options.outputPath, durationSeconds: 0, width: plan.width, height: plan.height, undecodable: [] };
     }
 
-    // 5b. The film.
+    // 5b. The film: every frame as a lossless PNG, then one encode (see encodeFrames).
+    const framesDir = path.join(workDir, 'frames');
     const rawPath = path.join(workDir, 'render.mp4');
     const renderArgs = [
       'render',
-      '--output', rawPath,
-      '--format', 'mp4',
+      '--output', framesDir,
+      '--format', 'png-sequence',
       '--fps', String(fps),
-      '--quality', 'high',
-      // The Remotion engine's rates: visually lossless for interface captures, which band long before photographs do.
-      '--crf', String(crf),
       '--workers', options.concurrency && options.concurrency > 0 ? String(Math.floor(options.concurrency)) : 'auto',
       // Software rendering, as the Remotion engine renders: the same pixels on every worker, GPU or not.
       '--no-browser-gpu',
@@ -302,6 +300,19 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
         ...run.stderrTail.slice(-10),
         ...run.stdoutTail.slice(-10),
       ]);
+    }
+
+    // The Remotion engine's rate factor: visually lossless for interface captures, which band long before photographs do.
+    const encoded = await timed('encode', () =>
+      encodeFrames(framesDir, rawPath, { fps, frames: filmFrames, width: plan.width, height: plan.height, crf }, signal).catch((error: unknown) => {
+        if (error instanceof MediaError) throw new HyperFramesRenderError('render_failed', 'The rendered frames could not be encoded.', [error.message]);
+        throw error;
+      }),
+    );
+    // The frames are the largest thing a render writes; the disk is given back before delivery, not with the work directory.
+    await rm(framesDir, { recursive: true, force: true });
+    if (encoded.scaledFrom) {
+      notes.push(`Drawn at ${encoded.scaledFrom.width}×${encoded.scaledFrom.height} and scaled to ${plan.width}×${plan.height} in the encode.`);
     }
 
     const delivered = await timed('deliver', () =>
@@ -476,15 +487,40 @@ type CheckLoopInput = {
  * composition. If that composition is refused too, or a refusal names no scene
  * at all, the fault is the engine's and the render stops with the findings.
  */
+/**
+ * What HyperFrames may refuse the engine's own composition for.
+ *
+ * The composition is the Remotion engine's scene drawn by another renderer. A
+ * lint or runtime error in it is a bug in this package and stops the render;
+ * a layout, motion or contrast finding is about the material — a long word,
+ * a bright photograph under white type — and the Remotion engine draws
+ * exactly the same frame. That is Act One's QA's to judge, so it is recorded
+ * with the render rather than refused. A scene the agent wrote is still sent
+ * back for any of them.
+ */
+const ENGINE_BUG_SECTIONS: ReadonlySet<EngineFinding['section']> = new Set<EngineFinding['section']>(['lint', 'runtime']);
+
 async function checkUntilClean(input: CheckLoopInput): Promise<{ passes: number; rewritten: string[]; findings: EngineFinding[] }> {
   const rewritten = new Set<string>();
   let enginePassUsed = false;
   for (let pass = 1; ; pass += 1) {
     await input.assemble();
     const report = await runCheck(input.tools, input.projectDir, input.frameIds, input.signal);
-    const errors = blocking(report.findings);
+    const drawnByEngine = (finding: EngineFinding) =>
+      !ENGINE_BUG_SECTIONS.has(finding.section) &&
+      finding.frameIds.length > 0 &&
+      finding.frameIds.every((frameId) => {
+        const scene = input.scenes.get(frameId);
+        return scene !== undefined && isEngineScene(scene.html);
+      });
+    const errors = blocking(report.findings).filter((finding) => !drawnByEngine(finding));
     if (errors.length === 0) {
-      return { passes: pass, rewritten: [...rewritten].sort(), findings: report.findings };
+      const findings = report.findings.map((finding) =>
+        finding.severity === 'error' && drawnByEngine(finding)
+          ? { ...finding, severity: 'warning' as const, message: `Drawn as the Remotion engine draws it: ${finding.message}` }
+          : finding,
+      );
+      return { passes: pass, rewritten: [...rewritten].sort(), findings };
     }
     input.log(`check pass ${pass}: ${errors.length} blocking finding(s): ${errors.map((finding) => `${finding.code}@${finding.frameIds.join('+') || 'film'}`).join(', ')}`);
 
@@ -506,7 +542,7 @@ async function checkUntilClean(input: CheckLoopInput): Promise<{ passes: number;
     for (const [frameId, findings] of byScene) {
       const current = input.scenes.get(frameId)!;
       if (isEngineScene(current.html)) {
-        // The engine's own composition must pass HyperFrames' checks; a refusal here is a bug in this package.
+        // Only a lint or runtime error reaches here for the engine's own composition: a bug in this package.
         throw new HyperFramesRenderError('check_failed', `HyperFrames refused the engine's own composition for ${frameId}.`, findings.map(describe));
       }
       if (agentMayRewrite) {

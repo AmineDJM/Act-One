@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { ScriptedLlmProvider } from '@act-one/providers';
+import { runFfmpeg } from '@act-one/sound';
 import { probeMedia, deliveryProblems } from '../media.ts';
 import { HyperFramesRenderError, renderFilmWithHyperFrames } from '../render.ts';
 import { browserCandidates, resolveTools } from '../tools.ts';
@@ -71,6 +72,36 @@ describe.skipIf(!browser)('a film rendered by HyperFrames', () => {
     expect(result.checks.findings.filter((finding) => finding.severity === 'error')).toEqual([]);
     const tools = await resolveTools({ browserPath: browser! });
     expect(deliveryProblems(await probeMedia(tools.ffprobePath, outputPath), { width: 960, height: 540, frames: 90 })).toEqual([]);
+  }, 180_000);
+
+  it('shows a flat brand colour as that colour, read as the file describes it', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-colour-'));
+    const picture = path.join(dir, 'green.png');
+    await sharp({ create: { width: 1920, height: 1080, channels: 3, background: '#39d98a' } }).png().toFile(picture);
+    const outputPath = path.join(dir, 'green.mp4');
+    const result = await renderFilmWithHyperFrames({
+      props: { storyboard: storyboard([scene(0, { recipe: 'photo_hold', text: ['Every desk, one view.'], assets: ['ast_green'], duration: 2 })]), brand, assetUrls: { ast_green: pathToFileURL(picture).href } },
+      aspect: '16:9',
+      quality: 'preview',
+      outputPath,
+      ...(browser ? { browserExecutable: browser } : {}),
+      log: () => undefined,
+    });
+    const raw = path.join(dir, 'frame.rgb');
+    const read = await runFfmpeg(
+      ['-y', '-v', 'error', '-ss', '1.5', '-i', outputPath, '-frames:v', '1', '-vf', 'scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24', '-f', 'rawvideo', raw],
+      { timeoutMs: 60_000 },
+    );
+    expect(read.ok, read.stderr).toBe(true);
+    const pixels = await readFile(raw);
+    const at = (270 * 960 + 480) * 3;
+    const [r, g, b] = [pixels[at]!, pixels[at + 1]!, pixels[at + 2]!];
+    // Not the (41, 194, 134) that JPEG frames labelled BT.709 came back as.
+    expect([Math.abs(r - 57), Math.abs(g - 217), Math.abs(b - 138)].every((delta) => delta <= 4), `(${r}, ${g}, ${b})`).toBe(true);
+    // White words over a bright field fall short of WCAG AA; the engine draws them as the Remotion engine does, and says so.
+    const contrast = result.checks.findings.filter((finding) => finding.section === 'contrast');
+    expect(contrast.length).toBeGreaterThan(0);
+    expect(contrast.every((finding) => finding.severity === 'warning' && finding.message.startsWith('Drawn as the Remotion engine draws it'))).toBe(true);
   }, 180_000);
 
   it('sends a scene HyperFrames refuses back to its author, then draws it itself', async () => {

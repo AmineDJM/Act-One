@@ -16,10 +16,10 @@ import {
   type Storyboard,
 } from '@act-one/core';
 import { HeroShotDirector } from '@act-one/creative';
-import { renderFilm } from '@act-one/motion';
 import { readUiStructure } from '@act-one/research';
 import { extractFrame } from '@act-one/sound';
 import { resolveAssetUrls, type StageContext } from '../context.ts';
+import { drawPreview } from './film-engine.ts';
 
 /**
  * Finding the shot the film is remembered for.
@@ -342,7 +342,7 @@ async function renderShortlist(
   const work = await mkdtemp(path.join(params.workDir, 'hero-'));
   try {
     const outputPath = path.join(work, 'shortlist.mp4');
-    await renderFilm({
+    await drawPreview(context, {
       props: {
         storyboard,
         brand: params.brand,

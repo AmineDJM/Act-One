@@ -154,8 +154,8 @@ describe('the engine composition is the Remotion component', () => {
     expect(html).toContain('background: rgb(16, 20, 29)');
     expect(html).toContain('id="scene-01-f2-lift"');
     expect(html).toContain('id="scene-01-f2-words"');
-    // The last framing clears over 0.3 s at its own end, as the Remotion component does.
-    expect(html).toContain('tl.fromTo("#scene-01-f2-ground", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "none", immediateRender: false }, 4.5);');
+    // The last framing clears over 0.3 s ending at the beat's end, as the Remotion component does.
+    expect(html).toContain('tl.fromTo("#scene-01-f2-ground", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "none", immediateRender: false }, 3.7);');
   });
 
   it('counts a figure the way it was written, starting from zero', () => {

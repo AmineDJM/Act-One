@@ -1,9 +1,10 @@
 import type { MotionRecipeName } from '@act-one/core';
-import { applyCase, fitToLines, type DesignTokens } from '@act-one/design';
+import type { DesignTokens } from '@act-one/design';
 import type { StagedAsset } from './assets.ts';
 import { escapeHtml } from './captions.ts';
 import { PLACEMENT_CLASS, type ProductWindowBox } from './studio.ts';
-import type { TypesetBlock } from './typeset.ts';
+import type { InFrameWords, TypesetBlock } from './typeset.ts';
+import { FILMED_RECIPES, filmedSequence, type FilmedSequence, type Framing, type Rect } from './ui-sequence.ts';
 import type { ScenePacket } from './types.ts';
 
 /**
@@ -349,56 +350,6 @@ function productShot(packet: ScenePacket, design: DesignTokens, picture: StagedA
   );
 }
 
-/** The recipes the Remotion engine films as a sequence of framings when production planned one. */
-const FILMED_RECIPES: ReadonlySet<MotionRecipeName> = new Set<MotionRecipeName>([
-  'product_window', 'product_sequence', 'floating_ui', 'feature_stack', 'product_zoom',
-]);
-
-type Rect = { x: number; y: number; width: number; height: number };
-type Framing = {
-  move: string;
-  from: Rect;
-  to: Rect;
-  seconds: number;
-  cut: boolean;
-  lift: Rect | null;
-  words: 'none' | 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right';
-  layers: { role: string; motion: string; delaySeconds: number; durationSeconds: number }[];
-};
-type FilmedSequence = { sourceWidth: number; sourceHeight: number; background: { r: number; g: number; b: number }; framings: Framing[] };
-
-/** The planned sequence, read defensively: the brief carries it as data, and a malformed one is not filmed. */
-function filmedSequence(value: unknown): FilmedSequence | null {
-  const sequence = value as Partial<FilmedSequence> | null;
-  if (!sequence || !Array.isArray(sequence.framings) || sequence.framings.length === 0) return null;
-  const finite = (...numbers: unknown[]) => numbers.every((number) => typeof number === 'number' && Number.isFinite(number));
-  const rect = (candidate: unknown): candidate is Rect => {
-    const r = candidate as Rect | null;
-    return Boolean(r) && finite(r!.x, r!.y, r!.width, r!.height) && r!.width > 0 && r!.height > 0;
-  };
-  if (!finite(sequence.sourceWidth, sequence.sourceHeight) || !sequence.background || !finite(sequence.background.r, sequence.background.g, sequence.background.b)) return null;
-  const framings = sequence.framings.filter((framing) => rect(framing.from) && rect(framing.to) && finite(framing.seconds) && framing.seconds > 0);
-  if (framings.length === 0) return null;
-  return {
-    sourceWidth: sequence.sourceWidth!,
-    sourceHeight: sequence.sourceHeight!,
-    background: { r: channel(sequence.background.r), g: channel(sequence.background.g), b: channel(sequence.background.b) },
-    framings: framings.map((framing) => ({
-      move: String(framing.move ?? 'settle'),
-      from: framing.from,
-      to: framing.to,
-      seconds: framing.seconds,
-      cut: framing.cut !== false,
-      lift: rect(framing.lift) ? framing.lift : null,
-      words: (['top_left', 'top_right', 'bottom_left', 'bottom_right'] as const).find((corner) => corner === framing.words) ?? 'none',
-      layers: Array.isArray(framing.layers) ? framing.layers.map((layer) => ({ role: String(layer.role), motion: String(layer.motion), delaySeconds: Number(layer.delaySeconds) || 0, durationSeconds: Number(layer.durationSeconds) || 0.8 })) : [],
-    })),
-  };
-}
-
-function channel(value: number): number {
-  return Math.max(0, Math.min(255, Math.round(value)));
-}
 
 /**
  * The capture filmed as its sequence of framings: the Remotion `UiCinema`.
@@ -416,9 +367,9 @@ function filmedShot(packet: ScenePacket, design: DesignTokens, picture: StagedAs
   const token = idVar(id);
   const { width: W, height: H } = design.frame;
   const recipeEase = packet.recipe.easing;
-  const words = packet.onScreenText.join(' ').trim();
   const mounted = packet.timing.mountedSeconds;
   const leavesByCut = packet.timing.leaves === null;
+  const beatEnd = packet.timing.beatStart + packet.timing.beatDuration;
 
   parts.styles.push(
     `.${id}-framing { position: absolute; inset: 0; }`,
@@ -445,8 +396,11 @@ function filmedShot(packet: ScenePacket, design: DesignTokens, picture: StagedAs
     const start = cursor;
     cursor += framing.seconds;
     if (start >= mounted - 0.001) return;
-    const seconds = Math.min(framing.seconds, mounted - start);
     const last = index === sequence.framings.length - 1;
+    // Each framing is cut away at its own end; the last one holds for as long as the scene is mounted.
+    const seconds = last ? mounted - start : Math.min(framing.seconds, mounted - start);
+    // What a framing holds clears where it ends: at the cut to the next framing, or at the beat's end when the scene leaves by a cut.
+    const clearsAt = last ? (leavesByCut ? beatEnd : null) : start + framing.seconds;
     const key = `${id}-f${index + 1}`;
     const rects = (rect: Rect) => `[${num(rect.x)}, ${num(rect.y)}, ${num(rect.width)}, ${num(rect.height)}]`;
 
@@ -484,9 +438,9 @@ function filmedShot(packet: ScenePacket, design: DesignTokens, picture: StagedAs
       );
       if (framing.cut) parts.tweens.push(`tl.fromTo("#${key}-lift", { opacity: 0 }, { opacity: 1, duration: 0.22, ease: ActOne.ease("out_quint") }, ${at(0)});`);
     }
-    if (words && framing.words !== 'none') markup.push(wordsInFrame(packet, design, key, framing.words, words, start, framing.seconds, parts));
-    if (last && leavesByCut) {
-      parts.tweens.push(`tl.fromTo("#${key}-ground", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "none", immediateRender: false }, ${at(Math.max(0, framing.seconds - 0.3))});`);
+    if (packet.inFrameWords && framing.words !== 'none') markup.push(wordsInFrame(packet, packet.inFrameWords, design, key, framing.words, start, clearsAt, parts));
+    if (last && clearsAt !== null) {
+      parts.tweens.push(`tl.fromTo("#${key}-ground", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "none", immediateRender: false }, ${num(Math.max(start, clearsAt - 0.3))});`);
     }
 
     parts.markup.push(
@@ -498,50 +452,43 @@ function filmedShot(packet: ScenePacket, design: DesignTokens, picture: StagedAs
 /** The scene's words in the quiet corner of a framing, over a scrim anchored to it: the Remotion `WordsInFrame`. */
 function wordsInFrame(
   packet: ScenePacket,
+  words: InFrameWords,
   design: DesignTokens,
   key: string,
   corner: Exclude<Framing['words'], 'none'>,
-  words: string,
   start: number,
-  seconds: number,
+  clearsAt: number | null,
   parts: Parts,
 ): string {
-  const { width: W, height: H } = design.frame;
+  const H = design.frame.height;
   const top = corner === 'top_left' || corner === 'top_right';
   const leftSide = corner === 'top_left' || corner === 'bottom_left';
-  const margin = design.grid.safe.x;
-  const blockWidth = Math.min(design.grid.safe.width * 0.46, W * 0.42);
-  const statement = design.type.statement;
-  const fitted = fitToLines(applyCase(words, statement), {
-    family: statement.family,
-    fontSizePx: statement.sizePx,
-    tracking: statement.tracking,
-    weight: statement.weight,
-    maxWidthPx: blockWidth,
-    maxLines: 3,
-  });
-  const lineHeight = fitted.fontSizePx * statement.lineHeight;
+  const margin = words.marginPx;
+  const blockWidth = words.widthPx;
+  const lineHeight = words.fontSizePx * words.lineHeight;
   const at = (offset: number) => num(start + offset);
 
   parts.styles.push(
     `#${key}-scrim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(84% 68% at ${leftSide ? '6%' : '94%'} ${top ? '8%' : '92%'}, rgba(6,6,10,0.86) 0%, rgba(6,6,10,0.62) 34%, rgba(6,6,10,0.18) 66%, rgba(6,6,10,0) 100%); }`,
-    `#${key}-words { position: absolute; ${top ? 'top' : 'bottom'}: ${px(margin)}; ${leftSide ? 'left' : 'right'}: ${px(margin)}; width: ${px(blockWidth)}; display: flex; flex-direction: column; align-items: ${leftSide ? 'flex-start' : 'flex-end'}; gap: ${px(Math.round(statement.sizePx * 0.42))}; }`,
-    `#${key}-rule { width: ${px(Math.round(W * 0.036))}; height: 3px; background: var(--ao-accent); border-radius: 2px; }`,
+    `#${key}-words { position: absolute; ${top ? 'top' : 'bottom'}: ${px(margin)}; ${leftSide ? 'left' : 'right'}: ${px(margin)}; width: ${px(blockWidth)}; display: flex; flex-direction: column; align-items: ${leftSide ? 'flex-start' : 'flex-end'}; gap: ${px(words.gapPx)}; }`,
+    `#${key}-rule { width: ${px(words.ruleWidthPx)}; height: 3px; background: var(--ao-accent); border-radius: 2px; }`,
     `#${key}-shadow { text-shadow: 0 ${Math.round(H * 0.004)}px ${Math.round(H * 0.02)}px rgba(0,0,0,0.55); }`,
-    `#${key}-lines { font-family: var(--ao-statement-family); font-size: ${px(fitted.fontSizePx)}; font-weight: ${statement.weight}; line-height: ${statement.lineHeight}; letter-spacing: ${statement.tracking}em; color: #FFFFFF; text-align: ${leftSide ? 'left' : 'right'}; text-transform: none; font-kerning: normal; font-feature-settings: "kern" 1, "liga" 1, "calt" 1; text-rendering: geometricPrecision; margin: 0; }`,
+    `#${key}-lines { font-family: var(--ao-statement-family); font-size: ${px(words.fontSizePx)}; font-weight: ${words.weight}; line-height: ${words.lineHeight}; letter-spacing: ${words.trackingEm}em; color: #FFFFFF; text-align: ${leftSide ? 'left' : 'right'}; text-transform: none; font-kerning: normal; font-feature-settings: "kern" 1, "liga" 1, "calt" 1; text-rendering: geometricPrecision; margin: 0; }`,
     `.${key}-mask { overflow: hidden; height: ${px(lineHeight)}; }`,
   );
   parts.tweens.push(
     `tl.fromTo("#${key}-scrim", { opacity: 0 }, { opacity: 1, duration: 0.7, ease: ActOne.ease("out_quint") }, ${at(0.18)});`,
     `tl.fromTo("#${key}-words", { opacity: 0, y: ${num(H * 0.018)} }, { opacity: 1, y: 0, duration: 0.7, ease: ActOne.ease("out_quint") }, ${at(0.18)});`,
-    ...fitted.lines.map(
+    ...words.lines.map(
       (_, index) =>
         `tl.fromTo("#${key}-line-${index + 1}", { y: ${num(lineHeight * 0.92)}, opacity: 0 }, { y: 0, opacity: 1, duration: 0.72, ease: ActOne.ease(${JSON.stringify(packet.recipe.easing)}) }, ${at(0.25 + index * 0.06)});`,
     ),
-    // The words clear at the end of their framing, as the Remotion WordReveal inside it does.
-    `tl.fromTo("#${key}-lines", { opacity: 1 }, { opacity: 0, duration: ${DEFAULT_TAIL}, ease: "none", immediateRender: false }, ${at(Math.max(0, seconds - DEFAULT_TAIL))});`,
   );
-  const lines = fitted.lines.map((line, index) => `<div class="${key}-mask"><div id="${key}-line-${index + 1}">${escapeHtml(line)}</div></div>`).join('');
+  // The words clear with what holds them, as the Remotion WordReveal inside the framing does; a join carries them out whole.
+  if (clearsAt !== null) {
+    parts.tweens.push(`tl.fromTo("#${key}-lines", { opacity: 1 }, { opacity: 0, duration: ${DEFAULT_TAIL}, ease: "none", immediateRender: false }, ${num(Math.max(start, clearsAt - DEFAULT_TAIL))});`);
+  }
+  const lines = words.lines.map((line, index) => `<div class="${key}-mask"><div id="${key}-line-${index + 1}">${escapeHtml(line)}</div></div>`).join('');
   return `<div id="${key}-scrim"></div><div id="${key}-words"><div id="${key}-rule"></div><div id="${key}-shadow"><div id="${key}-lines">${lines}</div></div></div>`;
 }
 

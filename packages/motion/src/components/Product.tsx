@@ -4,6 +4,7 @@ import type { DesignTokens } from '@act-one/design';
 import { stageProduct } from '@act-one/design';
 import type { CameraRecipe, EasingName } from '@act-one/core';
 import { ease, exitProgress, interpolate, progress, staggered } from '../easing.ts';
+import { useSceneClock } from '../clock.tsx';
 
 /**
  * Product cinematography.
@@ -42,6 +43,7 @@ export const ProductWindow: React.FC<ProductWindowProps> = ({
   aspect = 16 / 9,
 }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
 
   const entrance = ease(
@@ -50,7 +52,7 @@ export const ProductWindow: React.FC<ProductWindowProps> = ({
   );
   // The camera move runs for the whole scene, independent of the entrance.
   const camT = ease(camera.easing, progress(frame, fps, { durationSeconds }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.35);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.35, clock);
 
   // The chrome bar is part of the object: the box is sized so image plus bar
   // fit the stage, rather than the bar eating the bottom of the image.
@@ -153,9 +155,10 @@ export const ProductZoom: React.FC<{
   delaySeconds?: number;
 }> = ({ src, tokens, focus, durationSeconds, easing, delaySeconds }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const t = ease(easing ?? 'in_out_quart', progress(frame, fps, { delaySeconds, durationSeconds }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.3);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.3, clock);
 
   const box = stageProduct(tokens.grid, 16 / 9, { inset: 0.94 });
   const targetScale = Math.min(3, 1 / Math.max(0.2, Math.max(focus.width, focus.height)));
@@ -206,12 +209,13 @@ export const SpatialCards: React.FC<{
   easing?: EasingName;
 }> = ({ srcs, tokens, durationSeconds, easing }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const drift = progress(frame, fps, { durationSeconds });
   // The whole group settles toward the camera as it arrives, which is what
   // makes three planes read as one space rather than three cards.
   const settle = ease(easing ?? 'out_expo', progress(frame, fps, { durationSeconds: 1.4 }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.4);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.4, clock);
   const planes = srcs.slice(0, 3);
 
   return (
@@ -273,9 +277,10 @@ export const CursorSequence: React.FC<{
   easing?: EasingName;
 }> = ({ src, tokens, path, durationSeconds, easing }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const box = stageProduct(tokens.grid, 16 / 9, { inset: 0.9 });
-  const exit = exitProgress(frame, fps, durationSeconds, 0.3);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.3, clock);
 
   const points = path.length > 0 ? path : [{ x: 0.5, y: 0.5 }];
   const legDuration = durationSeconds / Math.max(1, points.length);
@@ -356,10 +361,11 @@ export const PhotoHold: React.FC<{
   children?: React.ReactNode;
 }> = ({ src, tokens, camera, durationSeconds, easing, delaySeconds, children }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const entrance = ease(easing ?? 'out_quint', progress(frame, fps, { delaySeconds: delaySeconds ?? 0, durationSeconds: 0.9 }));
   const camT = ease(camera.easing, progress(frame, fps, { durationSeconds }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.35);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.35, clock);
 
   // A static camera still breathes: the quietest possible push keeps a held
   // photograph from reading as a paused video.

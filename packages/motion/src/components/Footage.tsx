@@ -3,6 +3,7 @@ import { AbsoluteFill, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'r
 import type { CameraRecipe, EasingName } from '@act-one/core';
 import type { DesignTokens } from '@act-one/design';
 import { ease, exitProgress, interpolate, progress } from '../easing.ts';
+import { useSceneClock } from '../clock.tsx';
 
 /**
  * Moving footage, held in the frame.
@@ -33,10 +34,11 @@ export const Footage: React.FC<{
   children?: React.ReactNode;
 }> = ({ src, tokens, camera, durationSeconds, easing, delaySeconds, children }) => {
   const frame = useCurrentFrame();
+  const clock = useSceneClock();
   const { fps } = useVideoConfig();
   const entrance = ease(easing ?? 'out_quint', progress(frame, fps, { delaySeconds: delaySeconds ?? 0, durationSeconds: 0.6 }));
   const camT = ease(camera.easing, progress(frame, fps, { durationSeconds }));
-  const exit = exitProgress(frame, fps, durationSeconds, 0.35);
+  const exit = exitProgress(frame, fps, durationSeconds, 0.35, clock);
 
   // A static camera still breathes, for the same reason a held photograph does.
   const fromScale = camera.move === 'static' ? 1.0 : camera.fromScale;

@@ -28,6 +28,7 @@ import {
   blocksRelease,
   type QaFinding,
   type Render,
+  type RenderEngine,
   type RenderKind,
   type RenderQuality,
   weakestDimensions,
@@ -51,8 +52,8 @@ import {
   releaseDecision,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
-import { renderFilm, type RenderFilmOptions, type RenderFilmResult } from '@act-one/motion';
-import { renderFilmWithHyperFrames, StorageSceneStore } from '@act-one/motion-hyperframes';
+import { REMOTION_VERSION, renderFilm, type RenderFilmOptions, type RenderFilmResult } from '@act-one/motion';
+import { renderFilmWithHyperFrames, SCENE_CONTRACT_VERSION, StorageSceneStore, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
 import { resolveTokens } from '@act-one/design';
 import {
   bedReductionDb,
@@ -107,6 +108,7 @@ import {
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { isBlenderAvailable } from '@act-one/three-d';
 import { filmTheProduct } from './product-cinematography.ts';
+import { filmEngine } from './film-engine.ts';
 import { runHeroShot, withHeroShot } from './hero-shot.ts';
 import { runSceneAssets } from './assets.ts';
 import { runCreativeMasterGate } from './creative-gate.ts';
@@ -286,6 +288,7 @@ export async function runRender(
     productionVerdict: null,
     creativeVerdict: null,
     creativeReason: '',
+    engine: null,
     error: null,
     startedAt: new Date().toISOString(),
     completedAt: null,
@@ -1332,17 +1335,6 @@ function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
-/**
- * The engine that draws this film.
- *
- * The operator's setting, unless the environment pins one — a worker set up
- * to compare engines, or one without the other engine's tooling installed.
- */
-export function filmEngine(context: StageContext): 'remotion' | 'hyperframes' {
-  const pinned = process.env['ACT_ONE_FILM_ENGINE'];
-  if (pinned === 'remotion' || pinned === 'hyperframes') return pinned;
-  return context.registry.config.render.engine;
-}
 
 /**
  * The picture, drawn by whichever engine the platform is set to.
@@ -1355,7 +1347,11 @@ export function filmEngine(context: StageContext): 'remotion' | 'hyperframes' {
  */
 async function drawFilm(context: StageContext, render: Render, options: RenderFilmOptions): Promise<RenderFilmResult> {
   const engine = filmEngine(context);
-  if (engine === 'remotion') return renderFilm(options);
+  if (engine === 'remotion') {
+    const drawn = await renderFilm(options);
+    await context.store.renders.update(context.organizationId, render.id, { engine: remotionEngineRecord() });
+    return drawn;
+  }
 
   const settings = context.registry.config.render;
   let llm: ReturnType<StageContext['registry']['llm']> | null = null;
@@ -1389,7 +1385,36 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
   for (const scene of result.scenes.filter((candidate) => candidate.fallbackReason && candidate.source === 'fallback')) {
     console.log(`[render:hyperframes] ${render.id} ${scene.frameId} (${scene.sceneId}) drawn by the engine: ${scene.fallbackReason}`);
   }
+  await context.store.renders.update(context.organizationId, render.id, { engine: hyperframesEngineRecord(result) });
   return result;
+}
+
+export { filmEngine };
+
+/** What a render drawn by the Remotion engine records about it. */
+export function remotionEngineRecord(): RenderEngine {
+  return { name: 'remotion', version: `Remotion ${REMOTION_VERSION}`, sceneContract: null, scenes: [], warnings: [], costUsd: 0 };
+}
+
+/** What a render drawn by HyperFrames records: who drew each scene, what it cost, what was noted without being refused. */
+export function hyperframesEngineRecord(result: HyperFramesRenderResult): RenderEngine {
+  return {
+    name: 'hyperframes',
+    version: `${result.engineVersion} (HyperFrames ${result.cliVersion})`.slice(0, 80),
+    sceneContract: SCENE_CONTRACT_VERSION,
+    scenes: result.scenes.map((scene) => ({
+      sceneId: scene.sceneId,
+      source: scene.source,
+      attempts: scene.attempts,
+      costUsd: Math.round(scene.costUsd * 10_000) / 10_000,
+      fallbackReason: scene.fallbackReason ? scene.fallbackReason.slice(0, 400) : null,
+    })),
+    warnings: result.checks.findings
+      .filter((finding) => finding.severity === 'warning')
+      .slice(0, 50)
+      .map((finding) => `${finding.section}/${finding.code}${finding.frameIds.length > 0 ? ` (${finding.frameIds.join(', ')})` : ''}: ${finding.message}`.slice(0, 400)),
+    costUsd: Math.round(result.costUsd * 10_000) / 10_000,
+  };
 }
 
 async function renderOnce(

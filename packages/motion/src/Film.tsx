@@ -11,7 +11,9 @@ import {
   type CaptionCue,
   sceneWindows,
   type RenderQuality,
+  type HandoverPlan,
   type Scene,
+  type SceneWindow,
   type Storyboard,
 } from '@act-one/core';
 import { resolveTokens, watermark as watermarkSvg, type DesignTokens } from '@act-one/design';
@@ -21,6 +23,7 @@ import { UiCinema } from './components/UiCinema.tsx';
 import { Footage } from './components/Footage.tsx';
 import { CtaEndCard, DepthTransition, LogoReveal, MaskReveal } from './components/Brand.tsx';
 import { Joined } from './handover.tsx';
+import { SceneClockProvider, type SceneClock } from './clock.tsx';
 
 /**
  * The film.
@@ -69,6 +72,7 @@ export const Film: React.FC<FilmProps> = ({
       {storyboard.scenes.map((scene, index) => {
         const window = windows[index]!;
         const previous = index > 0 ? storyboard.scenes[index - 1] : undefined;
+        const outgoing = storyboard.handovers[scene.id] ?? null;
         return (
         <Sequence
           key={scene.id}
@@ -79,8 +83,9 @@ export const Film: React.FC<FilmProps> = ({
          <Joined
            window={window}
            incoming={previous ? storyboard.handovers[previous.id] ?? null : null}
-           outgoing={storyboard.handovers[scene.id] ?? null}
+           outgoing={outgoing}
          >
+          <SceneClockProvider value={sceneClock(scene, window, outgoing)}>
           <SceneRenderer
             scene={scene}
             tokens={tokens}
@@ -97,6 +102,7 @@ export const Film: React.FC<FilmProps> = ({
             tagline={tagline ?? ''}
             footage={new Set(footageAssetIds ?? [])}
           />
+          </SceneClockProvider>
          </Joined>
         </Sequence>
         );
@@ -688,4 +694,12 @@ function aspectFor(width: number, height: number): '16:9' | '9:16' | '1:1' | '4:
   return '16:9';
 }
 
-
+/** The beat inside the scene's mount, read the way the joins placed it. */
+function sceneClock(scene: Scene, window: SceneWindow, outgoing: HandoverPlan | null): SceneClock {
+  return {
+    beatStartSeconds: Math.max(0, scene.startTime - window.fromSeconds),
+    beatSeconds: scene.duration,
+    mountedSeconds: window.toSeconds - window.fromSeconds,
+    leavesByCut: !(window.departSeconds > 0 && outgoing !== null),
+  };
+}

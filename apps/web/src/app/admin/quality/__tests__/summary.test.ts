@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { QaIssue, QaReport, newId, type GenerationCost, type RepairRecord } from '@act-one/core';
+import { QaIssue, QaReport, Render, newId, type GenerationCost, type RenderEngine, type RepairRecord } from '@act-one/core';
 import {
   REGENERATING,
   archetypesByScene,
   average,
   durationBand,
+  engineTallies,
   failing,
+  fallbackReasons,
   groupByRender,
   providersByScene,
   repairSuccessByCheck,
@@ -204,3 +206,38 @@ function cost(sceneId: string, provider: string, model: string | null): Generati
     createdAt: '2026-01-01T00:00:00.000Z',
   };
 }
+
+describe('which engine drew the films', () => {
+  const film = (engine: RenderEngine | null, status: 'completed' | 'failed' = 'completed') =>
+    Render.parse({
+      id: newId('rnd'), projectId: 'prj_1', storyboardId: 'sbd_1', organizationId: 'org_1', status,
+      masterAssetId: status === 'completed' ? newId('ast') : null, engine, createdAt: '2026-09-24T00:00:00.000Z',
+    });
+  const scene = (source: 'agent' | 'cache' | 'fallback', fallbackReason: string | null = null) => ({ sceneId: newId('scn'), source, attempts: 1, costUsd: 0.02, fallbackReason });
+  const hyperframes = (scenes: ReturnType<typeof scene>[], costUsd: number): RenderEngine => ({ name: 'hyperframes', version: '1.2.0', sceneContract: 4, scenes, warnings: [], costUsd });
+  const remotion: RenderEngine = { name: 'remotion', version: 'Remotion 4.0.526', sceneContract: null, scenes: [], warnings: [], costUsd: 0 };
+
+  it('counts each engine’s films, and who drew the HyperFrames scenes', () => {
+    const renders = [
+      film(remotion),
+      film(hyperframes([scene('agent'), scene('agent'), scene('fallback', 'HyperFrames refused the written scene: contrast_aa_failure')], 0.2)),
+      film(hyperframes([scene('cache'), scene('agent')], 0.05), 'failed'),
+      film(null),
+    ];
+    const tallies = engineTallies(renders, (render) => render.status === 'completed');
+    expect(tallies.map((tally) => tally.engine)).toEqual(['remotion', 'hyperframes', 'unrecorded']);
+    expect(tallies[1]).toMatchObject({ films: 2, released: 1, byAgent: 3, fromStore: 1, byEngine: 1 });
+    expect(tallies[1]!.sceneWritingUsd).toBeCloseTo(0.25, 10);
+    // A film drawn before engines were recorded is not credited to the default engine.
+    expect(tallies[2]).toMatchObject({ films: 1, released: 1, byAgent: 0 });
+  });
+
+  it('lists why scenes were drawn by the engine, most frequent first', () => {
+    const renders = [
+      film(hyperframes([scene('fallback', 'b refused'), scene('fallback', 'a refused'), scene('agent')], 0)),
+      film(hyperframes([scene('fallback', 'b refused'), scene('fallback', null)], 0)),
+    ];
+    expect(fallbackReasons(renders)).toEqual([{ reason: 'b refused', count: 2 }, { reason: 'a refused', count: 1 }]);
+    expect(fallbackReasons([film(remotion), film(null)])).toEqual([]);
+  });
+});

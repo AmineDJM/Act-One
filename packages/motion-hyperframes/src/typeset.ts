@@ -234,3 +234,51 @@ function block(
 function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+/**
+ * The scene's words as the Remotion `WordsInFrame` sets them in a filmed capture.
+ *
+ * A column in the quiet corner of the framing: at most 46% of the safe width
+ * (and 42% of the frame), in the statement role, broken into three lines at
+ * most, with an accent rule above them. The corner changes from framing to
+ * framing; the lines do not.
+ */
+export type InFrameWords = {
+  lines: string[];
+  fontSizePx: number;
+  lineHeight: number;
+  weight: number;
+  trackingEm: number;
+  /** The column's width, and its distance from both edges of the corner it sits in. */
+  widthPx: number;
+  marginPx: number;
+  /** Between the rule and the lines. */
+  gapPx: number;
+  ruleWidthPx: number;
+};
+
+export function inFrameWords(onScreenText: readonly string[], tokens: DesignTokens): InFrameWords | null {
+  const text = onScreenText.join(' ').trim();
+  if (!text) return null;
+  const statement = tokens.type.statement;
+  const widthPx = Math.min(tokens.grid.safe.width * 0.46, tokens.frame.width * 0.42);
+  const fitted = fitToLines(applyCase(text, statement), {
+    family: statement.family,
+    fontSizePx: statement.sizePx,
+    tracking: statement.tracking,
+    weight: statement.weight,
+    maxWidthPx: widthPx,
+    maxLines: 3,
+  });
+  return {
+    lines: fitted.lines,
+    fontSizePx: fitted.fontSizePx,
+    lineHeight: statement.lineHeight,
+    weight: statement.weight,
+    trackingEm: statement.tracking,
+    widthPx,
+    marginPx: tokens.grid.safe.x,
+    gapPx: Math.round(statement.sizePx * 0.42),
+    ruleWidthPx: Math.round(tokens.frame.width * 0.036),
+  };
+}

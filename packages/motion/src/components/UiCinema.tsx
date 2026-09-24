@@ -2,6 +2,7 @@ import React from 'react';
 import { Img, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { DesignTokens } from '@act-one/design';
 import type { EasingName, FramingRect, UiFraming, UiSequence, WordCorner } from '@act-one/core';
+import { clockFrom, SceneClockProvider, useSceneClock, type SceneClock } from '../clock.tsx';
 import { ease, exitProgress, progress } from '../easing.ts';
 import { WordReveal } from './Type.tsx';
 import { LayeredShot, VolumeShot, plateGeometry } from './UiLayers.tsx';
@@ -34,26 +35,40 @@ export type UiCinemaProps = {
 
 export const UiCinema: React.FC<UiCinemaProps> = ({ src, sources, sequence, tokens, words, easing }) => {
   const { fps } = useVideoConfig();
+  const scene = useSceneClock();
 
   let cursor = 0;
   return (
     <>
       {sequence.framings.map((framing, index) => {
-        const from = Math.round(cursor * fps);
+        const start = cursor;
+        const from = Math.round(start * fps);
         cursor += framing.seconds;
-        const frames = Math.max(1, Math.round(framing.seconds * fps));
+        const last = index === sequence.framings.length - 1;
+        /*
+         * Each framing is cut away at its own end, so what it holds clears
+         * there. The last one belongs to the scene: it holds for as long as the
+         * scene is mounted, clears at the beat's end when the scene leaves by
+         * a cut and not at all when a join carries it out, rather than leaving
+         * the frame empty after a join brought the scene in early.
+         */
+        const own: SceneClock = { beatStartSeconds: 0, beatSeconds: framing.seconds, mountedSeconds: framing.seconds, leavesByCut: true };
+        const clock = last && scene ? clockFrom(scene, start) : own;
+        const frames = Math.max(1, Math.round(Math.max(framing.seconds, clock.mountedSeconds) * fps));
         return (
           <Sequence key={index} from={from} durationInFrames={frames} name={`${index + 1}. ${framing.role}`}>
-            <Shot
-              src={src}
-              sources={sources}
-              sequence={sequence}
-              framing={framing}
-              tokens={tokens}
-              words={words}
-              easing={easing}
-              last={index === sequence.framings.length - 1}
-            />
+            <SceneClockProvider value={clock}>
+              <Shot
+                src={src}
+                sources={sources}
+                sequence={sequence}
+                framing={framing}
+                tokens={tokens}
+                words={words}
+                easing={easing}
+                last={last}
+              />
+            </SceneClockProvider>
           </Sequence>
         );
       })}
@@ -114,7 +129,8 @@ const Shot: React.FC<{
   const { imageWidth, imageHeight, left, top } = geometry;
 
   const cutIn = framing.cut ? ease('out_quint', progress(frame, fps, { durationSeconds: CUT_IN_SECONDS })) : 1;
-  const out = last ? exitProgress(frame, fps, framing.seconds, 0.3) : 0;
+  const clock = useSceneClock();
+  const out = last ? exitProgress(frame, fps, framing.seconds, 0.3, clock) : 0;
 
   const lift = framing.lift ? geometry.onScreen(framing.lift) : null;
   /*

@@ -126,6 +126,21 @@ describe.skipIf(browser === undefined)('a beat leaving while the next arrives', 
     expect(joined, where).toBeGreaterThan(plain);
     expect(joined, where).toBeGreaterThan(alone);
 
+    /*
+     * And each beat keeps to its own clock through the join. The first is
+     * carried out by the join rather than faded before it begins, so just
+     * after the second beat starts both are still on screen; the second,
+     * mounted a second early to arrive, holds until its own end rather than
+     * clearing a second before the film does.
+     */
+    const leavingFrame = path.join(dir, 'leaving.png');
+    const lateFrame = path.join(dir, 'late.png');
+    expect((await runFfmpeg(posterArgs(carried, 3.2, leavingFrame))).ok).toBe(true);
+    expect((await runFfmpeg(posterArgs(carried, 5.6, lateFrame))).ok).toBe(true);
+    const [leaving, late] = await Promise.all([ink(leavingFrame), ink(lateFrame)]);
+    expect(leaving, `leaving ${leaving.toFixed(4)}, ${where}`).toBeGreaterThan(alone);
+    expect(late, `late ${late.toFixed(4)}, ${where}`).toBeGreaterThan(alone * 0.8);
+
     // And the film is not made longer by the overlap: the editorial clock
     // still decides the runtime, which is what every QA measurement keys off.
     const { readContainer } = await import('@act-one/qa');

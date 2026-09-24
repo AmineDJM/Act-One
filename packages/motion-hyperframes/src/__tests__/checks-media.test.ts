@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { runFfmpeg } from '@act-one/sound';
 import { blocking, CheckOutputError, parseCheckOutput, parseLintOutput, scenesNamed } from '../checks.ts';
-import { assumedColourMatrix, deliver, deliveryProblems, factsFrom, isDeliveryColour, normaliseClip, probeMedia, type MediaFacts } from '../media.ts';
+import { assumedColourMatrix, deliver, deliveryProblems, encodeFrames, factsFrom, isDeliveryColour, MediaError, normaliseClip, pngSize, probeMedia, type MediaFacts } from '../media.ts';
 
 const projectDir = '/work/project';
 const frameIds = new Set(['scene-01', 'scene-02', 'scene-03']);
@@ -185,5 +186,72 @@ describe.skipIf(!ffprobe)('a clip, made seekable', () => {
     const scaled = await deliver(ffprobe!, path.join(dir, 'moved.mp4'), path.join(dir, 'preview.mp4'), { width: 320, height: 180, crf: 18 });
     expect(scaled.treatment).toBe('scaled');
     expect(deliveryProblems(scaled.facts, { width: 320, height: 180, frames: 30 })).toEqual([]);
+  });
+});
+
+/** The frames a render writes: flat fields of one colour, numbered as HyperFrames numbers them. */
+async function frames(dir: string, count: number, width: number, height: number, colour: string): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  const png = await sharp({ create: { width, height, channels: 4, background: colour } }).png().toBuffer();
+  for (let index = 1; index <= count; index += 1) await writeFile(path.join(dir, `frame_${String(index).padStart(6, '0')}.png`), png);
+}
+
+/** The middle pixel of a frame of the film, read with the matrix the file names. */
+async function middlePixel(file: string, frame: number): Promise<number[]> {
+  const out = `${file}.${frame}.rgb`;
+  const made = await runFfmpeg(['-y', '-v', 'error', '-i', file, '-vf', `select=eq(n\\,${frame}),scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24`, '-frames:v', '1', '-f', 'rawvideo', out], { timeoutMs: 60_000 });
+  expect(made.ok, made.stderr).toBe(true);
+  const { readFile } = await import('node:fs/promises');
+  const facts = await probeMedia(ffprobe!, file);
+  const data = await readFile(out);
+  const at = (Math.floor(facts.height! / 2) * facts.width! + Math.floor(facts.width! / 2)) * 3;
+  return [data[at]!, data[at + 1]!, data[at + 2]!];
+}
+
+describe.skipIf(!ffprobe)('the film, encoded from its frames', () => {
+  it('is the delivery, in the colours it was drawn in', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-encode-'));
+    await frames(path.join(dir, 'frames'), 6, 320, 180, '#39d98a');
+    const output = path.join(dir, 'film.mp4');
+    expect(await encodeFrames(path.join(dir, 'frames'), output, { fps: 30, frames: 6, width: 320, height: 180, crf: 18 })).toEqual({ scaledFrom: null });
+    const facts = await probeMedia(ffprobe!, output);
+    expect(deliveryProblems(facts, { width: 320, height: 180, frames: 6 })).toEqual([]);
+    // The brand green, read the way the file says to read it: not the (41, 194, 134) that JPEG frames labelled BT.709 gave.
+    const [r, g, b] = await middlePixel(output, 3);
+    expect(Math.abs(r! - 57), `r ${r}`).toBeLessThanOrEqual(3);
+    expect(Math.abs(g! - 217), `g ${g}`).toBeLessThanOrEqual(3);
+    expect(Math.abs(b! - 138), `b ${b}`).toBeLessThanOrEqual(3);
+  });
+
+  it('reaches a size the renderer did not draw in the same pass', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-encode-scaled-'));
+    await frames(path.join(dir, 'frames'), 3, 640, 360, '#101820');
+    const output = path.join(dir, 'film.mp4');
+    expect(await encodeFrames(path.join(dir, 'frames'), output, { fps: 30, frames: 3, width: 320, height: 180, crf: 18 })).toEqual({ scaledFrom: { width: 640, height: 360 } });
+    expect(deliveryProblems(await probeMedia(ffprobe!, output), { width: 320, height: 180, frames: 3 })).toEqual([]);
+  });
+
+  it('refuses frames that are not the whole film, before encoding anything', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-encode-short-'));
+    await frames(path.join(dir, 'frames'), 4, 64, 36, '#000000');
+    const spec = { fps: 30, frames: 5, width: 64, height: 36, crf: 18 };
+    await expect(encodeFrames(path.join(dir, 'frames'), path.join(dir, 'a.mp4'), spec)).rejects.toThrow("the renderer wrote 4 frames of the film's 5");
+    await rm(path.join(dir, 'frames', 'frame_000002.png'));
+    await writeFile(path.join(dir, 'frames', 'frame_000009.png'), await sharp({ create: { width: 64, height: 36, channels: 3, background: '#000' } }).png().toBuffer());
+    await writeFile(path.join(dir, 'frames', 'frame_000010.png'), await sharp({ create: { width: 64, height: 36, channels: 3, background: '#000' } }).png().toBuffer());
+    await expect(encodeFrames(path.join(dir, 'frames'), path.join(dir, 'b.mp4'), spec)).rejects.toThrow('not one numbered sequence');
+    expect(existsSync(path.join(dir, 'a.mp4')) || existsSync(path.join(dir, 'b.mp4'))).toBe(false);
+  });
+});
+
+describe('a frame is sized from its own header', () => {
+  it('reads a PNG, and refuses anything else', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-png-'));
+    const file = path.join(dir, 'frame_000001.png');
+    await writeFile(file, await sharp({ create: { width: 1920, height: 1080, channels: 3, background: '#000' } }).png().toBuffer());
+    expect(await pngSize(file)).toEqual({ width: 1920, height: 1080 });
+    const jpeg = path.join(dir, 'frame_000002.png');
+    await writeFile(jpeg, await sharp({ create: { width: 8, height: 8, channels: 3, background: '#000' } }).jpeg().toBuffer());
+    await expect(pngSize(jpeg)).rejects.toBeInstanceOf(MediaError);
   });
 });

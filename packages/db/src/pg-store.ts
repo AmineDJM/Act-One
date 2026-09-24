@@ -5,7 +5,7 @@ import {
   CriticReview,
   DirectorDecision,
 } from '@act-one/core';
-import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, Benchmark as BenchmarkSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, Referral as ReferralSchema } from '@act-one/core';
+import { Article as ArticleSchema, ArticleTopic as ArticleTopicSchema, Asset as AssetSchema, Benchmark as BenchmarkSchema, BrandSystem as BrandSystemSchema, CollectionEntry as CollectionEntrySchema, CreativeReplan as CreativeReplanSchema, QaReport as QaReportSchema, Render as RenderSchema, RenderEngine, Referral as ReferralSchema } from '@act-one/core';
 import { z } from 'zod';
 import {
   AppError,
@@ -1504,7 +1504,8 @@ export class PgStore implements Store {
              completed_at = COALESCE($12, completed_at),
              production_verdict = COALESCE($13, production_verdict),
              creative_verdict = COALESCE($14, creative_verdict),
-             creative_reason = COALESCE($15, creative_reason)
+             creative_reason = COALESCE($15, creative_reason),
+             engine = COALESCE($16::jsonb, engine)
            WHERE id = $1 AND organization_id = $2 RETURNING *`,
           [
             id, organizationId, patch.status ?? null, patch.masterAssetId ?? null,
@@ -1513,6 +1514,7 @@ export class PgStore implements Store {
             patch.qaReportId ?? null, patch.error ?? null, patch.startedAt ?? null,
             patch.completedAt ?? null, patch.productionVerdict ?? null,
             patch.creativeVerdict ?? null, patch.creativeReason ?? null,
+            patch.engine ? JSON.stringify(RenderEngine.parse(patch.engine)) : null,
           ],
         );
         if (!r.rows[0]) throw notFound('Render');
@@ -3820,6 +3822,7 @@ function toRender(row: Row): Render {
     productionVerdict: (row['production_verdict'] as Render['productionVerdict']) ?? null,
     creativeVerdict: (row['creative_verdict'] as Render['creativeVerdict']) ?? null,
     creativeReason: (row['creative_reason'] as string) ?? '',
+    engine: row['engine'] ? RenderEngine.parse(row['engine']) : null,
     error: (row['error'] as string) ?? null,
     startedAt: isoOrNull(row['started_at']),
     completedAt: isoOrNull(row['completed_at']),

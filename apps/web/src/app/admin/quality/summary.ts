@@ -5,6 +5,7 @@ import {
   type QaIssue,
   type QaReport,
   type QaSeverity,
+  type Render,
   type RepairRecord,
 } from '@act-one/core';
 
@@ -220,3 +221,57 @@ export const REGENERATING: ReadonlySet<RepairRecord['action']> = new Set<RepairR
   'alternate_archetype',
   'swap_asset',
 ]);
+
+/** One engine's share of the films, and for HyperFrames who drew their scenes. */
+export type EngineTally = {
+  engine: 'remotion' | 'hyperframes' | 'unrecorded';
+  films: number;
+  released: number;
+  /** HyperFrames only: scenes the agent wrote, served from the scene store, and drawn by the engine's port. */
+  byAgent: number;
+  fromStore: number;
+  byEngine: number;
+  sceneWritingUsd: number;
+};
+
+/**
+ * Which engine drew the films, and how the HyperFrames ones were written.
+ *
+ * Films drawn before engines were recorded are counted apart rather than
+ * credited to the default engine: nothing recorded which one drew them.
+ */
+export function engineTallies(renders: readonly Render[], released: (render: Render) => boolean): EngineTally[] {
+  const tallies = new Map<EngineTally['engine'], EngineTally>();
+  for (const render of renders) {
+    const engine = render.engine?.name ?? 'unrecorded';
+    const tally = tallies.get(engine) ?? { engine, films: 0, released: 0, byAgent: 0, fromStore: 0, byEngine: 0, sceneWritingUsd: 0 };
+    tally.films += 1;
+    if (released(render)) tally.released += 1;
+    for (const scene of render.engine?.scenes ?? []) {
+      if (scene.source === 'agent') tally.byAgent += 1;
+      else if (scene.source === 'cache') tally.fromStore += 1;
+      else tally.byEngine += 1;
+    }
+    tally.sceneWritingUsd += render.engine?.costUsd ?? 0;
+    tallies.set(engine, tally);
+  }
+  const order: EngineTally['engine'][] = ['remotion', 'hyperframes', 'unrecorded'];
+  return order.flatMap((engine) => (tallies.has(engine) ? [tallies.get(engine)!] : []));
+}
+
+/** Why HyperFrames scenes ended up drawn by the engine rather than as written, most frequent first. */
+export function fallbackReasons(renders: readonly Render[], limit = 5): { reason: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const render of renders) {
+    for (const scene of render.engine?.scenes ?? []) {
+      if (scene.source !== 'fallback' || !scene.fallbackReason) continue;
+      // Grouped by their wording, cut where the list of findings starts to vary from scene to scene.
+      const reason = scene.fallbackReason.slice(0, 120);
+      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason))
+    .slice(0, limit);
+}

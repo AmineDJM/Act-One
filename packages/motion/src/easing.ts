@@ -1,4 +1,5 @@
 import type { EasingName } from '@act-one/core';
+import type { SceneClock } from './clock.tsx';
 
 /**
  * Easing.
@@ -128,14 +129,21 @@ export function interpolate(t: number, from: number, to: number): number {
  *
  * Scenes that only animate in and then cut hard feel unfinished when the cut is
  * a dissolve. This returns 0 until the tail of the scene, then ramps to 1.
+ *
+ * Inside a film the tail ends where the scene's beat ends, and a scene that a
+ * join carries out does not clear at all (see clock.tsx). A component drawn on
+ * its own, with no clock, clears at the end of the duration it was given.
  */
 export function exitProgress(
   frame: number,
   fps: number,
   sceneDurationSeconds: number,
   tailSeconds = 0.35,
+  clock: SceneClock | null = null,
 ): number {
-  const totalFrames = sceneDurationSeconds * fps;
+  if (clock && !clock.leavesByCut) return 0;
+  const endSeconds = clock ? clock.beatStartSeconds + clock.beatSeconds : sceneDurationSeconds;
+  const totalFrames = endSeconds * fps;
   const tailFrames = tailSeconds * fps;
   return clamp01((frame - (totalFrames - tailFrames)) / Math.max(1, tailFrames));
 }

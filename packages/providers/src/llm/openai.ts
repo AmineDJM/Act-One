@@ -61,6 +61,21 @@ const DEFAULT_ROUTING: OpenAiModelRouting = {
  * is one they act on.
  */
 const BUILT_IN_PRICING: Record<string, { input: number; output: number }> = {
+  /*
+   * The models the default routing sends work to, at OpenAI's standard rates
+   * for prompts under 272K tokens, as developers.openai.com/api/docs/pricing
+   * listed them on 24 September 2026. Before they were here every call to them
+   * was charged at the dearest rate below — gpt-4o's — which is under half of
+   * gpt-5.5's, so the ledger understated the deep tier by two to three times.
+   * Cached input is charged as input: over rather than under.
+   */
+  'gpt-5.5': { input: 5.0, output: 30.0 },
+  'gpt-5.4': { input: 2.5, output: 15.0 },
+  'gpt-5.4-mini': { input: 0.75, output: 4.5 },
+  'gpt-5.2': { input: 1.75, output: 14.0 },
+  'gpt-5.1': { input: 1.25, output: 10.0 },
+  'gpt-5': { input: 1.25, output: 10.0 },
+  'gpt-5-mini': { input: 0.25, output: 2.0 },
   'gpt-4.1': { input: 2.0, output: 8.0 },
   'gpt-4.1-mini': { input: 0.4, output: 1.6 },
   'gpt-4o': { input: 2.5, output: 10.0 },

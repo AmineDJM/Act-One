@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { copyFile, rename, rm } from 'node:fs/promises';
+import { copyFile, open, readdir, rename, rm } from 'node:fs/promises';
+import path from 'node:path';
 import { runFfmpeg } from '@act-one/sound';
 
 /**
@@ -175,6 +176,93 @@ export async function normaliseClip(
   }
 }
 
+export type FrameEncodeSpec = {
+  fps: number;
+  /** The film's length in frames: the renderer must have written exactly these. */
+  frames: number;
+  /** The delivery size; frames drawn at another size are scaled in the same pass. */
+  width: number;
+  height: number;
+  /** x264 quality, the same the Remotion engine renders with. */
+  crf: number;
+};
+
+/**
+ * The film, encoded from its frames the way the Remotion engine encodes its own.
+ *
+ * The renderer writes every frame as a lossless PNG, and this passes FFmpeg the
+ * arguments the Remotion engine's renderer passes it: x264 at the same rate
+ * factor, 4:2:0, and zscale turning the RGB into limited-range BT.709. The two
+ * engines' pictures take one road from the browser to the file, and the colours
+ * are the colours the file says they are. The CLI's own MP4 path pipes JPEG
+ * frames, whose YCbCr is BT.601, changes only their range and labels them
+ * BT.709, so every colour came out shifted: the brand green #39d98a as
+ * (41, 194, 134).
+ */
+export async function encodeFrames(framesDir: string, outputPath: string, spec: FrameEncodeSpec, signal?: AbortSignal): Promise<{ scaledFrom: { width: number; height: number } | null }> {
+  const numbered = (await readdir(framesDir))
+    .map((name) => ({ name, match: FRAME_FILE.exec(name) }))
+    .filter((entry): entry is { name: string; match: RegExpExecArray } => entry.match !== null)
+    .map(({ name, match }) => ({ name, index: Number(match[1]), digits: match[1]!.length }))
+    .sort((a, b) => a.index - b.index);
+  if (numbered.length !== spec.frames) {
+    throw new MediaError(`the renderer wrote ${numbered.length} frames of the film's ${spec.frames}`);
+  }
+  const first = numbered[0]!;
+  const last = numbered[numbered.length - 1]!;
+  if (last.index - first.index + 1 !== spec.frames || numbered.some((entry) => entry.digits !== first.digits)) {
+    throw new MediaError(`the frames are not one numbered sequence (${first.name} to ${last.name} for ${spec.frames} frames)`);
+  }
+
+  const drawn = await pngSize(path.join(framesDir, first.name));
+  const scaled = drawn.width !== spec.width || drawn.height !== spec.height;
+  const filters = [
+    ...(scaled ? [`scale=${spec.width}:${spec.height}:flags=lanczos`] : []),
+    'zscale=matrix=709:matrixin=709:range=limited',
+  ];
+  await ffmpegOrThrow(
+    [
+      '-y', '-v', 'error',
+      '-framerate', String(spec.fps),
+      '-start_number', String(first.index),
+      '-i', path.join(framesDir, `frame_%0${first.digits}d.png`),
+      '-an',
+      '-c:v', 'libx264',
+      '-colorspace:v', 'bt709',
+      '-color_primaries:v', 'bt709',
+      '-color_trc:v', 'bt709',
+      '-color_range', 'tv',
+      '-vf', filters.join(','),
+      '-pix_fmt', 'yuv420p',
+      '-video_track_timescale', '90000',
+      '-crf', String(spec.crf),
+      '-movflags', '+faststart',
+      outputPath,
+    ],
+    signal,
+    'encode the frames',
+  );
+  return { scaledFrom: scaled ? drawn : null };
+}
+
+const FRAME_FILE = /^frame_(\d+)\.png$/;
+
+/** A PNG's size, from its header: the width and height of the IHDR chunk. */
+export async function pngSize(file: string): Promise<{ width: number; height: number }> {
+  const handle = await open(file, 'r');
+  try {
+    const header = Buffer.alloc(24);
+    const { bytesRead } = await handle.read(header, 0, 24, 0);
+    const signature = header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    if (bytesRead < 24 || !signature || header.toString('ascii', 12, 16) !== 'IHDR') {
+      throw new MediaError(`${path.basename(file)} is not a PNG frame`);
+    }
+    return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) };
+  } finally {
+    await handle.close();
+  }
+}
+
 export type DeliveryTarget = {
   width: number;
   height: number;
@@ -183,13 +271,12 @@ export type DeliveryTarget = {
 };
 
 /**
- * The rendered file, made into the delivery the Remotion engine produces.
+ * The encoded file, checked into the delivery the Remotion engine produces.
  *
- * Silent H.264, 4:2:0, limited-range BT.709, at the requested size. HyperFrames
- * already writes exactly that at the size it drew, so most films are moved into
- * place untouched; only a size it could not draw (a preview, 4K at 4:5) is
- * scaled, and only a file that somehow carries sound or another colour
- * description is re-encoded to the delivery.
+ * Silent H.264, 4:2:0, limited-range BT.709, at the requested size. The frames
+ * are encoded to exactly that (see encodeFrames), so a film is moved into place
+ * untouched; a file that somehow is not is remuxed, or re-encoded, rather than
+ * delivered as it is.
  */
 export async function deliver(
   ffprobePath: string,

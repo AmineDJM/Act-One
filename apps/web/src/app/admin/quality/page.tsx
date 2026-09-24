@@ -5,7 +5,9 @@ import {
   archetypesByScene,
   average,
   durationBand,
+  engineTallies,
   failing,
+  fallbackReasons,
   groupByRender,
   providersByScene,
   repairSuccessByCheck,
@@ -142,6 +144,14 @@ export default async function QualityPage() {
   const heldByCreative = deliverables.filter(
     (render) => render.productionVerdict === 'pass' && !canRelease(render),
   );
+
+  /*
+   * Two engines draw films from the same storyboards. Which one drew what, and
+   * for HyperFrames how often the agent's scene went in as written, is how the
+   * second engine earns — or does not earn — the films it is given.
+   */
+  const engines = engineTallies(deliverables, canRelease);
+  const reasons = fallbackReasons(deliverables);
 
   return (
     <>
@@ -405,6 +415,54 @@ export default async function QualityPage() {
 
       <section className={styles.section}>
         <div className={styles.sectionHead}>
+          <h2>Which engine drew them</h2>
+        </div>
+        {engines.length === 0 ? (
+          <p className={styles.empty}>No film has been drawn yet.</p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Engine</th>
+                <th className={styles.num}>Films</th>
+                <th className={styles.num}>Released</th>
+                <th className={styles.num}>Scenes by the agent</th>
+                <th className={styles.num}>From the scene store</th>
+                <th className={styles.num}>Drawn by the engine</th>
+                <th className={styles.num}>Scene writing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {engines.map((tally) => {
+                const hyperframes = tally.engine === 'hyperframes';
+                return (
+                  <tr key={tally.engine}>
+                    <td className="mono">{ENGINE_NAMES[tally.engine]}</td>
+                    <td className={styles.num}>{plain(tally.films)}</td>
+                    <td className={styles.num}>{rate(tally.released, tally.films)}</td>
+                    <td className={styles.num}>{hyperframes ? plain(tally.byAgent) : '—'}</td>
+                    <td className={styles.num}>{hyperframes ? plain(tally.fromStore) : '—'}</td>
+                    <td className={styles.num}>{hyperframes ? plain(tally.byEngine) : '—'}</td>
+                    <td className={styles.num}>{hyperframes ? `$${tally.sceneWritingUsd.toFixed(2)}` : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        {reasons.length > 0 ? (
+          <ul className={styles.list}>
+            {reasons.map((entry) => (
+              <li key={entry.reason}>
+                <span className="mono">{plain(entry.count)}×</span> {entry.reason}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
           <h2>Recent productions</h2>
         </div>
         {productions.length === 0 ? (
@@ -466,6 +524,13 @@ export default async function QualityPage() {
     </>
   );
 }
+
+/** The engines, as an operator names them. */
+const ENGINE_NAMES: Record<'remotion' | 'hyperframes' | 'unrecorded', string> = {
+  remotion: 'Remotion',
+  hyperframes: 'HyperFrames',
+  unrecorded: 'Not recorded',
+};
 
 /** The repair ladder, in the words an operator would use for each rung. */
 const LEVEL_NAMES: Record<number, string> = {

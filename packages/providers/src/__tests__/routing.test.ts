@@ -85,6 +85,19 @@ describe('what a model costs, set by whoever pays the bill', () => {
     expect(unpricedModels()).not.toContain('some-model-nobody-priced');
   });
 
+  it('knows the price of every model the default routing sends work to', () => {
+    /*
+     * The models this product routes to by default were missing from the
+     * table, so each call to them was billed at the dearest listed rate —
+     * gpt-4o's, under half of gpt-5.5's. The ledger understated the deep
+     * tier by two to three times while saying it was guessing high.
+     */
+    for (const [tier, model] of Object.entries(DEFAULT_ROUTING)) expect(pricedModels(), tier).toContain(model);
+    // OpenAI's standard rates for gpt-5.5 under 272K tokens: $5 in, $30 out per million.
+    expect(priceFor('gpt-5.5', 1_000_000, 1_000_000)).toBeCloseTo(35);
+    expect(unpricedModels()).not.toContain('gpt-5.5');
+  });
+
   it('keeps guessing high for a model nobody has priced', () => {
     /*
      * The safe direction. A price list compiled into a build goes stale the

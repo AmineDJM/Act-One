@@ -1,7 +1,7 @@
 import type { AspectRatio, CameraRecipe, EasingName, Handover, MotionRecipeName, VisualType } from '@act-one/core';
 import type { StagedAsset } from './assets.ts';
 import type { ProductWindowBox } from './studio.ts';
-import type { Typeset } from './typeset.ts';
+import type { InFrameWords, Typeset } from './typeset.ts';
 
 /**
  * One scene, as the agent that writes it is told about it.
@@ -53,6 +53,8 @@ export type ScenePacket = {
    * Null for every other kind of scene.
    */
   productWindow: ProductWindowBox | null;
+  /** The scene's words when the capture is filmed as its framings (see uiSequence); null otherwise. */
+  inFrameWords: InFrameWords | null;
   brand: {
     name: string;
     logo: StagedAsset | null;
