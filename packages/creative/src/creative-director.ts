@@ -22,10 +22,12 @@ import { getSystem } from './systems/index.ts';
  * show. A treatment that only lists what is in the film produces a film that
  * includes everything, and a film that includes everything says nothing.
  *
- * It also decides whether the film speaks. Voice-over is the default in
- * automated video and it is usually wrong — most launch films are stronger with
- * type, product sound and music, because a synthetic voice explaining on-screen
- * text is the single clearest tell that nobody directed this.
+ * It also decides who speaks. Every film is narrated unless the customer
+ * asked for silence (see `settleVoice`): measured against the launch films
+ * customers compare us with, which are heard nearly throughout, a film of
+ * type and music alone read as unfinished. What stays true is the old
+ * warning — a synthetic voice reading out the text on screen is the clearest
+ * tell that nobody directed this — so the voice says what the picture cannot.
  */
 const TreatmentResponse = z.object({
   title: z.string().trim().min(1).max(120),
@@ -52,9 +54,9 @@ const SYSTEM_PROMPT = `You are the creative director. A concept has been approve
 You decide three things nobody else can:
 1. What the film shows.
 2. What the film deliberately does NOT show. Be specific and give at least two real exclusions — things a lesser film would include and this one will not.
-3. Whether the film speaks at all.
+3. Who speaks, and what the voice says that the picture cannot.
 
-On voice: do not default to voice-over. Choose "none" unless narration genuinely does something typography and product sound cannot. A voice reading out what is already on screen is the clearest sign a film was automated. If you do choose a voice, say why in voiceRationale.
+On voice: every film is narrated unless the customer asked for none. Choose the voice — "narrator" by default, "founder" when the story is the maker's own, "brand_voice" when the brand speaks as itself — and say why in voiceRationale. The voice never reads out what is on screen: it says what the picture cannot — the why, the stakes, what changes for the viewer — in few words, leaving room for the music. Choose "none" only when the customer asked for a film without a voice.
 
 On the script: if the film has no narration, "script" should contain the on-screen text beats instead, one per line, in order. If there is narration, write it as narration. Either way write it tight — you have seconds, not paragraphs.
 
@@ -71,6 +73,19 @@ export type DirectionInput = {
   brand: BrandSystem;
   brief: ProjectBrief;
 };
+
+/**
+ * Who speaks in the film.
+ *
+ * The customer's explicit choice outranks everything, silence included. Short
+ * of one the film is narrated, and the director chooses whose voice: a
+ * director's "none" is read as the narrator, because every film speaks unless
+ * the customer asked it not to.
+ */
+export function settleVoice(asked: VoiceStrategy | null | undefined, directed: VoiceStrategy): VoiceStrategy {
+  if (asked) return asked;
+  return directed === 'none' ? 'narrator' : directed;
+}
 
 export class CreativeDirector {
   private readonly llm: LlmProvider;
@@ -159,8 +174,7 @@ export class CreativeDirector {
       context,
     );
 
-    // The customer's explicit voice choice outranks the director's.
-    const voiceStrategy = input.brief.voiceStrategy ?? value.voiceStrategy;
+    const voiceStrategy = settleVoice(input.brief.voiceStrategy, value.voiceStrategy);
 
     return {
       id: newId('cpt'),

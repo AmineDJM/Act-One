@@ -616,7 +616,7 @@ export async function runRender(
               usableSeconds: round3(
                 Math.max(0, contract.approvedSeconds - (score.runtimeBefore - score.runtimeAfter)),
               ),
-              preservedConstraints: contractLines(contract, project),
+              preservedConstraints: contractLines(contract, project, current.voiceStrategy),
               previousAttempts: repairs.map((repair) => ({
                 action: repair.action,
                 outcome: repair.outcome,
@@ -1237,7 +1237,7 @@ function repairHeadline(plan: { scenes: { action: RepairAction }[]; film: { acti
  * Written out rather than left implicit because a model given a film and told
  * to improve a beat will improve the film, and the film was approved.
  */
-function contractLines(contract: FilmContract, project: StageContext['project']): string[] {
+function contractLines(contract: FilmContract, project: StageContext['project'], voice: Storyboard['voiceStrategy']): string[] {
   return [
     `The film runs ${contract.approvedSeconds.toFixed(2)}s and must still run ${contract.approvedSeconds.toFixed(2)}s.`,
     `It is a ${contract.cut === 'short' ? 'vertical short' : 'landscape film'} and stays one.`,
@@ -1245,9 +1245,11 @@ function contractLines(contract: FilmContract, project: StageContext['project'])
     `Language: ${project.brief.language ?? 'the customer’s own'}.`,
     /*
      * Said out loud, because a director handed a beat to rewrite will write a
-     * line for it unless told the film has no voice.
+     * line for it unless told the film has no voice. Read off the storyboard,
+     * which carries the voice the film was made with; the brief only says
+     * what the customer asked for, and is empty when they asked for nothing.
      */
-    project.brief.voiceStrategy && project.brief.voiceStrategy !== 'none'
+    voice !== 'none'
       ? 'The film is narrated. A beat you rewrite carries its own line.'
       : 'The film does not speak. Write no narration: this beat is type, picture and sound.',
     `Shots: ${contract.shots.length}, in the order they are in, unless you replace a beat outright.`,
