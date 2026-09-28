@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { DesignTokens } from '@act-one/design';
 import { ProviderError, type CallContext, type ImageInput, type LlmProvider, type LlmTier } from '@act-one/providers';
 import { fallbackScene, shotOf } from './fallback.ts';
+import { launchReadable, launchScene, type LaunchBeat } from './launch.ts';
 import { sceneMessages } from './prompt.ts';
 import { sceneKey } from './scene-store.ts';
 import type { FilmTokens } from './tokens.ts';
@@ -33,6 +34,8 @@ export type SceneAuthorOptions = {
   showPictures: boolean;
   /** Who draws a scene whose capture is taken apart or hung in a volume (see `isConstruction`). */
   constructions: 'engine' | 'agent';
+  /** How the engine draws a scene itself. The classic port when absent. */
+  look?: EngineLook;
   log: (line: string) => void;
   /**
    * Shared by every scene of a render. Set when the model answers in a way no
@@ -44,6 +47,23 @@ export type SceneAuthorOptions = {
 };
 
 export type AuthoredScene = { packet: ScenePacket; key: string; html: string; report: SceneReport };
+
+/**
+ * How the engine draws a scene itself.
+ *
+ * `classic` is the port of the Remotion components, number for number. The
+ * `launch` look stages the same beat as a motion designer would, over one
+ * backdrop the film assembles under every scene, from a plan of the whole
+ * film (which beat opens, which are chapters, which act each belongs to).
+ */
+export type EngineLook = { name: 'classic' } | { name: 'launch'; plan: ReadonlyMap<string, LaunchBeat> };
+
+export const CLASSIC_LOOK: EngineLook = { name: 'classic' };
+
+/** A beat the plan does not name is staged as the product's. */
+const UNPLANNED_BEAT: LaunchBeat = { act: 'day', opener: false, chapter: false, chapterIndex: -1 };
+
+const LAUNCH_REASON = 'drawn by the engine in the launch look, which stages every beat of the film itself';
 
 /**
  * A scene whose capture is taken apart into layers or hung in a volume.
@@ -109,8 +129,14 @@ export async function authorScene(
   options: SceneAuthorOptions,
   feedback?: { previous: string; findings: ValidationFinding[] },
 ): Promise<AuthoredScene> {
-  const key = sceneKey(packet, tokens.film, options.tier);
+  const look = options.look ?? CLASSIC_LOOK;
+  const key = sceneKey(packet, tokens.film, options.tier, lookVariant(look, packet));
   const context = validationContextFor(packet);
+
+  // Drawn here, for nothing, every time: there is nothing to keep and nothing to ask a model.
+  if (!feedback && look.name === 'launch') {
+    return engineScene(packet, tokens.design, key, 0, 0, LAUNCH_REASON, look);
+  }
 
   // Ahead of the store: a construction the agent wrote under the other setting is not what this one asks for.
   if (!feedback && options.constructions === 'engine' && isConstruction(packet)) {
@@ -240,14 +266,23 @@ export function engineScene(
   attempts: number,
   costUsd: number,
   reason: string,
+  look: EngineLook = CLASSIC_LOOK,
 ): AuthoredScene {
-  const html = fallbackScene(packet, design).replace('<div id="root"', `<div ${FALLBACK_MARK} id="root"`);
-  const findings = validateScene(html, validationContextFor(packet));
+  const drawn = look.name === 'launch' ? launchScene(packet, design, look.plan.get(packet.frameId) ?? UNPLANNED_BEAT) : fallbackScene(packet, design);
+  const html = drawn.replace('<div id="root"', `<div ${FALLBACK_MARK} id="root"`);
+  const context = validationContextFor(packet);
+  // The launch look sets its own type, a typed line glyph by glyph; the studio's frame is the classic composition's.
+  const findings = look.name === 'launch' ? validateScene(launchReadable(html), { ...context, expectsFrame: false }) : validateScene(html, context);
   if (findings.some((finding) => finding.severity === 'error')) {
     // The engine's own composition must always pass its own checks; if it does not, that is a bug here.
-    throw new Error(`The fallback for ${packet.frameId} fails validation: ${findings.map((finding) => finding.code).join(', ')}`);
+    throw new Error(`The engine's own scene for ${packet.frameId} fails validation: ${findings.filter((finding) => finding.severity === 'error').map((finding) => `[${finding.code}] ${finding.message}`).join(' ').slice(0, 600)}`);
   }
   return { packet, key, html, report: report(packet, 'fallback', attempts, costUsd, findings, reason) };
+}
+
+/** What a look adds to a scene's key: nothing for the classic port, the look and the beat's staging otherwise. */
+function lookVariant(look: EngineLook, packet: ScenePacket): unknown {
+  return look.name === 'launch' ? { look: 'launch', beat: look.plan.get(packet.frameId) ?? UNPLANNED_BEAT } : undefined;
 }
 
 /** Whether a stored or assembled scene is the engine's own composition. */

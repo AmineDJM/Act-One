@@ -3,18 +3,20 @@
  *
  * A second renderer behind the same contract as @act-one/motion's
  * `renderFilm`: the same props in, the same silent master out. Scenes are
- * written as HyperFrames compositions by an agent (or drawn by the engine's
- * port of the Remotion components), checked, assembled and rendered by the
- * pinned HyperFrames CLI.
+ * written as HyperFrames compositions by an agent (or drawn by the engine
+ * itself: its port of the Remotion components, or its launch look), checked,
+ * assembled and rendered by the pinned HyperFrames CLI.
  */
 export {
   renderFilmWithHyperFrames,
   HyperFramesRenderError,
+  type FilmLook,
   type HyperFramesErrorCode,
   type HyperFramesRenderOptions,
   type HyperFramesRenderResult,
   type SceneAuthorConfig,
 } from './render.ts';
+export type { LaunchSoundCue } from './launch.ts';
 export { DirectorySceneStore, MemorySceneStore, StorageSceneStore, sceneKey } from './scene-store.ts';
 export { resolveTools, ToolingError, type HyperFramesTools, type ToolOptions } from './tools.ts';
 export { normalizeScene, validateScene, type ValidationContext, type ValidationFinding } from './validate.ts';

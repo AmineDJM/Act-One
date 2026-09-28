@@ -11,15 +11,18 @@ import { ENGINE_VERSION, SCENE_CONTRACT_VERSION } from './version.ts';
  *
  * Everything the agent was told, and nothing it was not: the packet (words,
  * recipe, camera, timing, files by path and size), the tokens, the contract
- * and engine versions, and the tier of model asked. Two renders that would
- * brief the agent identically share the scene; any change to the brief —
- * a reworded line, a new capture, a revised brand colour — writes a new one.
+ * and engine versions, the tier of model asked, and the look the engine
+ * draws in when it is not the classic one. Two renders that would brief the
+ * agent identically share the scene; any change to the brief — a reworded
+ * line, a new capture, a revised brand colour — writes a new one.
  */
-export function sceneKey(packet: ScenePacket, tokens: FilmTokens, tier: string): string {
+export function sceneKey(packet: ScenePacket, tokens: FilmTokens, tier: string, variant?: unknown): string {
   const material = stableJson({
     contract: SCENE_CONTRACT_VERSION,
     engine: ENGINE_VERSION,
     tier,
+    // Absent for the classic composition, so its keys, and the scenes kept under them, are unchanged.
+    ...(variant === undefined ? {} : { variant }),
     packet: { ...packet, assets: packet.assets.map(fingerprint), clip: packet.clip ? fingerprint(packet.clip) : null, brand: { ...packet.brand, logo: packet.brand.logo ? fingerprint(packet.brand.logo) : null } },
     tokens,
   });

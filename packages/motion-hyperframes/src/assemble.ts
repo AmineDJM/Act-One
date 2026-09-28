@@ -1,8 +1,9 @@
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { CAPTION_CSS } from './captions.ts';
+import { captionCss, type CaptionStyle } from './captions.ts';
 import { joinStatements, type HostTiming } from './joins.ts';
+import type { Backdrop } from './launch.ts';
 import { motionRuntimeSource } from './motion-runtime.ts';
 import type { ScenePacket } from './types.ts';
 
@@ -18,6 +19,9 @@ import type { ScenePacket } from './types.ts';
  * reach anything but the project's own files.
  */
 export const FILM_COMPOSITION_ID = 'film';
+
+/** The launch look's field under every scene, mounted as a composition of its own on the lowest track. */
+export const BACKDROP_COMPOSITION_ID = 'ao-backdrop';
 
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
@@ -51,7 +55,15 @@ export type ProjectInput = {
   studioCss: string;
   fontCss: string;
   captionsHtml: string;
+  /** How the captions are set: the classic plate, or the launch look's pill. */
+  captionStyle?: CaptionStyle;
   watermarkSvg: string | null;
+  /**
+   * The field under every scene, in place of the canvas colour: the launch
+   * look's backdrop, given where each beat starts on the film's clock.
+   * Absent, the field is the canvas colour.
+   */
+  backdrop?: (beatStarts: ReadonlyMap<string, number>) => Backdrop;
 };
 
 const require = createRequire(import.meta.url);
@@ -76,8 +88,19 @@ export async function writeProject(input: ProjectInput): Promise<{ indexPath: st
     await writeFile(path.join(projectDir, 'compositions', `${packet.frameId}.html`), withPreamble(scene, input.fontCss), 'utf8');
   }
 
+  const duration = filmSeconds(input.filmFrames, input.fps);
+  const beatStarts = new Map(input.packets.map((packet) => [packet.frameId, hosts.get(packet.frameId)!.fromSeconds + packet.timing.beatStart]));
+  const backdrop = input.backdrop ? input.backdrop(beatStarts) : null;
+  if (backdrop) {
+    await writeFile(
+      path.join(projectDir, 'compositions', `${BACKDROP_COMPOSITION_ID}.html`),
+      withPreamble(backdropComposition(backdrop, input.canvas, duration), ''),
+      'utf8',
+    );
+  }
+
   const indexPath = path.join(projectDir, 'index.html');
-  await writeFile(indexPath, indexHtml(input, hosts), 'utf8');
+  await writeFile(indexPath, indexHtml(input, hosts, backdrop !== null), 'utf8');
   await writeFile(
     path.join(projectDir, 'hyperframes.json'),
     JSON.stringify({ media: { autoProxy: false } }, null, 2),
@@ -128,10 +151,38 @@ export function boundarySeconds(frame: number, fps: number): number {
   return Math.max(0, frame / fps - (frame === 0 ? 0 : BOUNDARY_GUARD_SECONDS));
 }
 
-function indexHtml(input: ProjectInput, hosts: ReadonlyMap<string, HostTiming>): string {
+/** The film's length as it is written: a hair short of the last frame's end, so the frame count rounds to exactly filmFrames in every reading of it. */
+function filmSeconds(filmFrames: number, fps: number): number {
+  return Math.floor((filmFrames / fps) * 1e6) / 1e6;
+}
+
+/**
+ * The backdrop as a composition: its layers, its styles and its own timeline,
+ * on the film's clock from the film's first frame. A composition rather than
+ * layers in the film's page, because HyperFrames builds a film only from
+ * compositions and reads a clip that holds other elements as a mistake.
+ */
+export function backdropComposition(backdrop: Backdrop, canvas: { width: number; height: number }, durationSeconds: number): string {
+  return [
+    '<template>',
+    `<style>\n#root { position: absolute; inset: 0; overflow: hidden; }\n${backdrop.css}\n</style>`,
+    `<div id="root" data-composition-id="${BACKDROP_COMPOSITION_ID}" data-width="${canvas.width}" data-height="${canvas.height}">`,
+    backdrop.markup,
+    '</div>',
+    '<script>',
+    'const tl = gsap.timeline({ paused: true });',
+    ...backdrop.statements,
+    `tl.set({}, {}, ${durationSeconds});`,
+    'window.__timelines = window.__timelines || {};',
+    `window.__timelines[${JSON.stringify(BACKDROP_COMPOSITION_ID)}] = tl;`,
+    '</script>',
+    '</template>',
+  ].join('\n');
+}
+
+function indexHtml(input: ProjectInput, hosts: ReadonlyMap<string, HostTiming>, hasBackdrop: boolean): string {
   const { width, height } = input.canvas;
-  // Written a hair short of the last frame's end, so the frame count rounds to exactly filmFrames in every reading of it.
-  const duration = Math.floor((input.filmFrames / input.fps) * 1e6) / 1e6;
+  const duration = filmSeconds(input.filmFrames, input.fps);
   const language = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(input.language) ? input.language : 'en';
 
   const sceneHosts = input.packets.map((packet, position) => {
@@ -148,6 +199,10 @@ function indexHtml(input: ProjectInput, hosts: ReadonlyMap<string, HostTiming>):
       ` data-width="${width}" data-height="${height}"></div>`,
     ].join('');
   });
+
+  const field = hasBackdrop
+    ? `  <div id="host-${BACKDROP_COMPOSITION_ID}" class="ao-scene" data-composition-id="${BACKDROP_COMPOSITION_ID}" data-composition-src="compositions/${BACKDROP_COMPOSITION_ID}.html" data-start="0" data-duration="${duration}" data-track-index="0" data-width="${width}" data-height="${height}"></div>`
+    : `  <div id="ao-field" class="clip ao-overlay" data-start="0" data-duration="${duration}" data-track-index="0" style="background: var(--ao-canvas);"></div>`;
 
   const timeline = [
     'window.__timelines = window.__timelines || {};',
@@ -175,12 +230,12 @@ html, body { margin: 0; padding: 0; width: ${width}px; height: ${height}px; over
 #root { position: relative; width: ${width}px; height: ${height}px; overflow: hidden; background: var(--ao-canvas); }
 .ao-scene { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 50%; }
 .ao-overlay { position: absolute; inset: 0; pointer-events: none; }
-${CAPTION_CSS}
+${captionCss(input.captionStyle ?? 'plate')}
 </style>
 </head>
 <body>
 <div id="root" data-composition-id="${FILM_COMPOSITION_ID}" data-start="0" data-duration="${duration}" data-width="${width}" data-height="${height}" data-fps="${input.fps}">
-  <div id="ao-field" class="clip ao-overlay" data-start="0" data-duration="${duration}" data-track-index="0" style="background: var(--ao-canvas);"></div>
+${field}
 ${sceneHosts.join('\n')}
 ${input.captionsHtml}
 ${input.watermarkSvg ? `  <div id="ao-watermark" class="clip ao-overlay" data-start="0" data-duration="${duration}" data-track-index="5"><svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${input.watermarkSvg}</svg></div>` : ''}

@@ -74,6 +74,41 @@ describe.skipIf(!browser)('a film rendered by HyperFrames', () => {
     expect(deliveryProblems(await probeMedia(tools.ffprobePath, outputPath), { width: 960, height: 540, frames: 90 })).toEqual([]);
   }, 180_000);
 
+  it('stages a launch film that HyperFrames passes on its first check, with the sounds its motion asks for', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-launch-'));
+    const picture = path.join(dir, 'capture.png');
+    await sharp({ create: { width: 1600, height: 1000, channels: 3, background: '#e8eef8' } }).png().toFile(picture);
+    const outputPath = path.join(dir, 'launch.mp4');
+    const result = await renderFilmWithHyperFrames({
+      props: {
+        storyboard: storyboard([
+          scene(0, { recipe: 'kinetic_headline', text: ['If it’s customizable,'], duration: 1.6 }),
+          scene(1, { recipe: 'product_window', text: ['Launcher. Tasks. Tray.'], assets: ['ast_capture'], duration: 1.6 }),
+          scene(2, { recipe: 'kinetic_headline', text: ['Apps.'], duration: 1 }),
+          scene(3, { recipe: 'cta_end_card', text: [], duration: 1.4 }),
+        ]),
+        brand,
+        assetUrls: { ast_capture: pathToFileURL(picture).href },
+        cta: 'northwind.example',
+        tagline: 'Close the books while you sleep.',
+      },
+      aspect: '16:9',
+      quality: 'preview',
+      outputPath,
+      look: 'launch',
+      ...(browser ? { browserExecutable: browser } : {}),
+      log: () => undefined,
+    });
+
+    expect(result).toMatchObject({ look: 'launch', width: 960, height: 540, durationSeconds: 5.6, costUsd: 0 });
+    expect(result.checks.passes).toBe(1);
+    // Nothing HyperFrames' own linter or runtime says about the look, not even a warning.
+    expect(result.checks.findings.filter((finding) => finding.section === 'lint' || finding.section === 'runtime')).toEqual([]);
+    expect(result.soundCues.map((cue) => cue.type)).toContain('logo_sting');
+    const tools = await resolveTools({ browserPath: browser! });
+    expect(deliveryProblems(await probeMedia(tools.ffprobePath, outputPath), { width: 960, height: 540, frames: 168 })).toEqual([]);
+  }, 240_000);
+
   it('shows a flat brand colour as that colour, read as the file describes it', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'act-one-hf-colour-'));
     const picture = path.join(dir, 'green.png');

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProviderConfig, ProviderRegistry } from '@act-one/providers';
 import type { StageContext } from '../context.ts';
-import { RenderEngine } from '@act-one/core';
+import { RenderEngine, Scene, Storyboard } from '@act-one/core';
 import { SCENE_CONTRACT_VERSION, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
-import { agentWritesScenes, filmEngine, hyperframesEngineRecord, remotionEngineRecord } from '../stages/render.ts';
+import { agentWritesScenes, filmEngine, hyperframesEngineRecord, remotionEngineRecord, withMotionCues } from '../stages/render.ts';
 
 /**
  * Which engine draws the film.
@@ -24,7 +24,9 @@ afterEach(() => {
 describe('the film engine', () => {
   it('is Remotion unless the operator chose otherwise', () => {
     expect(filmEngine(contextWith())).toBe('remotion');
-    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthor: 'engine', sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
+    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthor: 'engine', look: 'classic', sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
+    expect(ProviderConfig.parse({ render: { look: 'launch' } }).render.look).toBe('launch');
+    expect(ProviderConfig.safeParse({ render: { look: 'loud' } }).success).toBe(false);
     expect(filmEngine(contextWith('hyperframes'))).toBe('hyperframes');
   });
 
@@ -95,5 +97,37 @@ describe('what a render records about its engine', () => {
     expect(record.scenes.map((scene) => scene.source)).toEqual(['agent', 'fallback']);
     expect(record.scenes[1]!.fallbackReason).toHaveLength(400);
     expect(record.warnings).toEqual(['contrast/contrast_aa_failure (scene-02): Drawn as the Remotion engine draws it: 4.3:1']);
+  });
+
+  it('names the launch look in the engine’s version, and nothing for the classic one', () => {
+    const result = { engineVersion: '1.4.0', cliVersion: '0.8.70', costUsd: 0, scenes: [], checks: { passes: 1, rewritten: [], findings: [] } };
+    expect(hyperframesEngineRecord({ ...result, look: 'launch' } as unknown as HyperFramesRenderResult).version).toBe('1.4.0 launch (HyperFrames 0.8.70)');
+    expect(hyperframesEngineRecord({ ...result, look: 'classic' } as unknown as HyperFramesRenderResult).version).toBe('1.4.0 (HyperFrames 0.8.70)');
+  });
+});
+
+describe('the sounds a film’s motion asks for', () => {
+  const scene = (index: number, soundCues: unknown[] = []) =>
+    Scene.parse({
+      id: `scn_${index}`, storyboardId: 'sbd_test', index, startTime: index * 2, duration: 2, purpose: 'beat', visualType: 'kinetic_typography',
+      motionRecipe: { name: 'kinetic_headline' }, cameraRecipe: {}, onScreenText: ['Apps.'], narration: '', assetRefs: [], generativeNeeds: [],
+      status: 'ready', notes: '', soundCues,
+    });
+  const board = Storyboard.parse({
+    id: 'sbd_test', projectId: 'prj_test', conceptId: 'cpt_test', treatmentId: 'trt_test', version: 1, handovers: {}, language: 'en',
+    scenes: [scene(0), scene(1, [{ time: 2.5, type: 'riser' }])],
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  it('are offered to the beats that asked for no sound, and never replace a beat’s own', () => {
+    const sounded = withMotionCues(board, [
+      { sceneId: 'scn_0', time: 0.06, type: 'whoosh', intensity: 0.45 },
+      { sceneId: 'scn_1', time: 2.2, type: 'impact', intensity: 0.35 },
+    ]);
+    expect(sounded.scenes[0]!.soundCues).toEqual([{ time: 0.06, type: 'whoosh', assetId: null, intensity: 0.45, durationSeconds: null }]);
+    expect(sounded.scenes[1]!.soundCues).toEqual(board.scenes[1]!.soundCues);
+    // The storyboard the rest of the stage reads is untouched.
+    expect(board.scenes[0]!.soundCues).toEqual([]);
+    expect(withMotionCues(board, [])).toBe(board);
   });
 });

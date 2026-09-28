@@ -11,9 +11,11 @@ import { safeStem, stageAssets, type AssetFailure, type AssetLimits, type AssetR
 import {
   authorScene,
   authorScenes,
+  CLASSIC_LOOK,
   engineScene,
   isEngineScene,
   type AuthoredScene,
+  type EngineLook,
   type SceneAuthorOptions,
   type SceneTokens,
 } from './author.ts';
@@ -21,6 +23,7 @@ import { authoringCanvas, outputPlan } from './canvas.ts';
 import { captionsMarkup } from './captions.ts';
 import { blocking, CheckOutputError, parseCheckOutput, type CheckReport, type EngineFinding } from './checks.ts';
 import { bundleFonts } from './fonts.ts';
+import { launchBackdrop, launchSoundCues, planLaunch, type LaunchSoundCue } from './launch.ts';
 import { assumedColourMatrix, deliver, deliveryProblems, encodeFrames, MediaError, normaliseClip, probeMedia } from './media.ts';
 import { buildPackets, referencedAssetIds } from './packets.ts';
 import { MemorySceneStore } from './scene-store.ts';
@@ -72,8 +75,22 @@ export type SceneAuthorConfig = {
   constructions?: 'engine' | 'agent';
 };
 
+/**
+ * How the engine stages the film.
+ *
+ * `classic` is the Remotion engine's film drawn by another renderer, scene
+ * for scene. `launch` keeps the storyboard — every beat, word, picture,
+ * framing and cut — and stages it as a launch film: one backdrop in three
+ * acts under every scene, type that resolves and types itself, captures on
+ * tilted cards, chapters, chips and a closing mark in orbit. Every scene of a
+ * launch film is drawn by the engine; no model is asked for any of it.
+ */
+export type FilmLook = 'classic' | 'launch';
+
 export type HyperFramesRenderOptions = RenderFilmOptions & {
   author?: SceneAuthorConfig;
+  /** The classic composition when absent. */
+  look?: FilmLook;
   /** Rewrites of scenes HyperFrames' own check refuses, before the engine draws them itself. */
   maxRepairPasses?: number;
   tools?: ToolOptions;
@@ -90,6 +107,9 @@ export type HyperFramesRenderOptions = RenderFilmOptions & {
 export type HyperFramesRenderResult = RenderFilmResult & {
   engine: typeof ENGINE_NAME;
   engineVersion: string;
+  look: FilmLook;
+  /** Where the film's own motion asks for a sound, on the film's clock: the launch look's moments; none for the classic film. */
+  soundCues: LaunchSoundCue[];
   cliVersion: string;
   /** Scene by scene: who drew it, in how many attempts, at what cost, and why it fell back when it did. */
   scenes: SceneReport[];
@@ -211,7 +231,12 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
     );
 
     // 3. The scenes.
-    const authorOptions = sceneAuthorOptions(options, log);
+    const look: EngineLook = options.look === 'launch' ? { name: 'launch', plan: planLaunch(packets) } : CLASSIC_LOOK;
+    const authorOptions = sceneAuthorOptions(options, log, look);
+    const soundCues =
+      look.name === 'launch'
+        ? launchSoundCues(packets, look.plan, new Map(packets.map((packet) => [packet.frameId, windows.get(packet.frameId)!.fromSeconds + packet.timing.beatStart])))
+        : [];
     const authored = await timed('author', () => authorScenes(packets, tokens, projectDir, authorOptions));
     progress.phase(0.3, `${authored.length} scenes written`);
     const scenes = new Map(authored.map((scene) => [scene.packet.frameId, scene]));
@@ -230,8 +255,10 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
         tokenCss: tokenCss(tokens.film),
         studioCss: studioCss(design),
         fontCss: fonts.css,
-        captionsHtml: props.captions && props.captions.length > 0 ? captionsMarkup(props.captions, tokens.film, aspect, 3) : '',
+        captionsHtml: props.captions && props.captions.length > 0 ? captionsMarkup(props.captions, tokens.film, aspect, 3, look.name === 'launch' ? 'pill' : 'plate') : '',
+        captionStyle: look.name === 'launch' ? 'pill' : 'plate',
         watermarkSvg: props.watermarkLabel ? watermark(design, props.watermarkLabel) : null,
+        ...(look.name === 'launch' ? { backdrop: (beatStarts: ReadonlyMap<string, number>) => launchBackdrop(packets, look.plan, beatStarts, design) } : {}),
       });
     };
     const checked = await timed('check', () =>
@@ -261,6 +288,8 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
       fps,
       engine: ENGINE_NAME,
       engineVersion: ENGINE_VERSION,
+      look: look.name,
+      soundCues,
       cliVersion: tools.cliVersion,
       scenes: sceneReports,
       checks: { passes: checked.passes, rewritten: checked.rewritten, findings: checked.findings },
@@ -452,7 +481,7 @@ async function seekableClips(
   return result;
 }
 
-function sceneAuthorOptions(options: HyperFramesRenderOptions, log: (line: string) => void): SceneAuthorOptions {
+function sceneAuthorOptions(options: HyperFramesRenderOptions, log: (line: string) => void, look: EngineLook): SceneAuthorOptions {
   const author = options.author;
   const signals = [options.signal, author?.call.signal].filter((signal): signal is AbortSignal => signal !== undefined);
   const call: CallContext = {
@@ -468,6 +497,7 @@ function sceneAuthorOptions(options: HyperFramesRenderOptions, log: (line: strin
     concurrency: Math.max(1, Math.floor(author?.concurrency ?? 4)),
     showPictures: author?.showPictures ?? true,
     constructions: author?.constructions ?? 'engine',
+    look,
     log,
     breaker: { reason: null },
   };
@@ -586,6 +616,7 @@ async function checkUntilClean(input: CheckLoopInput): Promise<{ passes: number;
           current.report.attempts,
           current.report.costUsd,
           `HyperFrames refused the written scene: ${findings.map((finding) => finding.code).join(', ')}`,
+          input.authorOptions.look,
         );
         await input.authorOptions.store.put(current.key, drawn.html).catch((error: unknown) => {
           input.log(`${frameId}: could not keep the engine's composition (${(error as Error).message})`);

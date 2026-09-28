@@ -11,11 +11,14 @@ import type { FilmTokens } from './tokens.ts';
  * platform furniture on a vertical frame, one plate per line at a contrast that
  * holds over any picture, no animation, one word marked in the brand's accent.
  */
-export function captionsMarkup(cues: readonly CaptionCue[], tokens: FilmTokens, aspect: AspectRatio, trackIndex: number): string {
+export type CaptionStyle = 'plate' | 'pill';
+
+export function captionsMarkup(cues: readonly CaptionCue[], tokens: FilmTokens, aspect: AspectRatio, trackIndex: number, style: CaptionStyle = 'plate'): string {
   const vertical = aspect === '9:16' || aspect === '4:5';
   const height = tokens.frame.height;
   const width = tokens.frame.width;
-  const sizePx = Math.round(height * (vertical ? 0.038 : 0.03));
+  // A pill is set a step smaller than a plate: it is read against a designed field, not over any picture.
+  const sizePx = Math.round(height * (vertical ? (style === 'pill' ? 0.034 : 0.038) : style === 'pill' ? 0.026 : 0.03));
   const bottom = Math.round(height * (vertical ? VERTICAL_CHROME_BOTTOM : TITLE_SAFE_INSET));
   const side = Math.round(width * TITLE_SAFE_INSET);
   const pad = Math.round(sizePx * 0.32);
@@ -37,6 +40,22 @@ export function captionsMarkup(cues: readonly CaptionCue[], tokens: FilmTokens, 
 }
 
 /** The stylesheet the caption markup relies on. */
+export function captionCss(style: CaptionStyle): string {
+  return style === 'pill' ? PILL_CAPTION_CSS : CAPTION_CSS;
+}
+
+/**
+ * Captions as the launch look sets them: each line a dark pill low in the
+ * frame. The same safe area, the same size rules less a step, the same
+ * contrast floor — white on a near-black at three quarters — as the plate.
+ */
+const PILL_CAPTION_CSS = `
+.ao-caption { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; pointer-events: none; }
+.ao-caption-block { display: flex; flex-direction: column; align-items: center; }
+.ao-caption-line { font-family: var(--ao-body-family); font-weight: 500; line-height: 1.3; letter-spacing: 0.01em; color: #FFFFFF; background-color: rgba(10, 12, 20, 0.78); padding: 0.4em 1.1em; border-radius: 999px; text-align: center; text-wrap: balance; }
+.ao-caption-emphasis { color: #FFFFFF; font-weight: 700; }
+`;
+
 export const CAPTION_CSS = `
 .ao-caption { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; pointer-events: none; }
 .ao-caption-block { display: flex; flex-direction: column; align-items: center; }

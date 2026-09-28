@@ -50,10 +50,11 @@ import {
   deliveryState,
   CreativeEscalation,
   releaseDecision,
+  SoundCue,
 } from '@act-one/core';
 import { getSystem } from '@act-one/creative';
 import { REMOTION_VERSION, renderFilm, type RenderFilmOptions, type RenderFilmResult } from '@act-one/motion';
-import { renderFilmWithHyperFrames, SCENE_CONTRACT_VERSION, StorageSceneStore, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
+import { renderFilmWithHyperFrames, SCENE_CONTRACT_VERSION, StorageSceneStore, type HyperFramesRenderResult, type LaunchSoundCue } from '@act-one/motion-hyperframes';
 import { resolveTokens } from '@act-one/design';
 import {
   bedReductionDb,
@@ -1336,6 +1337,9 @@ function round3(n: number): number {
 }
 
 
+/** The silent master, and where its own motion asks for a sound. */
+type DrawnFilm = RenderFilmResult & { motionCues: readonly LaunchSoundCue[] };
+
 /**
  * The picture, drawn by whichever engine the platform is set to.
  *
@@ -1345,12 +1349,12 @@ function round3(n: number): number {
  * place in the tenant's own storage to keep them, so the animatic's scenes are
  * the master's and a re-render after a repair only rewrites what changed.
  */
-async function drawFilm(context: StageContext, render: Render, options: RenderFilmOptions): Promise<RenderFilmResult> {
+async function drawFilm(context: StageContext, render: Render, options: RenderFilmOptions): Promise<DrawnFilm> {
   const engine = filmEngine(context);
   if (engine === 'remotion') {
     const drawn = await renderFilm(options);
     await context.store.renders.update(context.organizationId, render.id, { engine: remotionEngineRecord() });
-    return drawn;
+    return { ...drawn, motionCues: [] };
   }
 
   const settings = context.registry.config.render;
@@ -1377,6 +1381,7 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
       tier: settings.sceneAuthorTier,
       maxAttempts: settings.maxSceneAttempts,
     },
+    look: settings.look,
     log: (line) => console.log(`[render:hyperframes] ${render.id} ${line}`),
   });
   const bySource = result.scenes.reduce<Record<string, number>>((counts, scene) => ({ ...counts, [scene.source]: (counts[scene.source] ?? 0) + 1 }), {});
@@ -1388,7 +1393,28 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
     console.log(`[render:hyperframes] ${render.id} ${scene.frameId} (${scene.sceneId}) drawn by the engine: ${scene.fallbackReason}`);
   }
   await context.store.renders.update(context.organizationId, render.id, { engine: hyperframesEngineRecord(result) });
-  return result;
+  return { ...result, motionCues: result.soundCues ?? [] };
+}
+
+/**
+ * The storyboard as the Sound Director reads it: the beats that asked for no
+ * sound of their own carry the sounds the picture's motion asks for.
+ *
+ * A beat with cues of its own keeps them untouched — the storyboard's sound
+ * design is a decision, and the motion's is only an offer. Nothing here
+ * changes the storyboard the rest of the stage reads.
+ */
+export function withMotionCues(storyboard: Storyboard, cues: readonly LaunchSoundCue[]): Storyboard {
+  if (cues.length === 0) return storyboard;
+  return {
+    ...storyboard,
+    scenes: storyboard.scenes.map((scene) => {
+      if (scene.soundCues.length > 0) return scene;
+      const offered = cues.filter((cue) => cue.sceneId === scene.id);
+      if (offered.length === 0) return scene;
+      return { ...scene, soundCues: offered.map((cue) => SoundCue.parse({ time: cue.time, type: cue.type, intensity: cue.intensity })) };
+    }),
+  };
 }
 
 export { filmEngine };
@@ -1412,7 +1438,8 @@ export function remotionEngineRecord(): RenderEngine {
 export function hyperframesEngineRecord(result: HyperFramesRenderResult): RenderEngine {
   return {
     name: 'hyperframes',
-    version: `${result.engineVersion} (HyperFrames ${result.cliVersion})`.slice(0, 80),
+    // The look is named when it is not the classic one: a launch film and a classic one are drawn by the same engine release.
+    version: `${result.engineVersion}${result.look === 'launch' ? ' launch' : ''} (HyperFrames ${result.cliVersion})`.slice(0, 80),
     sceneContract: SCENE_CONTRACT_VERSION,
     scenes: result.scenes.map((scene) => ({
       sceneId: scene.sceneId,
@@ -1917,8 +1944,10 @@ async function renderOnce(
 
   await context.progress(0.62, 'Designing the sound');
 
+  // The sounds the picture's motion asks for, offered on the beats whose storyboard asked for none.
+  const sounded = withMotionCues(storyboard, drawn.motionCues);
   const directed = directSound({
-    storyboard,
+    storyboard: sounded,
     behaviour: system.sound,
     channel: params.aspect === '9:16' ? 'social' : 'web',
     hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
@@ -1959,7 +1988,7 @@ async function renderOnce(
    * composer configured this changes nothing at all.
    */
   const scored = await scoreFilm(context, {
-    storyboard,
+    storyboard: sounded,
     design,
     brand,
     understanding: params.understanding,
@@ -2042,7 +2071,7 @@ async function renderOnce(
    */
   const soundIntended =
     storyboard.musicDirection.trim().length > 0 ||
-    storyboard.scenes.some((scene) => scene.soundCues.length > 0 || scene.voiceOver) ||
+    sounded.scenes.some((scene) => scene.soundCues.length > 0 || scene.voiceOver) ||
     voiceTracks.length > 0;
   const hasSound = soundIntended;
   const soundKeys = new Set(

@@ -21,7 +21,7 @@ export function RoutingForm({
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
     speech: { primary: string; preview: string; recognizer: string };
-    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string };
+    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string; look: string };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -221,6 +221,17 @@ export function RoutingForm({
               <span className="hint">
                 The same storyboard, sound and checks either way, and the hero shot&rsquo;s shortlist is drawn by the
                 same engine as the film.
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-look">How a HyperFrames film is staged</label>
+              <select id="render-look" name="render.look" className="input" defaultValue={routing.render.look}>
+                <option value="classic">Classic (the Remotion film, drawn by HyperFrames)</option>
+                <option value="launch">Launch (backdrop in three acts, typed and resolving type, tilted cards, chapters)</option>
+              </select>
+              <span className="hint">
+                The same storyboard either way: its beats, words, pictures, framings and cuts. Every scene of a launch
+                film is drawn by the engine, for nothing; no model is asked.
               </span>
             </div>
             <div className="field">

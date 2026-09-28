@@ -135,6 +135,7 @@ export default async function ProvidersPage() {
               engine: config.providers.render.engine,
               sceneAuthor: config.providers.render.sceneAuthor,
               sceneAuthorTier: config.providers.render.sceneAuthorTier,
+              look: config.providers.render.look,
             },
             media: {
               enabled: config.providers.media.enabled,

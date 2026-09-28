@@ -142,6 +142,14 @@ const RenderConfig = z.object({
    * a review may send back is money spent before anyone has said yes.
    */
   sceneAuthor: z.enum(['engine', 'agent']).default('engine'),
+  /**
+   * How a HyperFrames film is staged: `classic` is the Remotion film drawn by
+   * another renderer; `launch` stages the same storyboard as a launch film —
+   * one backdrop in three acts, type that resolves and types itself, captures
+   * on tilted cards, chapters, chips, a closing mark in orbit. Drawn by the
+   * engine either way, for nothing.
+   */
+  look: z.enum(['classic', 'launch']).default('classic'),
   /** The tier of model that writes HyperFrames scenes, when a model writes them. */
   sceneAuthorTier: z.enum(['fast', 'balanced', 'deep']).default('deep'),
   /** Model calls per scene before the engine draws it itself. */
