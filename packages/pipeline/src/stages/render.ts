@@ -109,7 +109,7 @@ import {
 import { footageAmong, resolveAssetUrls, storeAsset, type StageContext } from '../context.ts';
 import { isBlenderAvailable } from '@act-one/three-d';
 import { filmTheProduct } from './product-cinematography.ts';
-import { filmEngine } from './film-engine.ts';
+import { captureWorkers, filmEngine } from './film-engine.ts';
 import { runHeroShot, withHeroShot } from './hero-shot.ts';
 import { runSceneAssets } from './assets.ts';
 import { runCreativeMasterGate } from './creative-gate.ts';
@@ -1367,6 +1367,7 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
       console.error(`[render:hyperframes] no scene author (${(error as Error).message}); the engine draws every scene`);
     }
   }
+  const workers = captureWorkers();
   const result = await renderFilmWithHyperFrames({
     ...options,
     author: {
@@ -1382,6 +1383,7 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
       maxAttempts: settings.maxSceneAttempts,
     },
     look: settings.look,
+    ...(workers ? { concurrency: workers } : {}),
     log: (line) => console.log(`[render:hyperframes] ${render.id} ${line}`),
   });
   const bySource = result.scenes.reduce<Record<string, number>>((counts, scene) => ({ ...counts, [scene.source]: (counts[scene.source] ?? 0) + 1 }), {});

@@ -4,6 +4,7 @@ import type { StageContext } from '../context.ts';
 import { RenderEngine, Scene, Storyboard } from '@act-one/core';
 import { SCENE_CONTRACT_VERSION, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
 import { agentWritesScenes, filmEngine, hyperframesEngineRecord, remotionEngineRecord, withMotionCues } from '../stages/render.ts';
+import { captureWorkers } from '../stages/film-engine.ts';
 
 /**
  * Which engine draws the film.
@@ -129,5 +130,15 @@ describe('the sounds a film’s motion asks for', () => {
     // The storyboard the rest of the stage reads is untouched.
     expect(board.scenes[0]!.soundCues).toEqual([]);
     expect(withMotionCues(board, [])).toBe(board);
+  });
+});
+
+describe('how many browsers capture a HyperFrames film', () => {
+  it('is the host’s to say, and HyperFrames’ own sizing when it says nothing readable', () => {
+    expect(captureWorkers({ ACT_ONE_HYPERFRAMES_WORKERS: '2' })).toBe(2);
+    expect(captureWorkers({ ACT_ONE_HYPERFRAMES_WORKERS: ' 4 ' })).toBe(4);
+    for (const unreadable of [undefined, '', '0', '9', '1.5', '-2', 'two', '2; rm -rf /']) {
+      expect(captureWorkers({ ACT_ONE_HYPERFRAMES_WORKERS: unreadable }), String(unreadable)).toBeUndefined();
+    }
   });
 });

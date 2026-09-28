@@ -119,6 +119,10 @@ services:
       # and risks the OOM killer taking the whole worker rather than one job.
       - key: ACT_ONE_WORKER_CONCURRENCY
         value: '2'
+      # ACT_ONE_HYPERFRAMES_WORKERS is left unset: HyperFrames gives each film
+      # one capture browser on this plan's two cores, which is right with two
+      # films at once. On a host with cores to spare (four or more per film in
+      # flight), setting it to 2 renders a HyperFrames film about 1.75x faster.
       # Where `npm run browsers` puts Playwright's Chromium. Under the project
       # directory so the build's download is there at run time. Public research
       # runs on it; authenticated customer products run on Browserbase, where

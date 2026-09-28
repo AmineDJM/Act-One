@@ -15,6 +15,25 @@ export function filmEngine(context: StageContext): 'remotion' | 'hyperframes' {
 }
 
 /**
+ * How many browsers HyperFrames captures a film with, when the host says.
+ *
+ * HyperFrames sizes this itself, and conservatively — two and a half cores a
+ * browser, so any film over a thousand frames gets one browser on a four-core
+ * host while the other cores idle. Measured on a four-core host rendering one
+ * film at a time, two browsers drew a fifteen-second launch film 1.75 times as
+ * fast, indistinguishable frame for frame (one frame in 450 differed by a
+ * gradient's dither). The right number depends on the host's cores and on how
+ * many films it renders at once, which only the deployment knows; unset or
+ * unreadable, HyperFrames decides.
+ */
+export function captureWorkers(env: Record<string, string | undefined> = process.env): number | undefined {
+  const raw = env['ACT_ONE_HYPERFRAMES_WORKERS']?.trim();
+  if (!raw || !/^\d+$/.test(raw)) return undefined;
+  const workers = Number(raw);
+  return workers >= 1 && workers <= 8 ? workers : undefined;
+}
+
+/**
  * A picture that is not the film — the hero shot's shortlist — drawn by the
  * engine that will draw the film, so what is judged is what will be shown.
  *
@@ -24,7 +43,8 @@ export function filmEngine(context: StageContext): 'remotion' | 'hyperframes' {
  */
 export async function drawPreview(context: StageContext, options: RenderFilmOptions): Promise<void> {
   if (filmEngine(context) === 'hyperframes') {
-    await renderFilmWithHyperFrames({ ...options, log: (line) => console.log(`[preview:hyperframes] ${line}`) });
+    const workers = captureWorkers();
+    await renderFilmWithHyperFrames({ ...options, ...(workers ? { concurrency: workers } : {}), log: (line) => console.log(`[preview:hyperframes] ${line}`) });
     return;
   }
   await renderFilm(options);
