@@ -217,8 +217,17 @@ function buildFilterGraph(
    * afterwards, using the same code that masters the sound library.
    */
   parts.push(`[premaster]alimiter=limit=0.95:attack=5:release=120[limited]`);
+  /*
+   * Exactly the film's length: padded with silence, then trimmed.
+   *
+   * The mix ends with its last sound, and an ending that takes the music out
+   * before the last frame — held silence under the mark — ends it early. A
+   * trim cannot lengthen anything, so the mix came out short of the picture,
+   * and the mux, which stops at the shorter stream, cut the picture to match:
+   * a 45.7-second film was delivered at 44.2, its close gone.
+   */
   parts.push(
-    `[limited]atrim=duration=${fixed(duration)},` +
+    `[limited]apad=whole_dur=${fixed(duration)},atrim=duration=${fixed(duration)},` +
       `afade=t=out:st=${fixed(Math.max(0, duration - 0.35))}:d=0.35[mixout]`,
   );
 
@@ -281,8 +290,17 @@ export function mixArgs(plan: MixPlan, outputPath: string): string[] {
   return args;
 }
 
-/** Muxes a rendered video with the finished mix, without re-encoding video. */
-export function muxArgs(videoPath: string, audioPath: string, outputPath: string): string[] {
+/**
+ * Muxes a rendered video with the finished mix, without re-encoding video.
+ *
+ * Given the picture's length, the sound is padded with silence to it, so a
+ * mix that came out short can never shorten the film: `-shortest` then ends
+ * at the picture's last frame. The padding is bounded — an unbounded pad
+ * against a copied video stream never ends.
+ */
+export function muxArgs(videoPath: string, audioPath: string, outputPath: string, pictureSeconds?: number): string[] {
+  // A quarter second past the picture, so the picture is always the stream that ends first.
+  const pad = pictureSeconds !== undefined && Number.isFinite(pictureSeconds) && pictureSeconds > 0 ? ['-af', `apad=whole_dur=${fixed(pictureSeconds + 0.25)}`] : [];
   return [
     '-y', '-hide_banner', '-loglevel', 'error',
     '-i', videoPath,
@@ -304,6 +322,7 @@ export function muxArgs(videoPath: string, audioPath: string, outputPath: string
     '-bsf:v',
     'h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0',
     '-c:a', 'aac', '-b:a', '256k',
+    ...pad,
     '-shortest',
     '-movflags', '+faststart',
     outputPath,

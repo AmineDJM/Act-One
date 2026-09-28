@@ -2120,10 +2120,10 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing, drawn.durationSeconds)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+  return { ...(await mux(context, silentPath, audioPath, params, stillMissing, drawn.durationSeconds)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
 }
 
 /**
@@ -2237,16 +2237,17 @@ async function checkColourDistribution(
   return issues;
 }
 
-/** Puts the picture and the mix together, falling back to the silent cut. */
+/** Puts the picture and the mix together, the picture's length kept, falling back to the silent cut. */
 async function mux(
   context: StageContext,
   silentPath: string,
   audioPath: string,
   params: { workDir: string; attempt: number },
   missingAudio: string[],
+  pictureSeconds: number,
 ): Promise<{ path: string; missingAudio: string[] }> {
   const masterPath = path.join(params.workDir, `master-${params.attempt}.mp4`);
-  const muxed = await runFfmpeg(muxArgs(silentPath, audioPath, masterPath), {
+  const muxed = await runFfmpeg(muxArgs(silentPath, audioPath, masterPath, pictureSeconds), {
     signal: context.signal,
     timeoutMs: 300_000,
   });
