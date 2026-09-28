@@ -67,6 +67,7 @@ import {
   posterArgs,
   extractFrame,
   runFfmpeg,
+  buildSoundLibrary,
   DEFAULT_LIBRARY,
 } from '@act-one/sound';
 import {
@@ -1980,6 +1981,8 @@ async function renderOnce(
   // A film with no whoosh is still a film, so a missing asset never fails the
   // render — but it is reported, and the caller turns it into a QA finding.
   const { resolved: resolvedPaths, missing: missingAudio } = await resolveLibraryPaths(context, design);
+  // What the house library lacks in storage is made here, from its scores, and kept for the next film.
+  Object.assign(resolvedPaths, await healLibrary(context, missingAudio, params.workDir));
 
   /*
    * A score written for this film, and sounds built for these shots.
@@ -2765,6 +2768,44 @@ async function resolveLibraryPaths(
   );
 
   return { resolved, missing: missing.sort() };
+}
+
+/**
+ * The house library's missing files, made here and kept for the next film.
+ *
+ * The library is code — seven scores and twelve effects rendered and mastered
+ * by `buildSoundLibrary` — so storage that never had it put there, or lost a
+ * file, does not have to mean a silent film: the files this film needs are
+ * rendered into its work directory, played from there, and stored under
+ * their library keys so the next film finds them where it looks. That costs
+ * this worker's CPU once — well under a minute for a track and a few effects
+ * — and nothing after. A file that cannot be made, or a key that is not the
+ * house library's, stays missing and is reported as before.
+ */
+export async function healLibrary(context: Pick<StageContext, 'registry'>, missing: readonly string[], workDir: string): Promise<Record<string, string>> {
+  const wanted = new Set(missing);
+  const library = {
+    music: DEFAULT_LIBRARY.music.filter((track) => wanted.has(track.storageKey)),
+    sfx: DEFAULT_LIBRARY.sfx.filter((sample) => wanted.has(sample.storageKey)),
+  };
+  if (library.music.length + library.sfx.length === 0) return {};
+  const dir = path.join(workDir, 'library');
+  const made: Record<string, string> = {};
+  try {
+    const { written } = await buildSoundLibrary({ storageDir: dir, library });
+    const storage = context.registry.storage();
+    for (const key of written) {
+      const file = path.join(dir, key);
+      made[key] = file;
+      await storage.putFile(key, file, { contentType: 'audio/wav' }).catch((error: unknown) => {
+        console.error(`[render] made ${key} but could not keep it (${(error as Error).message}); the next film makes it again`);
+      });
+    }
+    if (written.length > 0) console.log(`[render] made ${written.length} missing library sound(s) from their scores: ${written.join(', ')}`);
+  } catch (error) {
+    console.error('[render] could not make the missing library sounds:', (error as Error).message);
+  }
+  return made;
 }
 
 export { DEFAULT_LIBRARY };
