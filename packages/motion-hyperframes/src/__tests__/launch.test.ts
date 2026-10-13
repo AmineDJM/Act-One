@@ -547,12 +547,24 @@ describe('a capture drawn back up in the launch look', () => {
     expect(html).toContain('id="scene-01-ty-g1" class="ao-g">M</span>');
     expect(html).toContain('<img id="scene-01-real" src="assets/ast_img.png" alt="">');
     const realAt = Number(/tl\.fromTo\("#scene-01-real", \{ opacity: 0 \}, \{ opacity: 1, duration: 0\.45, ease: "power2\.inOut" \}, ([\d.]+)\);/.exec(html)?.[1]);
-    expect(realAt).toBeLessThanOrEqual(target.timing.beatStart + 3 - 0.35);
+    // The capture itself is fully up, and held, for at least 0.7 s before the beat starts to leave (0.36 s from its end).
+    expect(realAt + 0.45).toBeLessThanOrEqual(target.timing.beatStart + 3 - 0.36 - 0.7 + 1e-6);
     expect(realAt).toBeGreaterThan(target.timing.beatStart + 1);
+    // The click lands, and is seen to land, before the capture comes up.
+    const clickAt = Number(/tl\.fromTo\("#scene-01-ripple", [^)]*\}, ([\d.]+)\);/.exec(html)?.[1]);
+    expect(clickAt).toBeGreaterThan(target.timing.beatStart + 0.5);
+    expect(clickAt + 0.3).toBeLessThanOrEqual(realAt + 1e-6);
+  });
+
+  it('shows a picture inside the interface as the capture’s own pixels of it', () => {
+    const withPicture = { ...drawn(3), drawing: { ...drawing, nodes: [...drawing.nodes, { id: 'shot', parent: 'win', kind: 'image' as const, rect: { x: 0.3, y: 0.2, w: 0.4, h: 0.5 }, fill: null, radius: 'md' as const, text: null, ink: null, strong: false }] } };
+    const html = launchScene(withPicture, design(), DAY);
+    expect(html).toMatch(/#scene-01-n6 \{[^}]*background: url\(assets\/ast_img\.png\) -[\d.]+px -[\d.]+px \/ [\d.]+px [\d.]+px no-repeat/);
+    expect(errorsOf(html, withPicture)).toEqual([]);
   });
 
   it('is shown as captured when its beat is too short to draw it first', () => {
-    const html = launchScene(drawn(1.8), design(), DAY);
+    const html = launchScene(drawn(2.4), design(), DAY);
     expect(html).not.toContain('scene-01-ui');
     expect(html).toContain('id="scene-01-media"');
   });

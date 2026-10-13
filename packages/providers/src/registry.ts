@@ -155,8 +155,14 @@ const RenderConfig = z.object({
    * opening line, then the chapters — and the most a film may spend on them.
    * Every other beat, and any moment the budget does not cover, is drawn by
    * the engine for nothing. Zero scenes or a zero budget: the engine draws all.
+   *
+   * Off by default. Measured on the KDE film, the two moments a model wrote
+   * ($0.16) were plainer than the engine's own — set type that barely moved,
+   * where the engine types the line with its caret and underlines its word.
+   * Paying for a weaker film is not a default; it is there to switch on for
+   * a model, or a brief, that does better.
    */
-  signatureScenes: z.number().int().min(0).max(4).default(2),
+  signatureScenes: z.number().int().min(0).max(4).default(0),
   signatureBudgetUsd: z.number().min(0).max(2).default(0.25),
   /**
    * In the launch look, how many captures are read into parts and drawn back

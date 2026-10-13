@@ -648,8 +648,10 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   parts.markup.push(`<div id="${id}-words">${rule}<h1 id="${id}-title">${risingTitle(`${id}-title`, set, palette, parts, start + 0.15)}</h1></div>`);
 }
 
-/** A beat shorter than this shows its capture as it is: drawing it up first would leave no time to see it. */
-const DRAWING_MIN_SECONDS = 2.2;
+/** A beat shorter than this shows its capture as it is: drawing it up, using it and then showing it needs the time. */
+const DRAWING_MIN_SECONDS = 2.6;
+/** How long the real capture is held, fully up, before the beat leaves. */
+const DRAWING_REAL_HOLD = 0.7;
 
 /**
  * An interface drawn back up from its parts, used, and then shown as it is.
@@ -693,9 +695,15 @@ function drawnInterface(
     `#${id}-real { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; opacity: 0; }`,
   );
 
-  // Outermost first, as listed; a parent always arrives before what sits in it.
+  // The capture comes up early enough to be seen: crossfaded in, then held before the beat leaves.
+  const leaves = until - EXIT_SECONDS;
+  const real = leaves - DRAWING_REAL_HOLD - 0.45;
+  const hasFocus = drawing.focus !== null && drawing.nodes.some((node) => node.id === drawing.focus!.nodeId);
+  // Outermost first, as listed; a parent always arrives before what sits in it — in whatever time is left for it.
   const nodes = drawing.nodes;
-  const step = Math.min(0.035, 0.9 / Math.max(1, nodes.length));
+  // The click lands 0.3 s after the last part starts, and the capture comes up 0.3 s after the click.
+  const buildRoom = Math.max(0, real - from - (hasFocus ? 0.6 : 0.35));
+  const step = Math.min(0.035, buildRoom / Math.max(1, nodes.length));
   const markup = nodes.map((node, index) => {
     const left = node.rect.x * w;
     const top = node.rect.y * h;
@@ -710,7 +718,14 @@ function drawnInterface(
       `border-radius: ${px(node.kind === 'avatar' ? 999 : radii[node.radius])}`,
       `padding: 0 ${px(Math.min(nodeH * 0.35, w * 0.008))}`,
       node.kind === 'button' || node.kind === 'avatar' || node.kind === 'icon' ? 'justify-content: center' : '',
-      node.fill ? `background: ${node.fill}` : node.kind === 'icon' || node.kind === 'avatar' ? `background: ${hexAlpha(textInk, 0.22)}` : '',
+      // A picture inside the interface is the capture's own pixels of that rectangle, never a drawing of them.
+      node.kind === 'image' || node.kind === 'chart'
+        ? `background: url(${picture.path}) ${px(-left)} ${px(-top)} / ${px(w)} ${px(h)} no-repeat`
+        : node.fill
+          ? `background: ${node.fill}`
+          : node.kind === 'icon' || node.kind === 'avatar'
+            ? `background: ${hexAlpha(textInk, 0.22)}`
+            : '',
       !node.fill && contained.has(node.kind) ? `box-shadow: inset 0 0 0 1px ${hexAlpha(textInk, 0.1)}` : '',
       node.kind === 'input' ? `box-shadow: inset 0 0 0 1px ${hexAlpha(textInk, 0.22)}` : '',
     ].filter(Boolean);
@@ -729,18 +744,18 @@ function drawnInterface(
     parts.tweens.push(`tl.fromTo("#${id}-n${index + 1}", { opacity: 0, y: ${num(h * 0.008)} }, { opacity: 1, y: 0, duration: 0.35, ease: ActOne.ease("out_expo") }, ${num(at)});`);
     return `<div id="${id}-n${index + 1}" class="${id}-n">${content}</div>`;
   });
-  const built = from + nodes.length * step + 0.3;
+  const built = from + nodes.length * step;
 
   // The hand: to the control, a click or the words the field holds, typed.
   const focusIndex = drawing.focus ? nodes.findIndex((node) => node.id === drawing.focus!.nodeId) : -1;
-  const real = Math.min(until - 0.35, Math.max(built + (focusIndex >= 0 ? 0.9 : 0.25), until - 0.8));
   const extras: string[] = [];
-  if (focusIndex >= 0 && real - built > 0.5) {
+  if (focusIndex >= 0 && real - built >= 0.6 - 1e-6) {
     const focus = nodes[focusIndex]!;
     const cx = (focus.rect.x + focus.rect.w / 2) * w;
     const cy = (focus.rect.y + focus.rect.h / 2) * h;
     const size = Math.max(14, H * 0.028);
-    const click = built + 0.35;
+    // The cursor is already flying in while the last parts arrive.
+    const click = built + 0.3;
     parts.styles.push(
       `#${id}-cursor { position: absolute; left: ${px(cx)}; top: ${px(cy)}; width: ${px(size)}; height: ${px(size * 1.4)}; opacity: 0; }`,
       `#${id}-ripple { position: absolute; left: ${px(cx - size)}; top: ${px(cy - size)}; width: ${px(size * 2)}; height: ${px(size * 2)}; border-radius: 50%; background: ${hexAlpha(palette.accent, 0.35)}; opacity: 0; }`,

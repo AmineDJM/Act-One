@@ -25,7 +25,7 @@ afterEach(() => {
 describe('the film engine', () => {
   it('is Remotion unless the operator chose otherwise', () => {
     expect(filmEngine(contextWith())).toBe('remotion');
-    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthor: 'engine', look: 'classic', signatureScenes: 2, signatureBudgetUsd: 0.25, interfaceDrawings: 2, interfaceDrawingBudgetUsd: 0.05, sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
+    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthor: 'engine', look: 'classic', signatureScenes: 0, signatureBudgetUsd: 0.25, interfaceDrawings: 2, interfaceDrawingBudgetUsd: 0.05, sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
     expect(ProviderConfig.parse({ render: { look: 'launch' } }).render.look).toBe('launch');
     expect(ProviderConfig.safeParse({ render: { look: 'loud' } }).success).toBe(false);
     expect(filmEngine(contextWith('hyperframes'))).toBe('hyperframes');
@@ -70,8 +70,9 @@ describe('a model writing HyperFrames scenes', () => {
   });
 
   it('is asked, in the launch look, for its signature moments only while they have a budget', () => {
-    const launch = ProviderConfig.parse({ render: { engine: 'hyperframes', look: 'launch' } }).render;
-    expect(launch).toMatchObject({ signatureScenes: 2, signatureBudgetUsd: 0.25 });
+    expect(ProviderConfig.parse({ render: { engine: 'hyperframes', look: 'launch' } }).render).toMatchObject({ signatureScenes: 0, signatureBudgetUsd: 0.25 });
+    expect(agentWritesScenes(ProviderConfig.parse({ render: { engine: 'hyperframes', look: 'launch' } }).render, 'film')).toBe(false);
+    const launch = ProviderConfig.parse({ render: { engine: 'hyperframes', look: 'launch', signatureScenes: 2 } }).render;
     expect(agentWritesScenes(launch, 'film')).toBe(true);
     expect(agentWritesScenes(launch, 'animatic')).toBe(false);
     expect(agentWritesScenes({ ...launch, signatureBudgetUsd: 0 }, 'film')).toBe(false);

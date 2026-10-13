@@ -25,7 +25,7 @@ export type InterfaceDrawings = {
 };
 
 /** The shortest beat that is drawn before it is shown; the launch look holds the same line. */
-export const DRAWN_BEAT_MIN_SECONDS = 2.2;
+export const DRAWN_BEAT_MIN_SECONDS = 2.6;
 /** What one reading is expected to cost before any has been paid for: a fast-tier call with one image. */
 const READING_ESTIMATE_USD = 0.01;
 const READABLE = new Set(['image/png', 'image/jpeg', 'image/webp']);
