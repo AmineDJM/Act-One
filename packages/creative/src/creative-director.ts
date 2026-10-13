@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { brandDirectionLines, cutDirectionLines, formatDirectionLines } from './brief-lines.ts';
 import {
   standardsBrief,
+  VoiceDensity,
   VoiceStrategy,
   newId,
   topMoments,
@@ -41,6 +42,7 @@ const TreatmentResponse = z.object({
   motionStyleNotes: z.string().trim().min(1).max(600),
   soundStyle: z.string().trim().min(1).max(600),
   voiceStrategy: VoiceStrategy,
+  voiceDensity: VoiceDensity.default('key_moments'),
   voiceRationale: z.string().max(400).default(''),
   generativeMediaStrategy: z.string().trim().min(1).max(800),
   productUiUsage: z.string().trim().min(1).max(800),
@@ -56,7 +58,12 @@ You decide three things nobody else can:
 2. What the film deliberately does NOT show. Be specific and give at least two real exclusions — things a lesser film would include and this one will not.
 3. Who speaks, and what the voice says that the picture cannot.
 
-On voice: every film is narrated unless the customer asked for none. Choose the voice — "narrator" by default, "founder" when the story is the maker's own, "brand_voice" when the brand speaks as itself — and say why in voiceRationale. The voice never reads out what is on screen: it says what the picture cannot — the why, the stakes, what changes for the viewer — in few words, leaving room for the music. Choose "none" only when the customer asked for a film without a voice.
+On voice: every film is narrated unless the customer asked for none. Choose the voice — "narrator" by default, "founder" when the story is the maker's own, "brand_voice" when the brand speaks as itself — and say why in voiceRationale. The voice never reads out what is on screen: it says what the picture cannot — the why, the stakes, what changes for the viewer. Choose "none" only when the customer asked for a film without a voice.
+
+On how much the voice carries ("voiceDensity"), decide from the product, its energy, the tone and the art direction, and say why in voiceRationale:
+- "continuous": one read from the first beat to the mark, as a launch spot is read. It breathes between lines and stops only where you want the picture or the music alone — at most two such moments, each under three seconds (the reveal, the close). Right for a product that needs explaining, a warm or confident tone, a story.
+- "key_moments": the voice takes the beats that matter; between them the music and the sound design carry the film, for four seconds at most at a time, never into a hole. Right for a high-energy, rhythmic, visual film where the cut and the music are the argument.
+Either way the film is never silent: when the voice stops, something else is heard.
 
 On the script: if the film has no narration, "script" should contain the on-screen text beats instead, one per line, in order. If there is narration, write it as narration. Either way write it tight — you have seconds, not paragraphs.
 
@@ -190,6 +197,7 @@ export class CreativeDirector {
       motionStyleNotes: value.motionStyleNotes,
       soundStyle: value.soundStyle,
       voiceStrategy,
+      voiceDensity: value.voiceDensity,
       generativeMediaStrategy: input.brief.realMediaOnly
         ? 'Real media only, at the customer’s instruction. No generated imagery.'
         : value.generativeMediaStrategy,

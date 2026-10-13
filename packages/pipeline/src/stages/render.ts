@@ -82,6 +82,7 @@ import {
   captionSyncIssues,
   colourShares,
   deadAirIssues,
+  voiceGapIssues,
   distributionIssues,
   factCheck,
   flashIssues,
@@ -2448,6 +2449,7 @@ async function checkTiming(
   const issues: QaFinding[] = [
     ...captionSyncIssues({ cues: params.captions.cues, spoken: params.spoken, fps: params.fps }),
     ...speechDriftIssues({ spoken: params.spoken, scenes: params.storyboard.scenes }),
+    ...voiceGapIssues({ spoken: params.spoken, scenes: params.storyboard.scenes, durationSeconds: params.durationSeconds }),
   ];
 
   try {

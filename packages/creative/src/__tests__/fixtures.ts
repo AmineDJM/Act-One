@@ -215,6 +215,7 @@ export function treatmentFixture(over: Partial<CreativeTreatment> = {}): Creativ
     motionStyleNotes: 'Snap in, settle, never bounce.',
     soundStyle: 'Low pulse, a single impact on the turn.',
     voiceStrategy: 'none',
+    voiceDensity: 'key_moments',
     generativeMediaStrategy: 'None. Everything is rendered or captured.',
     productUiUsage: 'Real capture only.',
     exclusions: ['No stock footage', 'No fake interface'],

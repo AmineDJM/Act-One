@@ -107,6 +107,8 @@ export const QaCheck = z.enum([
   'sfx_sync',
   'transition_sync',
   'silence_gap',
+  /* The voice stopped mid-film: a hole in the story, whatever the track is doing. */
+  'voice_gap',
   'dead_pacing',
   'still_frame_hold',
   'awkward_hold',
@@ -373,7 +375,7 @@ const CHECK_CATEGORY: Record<QaCheck, QaCategory> = {
   lip_sync: 'sync', narration_shot_drift: 'sync', music_beat_alignment: 'sync',
   sfx_sync: 'sync', transition_sync: 'sync',
 
-  narration_timing: 'timing', narration_pause: 'timing', silence_gap: 'timing',
+  narration_timing: 'timing', narration_pause: 'timing', silence_gap: 'timing', voice_gap: 'timing',
   dead_pacing: 'timing', still_frame_hold: 'timing', awkward_hold: 'timing',
 
   duration_mismatch: 'delivery', aspect_mismatch: 'delivery', framerate_mismatch: 'delivery',

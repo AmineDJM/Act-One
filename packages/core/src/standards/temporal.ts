@@ -82,6 +82,17 @@ export const TEMPORAL_STANDARDS = {
       'A pause is a tool and dead air is a hole. The difference is length, and past about a ' +
       'second a viewer checks whether the file has stopped.',
   },
+  voiceContinuity: {
+    id: 'temporal.voice_continuity',
+    rule: 'A narrated film never leaves its voice silent for more than four seconds before its close.',
+    source: 'Act One house rule',
+    authority: 'house',
+    enforcement: 'checked',
+    because:
+      'A viewer who is being spoken to and then is not, for five or ten seconds in the middle of ' +
+      'a film, does not hear a pause: they hear the film stop explaining itself. Music can carry ' +
+      'a beat or two; past that the silence is a hole in the story, not a choice.',
+  },
   silentMaster: {
     id: 'temporal.silent_master',
     rule: 'A film that was scored is never delivered with nothing on its track.',

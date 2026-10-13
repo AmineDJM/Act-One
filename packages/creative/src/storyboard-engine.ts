@@ -3,6 +3,7 @@ import { brandDirectionLines, briefDirectionLines, cutDirectionLines, formatDire
 import {
   standardsBrief,
   budgetFor,
+  NARRATION_WORDS_PER_SECOND,
   cutAspect,
   cutSeconds,
   FILM_CUTS,
@@ -46,6 +47,7 @@ import {
 } from './systems/index.ts';
 import { routeShot, enforceBudget, checkBudget, type BudgetViolation } from './shot-routing.ts';
 import { copyFits, fitToDuration, narrationSeconds, readingSeconds, varyRhythm, type TimingConstraint } from './timing.ts';
+import { narrationWordsFor, voiceCoverage } from './voice-density.ts';
 import {
   canOpenAShort,
   needsAttention,
@@ -98,7 +100,8 @@ You will be given the creative system's scene archetypes. Every scene must use o
 
 Rules:
 - On-screen text is short. Most scenes carry a few words or none. If a scene's archetype allows 4 words, do not write 12.
-- Never write on-screen text that repeats the narration. If both exist, they must do different work.
+- On-screen text and narration in one scene are one idea, given two ways: the voice says it, the text gives what the ear cannot keep — the name, the number, the word to remember. Never the same words, never a different subject. A viewer who only reads and one who only listens must leave with the same film.
+- The narration is one script read straight through: each scene's line continues the one before it, and read in order the lines are a single spoken text with one voice, one tone and one direction, landing on the call to action.
 - Only set "momentId" when the scene genuinely films that product moment.
 - Each moment says what we can actually show. A capture of a public page shows that page, not an interaction: write that scene's on-screen text about what the page proves, never "watch it happen". Product images and in-product captures can carry feature beats. A moment marked NOT captured cannot carry a product scene at all.
 - Never film the same moment in two consecutive scenes. Two shots of one capture in a row is the same picture twice; put a different beat between them or use a different moment.
@@ -202,6 +205,24 @@ export class StoryboardEngine {
       if (opensOnAPatternInterrupt(second.storyboard.scenes)) built = second;
     }
 
+    /*
+     * A narrated film is heard throughout, as its director decided.
+     *
+     * Measured on the lines as written and the beats as timed, before a voice
+     * is paid for: a stretch where the voice simply stopped is written again,
+     * once, told where it is. The second plan is kept only when its voice
+     * leaves less of the film unspoken.
+     */
+    if (input.treatment.voiceStrategy !== 'none') {
+      const heard = voiceCoverage(built.storyboard.scenes, input.treatment.voiceDensity);
+      if (heard.problem) {
+        const rewritten = await this.plan(input, system, archetypes, target, context, { fillVoice: heard.problem });
+        const second = this.materialise(rewritten, input, system, archetypes, target);
+        const secondHeard = voiceCoverage(second.storyboard.scenes, input.treatment.voiceDensity);
+        if (unspoken(secondHeard) < unspoken(heard) && (cut !== 'short' || opensOnAPatternInterrupt(second.storyboard.scenes))) built = second;
+      }
+    }
+
     const budget = { ...budgetFor(input.brief.creativeMode, format) };
     const withinBudget = enforceBudget(built.storyboard, budget);
     const finalBoard = resequence(withinBudget);
@@ -300,8 +321,8 @@ export class StoryboardEngine {
     archetypes: SceneArchetype[],
     target: number,
     context: CallContext,
-    /** Set on the second pass, when the first film opened on setup. */
-    retry: { rewriteOpening: string } | null = null,
+    /** Set on a second pass: what was wrong with the first film's opening, or with where its voice was. */
+    retry: { rewriteOpening?: string; fillVoice?: string } | null = null,
   ): Promise<z.infer<typeof ScenePlan>> {
     const format = input.brief.filmFormat;
     const cut = input.brief.filmCut;
@@ -343,9 +364,7 @@ export class StoryboardEngine {
             `Camera: ${input.treatment.cameraLanguage}`,
             `Rhythm: ${input.treatment.rhythm}`,
             `Voice strategy: ${input.treatment.voiceStrategy}`,
-            input.treatment.voiceStrategy === 'none'
-              ? 'There is NO narration. Leave every "narration" empty.'
-              : 'Narration is used. Keep it short and never duplicate the on-screen text.',
+            ...voiceLines(input.treatment, target),
             ``,
             `Deliberately excluded from this film:`,
             ...input.treatment.exclusions.map((e) => `- ${e}`),
@@ -396,7 +415,17 @@ export class StoryboardEngine {
             `CTA at the end: ${input.treatment.cta}`,
             input.brief.realMediaOnly ? 'Real media only: no generative briefs at all.' : '',
             `Hard prohibitions: ${system.prohibitions.join('; ')}`,
-            ...(retry
+            ...(retry?.fillVoice
+              ? [
+                  ``,
+                  `# The voice has to be written again`,
+                  retry.fillVoice,
+                  `Write the narration so the voice carries the film as directed: give the silent beats lines`,
+                  `that continue the script, or fold them into the narrated beats around them. Keep the beats`,
+                  `that work, in the same order; this is the same film, heard throughout.`,
+                ]
+              : []),
+            ...(retry?.rewriteOpening
               ? [
                   ``,
                   `# The opening has to be written again`,
@@ -1218,3 +1247,24 @@ function evidenceFor(claimText: string, understanding: ProductUnderstanding): st
 }
 
 export { storyboardDuration };
+
+/** How much of a film its voice leaves unspoken, past what its density allows. */
+function unspoken(heard: ReturnType<typeof voiceCoverage>): number {
+  return heard.holes.reduce((total, hole) => total + hole.seconds, 0) + Math.max(0, 1 - heard.coverage) * heard.spokenSpanSeconds * 0.5;
+}
+
+/** What the planner is told about the voice: who speaks, how much of the film they carry, and about how many words that is. */
+function voiceLines(treatment: CreativeTreatment, target: number): string[] {
+  if (treatment.voiceStrategy === 'none') return ['There is NO narration. Leave every "narration" empty.'];
+  // The close is the mark's: about two and a half seconds the voice leaves to it.
+  const words = narrationWordsFor(Math.max(4, target - 2.5), treatment.voiceDensity, NARRATION_WORDS_PER_SECOND);
+  return treatment.voiceDensity === 'continuous'
+    ? [
+        'Voice: continuous. The narration carries the film from the first scene to the call to action, as a launch spot is read.',
+        `Give every scene a line except at most two you leave to the picture or the music alone, each under three seconds. Write about ${words} words of narration in all.`,
+      ]
+    : [
+        'Voice: on the key moments. The narration takes the beats that matter; the music and the cut carry what is between them.',
+        `Never more than four seconds of film without a line. Write about ${words} words of narration in all.`,
+      ];
+}

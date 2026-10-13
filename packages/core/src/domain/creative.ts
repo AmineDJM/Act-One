@@ -142,6 +142,18 @@ export type Channel = z.infer<typeof Channel>;
 export const VoiceStrategy = z.enum(['none', 'narrator', 'founder', 'brand_voice']);
 export type VoiceStrategy = z.infer<typeof VoiceStrategy>;
 
+/**
+ * How much of the film the voice carries — the director's call, film by film.
+ *
+ * `continuous`: one read from the first beat to the mark, as a launch spot is
+ * read; it breathes, and stops only where the director wants the picture or
+ * the music alone. `key_moments`: the voice takes the beats that matter and
+ * the music and the sound design carry what is between them — briefly, and
+ * never into a hole.
+ */
+export const VoiceDensity = z.enum(['continuous', 'key_moments']);
+export type VoiceDensity = z.infer<typeof VoiceDensity>;
+
 export const Concept = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -261,6 +273,8 @@ export const CreativeTreatment = z.object({
   motionStyleNotes: nonEmpty(600),
   soundStyle: nonEmpty(600),
   voiceStrategy: VoiceStrategy,
+  /** A treatment written before the director chose this reads as the sparser of the two. */
+  voiceDensity: VoiceDensity.default('key_moments'),
   generativeMediaStrategy: nonEmpty(800),
   productUiUsage: nonEmpty(800),
   /** What we deliberately will NOT show. A treatment without this is not a treatment. */

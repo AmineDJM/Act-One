@@ -233,6 +233,54 @@ export function speechDriftIssues(params: {
   return issues;
 }
 
+/** The longest a narrated film's voice may rest before its close. */
+export const VOICE_GAP_CEILING_SECONDS = 4;
+
+/**
+ * Where a narrated film stops talking.
+ *
+ * Read off where the lines were actually spoken, not where they were planned:
+ * a line that came back shorter than its beat leaves the rest of the beat to
+ * the music, and three of those in a row is ten seconds of nobody explaining
+ * anything. The close — the mark and its sting — is the picture's, and is
+ * not counted.
+ */
+export function voiceGapIssues(params: {
+  spoken: readonly SpokenLine[];
+  scenes: readonly Scene[];
+  durationSeconds: number;
+}): QaFinding[] {
+  if (params.spoken.length === 0) return [];
+  const last = params.scenes.at(-1);
+  const close = last && last.visualType === 'logo_reveal' && params.scenes.length > 1 ? last.startTime : params.durationSeconds;
+  const lines = [...params.spoken].sort((a, b) => a.startsAt - b.startsAt);
+  const rests: { from: number; to: number }[] = [];
+  let cursor = 0;
+  for (const line of lines) {
+    if (line.startsAt > cursor) rests.push({ from: cursor, to: Math.min(line.startsAt, close) });
+    cursor = Math.max(cursor, line.endsAt);
+  }
+  if (close > cursor) rests.push({ from: cursor, to: close });
+  return rests
+    .filter((rest) => rest.to - rest.from > VOICE_GAP_CEILING_SECONDS + 1e-6)
+    .map((rest) =>
+      finding({
+        check: 'voice_gap',
+        severity: 'soft_fail',
+        layer: 'cross_modal',
+        sceneId: sceneAt(params.scenes, rest.from)?.id ?? null,
+        timecodeStart: round3(rest.from),
+        timecodeEnd: round3(rest.to),
+        confidence: 0.9,
+        repair: 'manual_review',
+        message:
+          `The voice is silent for ${(rest.to - rest.from).toFixed(1)}s from ${rest.from.toFixed(1)}s, ` +
+          `in a narrated film; ${VOICE_GAP_CEILING_SECONDS}s is the most it rests before the close.`,
+        because: cite(TEMPORAL_STANDARDS.voiceContinuity),
+      }),
+    );
+}
+
 /** Frames that never changed. A held composition and a dropped motion look alike. */
 export function heldFrameIssues(params: {
   freezes: readonly Freeze[];
