@@ -96,17 +96,44 @@ describe('a narrated storyboard', () => {
     ]);
     const { storyboard } = await build(llm);
 
-    expect(llm.calls).toHaveLength(2);
+    // The plan, the editor's read of it, and the plan written again.
+    expect(llm.calls).toHaveLength(3);
     const first = llm.calls[0]!.messages.map((m) => m.content).join('\n');
     expect(first).toMatch(/Voice: continuous/);
     expect(first).toMatch(/Write about \d+ words of narration in all/);
-    expect(llm.calls[1]!.messages.map((m) => m.content).join('\n')).toMatch(/The voice is silent for/);
+    expect(llm.calls[1]!.options).toMatchObject({ schemaName: 'CoherenceEdit' });
+    expect(llm.calls[2]!.messages.map((m) => m.content).join('\n')).toMatch(/The voice is silent for/);
     expect(storyboard.scenes.filter((scene) => scene.narration.length > 0).length).toBeGreaterThan(5);
   });
 
-  it('is written once when its voice already carries the film', async () => {
+  it('is written once when its voice already carries the film, and read once by the editor', async () => {
     const llm = new ScriptedLlmProvider([{ respond: () => plan([LINE, LINE, LINE, LINE, LINE, LINE, LINE]) }]);
     await build(llm);
-    expect(llm.calls).toHaveLength(1);
+    expect(llm.calls.map((call) => (call.options as { schemaName?: string }).schemaName)).toEqual(['ScenePlan', 'CoherenceEdit']);
+  });
+
+  it('takes the editor’s words where voice, text and picture disagreed, and keeps the beats', async () => {
+    const llm = new ScriptedLlmProvider([
+      {
+        when: /You are the film's editor/,
+        respond: { edits: [{ beat: 2, narration: 'Type a name and the invoice is already there.', onScreenText: ['Found as you type'], why: 'the voice was about pricing over a search shot' }] },
+      },
+      { respond: () => plan([LINE, 'Pricing that scales with you, month after month.', LINE, LINE, LINE, LINE, LINE]) },
+    ]);
+    const { storyboard } = await build(llm);
+    const editor = llm.calls.find((call) => (call.options as { schemaName?: string }).schemaName === 'CoherenceEdit')!;
+    expect(editor.messages.map((m) => m.content).join('\n')).toMatch(/2\. Beat 2\n {3}shows: .*\n {3}voice: Pricing that scales/);
+    expect(storyboard.scenes[1]!.narration).toBe('Type a name and the invoice is already there.');
+    expect(storyboard.scenes[1]!.onScreenText).toEqual(['Found as you type']);
+    expect(storyboard.scenes[0]!.narration).toBe(LINE);
+  });
+
+  it('keeps the plan as written when the editor cannot be reached', async () => {
+    const llm = new ScriptedLlmProvider([
+      { when: /You are the film's editor/, respond: () => { throw new Error('the editor is out'); } },
+      { respond: () => plan([LINE, LINE, LINE, LINE, LINE, LINE, LINE]) },
+    ]);
+    const { storyboard } = await build(llm);
+    expect(storyboard.scenes.filter((scene) => scene.narration === LINE).length).toBeGreaterThan(5);
   });
 });

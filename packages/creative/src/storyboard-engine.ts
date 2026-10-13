@@ -116,6 +116,45 @@ ${standardsBrief('storyboard')}
 Return JSON only.`;
 
 /**
+ * The editor's read of the whole film, before it is made.
+ *
+ * A plan is written beat by beat, and a film written beat by beat is several
+ * small films: a voice on one subject while the type is on another, a line
+ * about typing over a shot where nothing is typed, a tone that changes halfway.
+ * This is one read of all of it at once — what each beat shows, says and
+ * writes — against the film's single idea, its feeling and where it ends, and
+ * it rewrites only what disagrees. Order, beats and pictures are not its to
+ * change: it edits words.
+ */
+const CoherenceEdit = z.object({
+  edits: z
+    .array(
+      z.object({
+        /** 1-based, as the beats were listed. */
+        beat: z.number().int().min(1),
+        narration: z.string().max(400).nullable().default(null),
+        onScreenText: z.array(z.string().max(160)).max(4).nullable().default(null),
+        why: z.string().max(240).default(''),
+      }),
+    )
+    .max(24)
+    .default([]),
+});
+
+const COHERENCE_PROMPT = `You are the film's editor. The whole film is in front of you, beat by beat: what each beat shows, what the voice says over it and what is written on screen. Read it once as a viewer would, then make it one film.
+
+Check every beat against these, and rewrite only the words that fail:
+- The voice and the on-screen text of a beat carry the same idea in two forms: the voice says it, the text gives what the ear cannot keep (the name, the number, the word to remember). Never the same words, never two subjects.
+- The voice says only what the picture can stand behind. A line about typing, clicking, moving or switching sits over a beat that shows exactly that; otherwise change the line to what the beat shows.
+- The narration, read in order, is one spoken text in one voice and one tone, each line continuing the one before, building to the call to action. No line restarts the argument or changes register.
+- Every beat serves the film's one idea and its feeling. A beat that wanders gets words that bring it back.
+- Keep each beat's on-screen text within its word limit, and keep the narration's length about the same as written, so the timing still holds.
+
+Never change the order, the number of beats, or what a beat shows. Return only the beats you changed, with the full new narration and on-screen text for each, and a short reason. An empty list is the right answer when the film already holds together.
+
+Return JSON only.`;
+
+/**
  * A library asset as the planner sees it: enough to choose it and to know
  * what it may stand for, never the bytes.
  */
@@ -181,7 +220,7 @@ export class StoryboardEngine {
       input.targetDurationSeconds ??
       cutSeconds(cut, input.brief.durationSeconds ?? input.concept.estimatedDurationSeconds);
 
-    const plan = await this.plan(input, system, archetypes, target, context);
+    const plan = await this.cohere(await this.plan(input, system, archetypes, target, context), input, archetypes, context);
     let built = this.materialise(plan, input, system, archetypes, target);
 
     /*
@@ -456,6 +495,74 @@ export class StoryboardEngine {
     );
 
     return value;
+  }
+
+  /**
+   * One read of the whole film, and the words that disagree rewritten.
+   *
+   * Only for a narrated film: that is where a voice and a page can tell two
+   * stories. One call; a failure of any kind keeps the plan as written, since
+   * a film that was not edited is still a film.
+   */
+  private async cohere(
+    plan: z.infer<typeof ScenePlan>,
+    input: StoryboardInput,
+    archetypes: SceneArchetype[],
+    context: CallContext,
+  ): Promise<z.infer<typeof ScenePlan>> {
+    if (input.treatment.voiceStrategy === 'none' || plan.scenes.length === 0) return plan;
+    const moments = new Map(input.understanding.productMoments.map((moment) => [moment.id, moment]));
+    const beats = plan.scenes.map((scene, index) => {
+      const archetype = archetypes.find((candidate) => candidate.id === scene.archetypeId);
+      const moment = scene.momentId ? moments.get(scene.momentId) : undefined;
+      const shows = moment
+        ? `the product: ${moment.title} (${moment.startState || 'start'} → ${moment.endState || 'result'})`
+        : archetype
+          ? `${archetype.visualType.replace(/_/g, ' ')}: ${archetype.purpose}`
+          : scene.purpose;
+      return [
+        `${index + 1}. ${scene.purpose}`,
+        `   shows: ${shows}`,
+        `   voice: ${scene.narration.trim() || '(none)'}`,
+        `   on screen (max ${archetype?.maxWords ?? 6} words): ${scene.onScreenText.join(' / ') || '(none)'}`,
+      ].join('\n');
+    });
+    try {
+      const { value } = await this.llm.completeJson(
+        [
+          { role: 'system', content: COHERENCE_PROMPT },
+          {
+            role: 'user',
+            content: [
+              `# The film: ${input.treatment.title}`,
+              `One idea: ${input.concept.keyIdea}`,
+              `Feeling: ${input.concept.targetEmotion}`,
+              `Tone: ${input.brand.tone}`,
+              `It ends on: ${input.treatment.cta}`,
+              `Voice: ${input.treatment.voiceStrategy}, ${input.treatment.voiceDensity === 'continuous' ? 'carrying the whole film' : 'on the key moments'}.`,
+              ``,
+              `# The beats`,
+              ...beats,
+            ].join('\n'),
+          },
+        ],
+        { schema: CoherenceEdit, schemaName: 'CoherenceEdit', tier: 'balanced', temperature: 0.3, maxOutputTokens: 4000, repairAttempts: 1 },
+        context,
+      );
+      if (value.edits.length === 0) return plan;
+      const scenes = plan.scenes.map((scene, index) => {
+        const edit = value.edits.find((candidate) => candidate.beat === index + 1);
+        if (!edit) return scene;
+        return {
+          ...scene,
+          ...(edit.narration !== null ? { narration: edit.narration } : {}),
+          ...(edit.onScreenText !== null ? { onScreenText: edit.onScreenText } : {}),
+        };
+      });
+      return { ...plan, scenes };
+    } catch {
+      return plan;
+    }
   }
 
   /**
