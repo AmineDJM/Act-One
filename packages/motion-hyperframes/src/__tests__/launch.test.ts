@@ -12,6 +12,8 @@ import { captionCss, captionsComposition, captionsMarkup } from '../captions.ts'
 import {
   accentWordOf,
   countable,
+  diveFraming,
+  drawingHand,
   launchBackdrop,
   launchSoundCues,
   launchPalettes,
@@ -19,6 +21,7 @@ import {
   launchScene,
   listItems,
   planLaunch,
+  productDive,
   type LaunchBeat,
 } from '../launch.ts';
 import { motionRuntimeSource } from '../motion-runtime.ts';
@@ -515,6 +518,31 @@ describe('an upright frame’s words', () => {
   });
 });
 
+describe('the camera going into a card', () => {
+  const frame = { width: 1920, height: 1080 };
+  const card = { x: 760, y: 200, width: 1075, height: 672 };
+
+  it('fills the frame with the interface, never showing past its edges', () => {
+    for (const focus of [{ x: 0.5, y: 0.5 }, { x: 0.02, y: 0.02 }, { x: 0.98, y: 0.97 }]) {
+      const at = diveFraming(card, frame, focus);
+      expect(card.width * at.scale).toBeGreaterThanOrEqual(frame.width);
+      expect(card.height * at.scale).toBeGreaterThanOrEqual(frame.height);
+      // The scaled card's edges stay outside the frame on every side.
+      expect(card.x + at.x).toBeLessThanOrEqual(1e-6);
+      expect(card.y + at.y).toBeLessThanOrEqual(1e-6);
+      expect(card.x + at.x + card.width * at.scale).toBeGreaterThanOrEqual(frame.width - 1e-6);
+      expect(card.y + at.y + card.height * at.scale).toBeGreaterThanOrEqual(frame.height - 1e-6);
+    }
+  });
+
+  it('brings the focus to the centre of the frame when the edges allow it', () => {
+    const focus = { x: 0.5, y: 0.5 };
+    const at = diveFraming(card, frame, focus);
+    expect(card.x + at.x + focus.x * card.width * at.scale).toBeCloseTo(frame.width / 2, 0);
+    expect(card.y + at.y + focus.y * card.height * at.scale).toBeCloseTo(frame.height / 2, 0);
+  });
+});
+
 describe('a capture drawn back up in the launch look', () => {
   const drawing = UiDrawing.parse({
     background: '#ffffff',
@@ -588,6 +616,39 @@ describe('a capture drawn back up in the launch look', () => {
     const short = drawn(2.4);
     const shortCues = launchSoundCues([short], planLaunch([short]), new Map([[short.frameId, 0]]));
     expect(shortCues.some((cue) => cue.type === 'typing' || cue.type === 'ui_click')).toBe(false);
+  });
+
+  it('is filmed in two shots when the beat holds them: wide on the card, then in close-up for the hand', () => {
+    const target = drawn(5);
+    const dive = productDive(target)!;
+    expect(dive).not.toBeNull();
+    // The hand waits for the camera: it clicks once the move has landed, and still types before the capture comes up.
+    const hand = drawingHand(drawing, Math.max(0.04, target.recipe.delaySeconds) + 0.25, 5, dive.at + dive.seconds + 0.1);
+    expect(hand.click).not.toBeNull();
+    expect(hand.click!).toBeGreaterThanOrEqual(dive.at + dive.seconds);
+    expect(hand.typing!.start + hand.typing!.glyphs * hand.typing!.perGlyph).toBeLessThanOrEqual(hand.real + 1e-6);
+    expect(5 - 0.36 - (dive.at + dive.seconds)).toBeGreaterThanOrEqual(0.9 - 1e-6);
+    // Framed on the field the hand types into.
+    expect(dive.focus).toEqual({ x: 0.5, y: 0.05 });
+
+    const html = launchScene(target, design(), DAY);
+    expect(errorsOf(html, target)).toEqual([]);
+    const at = target.timing.beatStart + dive.at;
+    expect(html).toMatch(new RegExp(`tl\\.fromTo\\("#scene-01-space", \\{ x: 0, y: 0, scale: 1 \\}, \\{ x: -?[\\d.]+, y: -?[\\d.]+, scale: [\\d.]+, transformOrigin: "0% 0%", duration: 0\\.9, ease: "power2\\.inOut", immediateRender: false \\}, ${at}\\);`));
+    expect(html).toContain(`tl.fromTo("#scene-01-words", { opacity: 1, x: 0 }, { opacity: 0,`);
+    const clickAt = Number(/tl\.fromTo\("#scene-01-ripple", [^)]*\}, ([\d.]+)\);/.exec(html)?.[1]);
+    expect(clickAt).toBeCloseTo(target.timing.beatStart + hand.click!, 3);
+    // The ear gets the move too, softly.
+    const cues = launchSoundCues([target], planLaunch([target]), new Map([[target.frameId, 0]]));
+    expect(cues.some((cue) => cue.type === 'whoosh' && Math.abs(cue.time - dive.at) < 1e-6)).toBe(true);
+  });
+
+  it('pushes toward what matters on a beat too short to cut in, rather than holding a still screen', () => {
+    const target = drawn(3);
+    expect(productDive(target)).toBeNull();
+    const html = launchScene(target, design(), DAY);
+    expect(html).toMatch(/tl\.fromTo\("#scene-01-space", \{ scale: 1 \}, \{ scale: 1\.12, transformOrigin: "[\d.]+% [\d.]+%"/);
+    expect(errorsOf(html, target)).toEqual([]);
   });
 
   it('is shown as captured when its beat is too short to draw it first', () => {

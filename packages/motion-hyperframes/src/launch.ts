@@ -1,4 +1,4 @@
-import { emphasisIn, type UiDrawing, type UiDrawingNode } from '@act-one/core';
+import { emphasisIn, readingSecondsFor, type UiDrawing, type UiDrawingNode } from '@act-one/core';
 import { contrastRatio, ensureContrast, fitToLines, hexToRgb, measureText, mix, rgbToHex, type DesignTokens } from '@act-one/design';
 import type { StagedAsset } from './assets.ts';
 import { escapeHtml } from './captions.ts';
@@ -574,6 +574,92 @@ type CardPicture = {
   tilt?: number;
 };
 
+/** How long the camera takes to go from the card to the interface. */
+const DIVE_SECONDS = 0.9;
+/** The least the close-up is held before the beat leaves: long enough to be a shot, not a lurch. */
+const DIVE_HOLD_SECONDS = 0.9;
+/** How much of the headline is given to be read before the camera leaves it, at most. */
+const DIVE_READ_SECONDS = 1.4;
+
+/**
+ * The camera going into a product beat.
+ *
+ * A capture held on a card for its whole beat is a slide of an interface,
+ * however well it is lit. A product beat is two shots: the card and its line,
+ * wide; then the camera dives into the card, flattens it and holds on the
+ * interface itself, filling the frame, framed on what matters in it — the
+ * control the hand is about to use, so the click and the keystrokes happen in
+ * close-up. The line has been read by then; the captions carry the voice.
+ *
+ * Times are on the beat's clock. Null when the beat is too short to hold a
+ * close-up, or does not show a screen.
+ */
+export type ProductDive = {
+  at: number;
+  seconds: number;
+  /** Where to frame, as fractions of the capture; null frames the card's upper middle. */
+  focus: { x: number; y: number } | null;
+};
+
+export function productDive(packet: ScenePacket): ProductDive | null {
+  const shot = shotOf(packet);
+  if (shot.kind !== 'ui' && shot.kind !== 'product') return null;
+  const entrance = entranceOf(packet, 'product');
+  const settle = Math.max(0.8, Math.min(1.1, packet.timing.beatDuration * 0.45));
+  const leaves = packet.timing.beatDuration - EXIT_SECONDS;
+  const read = entrance + 0.15 + Math.min(DIVE_READ_SECONDS, readingSecondsFor(lineOf(packet)));
+  const at = round(Math.max(entrance + settle * 0.6, read));
+  if (leaves - (at + DIVE_SECONDS) < DIVE_HOLD_SECONDS - 1e-6) return null;
+  const drawing = drawsInterface(packet) && shot.picture.kind === 'image' ? packet.drawing! : null;
+  if (drawing) {
+    // The hand acts in close-up. A drawing whose hand would have no time left after the move is filmed without it.
+    const hand = drawingHand(drawing, entrance + DRAWING_AFTER_ENTRANCE, packet.timing.beatDuration, handAfter(at));
+    const free = drawingHand(drawing, entrance + DRAWING_AFTER_ENTRANCE, packet.timing.beatDuration);
+    if (hand.click === null && free.click !== null) return null;
+  }
+  return { at, seconds: DIVE_SECONDS, focus: drawing ? focusOf(packet) : null };
+}
+
+/** When the hand may act, once the camera has gone in at `diveAt`. */
+function handAfter(diveAt: number): number {
+  return diveAt + DIVE_SECONDS + 0.1;
+}
+
+/**
+ * Where the camera sits once it is in: the card scaled to fill the frame, the
+ * focus as near the frame's centre as the card's edges allow — the frame
+ * never shows past the interface.
+ */
+export function diveFraming(
+  card: { x: number; y: number; width: number; height: number },
+  frame: { width: number; height: number },
+  focus: { x: number; y: number },
+): { scale: number; x: number; y: number } {
+  const scale = Math.ceil(Math.min(2.4, Math.max((frame.width * 1.04) / card.width, (frame.height * 1.04) / card.height)) * 1000) / 1000;
+  const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
+  const fx = focus.x * card.width * scale;
+  const fy = focus.y * card.height * scale;
+  // Translation of the card's top-left corner, scaled about it.
+  const x = clamp(frame.width / 2 - card.x - fx, frame.width - card.x - card.width * scale, -card.x);
+  const y = clamp(frame.height / 2 - card.y - fy, frame.height - card.y - card.height * scale, -card.y);
+  return { scale: Math.ceil(scale * 1000) / 1000, x: round(x), y: round(y) };
+}
+
+function round(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** What a screen beat frames on: the control its drawn interface uses, when it has one. */
+function focusOf(packet: ScenePacket): { x: number; y: number } | null {
+  const drawing = packet.drawing;
+  const target = drawing?.focus ? drawing.nodes.find((node) => node.id === drawing.focus!.nodeId) : undefined;
+  return target ? { x: target.rect.x + target.rect.w / 2, y: target.rect.y + target.rect.h / 2 } : null;
+}
+
+function shot(packet: ScenePacket): ReturnType<typeof shotOf>['kind'] {
+  return shotOf(packet).kind;
+}
+
 /**
  * A capture on a card: tilted in depth, lit from behind by the brand, and
  * drifting while it is read. A filmed capture keeps its planned camera inside
@@ -592,6 +678,8 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   const items = listItems(text);
   const start = packet.timing.beatStart + entranceOf(packet, 'product');
   const beatEnd = packet.timing.beatStart + packet.timing.beatDuration;
+  // The camera's move into the card, when the beat holds a close-up; the hand waits for it.
+  const dive = productDive(packet);
 
   // The framings were planned at the frame's proportions; any other picture keeps its own, within reason.
   const own = picture.width && picture.height ? picture.height / picture.width : 0.625;
@@ -615,7 +703,7 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
     `#${id}-shine { position: absolute; top: -20%; bottom: -20%; left: 0; width: 38%; background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,0.32), rgba(255,255,255,0)); opacity: 0; }`,
   );
   const media = drawing
-    ? drawnInterface(packet, drawing, picture, { width: cardW, height: cardH }, design, palette, parts, start + DRAWING_AFTER_ENTRANCE, beatEnd)
+    ? drawnInterface(packet, drawing, picture, { width: cardW, height: cardH }, design, palette, parts, start + DRAWING_AFTER_ENTRANCE, beatEnd, dive ? packet.timing.beatStart + handAfter(dive.at) : 0)
     : sequence
     ? framedPlate(packet, sequence, picture, { width: cardW, height: cardH }, parts)
     : picture.kind === 'video'
@@ -625,18 +713,55 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   parts.markup.push(`<div id="${id}-glow"></div>`, `<div id="${id}-space"><div id="${id}-card">${media}<div id="${id}-shine"></div></div></div>`);
 
   const settle = Math.max(0.8, Math.min(1.1, packet.timing.beatDuration * 0.45));
+  const diveAt = dive ? packet.timing.beatStart + dive.at : null;
+  // The card breathes while it is read, until the camera goes in.
+  const breathEnd = diveAt ?? beatEnd;
   parts.tweens.push(
     `tl.fromTo("#${id}-glow", { opacity: 0, scale: 0.75 }, { opacity: 1, scale: 1, duration: 1.2, ease: ActOne.ease("out_quint") }, ${num(start)});`,
     `tl.fromTo("#${id}-card", { rotationY: ${num(-24 * tilt)}, rotationX: ${num(12 * tilt)}, y: ${num(H * 0.08)}, scale: 0.9, opacity: 0 }, { rotationY: ${num(-10 * tilt)}, rotationX: ${num(5 * tilt)}, y: 0, scale: 1, opacity: 1, duration: ${num(settle)}, ease: ActOne.ease("out_expo") }, ${num(start)});`,
     // While it is read, it keeps turning toward the viewer: a held card that still breathes.
-    `tl.fromTo("#${id}-card", { rotationY: ${num(-10 * tilt)}, rotationX: ${num(5 * tilt)}, y: 0 }, { rotationY: ${num(-4 * tilt)}, rotationX: ${num(2 * tilt)}, y: ${num(-H * 0.012)}, duration: ${num(Math.max(0.3, beatEnd - start - settle))}, ease: "none", immediateRender: false }, ${num(start + settle + 0.002)});`,
+    `tl.fromTo("#${id}-card", { rotationY: ${num(-10 * tilt)}, rotationX: ${num(5 * tilt)}, y: 0 }, { rotationY: ${num(-4 * tilt)}, rotationX: ${num(2 * tilt)}, y: ${num(-H * 0.012)}, duration: ${num(Math.max(0.3, breathEnd - start - settle))}, ease: "none", immediateRender: false }, ${num(start + settle + 0.002)});`,
     `tl.fromTo("#${id}-shine", { x: ${num(-cardW * 0.5)}, opacity: 1 }, { x: ${num(cardW * 1.3)}, opacity: 1, duration: 0.9, ease: ${SWING} }, ${num(start + settle * 0.55)});`,
   );
+  // Where to frame: the capture's point, as the card places the capture (covering it, from the top).
+  const sourceW = picture.width ?? cardW;
+  const sourceH = picture.height ?? cardH;
+  const cover = Math.max(cardW / sourceW, cardH / sourceH);
+  const point = dive?.focus ?? focusOf(packet);
+  const focus = point
+    ? { x: ((cardW - sourceW * cover) / 2 + point.x * sourceW * cover) / cardW, y: (point.y * sourceH * cover) / cardH }
+    : { x: 0.5, y: 0.38 };
+  if (!dive && (shot(packet) === 'ui' || shot(packet) === 'product')) {
+    // Too short to cut in: the camera still never stands still on a screen, it pushes toward what matters.
+    parts.tweens.push(
+      `tl.fromTo("#${id}-space", { scale: 1 }, { scale: 1.12, transformOrigin: "${num(focus.x * 100)}% ${num(focus.y * 100)}%", duration: ${num(Math.max(0.3, beatEnd - start - settle))}, ease: "none", immediateRender: false }, ${num(start + settle)});`,
+    );
+  }
+  if (dive && diveAt !== null) {
+    const framing = diveFraming({ x: cardX, y: cardY, width: cardW, height: cardH }, { width: W, height: H }, focus);
+    const hold = Math.max(0.2, beatEnd - diveAt - dive.seconds);
+    parts.tweens.push(
+      `tl.fromTo("#${id}-space", { x: 0, y: 0, scale: 1 }, { x: ${num(framing.x)}, y: ${num(framing.y)}, scale: ${num(framing.scale)}, transformOrigin: "0% 0%", duration: ${num(dive.seconds)}, ease: ${SWING}, immediateRender: false }, ${num(diveAt)});`,
+      `tl.fromTo("#${id}-card", { rotationY: ${num(-4 * tilt)}, rotationX: ${num(2 * tilt)}, y: ${num(-H * 0.012)} }, { rotationY: 0, rotationX: 0, y: 0, duration: ${num(dive.seconds)}, ease: ${SWING}, immediateRender: false }, ${num(diveAt)});`,
+      `tl.fromTo("#${id}-glow", { opacity: 1 }, { opacity: 0, duration: ${num(dive.seconds * 0.6)}, ease: "none", immediateRender: false }, ${num(diveAt)});`,
+      // In close-up the camera keeps drifting in, so the held shot is still a shot.
+      `tl.fromTo("#${id}-card", { scale: 1 }, { scale: 1.035, transformOrigin: "${num(focus.x * 100)}% ${num(focus.y * 100)}%", duration: ${num(hold)}, ease: "none", immediateRender: false }, ${num(diveAt + dive.seconds)});`,
+    );
+  }
 
   if (!text) return;
+  // The line has been read when the camera goes in: it steps out of the way.
+  const clearWords = (selector: string) => {
+    if (diveAt === null) return;
+    parts.tweens.push(`tl.fromTo("${selector}", { opacity: 1, x: 0 }, { opacity: 0, x: ${num(-H * 0.05)}, duration: 0.45, ease: ${EASE_OUT}, immediateRender: false }, ${num(diveAt)});`);
+  };
   const colW = portrait ? design.grid.safe.width : cardX - design.grid.safe.x - W * 0.04;
   const colX = design.grid.safe.x;
-  if (items.length >= 2 && !portrait && chips(packet, design, palette, parts, items, { x: colX, width: colW, cardX, cardY, cardH, start })) return;
+  if (items.length >= 2 && !portrait && chips(packet, design, palette, parts, items, { x: colX, width: colW, cardX, cardY, cardH, start })) {
+    items.forEach((_, index) => clearWords(`#${id}-chip${index + 1}`));
+    clearWords(`#${id}-wires`);
+    return;
+  }
   const set = setLines(text, design, { fontSizePx: H * (portrait ? 0.05 : 0.066), maxWidthPx: colW, maxLines: 3, role: 'display' });
   parts.styles.push(
     portrait
@@ -646,6 +771,7 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   );
   const rule = accentRule(`${id}-rule`, palette, parts, start + 0.1, H, portrait ? 'center' : 'left');
   parts.markup.push(`<div id="${id}-words">${rule}<h1 id="${id}-title">${risingTitle(`${id}-title`, set, palette, parts, start + 0.15)}</h1></div>`);
+  clearWords(`#${id}-words`);
 }
 
 /** A beat shorter than this shows its capture as it is: drawing it up, using it and then showing it needs the time. */
@@ -675,7 +801,7 @@ export type DrawingHand = {
   real: number;
 };
 
-export function drawingHand(drawing: UiDrawing, from: number, until: number): DrawingHand {
+export function drawingHand(drawing: UiDrawing, from: number, until: number, clickNotBefore = 0): DrawingHand {
   const leaves = until - EXIT_SECONDS;
   const real = leaves - DRAWING_REAL_HOLD - 0.45;
   const nodes = drawing.nodes;
@@ -684,8 +810,9 @@ export function drawingHand(drawing: UiDrawing, from: number, until: number): Dr
   const buildRoom = Math.max(0, real - from - (focusIndex >= 0 ? 0.6 : 0.35));
   const step = Math.min(0.035, buildRoom / Math.max(1, nodes.length));
   const built = from + nodes.length * step;
-  if (focusIndex < 0 || real - built < 0.6 - 1e-6) return { built, click: null, typing: null, real };
-  const click = built + 0.3;
+  // The hand waits for the camera when the camera is going in to watch it.
+  const click = Math.max(built + 0.3, clickNotBefore);
+  if (focusIndex < 0 || real - click < 0.3 - 1e-6) return { built, click: null, typing: null, real };
   const focus = nodes[focusIndex]!;
   const typed = drawing.focus!.action === 'type' && drawing.focus!.typed && !focus.text ? [...drawing.focus!.typed].slice(0, 40) : [];
   const typing =
@@ -720,6 +847,7 @@ function drawnInterface(
   parts: Parts,
   from: number,
   until: number,
+  clickNotBefore = 0,
 ): string {
   const id = packet.frameId;
   const H = design.frame.height;
@@ -743,7 +871,7 @@ function drawnInterface(
   );
 
   // The capture comes up early enough to be seen: crossfaded in, then held before the beat leaves.
-  const hand = drawingHand(drawing, from, until);
+  const hand = drawingHand(drawing, from, until, clickNotBefore);
   const { real } = hand;
   // Outermost first, as listed; a parent always arrives before what sits in it — in whatever time is left for it.
   const nodes = drawing.nodes;
@@ -1260,9 +1388,12 @@ export function launchSoundCues(
         break;
       case 'product': {
         cue(entrance, 'whoosh', 0.3);
+        // The camera going in is a move the ear should feel, softly.
+        const dive = productDive(packet);
+        if (dive) cue(dive.at, 'whoosh', 0.22);
         // A click where the cursor clicks, keystrokes while the field is typed into — and only there.
         if (!drawsInterface(packet)) break;
-        const hand = drawingHand(packet.drawing!, entrance + DRAWING_AFTER_ENTRANCE, packet.timing.beatDuration);
+        const hand = drawingHand(packet.drawing!, entrance + DRAWING_AFTER_ENTRANCE, packet.timing.beatDuration, dive ? handAfter(dive.at) : 0);
         if (hand.click !== null) cue(hand.click, 'ui_click', 0.5);
         if (hand.typing) {
           const seconds = hand.typing.glyphs * hand.typing.perGlyph;
