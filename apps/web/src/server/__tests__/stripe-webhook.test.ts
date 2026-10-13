@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Stripe from 'stripe';
 import { newId } from '@act-one/core';
 import { MemoryStore } from '@act-one/db';
@@ -270,43 +270,56 @@ describe('the webhook', () => {
   });
 
   it('gives an annual subscriber their credits every month, not once a year', async () => {
-    await deliver(
-      eventPayload('customer.subscription.created', {
-        id: 'sub_annual',
-        object: 'subscription',
-        customer: 'cus_acme',
-        status: 'active',
-        metadata: { organizationId, planId: 'pro' },
-        current_period_end: Math.floor(Date.now() / 1000) + 365 * 24 * 3600,
-        cancel_at_period_end: false,
-        items: { data: [{ quantity: 1, price: { recurring: { interval: 'year' } } }] },
-      }),
-    );
-    // Read off the price Stripe is charging, not guessed.
-    expect((await store.subscriptions.getForOrganization(organizationId))?.billingInterval).toBe('annual');
-    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
-
     /*
-     * The other eleven months, in which Stripe sends nothing at all. The
-     * worker's clock is what notices, and it is the only reason this customer
-     * is not left with one month of credits for the year they paid for.
+     * A clock in the middle of a month. Eleven months is a calendar span, not
+     * a number of days: written as 335 days, the test passed only on the days
+     * of the year when 335 days happened to be eleven months, and failed on
+     * the rest — the opening's period then fell on another day than the
+     * eleventh anniversary, and the ledger had no duplicate to refuse.
      */
-    const elevenMonthsAgo = new Date(Date.now() - 335 * 24 * 3600 * 1000).toISOString();
-    const live = (await store.subscriptions.getForOrganization(organizationId))!;
-    await store.subscriptions.upsert({
-      ...live,
-      createdAt: elevenMonthsAgo,
-      allowanceGrantedThrough: elevenMonthsAgo.slice(0, 10),
-    });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    try {
+      await deliver(
+        eventPayload('customer.subscription.created', {
+          id: 'sub_annual',
+          object: 'subscription',
+          customer: 'cus_acme',
+          status: 'active',
+          metadata: { organizationId, planId: 'pro' },
+          current_period_end: Math.floor(Date.now() / 1000) + 365 * 24 * 3600,
+          cancel_at_period_end: false,
+          items: { data: [{ quantity: 1, price: { recurring: { interval: 'year' } } }] },
+        }),
+      );
+      // Read off the price Stripe is charging, not guessed.
+      expect((await store.subscriptions.getForOrganization(organizationId))?.billingInterval).toBe('annual');
+      expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000);
 
-    const { grantAllowancesForEveryone } = await import('@act-one/db');
-    const { DEFAULT_PLANS } = await import('@act-one/core');
-    const outcome = await grantAllowancesForEveryone({ store, plans: DEFAULT_PLANS });
+      /*
+       * The other eleven months, in which Stripe sends nothing at all. The
+       * worker's clock is what notices, and it is the only reason this customer
+       * is not left with one month of credits for the year they paid for.
+       */
+      const elevenMonthsAgo = '2025-07-15T11:00:00.000Z';
+      const live = (await store.subscriptions.getForOrganization(organizationId))!;
+      await store.subscriptions.upsert({
+        ...live,
+        createdAt: elevenMonthsAgo,
+        allowanceGrantedThrough: elevenMonthsAgo.slice(0, 10),
+      });
 
-    // Eleven anniversaries have passed; one of them is the period the opening
-    // already paid for, and the ledger refuses that one.
-    expect(outcome.creditsAdded).toBe(2000 * 10);
-    expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000 * 11);
+      const { grantAllowancesForEveryone } = await import('@act-one/db');
+      const { DEFAULT_PLANS } = await import('@act-one/core');
+      const outcome = await grantAllowancesForEveryone({ store, plans: DEFAULT_PLANS });
+
+      // Eleven anniversaries have passed; one of them is the period the opening
+      // already paid for, and the ledger refuses that one.
+      expect(outcome.creditsAdded).toBe(2000 * 10);
+      expect((await store.organizations.get(organizationId))?.creditBalance).toBe(2000 * 11);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets a workspace back in when the retry collects', async () => {
