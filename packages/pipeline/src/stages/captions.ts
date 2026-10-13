@@ -1,12 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import {
+  CAPTION_MAX_LINES,
   CAPTION_STANDARDS,
+  captionCharactersPerLine,
   captionFindings,
   captionsFrom,
   cite,
   indexStandards,
   newId,
   toWebVtt,
+  type AspectRatio,
   type CaptionCue,
   type QaFinding,
 } from '@act-one/core';
@@ -67,6 +70,8 @@ export async function captionFilm(
     filmSeconds: number;
     /** Scene starts. A caption never spans one. */
     boundaries: readonly number[];
+    /** The frame the captions are burned into: a vertical one holds shorter lines. */
+    aspect: AspectRatio;
   },
 ): Promise<FilmCaptions> {
   const spoken = params.tracks.filter((track) => track.text.trim().length > 0);
@@ -110,6 +115,7 @@ export async function captionFilm(
     language: params.language,
     filmSeconds: params.filmSeconds,
     boundaries: params.boundaries,
+    maxCharacters: captionCharactersPerLine(params.language, params.aspect) * CAPTION_MAX_LINES,
   });
 
   return {

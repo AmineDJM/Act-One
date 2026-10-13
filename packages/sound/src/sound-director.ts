@@ -1,4 +1,5 @@
 import {
+  DEFAULT_FPS,
   LUFS_BROADCAST,
   LUFS_STREAMING_PLATFORM,
   LUFS_WEB,
@@ -10,6 +11,7 @@ import {
   type Storyboard,
 } from '@act-one/core';
 import { DEFAULT_LIBRARY, findMusic, findSfx, type MusicCharacter, type MusicTrack, type SfxKind, type SoundLibrary } from './library.ts';
+import { beatTimes, cutTimes, phaseToCuts, snapCutsToBeats, type MusicPlacement } from './beats.ts';
 import { planEnding, type EndingPlan } from './ending.ts';
 
 /**
@@ -85,6 +87,14 @@ export type SoundDirectionInput = {
   channel?: 'web' | 'social' | 'broadcast';
   library?: SoundLibrary;
   hasVoiceOver?: boolean;
+  /**
+   * Where the music already sits, from `syncCutsToMusic`: the cuts were moved
+   * onto this placement's beats, so the mix must play exactly it. Ignored if
+   * it names a track other than the one this film would choose.
+   */
+  placement?: MusicPlacement;
+  /** The picture's frame rate, for the beat window. 30 unless said. */
+  fps?: number;
 };
 
 /**
@@ -120,9 +130,12 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
   // Music enters where the film earns it. A system that opens on silence holds
   // it until the first real beat; one that opens on music starts at zero.
   const firstScene = storyboard.scenes[0];
-  const enterAt = input.behaviour.openOnMusic
-    ? 0
-    : Math.min(firstScene ? firstScene.duration * 0.55 : 1.2, 2.2);
+  const kept = track && input.placement?.trackId === track.id ? input.placement : null;
+  const enterAt = kept
+    ? kept.enterAtSeconds
+    : input.behaviour.openOnMusic
+      ? 0
+      : Math.min(firstScene ? firstScene.duration * 0.55 : 1.2, 2.2);
 
   const cues: PlacedCue[] = [];
   for (const scene of storyboard.scenes) {
@@ -174,7 +187,7 @@ export function directSound(input: SoundDirectionInput): SoundDesign {
       ? {
           trackId: track.id,
           storageKey: track.storageKey,
-          startOffsetSeconds: chooseStartOffset(track, storyboard, enterAt),
+          startOffsetSeconds: kept ? kept.startOffsetSeconds : placeOnCuts(track, storyboard, enterAt, total, input.fps ?? DEFAULT_FPS),
           enterAtSeconds: Number(enterAt.toFixed(3)),
           fadeInSeconds: input.behaviour.openOnMusic ? 0.8 : 1.6,
           /*
@@ -361,6 +374,50 @@ function pickTrack(candidates: MusicTrack[], filmSeconds: number, storyboard: St
   const idealBpm = Math.min(150, Math.max(60, cutsPerMinute * 6));
 
   return [...usable].sort((a, b) => Math.abs(a.bpm - idealBpm) - Math.abs(b.bpm - idealBpm))[0]!;
+}
+
+/** Whether a track has a pulse a cut can land on. A pad is texture: there is nothing to cut to. */
+export function hasPulse(track: MusicTrack): boolean {
+  return track.character !== 'ambient_pad';
+}
+
+/**
+ * Where in the track to start: the drop on the film's turn, then the phase
+ * within half a beat of that which puts the most cuts on the beat.
+ */
+function placeOnCuts(track: MusicTrack, storyboard: Storyboard, enterAt: number, total: number, fps: number): number {
+  const dropped = chooseStartOffset(track, storyboard, enterAt);
+  if (!hasPulse(track)) return dropped;
+  return phaseToCuts(track, cutTimes(storyboard), { enterAtSeconds: enterAt, startOffsetSeconds: dropped }, { fps, untilSeconds: total });
+}
+
+/**
+ * The film's cuts, moved onto the music's beats before anything is drawn.
+ *
+ * Run on the storyboard before the voice and the picture: the music the film
+ * will get is chosen exactly as the mix will choose it, phased against the
+ * cuts, and each cut within a few frames of a beat is moved onto it. The
+ * placement comes back so the mix plays that phase and no other — the cuts
+ * were moved to meet it.
+ */
+export function syncCutsToMusic(
+  input: SoundDirectionInput,
+  fps: number = DEFAULT_FPS,
+): { storyboard: Storyboard; placement: MusicPlacement | null; moved: number; onBeat: number; cuts: number } {
+  const library = input.library ?? DEFAULT_LIBRARY;
+  const design = directSound({ ...input, fps });
+  const track = design.music ? library.music.find((candidate) => candidate.id === design.music!.trackId) ?? null : null;
+  const cuts = cutTimes(input.storyboard).length;
+  if (!design.music || !track) return { storyboard: input.storyboard, placement: null, moved: 0, onBeat: 0, cuts };
+  const placement: MusicPlacement = {
+    trackId: track.id,
+    enterAtSeconds: design.music.enterAtSeconds,
+    startOffsetSeconds: design.music.startOffsetSeconds,
+  };
+  if (!hasPulse(track)) return { storyboard: input.storyboard, placement, moved: 0, onBeat: 0, cuts };
+  const beats = beatTimes(track, placement, Math.min(design.music.exitAtSeconds, storyboardDuration(input.storyboard)));
+  const snapped = snapCutsToBeats(input.storyboard, beats, fps);
+  return { storyboard: snapped.storyboard, placement, moved: snapped.moved, onBeat: snapped.onBeat, cuts: snapped.cuts };
 }
 
 /**

@@ -106,6 +106,7 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 30,
       boundaries: [],
+      aspect: '16:9',
     });
 
     expect(aligner.calls).toEqual(['One run.']);
@@ -124,6 +125,7 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 30,
       boundaries: [],
+      aspect: '16:9',
     });
 
     expect(result.cues.length).toBeGreaterThan(0);
@@ -142,6 +144,7 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 30,
       boundaries: [],
+      aspect: '16:9',
     });
     expect(result.cues.length).toBeGreaterThan(0);
     expect(result.alignedPassages).toBe(0);
@@ -154,9 +157,22 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 30,
       boundaries: [],
+      aspect: '16:9',
     });
     expect(result.cues.length).toBeGreaterThan(0);
     expect(result.alignedPassages).toBe(0);
+  });
+
+  it('breaks lines to fit a vertical frame, where the television line would not', async () => {
+    const context = await contextWith(null);
+    const text = 'Plasma starts simple: a desktop that finds what you need as you type.';
+    const wide = await captionFilm(context, { tracks: [await passage({ text })], language: 'en', filmSeconds: 30, boundaries: [], aspect: '16:9' });
+    const tall = await captionFilm(context, { tracks: [await passage({ text })], language: 'en', filmSeconds: 30, boundaries: [], aspect: '9:16' });
+    const longest = (cues: { lines: string[] }[]) => Math.max(...cues.flatMap((cue) => cue.lines.map((line) => line.length)));
+    expect(longest(wide.cues)).toBeGreaterThan(21);
+    expect(longest(tall.cues)).toBeLessThanOrEqual(21);
+    expect(tall.cues.every((cue) => cue.lines.length <= 2)).toBe(true);
+    expect(tall.cues.length).toBeGreaterThan(wide.cues.length);
   });
 
   it('says nothing at all for a film with no voice-over', async () => {
@@ -166,6 +182,7 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 30,
       boundaries: [],
+      aspect: '16:9',
     });
     expect(result.cues).toEqual([]);
     expect(result.vtt).toBe('');
@@ -183,6 +200,7 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 8,
       boundaries: [3],
+      aspect: '16:9',
     });
 
     for (const cue of result.cues) {
@@ -204,6 +222,7 @@ describe('captions for a film', () => {
       language: 'en',
       filmSeconds: 2,
       boundaries: [],
+      aspect: '16:9',
     });
 
     const rate = result.issues.filter((issue) => issue.message.includes('a second'));

@@ -113,15 +113,15 @@ describe('the captions', () => {
   ] as unknown as CaptionCue[];
 
   it('are timed to the microsecond, escaped, and mark one word', () => {
-    const html = captionsMarkup(cues, tokens, '16:9', 3);
-    expect(html).toContain('data-start="1.234568" data-duration="1.265432" data-track-index="3"');
+    const html = captionsMarkup(cues, tokens, '16:9');
+    expect(html).toContain('data-cue-start="1.234568" data-cue-end="2.5"');
     expect(html).toContain('Close the <span class="ao-caption-emphasis">books</span>');
     expect(html).toContain('&lt;tonight&gt;');
     expect(html).not.toContain('empty');
   });
 
   it('are larger on a vertical cut, as the Remotion engine sets them', () => {
-    const vertical = captionsMarkup(cues.slice(0, 1), filmTokens(design()), '9:16', 3);
+    const vertical = captionsMarkup(cues.slice(0, 1), filmTokens(design()), '9:16');
     expect(vertical).toContain(`font-size:${Math.round(tokens.frame.height * 0.038)}px`);
   });
 });
@@ -155,7 +155,7 @@ describe('the assembled project', () => {
       tokenCss: tokenCss(tokens.film),
       studioCss: studioCss(tokens.design),
       fontCss: '@font-face { font-family: "Inter"; src: url(fonts/inter.woff2); }',
-      captionsHtml: '<div id="ao-caption-1" class="clip ao-caption" data-start="0" data-duration="1" data-track-index="3">x</div>',
+      captions: () => '<template><div id="root" data-composition-id="ao-captions"><div id="ao-caption-1" class="ao-caption">x</div></div></template>',
       watermarkSvg: '<text>Act One</text>',
     });
     const index = await readFile(path.join(dir, 'index.html'), 'utf8');
@@ -171,7 +171,8 @@ describe('the assembled project', () => {
     expect(index).toContain('data-track-index="1"');
     expect(index).toContain('id="host-scene-02"');
     expect(index).toContain('data-track-index="2"');
-    expect(index).toContain('ao-caption-1');
+    expect(index).toContain('id="host-ao-captions"');
+    expect(await readFile(path.join(dir, 'compositions', 'ao-captions.html'), 'utf8')).toContain('ao-caption-1');
     expect(index).toContain('<text>Act One</text>');
     expect(index).toContain('window.__timelines["film"] = tl;');
     expect(await readdir(path.join(dir, 'vendor'))).toEqual(['act-one-motion.js', 'gsap.min.js']);

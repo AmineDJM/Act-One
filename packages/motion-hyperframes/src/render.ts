@@ -20,7 +20,7 @@ import {
   type SceneTokens,
 } from './author.ts';
 import { authoringCanvas, outputPlan } from './canvas.ts';
-import { captionsMarkup } from './captions.ts';
+import { captionsComposition } from './captions.ts';
 import { blocking, CheckOutputError, parseCheckOutput, type CheckReport, type EngineFinding } from './checks.ts';
 import { bundleFonts } from './fonts.ts';
 import { launchBackdrop, launchSoundCues, planLaunch, type LaunchSoundCue } from './launch.ts';
@@ -255,8 +255,7 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
         tokenCss: tokenCss(tokens.film),
         studioCss: studioCss(design),
         fontCss: fonts.css,
-        captionsHtml: props.captions && props.captions.length > 0 ? captionsMarkup(props.captions, tokens.film, aspect, 3, look.name === 'launch' ? 'pill' : 'plate') : '',
-        captionStyle: look.name === 'launch' ? 'pill' : 'plate',
+        captions: (seconds: number) => captionsComposition(props.captions ?? [], tokens.film, aspect, look.name === 'launch' ? 'pill' : 'plate', seconds),
         watermarkSvg: props.watermarkLabel ? watermark(design, props.watermarkLabel) : null,
         ...(look.name === 'launch' ? { backdrop: (beatStarts: ReadonlyMap<string, number>) => launchBackdrop(packets, look.plan, beatStarts, design) } : {}),
       });

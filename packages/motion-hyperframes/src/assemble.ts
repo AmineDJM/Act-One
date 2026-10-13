@@ -1,7 +1,7 @@
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { captionCss, type CaptionStyle } from './captions.ts';
+import { CAPTIONS_COMPOSITION_ID } from './captions.ts';
 import { joinStatements, type HostTiming } from './joins.ts';
 import type { Backdrop } from './launch.ts';
 import { motionRuntimeSource } from './motion-runtime.ts';
@@ -54,9 +54,8 @@ export type ProjectInput = {
   /** The studio's layout primitives: the frames type is placed in. */
   studioCss: string;
   fontCss: string;
-  captionsHtml: string;
-  /** How the captions are set: the classic plate, or the launch look's pill. */
-  captionStyle?: CaptionStyle;
+  /** The captions' composition for a film of this length (`captionsComposition`); absent or null, a film without them. */
+  captions?: (durationSeconds: number) => string | null;
   watermarkSvg: string | null;
   /**
    * The field under every scene, in place of the canvas colour: the launch
@@ -99,8 +98,13 @@ export async function writeProject(input: ProjectInput): Promise<{ indexPath: st
     );
   }
 
+  const captions = input.captions ? input.captions(duration) : null;
+  if (captions) {
+    await writeFile(path.join(projectDir, 'compositions', `${CAPTIONS_COMPOSITION_ID}.html`), withPreamble(captions, input.fontCss), 'utf8');
+  }
+
   const indexPath = path.join(projectDir, 'index.html');
-  await writeFile(indexPath, indexHtml(input, hosts, backdrop !== null), 'utf8');
+  await writeFile(indexPath, indexHtml(input, hosts, backdrop !== null, captions !== null), 'utf8');
   await writeFile(
     path.join(projectDir, 'hyperframes.json'),
     JSON.stringify({ media: { autoProxy: false } }, null, 2),
@@ -180,7 +184,7 @@ export function backdropComposition(backdrop: Backdrop, canvas: { width: number;
   ].join('\n');
 }
 
-function indexHtml(input: ProjectInput, hosts: ReadonlyMap<string, HostTiming>, hasBackdrop: boolean): string {
+function indexHtml(input: ProjectInput, hosts: ReadonlyMap<string, HostTiming>, hasBackdrop: boolean, hasCaptions: boolean): string {
   const { width, height } = input.canvas;
   const duration = filmSeconds(input.filmFrames, input.fps);
   const language = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(input.language) ? input.language : 'en';
@@ -230,14 +234,13 @@ html, body { margin: 0; padding: 0; width: ${width}px; height: ${height}px; over
 #root { position: relative; width: ${width}px; height: ${height}px; overflow: hidden; background: var(--ao-canvas); }
 .ao-scene { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 50%; }
 .ao-overlay { position: absolute; inset: 0; pointer-events: none; }
-${captionCss(input.captionStyle ?? 'plate')}
 </style>
 </head>
 <body>
 <div id="root" data-composition-id="${FILM_COMPOSITION_ID}" data-start="0" data-duration="${duration}" data-width="${width}" data-height="${height}" data-fps="${input.fps}">
 ${field}
 ${sceneHosts.join('\n')}
-${input.captionsHtml}
+${hasCaptions ? `  <div id="host-${CAPTIONS_COMPOSITION_ID}" class="ao-scene" data-composition-id="${CAPTIONS_COMPOSITION_ID}" data-composition-src="compositions/${CAPTIONS_COMPOSITION_ID}.html" data-start="0" data-duration="${duration}" data-track-index="3" data-width="${width}" data-height="${height}"></div>` : ''}
 ${input.watermarkSvg ? `  <div id="ao-watermark" class="clip ao-overlay" data-start="0" data-duration="${duration}" data-track-index="5"><svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${input.watermarkSvg}</svg></div>` : ''}
 </div>
 <script>

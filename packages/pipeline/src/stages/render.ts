@@ -62,6 +62,8 @@ import {
   bedReductionDb,
   buildMix,
   directSound,
+  syncCutsToMusic,
+  type MusicPlacement,
   masterLoudness,
   measureDialogueLead,
   mixArgs,
@@ -376,10 +378,27 @@ export async function runRender(
     let spokenLines: readonly SpokenLine[] = [];
 
     for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
+      /*
+       * The cuts, on the music's beat.
+       *
+       * Before the voice and the picture, so both are made to the cuts the
+       * film will have, and the checks judge the same ones: the track this
+       * film will get is placed against its cuts and each cut within four
+       * frames of a beat moves onto it. The mix then plays that placement.
+       */
+      const synced = syncCutsToMusic(
+        { storyboard: current, behaviour: system.sound, channel: soundChannel(aspect), hasVoiceOver: current.scenes.some((scene) => scene.voiceOver) },
+        DEFAULT_FPS,
+      );
+      current = synced.storyboard;
+      if (synced.placement) {
+        console.log(`[render] cut to ${synced.placement.trackId}: ${synced.moved} of ${synced.cuts} cuts moved onto the beat, ${synced.onBeat} on it`);
+      }
       const rendered = await renderOnce(context, {
         render,
         filmRepairs,
         storyboard: current,
+        musicPlacement: synced.placement,
         brand,
         system,
         aspect,
@@ -1412,6 +1431,11 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
  * design is a decision, and the motion's is only an offer. Nothing here
  * changes the storyboard the rest of the stage reads.
  */
+/** Where the film will be heard: a vertical cut goes to the platforms, the rest to the web. */
+export function soundChannel(aspect: AspectRatio): 'social' | 'web' {
+  return aspect === '9:16' ? 'social' : 'web';
+}
+
 export function withMotionCues(storyboard: Storyboard, cues: readonly LaunchSoundCue[]): Storyboard {
   if (cues.length === 0) return storyboard;
   return {
@@ -1484,6 +1508,8 @@ async function renderOnce(
     mode: RenderMode;
     /** Film-level repairs this pass must carry out. Empty on the first pass. */
     filmRepairs?: readonly RepairAction[];
+    /** Where the music sits: the cuts were moved onto its beats, so the mix plays exactly it. */
+    musicPlacement?: MusicPlacement | null;
   },
 ): Promise<{
   path: string;
@@ -1563,6 +1589,7 @@ async function renderOnce(
     language: storyboard.language ?? context.project.brief.language ?? null,
     filmSeconds: storyboardDuration(storyboard),
     boundaries: storyboard.scenes.map((scene) => scene.startTime).filter((at) => at > 0),
+    aspect: params.aspect,
   });
   /*
    * The repair the timing checks ask for, carried out.
@@ -1957,8 +1984,10 @@ async function renderOnce(
   const directed = directSound({
     storyboard: sounded,
     behaviour: system.sound,
-    channel: params.aspect === '9:16' ? 'social' : 'web',
+    channel: soundChannel(params.aspect),
     hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
+    ...(params.musicPlacement ? { placement: params.musicPlacement } : {}),
+    fps: DEFAULT_FPS,
   });
 
   /*

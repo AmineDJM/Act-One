@@ -3,6 +3,7 @@ import {
   CAPTION_MAX_SECONDS,
   CAPTION_MIN_GAP_SECONDS,
   CAPTION_MIN_SECONDS,
+  captionCharactersPerLine,
   captionFindings,
   captionLimits,
   captionLines,
@@ -206,5 +207,17 @@ describe('the checks, against a track built by hand to fail them', () => {
 
   it('passes a track the builder produced', () => {
     expect(captionFindings(captionsFrom(speak(LINE)))).toEqual([]);
+  });
+});
+
+describe('the line a frame holds', () => {
+  it('is the guide’s television line on a wide or square frame, and shorter on a vertical one', () => {
+    expect(captionCharactersPerLine('en', '16:9')).toBe(42);
+    expect(captionCharactersPerLine('en', '1:1')).toBe(42);
+    // 3.8% of 1920 is 73 px: 21 Latin characters across the title-safe width of 1080.
+    expect(captionCharactersPerLine('en', '9:16')).toBe(21);
+    expect(captionCharactersPerLine('en', '4:5')).toBe(31);
+    expect(captionCharactersPerLine('ja', '9:16')).toBe(12);
+    expect(captionCharactersPerLine('ja', '16:9')).toBe(16);
   });
 });

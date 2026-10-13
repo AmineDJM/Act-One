@@ -24,6 +24,14 @@ export const MusicTrack = z.object({
   title: z.string(),
   character: MusicCharacter,
   bpm: z.number().int().min(50).max(200),
+  /**
+   * Where the first downbeat falls in the file, in seconds. The beat grid is
+   * this plus whole beats: what a cut is snapped to. The house scores are
+   * written on the grid from zero; a bought track rarely is, and its value is
+   * measured once when it enters the catalogue, never guessed per film.
+   */
+  firstBeatSeconds: z.number().min(0).max(8).default(0),
+  beatsPerBar: z.number().int().min(2).max(12).default(4),
   /** Seconds. Tracks are longer than any film and get trimmed to the edit. */
   durationSeconds: z.number().min(30),
   /** Points where the track naturally opens up. The edit lands its beat here. */
@@ -34,7 +42,18 @@ export const MusicTrack = z.object({
   /** Integrated loudness of the source, so the mix starts from a known level. */
   lufs: z.number().default(-16),
   // (Music is long enough for BS.1770 to have an opinion; see SfxSample.)
-  license: z.literal('owned').default('owned'),
+  /**
+   * Who may use it. `owned`: made here. `licensed`: bought for the catalogue,
+   * under the agreement `licenseRef` names — admitted only on terms that
+   * cover every film the platform makes (perpetual, worldwide, all channels,
+   * paid social included, no per-use reporting, no Content ID claims on the
+   * customer's upload), and with a stem or a clean ending the mix can fade.
+   */
+  license: z.enum(['owned', 'licensed']).default('owned'),
+  licenseRef: z.string().max(200).nullable().default(null),
+}).refine((track) => track.license === 'owned' || (track.licenseRef !== null && track.licenseRef.trim().length > 0), {
+  message: 'A licensed track names the agreement it is used under.',
+  path: ['licenseRef'],
 });
 export type MusicTrack = z.infer<typeof MusicTrack>;
 
@@ -82,37 +101,44 @@ export const DEFAULT_LIBRARY: SoundLibrary = {
     {
       id: 'mus_deep_still', title: 'Deep Still', character: 'sub_tonal', bpm: 72,
       durationSeconds: 180, dropPoints: [8, 24, 48], hasOutro: true,
-      storageKey: 'library/music/deep-still.wav', lufs: -18, license: 'owned',
+      storageKey: 'library/music/deep-still.wav', lufs: -18, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
     {
       id: 'mus_low_orbit', title: 'Low Orbit', character: 'sub_tonal', bpm: 66,
       durationSeconds: 210, dropPoints: [12, 36], hasOutro: true,
-      storageKey: 'library/music/low-orbit.wav', lufs: -18, license: 'owned',
+      storageKey: 'library/music/low-orbit.wav', lufs: -18, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
     {
       id: 'mus_machine_room', title: 'Machine Room', character: 'percussive', bpm: 124,
       durationSeconds: 150, dropPoints: [4, 16, 32, 48], hasOutro: true,
-      storageKey: 'library/music/machine-room.wav', lufs: -15, license: 'owned',
+      storageKey: 'library/music/machine-room.wav', lufs: -15, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
     {
       id: 'mus_column', title: 'Column', character: 'acoustic_sparse', bpm: 88,
       durationSeconds: 165, dropPoints: [10, 30], hasOutro: true,
-      storageKey: 'library/music/column.wav', lufs: -17, license: 'owned',
+      storageKey: 'library/music/column.wav', lufs: -17, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
     {
       id: 'mus_forward', title: 'Forward', character: 'driving', bpm: 140,
       durationSeconds: 120, dropPoints: [2, 8, 16], hasOutro: false,
-      storageKey: 'library/music/forward.wav', lufs: -14, license: 'owned',
+      storageKey: 'library/music/forward.wav', lufs: -14, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
     {
       id: 'mus_glass_air', title: 'Glass Air', character: 'ambient_pad', bpm: 60,
       durationSeconds: 240, dropPoints: [], hasOutro: true,
-      storageKey: 'library/music/glass-air.wav', lufs: -20, license: 'owned',
+      storageKey: 'library/music/glass-air.wav', lufs: -20, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
     {
       id: 'mus_ascent', title: 'Ascent', character: 'orchestral_min', bpm: 76,
       durationSeconds: 195, dropPoints: [16, 40], hasOutro: true,
-      storageKey: 'library/music/ascent.wav', lufs: -17, license: 'owned',
+      storageKey: 'library/music/ascent.wav', lufs: -17, license: 'owned', licenseRef: null,
+      firstBeatSeconds: 0, beatsPerBar: 4,
     },
   ],
   sfx: [

@@ -13,30 +13,87 @@ import type { FilmTokens } from './tokens.ts';
  */
 export type CaptionStyle = 'plate' | 'pill';
 
-export function captionsMarkup(cues: readonly CaptionCue[], tokens: FilmTokens, aspect: AspectRatio, trackIndex: number, style: CaptionStyle = 'plate'): string {
+/** The captions' composition id: mounted for the whole film on its own track, above the scenes. */
+export const CAPTIONS_COMPOSITION_ID = 'ao-captions';
+
+/** One element per cue, set for the frame; hidden until its timeline shows it. */
+export function captionsMarkup(cues: readonly CaptionCue[], tokens: FilmTokens, aspect: AspectRatio, style: CaptionStyle = 'plate'): string {
   const vertical = aspect === '9:16' || aspect === '4:5';
   const height = tokens.frame.height;
   const width = tokens.frame.width;
   // A pill is set a step smaller than a plate: it is read against a designed field, not over any picture.
-  const sizePx = Math.round(height * (vertical ? (style === 'pill' ? 0.034 : 0.038) : style === 'pill' ? 0.026 : 0.03));
+  // A square film is watched in a feed, on a phone: its pill keeps the plate's size.
+  const pill = vertical ? 0.034 : aspect === '1:1' ? 0.03 : 0.026;
+  const sizePx = Math.round(height * (style === 'pill' ? pill : vertical ? 0.038 : 0.03));
   const bottom = Math.round(height * (vertical ? VERTICAL_CHROME_BOTTOM : TITLE_SAFE_INSET));
   const side = Math.round(width * TITLE_SAFE_INSET);
   const pad = Math.round(sizePx * 0.32);
 
-  return cues
-    .filter((cue) => cue.end > cue.start)
+  return timedCues(cues)
     .map((cue, index) => {
       const lines = (cue.lines.length > 0 ? cue.lines : [cue.text])
         .map((line) => `<span class="ao-caption-line">${marked(line, cue.emphasis)}</span>`)
         .join('');
       return [
-        `<div id="ao-caption-${index + 1}" class="clip ao-caption" data-start="${round(cue.start)}" data-duration="${round(cue.end - cue.start)}" data-track-index="${trackIndex}"`,
+        `<div id="ao-caption-${index + 1}" class="ao-caption" data-cue-start="${round(cue.start)}" data-cue-end="${round(cue.end)}"`,
         ` style="padding-bottom:${bottom}px;padding-left:${side}px;padding-right:${side}px;">`,
         `<div class="ao-caption-block" style="gap:${Math.round(sizePx * 0.16)}px;font-size:${sizePx}px;--ao-caption-pad:${Math.round(pad * 0.55)}px ${pad}px;">${lines}</div>`,
         '</div>',
       ].join('');
     })
     .join('\n');
+}
+
+/**
+ * The captions as a composition of their own, on the film's clock.
+ *
+ * Laid in the film's page, each cue was a clip holding other elements, which
+ * HyperFrames reads as structure that belongs in a composition — nine
+ * warnings on a narrated film. Here each cue is shown and hidden by the
+ * composition's timeline, exactly for its words: a plate cuts in and out, as
+ * the Remotion engine sets it; the launch look's pill lifts in over four
+ * frames, which reads as set rather than switched on.
+ */
+export function captionsComposition(
+  cues: readonly CaptionCue[],
+  tokens: FilmTokens,
+  aspect: AspectRatio,
+  style: CaptionStyle,
+  durationSeconds: number,
+): string | null {
+  const timed = timedCues(cues);
+  if (timed.length === 0) return null;
+  const rise = Math.round(tokens.frame.height * 0.008);
+  const statements = timed.flatMap((cue, index) => {
+    const id = JSON.stringify(`#ao-caption-${index + 1}`);
+    const block = JSON.stringify(`#ao-caption-${index + 1} .ao-caption-block`);
+    return [
+      `tl.set(${id}, { visibility: "visible" }, ${round(cue.start)});`,
+      ...(style === 'pill'
+        ? [`tl.fromTo(${block}, { opacity: 0, y: ${rise} }, { opacity: 1, y: 0, duration: 0.14, ease: "power2.out", immediateRender: false }, ${round(cue.start)});`]
+        : []),
+      `tl.set(${id}, { visibility: "hidden" }, ${round(cue.end)});`,
+    ];
+  });
+  return [
+    '<template>',
+    `<style>\n#root { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }\n${captionCss(style)}\n.ao-caption { visibility: hidden; }\n</style>`,
+    `<div id="root" data-composition-id="${CAPTIONS_COMPOSITION_ID}" data-width="${tokens.frame.width}" data-height="${tokens.frame.height}">`,
+    captionsMarkup(timed, tokens, aspect, style),
+    '</div>',
+    '<script>',
+    'const tl = gsap.timeline({ paused: true });',
+    ...statements,
+    `tl.set({}, {}, ${round(durationSeconds)});`,
+    'window.__timelines = window.__timelines || {};',
+    `window.__timelines[${JSON.stringify(CAPTIONS_COMPOSITION_ID)}] = tl;`,
+    '</script>',
+    '</template>',
+  ].join('\n');
+}
+
+function timedCues(cues: readonly CaptionCue[]): CaptionCue[] {
+  return cues.filter((cue) => cue.end > cue.start);
 }
 
 /** The stylesheet the caption markup relies on. */

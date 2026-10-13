@@ -8,7 +8,7 @@ import { contrastRatio, resolveTokens } from '@act-one/design';
 import type { LlmProvider } from '@act-one/providers';
 import { writeProject } from '../assemble.ts';
 import { authorScene, engineScene, validationContextFor, type SceneAuthorOptions } from '../author.ts';
-import { captionCss, captionsMarkup } from '../captions.ts';
+import { captionCss, captionsComposition, captionsMarkup } from '../captions.ts';
 import {
   accentWordOf,
   countable,
@@ -24,7 +24,7 @@ import {
 import { motionRuntimeSource } from '../motion-runtime.ts';
 import { MemorySceneStore, sceneKey } from '../scene-store.ts';
 import { studioCss } from '../studio.ts';
-import { tokenCss } from '../tokens.ts';
+import { filmTokens, tokenCss } from '../tokens.ts';
 import type { ScenePacket } from '../types.ts';
 import { validateScene } from '../validate.ts';
 import { brand, clip, design, image, packet, packetsFor, scene, sceneTokens, storyboard } from './helpers.ts';
@@ -334,8 +334,7 @@ describe('a launch film, assembled', () => {
       tokenCss: tokenCss(tokens.film),
       studioCss: studioCss(tokens.design),
       fontCss: '',
-      captionsHtml: captionsMarkup(cues, tokens.film, '16:9', 3, 'pill'),
-      captionStyle: 'pill',
+      captions: (seconds) => captionsComposition(cues, tokens.film, '16:9', 'pill', seconds),
       watermarkSvg: null,
       backdrop: (beatStarts) => launchBackdrop(packets, plan, beatStarts, tokens.design),
     });
@@ -343,8 +342,16 @@ describe('a launch film, assembled', () => {
     // Mounted as a composition of its own, on the lowest track, for the whole film.
     expect(index).toContain('<div id="host-ao-backdrop" class="ao-scene" data-composition-id="ao-backdrop" data-composition-src="compositions/ao-backdrop.html" data-start="0" data-duration="9" data-track-index="0"');
     expect(index).not.toContain('id="ao-field"');
-    expect(index).toContain('border-radius: 999px;');
-    expect(index).toContain('font-size:28px');
+    // The captions too, above the scenes: a clip holding elements in the film's page is a lint warning per cue.
+    expect(index).toContain('<div id="host-ao-captions" class="ao-scene" data-composition-id="ao-captions" data-composition-src="compositions/ao-captions.html" data-start="0" data-duration="9" data-track-index="3"');
+    expect(index).not.toContain('ao-caption-1');
+    const captions = await readFile(path.join(dir, 'compositions', 'ao-captions.html'), 'utf8');
+    expect(captions).toContain('border-radius: 999px;');
+    expect(captions).toContain('font-size:28px');
+    expect(captions).toContain('tl.set("#ao-caption-1", { visibility: "visible" }, 0.5);');
+    expect(captions).toContain('tl.fromTo("#ao-caption-1 .ao-caption-block", { opacity: 0, y: 9 }, { opacity: 1, y: 0, duration: 0.14, ease: "power2.out", immediateRender: false }, 0.5);');
+    expect(captions).toContain('tl.set("#ao-caption-1", { visibility: "hidden" }, 2);');
+    expect(captions).toContain('window.__timelines["ao-captions"] = tl;');
     const field = await readFile(path.join(dir, 'compositions', 'ao-backdrop.html'), 'utf8');
     expect(field).toContain('<div id="root" data-composition-id="ao-backdrop" data-width="1920" data-height="1080">');
     expect(field).toContain('#ao-bd-night { opacity: 1; }');
@@ -360,8 +367,11 @@ describe('a launch film, assembled', () => {
     expect(captionCss('pill')).toContain('border-radius: 999px');
     const tokens = sceneTokens();
     const cue: CaptionCue = { start: 0, end: 1, text: 'Hi there.', lines: ['Hi there.'], emphasis: null };
-    expect(captionsMarkup([cue], tokens.film, '16:9', 3)).toContain('font-size:32px');
-    expect(captionsMarkup([cue], tokens.film, '16:9', 3, 'pill')).toContain('font-size:28px');
+    expect(captionsMarkup([cue], tokens.film, '16:9')).toContain('font-size:32px');
+    expect(captionsMarkup([cue], tokens.film, '16:9', 'pill')).toContain('font-size:28px');
+    // A plate cuts in and out, as the Remotion engine sets it; nothing to show is no composition at all.
+    expect(captionsComposition([cue], tokens.film, '16:9', 'plate', 1)).not.toContain('fromTo');
+    expect(captionsComposition([], tokens.film, '16:9', 'plate', 1)).toBeNull();
   });
 });
 
@@ -447,3 +457,63 @@ function expectTransform(style: Style, [x, y, s]: number[]): void {
   expect(Number(match![2])).toBeCloseTo(y!, 3);
   expect(Number(match![3])).toBeCloseTo(s!, 5);
 }
+
+describe('the launch look on a square and an upright frame', () => {
+  const pxOf = (html: string, pattern: RegExp): number => Number(pattern.exec(html)?.[1] ?? Number.NaN);
+
+  it('sets a list beside the card at a size that keeps every chip inside its column, short of the card', () => {
+    const square = resolveTokens(brand, { aspect: '1:1', quality: 'hd', theme: 'dark' });
+    const target = packet({ recipe: 'feature_stack', text: ['Launcher. Tasks. Tray. Files.'], assets: ['ast_img'] }, { staged: [image('ast_img')] });
+    const html = launchScene(target, square, DAY);
+    const id = target.frameId;
+    const chipLeft = pxOf(html, new RegExp(`#${id}-chip1 \\{ left: ([\\d.]+)px`));
+    const chipWidth = pxOf(html, new RegExp(`#${id}-chip1 \\{[^}]*width: ([\\d.]+)px`));
+    const cardLeft = pxOf(html, new RegExp(`#${id}-space \\{ position: absolute; left: ([\\d.]+)px`));
+    const fontSize = pxOf(html, new RegExp(`\\.${id}-chip \\{[^}]*font-size: ([\\d.]+)px`));
+    expect(chipLeft + chipWidth).toBeLessThan(cardLeft);
+    // Stepped down from 4% of the frame's height to fit the column, not clipped to it.
+    expect(fontSize).toBeLessThan(1080 * 0.04);
+    expect(fontSize).toBeGreaterThanOrEqual(1080 * 0.026);
+  });
+
+  it('keeps an upright frame’s card clear of the lowest quarter, where the captions are', () => {
+    const upright = resolveTokens(brand, { aspect: '9:16', quality: 'hd', theme: 'dark' });
+    const target = packet({ recipe: 'product_zoom', text: ['Plasma starts as a desktop.'], assets: ['ast_img'] }, { staged: [image('ast_img')] });
+    const html = launchScene(target, upright, DAY);
+    const id = target.frameId;
+    const top = pxOf(html, new RegExp(`#${id}-space \\{[^}]*top: ([\\d.]+)px`));
+    const height = pxOf(html, new RegExp(`#${id}-space \\{[^}]*height: ([\\d.]+)px`));
+    expect(top + height).toBeLessThanOrEqual(1920 * 0.7);
+  });
+
+  it('sets a square film’s caption pill at the plate’s size: it is read on a phone', () => {
+    const square = resolveTokens(brand, { aspect: '1:1', quality: 'hd', theme: 'dark' });
+    const cue: CaptionCue = { start: 0, end: 1, text: 'Hi there.', lines: ['Hi there.'], emphasis: null };
+    expect(captionsMarkup([cue], filmTokens(square), '1:1', 'pill')).toContain('font-size:32px');
+  });
+});
+
+describe('an upright frame’s words', () => {
+  const upright = resolveTokens(brand, { aspect: '9:16', quality: 'hd', theme: 'dark' });
+  const H = 1920;
+  const pxOf = (html: string, pattern: RegExp): number => Number(pattern.exec(html)?.[1] ?? Number.NaN);
+
+  it('end above the captions on a chapter: two lines of the title, under its label, by 72% of the height', () => {
+    const target = packet({ recipe: 'kinetic_headline', text: ['Powerful when needed.'] });
+    const html = launchScene(target, upright, { act: 'day', opener: false, chapter: true, chapterIndex: 1 });
+    const id = target.frameId;
+    const top = pxOf(html, new RegExp(`#${id}-text \\{[^}]*top: ([\\d.]+)px`));
+    const size = pxOf(html, new RegExp(`#${id}-title \\{[^}]*font-size: ([\\d.]+)px`));
+    const lines = html.split('class="ao-l"').length - 1;
+    expect(lines).toBeGreaterThanOrEqual(1);
+    // The label above the title takes about 4% of the height; a display line about 1.1 of its size.
+    expect(top + H * 0.04 + lines * size * 1.1).toBeLessThanOrEqual(H * 0.72);
+  });
+
+  it('put the mark high enough that its line starts in the upper half and a bit', () => {
+    const target = packet({ recipe: 'cta_end_card', text: [] }, { logo: image('ast_logo') });
+    const html = launchScene(target, upright, { act: 'brand', opener: false, chapter: false, chapterIndex: -1 });
+    const top = pxOf(html, new RegExp(`#${target.frameId}-words \\{[^}]*top: ([\\d.]+)px`));
+    expect(top).toBeLessThanOrEqual(H * 0.53);
+  });
+});

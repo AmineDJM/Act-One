@@ -486,10 +486,11 @@ function chapterScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   const portrait = H > W;
   const ringsLeft = chapterIndex % 2 === 0;
   const text = lineOf(packet);
-  const set = setLines(text, design, { fontSizePx: H * (portrait ? 0.08 : 0.12), maxWidthPx: portrait ? design.grid.safe.width : W * 0.44, maxLines: 2, role: 'display' });
+  const set = setLines(text, design, { fontSizePx: H * (portrait ? 0.072 : 0.12), maxWidthPx: portrait ? design.grid.safe.width : W * 0.44, maxLines: 2, role: 'display' });
   const start = packet.timing.beatStart + entranceOf(packet, 'chapter');
+  // Upright, everything sits above the lowest quarter and a little more: that is where the captions are.
   const cx = portrait ? W / 2 : ringsLeft ? W * 0.29 : W * 0.71;
-  const cy = portrait ? H * 0.36 : H / 2;
+  const cy = portrait ? H * 0.3 : H / 2;
   const radii = [0.13, 0.2, 0.28, 0.37].map((share) => share * H);
 
   parts.styles.push(
@@ -497,7 +498,7 @@ function chapterScene(packet: ScenePacket, design: DesignTokens, palette: Palett
     `#${id}-core { position: absolute; left: ${px(cx - radii[0]! * 0.62)}; top: ${px(cy - radii[0]! * 0.62)}; width: ${px(radii[0]! * 1.24)}; height: ${px(radii[0]! * 1.24)}; border-radius: 50%; background: radial-gradient(circle at 35% 30%, ${hexAlpha('#ffffff', 0.2)}, ${hexAlpha('#ffffff', 0)} 62%), ${palette.accent}; box-shadow: 0 0 0 ${px(H * 0.012)} ${hexAlpha(palette.accent, 0.16)}, 0 ${px(H * 0.02)} ${px(H * 0.06)} ${hexAlpha(palette.accent, 0.35)}; }`,
     `#${id}-pulse { position: absolute; left: ${px(cx - radii[0]!)}; top: ${px(cy - radii[0]!)}; width: ${px(radii[0]! * 2)}; height: ${px(radii[0]! * 2)}; border-radius: 50%; border: ${px(Math.max(2, H * 0.003))} solid ${palette.accent}; opacity: 0; }`,
     portrait
-      ? `#${id}-text { position: absolute; left: ${px(design.grid.safe.x)}; right: ${px(design.grid.safe.x)}; top: ${px(H * 0.62)}; }`
+      ? `#${id}-text { position: absolute; left: ${px(design.grid.safe.x)}; right: ${px(design.grid.safe.x)}; top: ${px(H * 0.5)}; }`
       : `#${id}-text { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; ${ringsLeft ? `left: ${px(W * 0.5)}; right: ${px(design.grid.safe.x)};` : `left: ${px(design.grid.safe.x)}; right: ${px(W * 0.5)};`} }`,
     ...titleCss(`${id}-title`, 'display', set.fontSizePx, palette, portrait ? 'center' : 'left'),
   );
@@ -544,13 +545,14 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   const aspect = sequence ? H / W : Math.min(0.75, Math.max(0.5, own));
   let cardW = portrait ? design.grid.safe.width : W * 0.56;
   let cardH = cardW * aspect;
-  const maxH = portrait ? H * 0.44 : H * 0.72;
+  // Upright, the card sits between the line above it and the captions below: the lowest quarter is theirs.
+  const maxH = portrait ? H * 0.38 : H * 0.72;
   if (cardH > maxH) {
     cardH = maxH;
     cardW = cardH / aspect;
   }
   const cardX = portrait ? (W - cardW) / 2 : W - design.grid.safe.x * 0.7 - cardW;
-  const cardY = portrait ? H * 0.47 : (H - cardH) / 2 + H * 0.02;
+  const cardY = portrait ? H * 0.5 - cardH / 2 : (H - cardH) / 2 + H * 0.02;
   const radius = Math.max(design.radius.lg, H * 0.014);
 
   parts.styles.push(
@@ -579,10 +581,7 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   if (!text) return;
   const colW = portrait ? design.grid.safe.width : cardX - design.grid.safe.x - W * 0.04;
   const colX = design.grid.safe.x;
-  if (items.length >= 2 && !portrait) {
-    chips(packet, design, palette, parts, items, { x: colX, width: colW, cardX, cardY, cardH, start });
-    return;
-  }
+  if (items.length >= 2 && !portrait && chips(packet, design, palette, parts, items, { x: colX, width: colW, cardX, cardY, cardH, start })) return;
   const set = setLines(text, design, { fontSizePx: H * (portrait ? 0.05 : 0.066), maxWidthPx: colW, maxLines: 3, role: 'display' });
   parts.styles.push(
     portrait
@@ -648,15 +647,18 @@ function chips(
   parts: Parts,
   items: string[],
   frame: { x: number; width: number; cardX: number; cardY: number; cardH: number; start: number },
-): void {
+): boolean {
   const id = packet.frameId;
   const { height: H } = design.frame;
-  const size = H * 0.04;
+  // The widest item sets the chip; in a narrow column the type steps down to fit it rather than spill out of it.
+  const room = frame.width * 0.8;
+  const size = Math.min(H * 0.04, (H * 0.04 * room) / chipWidth(items, design, H * 0.04));
+  if (size < H * 0.026) return false;
   const chipH = size * 2.2;
   const gap = H * 0.024;
   const total = items.length * chipH + (items.length - 1) * gap;
   const top = frame.cardY + frame.cardH / 2 - total / 2;
-  const chipW = Math.min(frame.width * 0.8, chipWidth(items, design, size));
+  const chipW = chipWidth(items, design, size);
   parts.styles.push(...chipCss(id, design, palette, size, chipH), `#${id}-wires { position: absolute; left: 0; top: 0; overflow: visible; }`);
   const wires: string[] = [];
   items.forEach((item, index) => {
@@ -676,6 +678,7 @@ function chips(
     parts.tweens.push(`tl.fromTo("#${id}-node${index + 1}", { opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: 0.3, ease: ${OVERSHOOT}, transformOrigin: "50% 50%" }, ${num(at + 0.85)});`);
   });
   parts.markup.push(`<svg id="${id}-wires" width="${design.frame.width}" height="${H}" viewBox="0 0 ${design.frame.width} ${H}">${wires.join('')}</svg>`);
+  return true;
 }
 
 /**
@@ -850,7 +853,8 @@ function markScene(packet: ScenePacket, design: DesignTokens, palette: Palette, 
   const start = packet.timing.beatStart + entranceOf(packet, 'mark');
   const beatEnd = packet.timing.beatStart + packet.timing.beatDuration;
   const cx = W / 2;
-  const cy = H * (portrait ? 0.34 : 0.36);
+  // Upright, the mark rides high so its line and its address stay above the captions.
+  const cy = H * (portrait ? 0.28 : 0.36);
   const disc = H * (portrait ? 0.12 : 0.17);
   const orbit = disc * 1.45;
   const brandColour = cssColour(design.accent);

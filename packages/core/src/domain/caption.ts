@@ -7,6 +7,8 @@ import {
   captionScript,
   type CaptionScript,
 } from '../standards/caption.ts';
+import { TITLE_SAFE_INSET } from '../standards/layout.ts';
+import { ASPECT_DIMENSIONS, type AspectRatio } from './render.ts';
 
 /**
  * Captions.
@@ -48,6 +50,27 @@ export type CaptionCue = {
    */
   emphasis: string | null;
 };
+
+/**
+ * How many characters of a caption line fit across the frame it is burned into.
+ *
+ * The guide's 42 is a television line: a 16:9 frame with the caption at 3% of
+ * its height. A vertical frame is 1080 wide and sets its captions larger —
+ * 3.8% of 1920, about 73 px — so 42 Latin characters are twice the width of
+ * the picture, and the engine wraps them into one heavy slab of three or four
+ * lines. Measured here from the frame: the title-safe width less the plate's
+ * padding, over the caption's size at an average Latin advance of 0.56 em
+ * (1 em for full-width characters), never more than the guide allows.
+ */
+export function captionCharactersPerLine(language: string | null | undefined, aspect: AspectRatio): number {
+  const limit = captionLimits(language).charactersPerLine;
+  const { width, height } = ASPECT_DIMENSIONS[aspect];
+  const vertical = aspect === '9:16' || aspect === '4:5';
+  const sizePx = height * (vertical ? 0.038 : 0.03);
+  const usable = width * (1 - 2 * TITLE_SAFE_INSET) * 0.92;
+  const advance = captionScript(language) === 'full_width' ? 1 : 0.56;
+  return Math.max(8, Math.min(limit, Math.floor(usable / (sizePx * advance))));
+}
 
 export type CaptionOptions = {
   /** ISO 639-1. Decides the line length and the reading rate. */
