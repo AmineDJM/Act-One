@@ -150,6 +150,14 @@ const RenderConfig = z.object({
    * engine either way, for nothing.
    */
   look: z.enum(['classic', 'launch']).default('classic'),
+  /**
+   * In the launch look, how many of a film's moments a model writes — the
+   * opening line, then the chapters — and the most a film may spend on them.
+   * Every other beat, and any moment the budget does not cover, is drawn by
+   * the engine for nothing. Zero scenes or a zero budget: the engine draws all.
+   */
+  signatureScenes: z.number().int().min(0).max(4).default(2),
+  signatureBudgetUsd: z.number().min(0).max(2).default(0.25),
   /** The tier of model that writes HyperFrames scenes, when a model writes them. */
   sceneAuthorTier: z.enum(['fast', 'balanced', 'deep']).default('deep'),
   /** Model calls per scene before the engine draws it itself. */

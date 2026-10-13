@@ -77,7 +77,26 @@ A framing with "layers" and space "volume" ignores its crops and builds a space:
 Write the whole scene every time. Prefer a small number of well-timed tweens over many. Use the files you are given; if a file cannot serve the scene, set the words alone rather than inventing a picture.`;
 
 /** The per-scene message: the packet and the tokens, as data. */
-export function sceneMessages(packet: ScenePacket, tokens: FilmTokens, repair?: { previous: string; findings: ValidationFinding[] }): LlmMessage[] {
+/**
+ * A scene written inside the launch look: the field the film paints under it
+ * and the colour its accent is there. The scene's tokens are set to the act's
+ * own colours when it is assembled, so the model is told the field it writes
+ * for and the accent it will actually get.
+ */
+export type SceneStage = { field: 'dark' | 'light' | 'brand'; accent: string };
+
+const STAGE_NOTE: Record<SceneStage['field'], string> = {
+  dark: 'a deep, dark field lit softly by the brand colour',
+  light: 'a pale field tinted with the brand colour',
+  brand: 'a field of the brand colour itself',
+};
+
+export function sceneMessages(
+  packet: ScenePacket,
+  tokens: FilmTokens,
+  repair?: { previous: string; findings: ValidationFinding[] },
+  stage?: SceneStage,
+): LlmMessage[] {
   const brief = {
     frameId: packet.frameId,
     position: `scene ${packet.index + 1} of ${packet.sceneCount}`,
@@ -110,9 +129,9 @@ export function sceneMessages(packet: ScenePacket, tokens: FilmTokens, repair?: 
     tokens: {
       frame: tokens.frame,
       safe: tokens.safe,
-      isDarkCanvas: tokens.isDarkCanvas,
+      isDarkCanvas: stage ? stage.field !== 'light' : tokens.isDarkCanvas,
       // Written out as well as in var(--ao-accent): a volume's light is this colour with an alpha appended.
-      accent: tokens.accent,
+      accent: stage ? stage.accent : tokens.accent,
       type: tokens.type,
     },
   };
@@ -127,6 +146,17 @@ export function sceneMessages(packet: ScenePacket, tokens: FilmTokens, repair?: 
         JSON.stringify(brief, null, 1),
     },
   ];
+
+  if (stage) {
+    messages.push({
+      role: 'user',
+      content:
+        `This scene is one of the film's signature moments. The film paints ${STAGE_NOTE[stage.field]} under it, ` +
+        'and the colour tokens are already that field\'s: var(--ao-primary) reads on it. Leave the field to the film — ' +
+        'no full-frame background, plate, shade or vignette of your own. Make it the moment the film is remembered by: ' +
+        'one bold idea in type and motion for exactly the words given, within every rule above.',
+    });
+  }
 
   if (repair) {
     messages.push(

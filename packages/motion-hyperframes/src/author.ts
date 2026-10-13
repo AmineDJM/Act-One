@@ -4,8 +4,8 @@ import { z } from 'zod';
 import type { DesignTokens } from '@act-one/design';
 import { ProviderError, type CallContext, type ImageInput, type LlmProvider, type LlmTier } from '@act-one/providers';
 import { fallbackScene, shotOf } from './fallback.ts';
-import { launchReadable, launchScene, type LaunchBeat } from './launch.ts';
-import { sceneMessages } from './prompt.ts';
+import { actTokenCss, launchPalettes, launchReadable, launchScene, type LaunchBeat } from './launch.ts';
+import { sceneMessages, type SceneStage } from './prompt.ts';
 import { sceneKey } from './scene-store.ts';
 import type { FilmTokens } from './tokens.ts';
 import type { AuthoredSceneStore, ScenePacket, SceneReport } from './types.ts';
@@ -38,6 +38,12 @@ export type SceneAuthorOptions = {
   look?: EngineLook;
   log: (line: string) => void;
   /**
+   * The launch look's signature moments: the beats a model writes, over the
+   * film's backdrop in the act's colours, inside one budget for the film.
+   * Every other beat of the look is drawn by the engine.
+   */
+  signature?: SignaturePlan;
+  /**
    * Shared by every scene of a render. Set when the model answers in a way no
    * retry can change — no credit left, a key it refuses — so the scenes still
    * waiting are drawn by the engine at once instead of asking again, each
@@ -47,6 +53,28 @@ export type SceneAuthorOptions = {
 };
 
 export type AuthoredScene = { packet: ScenePacket; key: string; html: string; report: SceneReport };
+
+/**
+ * What a film may spend on its written scenes, and has.
+ *
+ * Shared by every signature scene of one render. A call is made only when
+ * what it is expected to cost still fits: the estimate until a call has been
+ * paid for, the mean of the calls so far after that. A scene that does not
+ * fit is drawn by the engine, and the record says the budget was spent.
+ */
+export type SceneBudget = { capUsd: number; spentUsd: number; calls: number; perCallUsd: number };
+
+export type SignaturePlan = { frameIds: ReadonlySet<string>; budget: SceneBudget };
+
+/** What a call is expected to cost: the mean so far, or the estimate before the first. */
+export function expectedCallUsd(budget: SceneBudget): number {
+  return budget.calls > 0 ? budget.spentUsd / budget.calls : budget.perCallUsd;
+}
+
+/** Whether one more call fits what is left. */
+export function budgetAllows(budget: SceneBudget): boolean {
+  return budget.spentUsd + expectedCallUsd(budget) <= budget.capUsd + 1e-9;
+}
 
 /**
  * How the engine draws a scene itself.
@@ -130,11 +158,13 @@ export async function authorScene(
   feedback?: { previous: string; findings: ValidationFinding[] },
 ): Promise<AuthoredScene> {
   const look = options.look ?? CLASSIC_LOOK;
-  const key = sceneKey(packet, tokens.film, options.tier, lookVariant(look, packet));
+  const signature = look.name === 'launch' && options.signature?.frameIds.has(packet.frameId) ? options.signature : null;
+  const stage = signature && look.name === 'launch' ? stageOf(tokens.design, look.plan.get(packet.frameId) ?? UNPLANNED_BEAT) : null;
+  const key = sceneKey(packet, tokens.film, options.tier, lookVariant(look, packet, signature !== null));
   const context = validationContextFor(packet);
 
   // Drawn here, for nothing, every time: there is nothing to keep and nothing to ask a model.
-  if (!feedback && look.name === 'launch') {
+  if (!feedback && look.name === 'launch' && !signature) {
     return engineScene(packet, tokens.design, key, 0, 0, LAUNCH_REASON, look);
   }
 
@@ -165,13 +195,13 @@ export async function authorScene(
 
   const llm = options.llm;
   if (!llm || options.maxAttempts < 1) {
-    const drawn = engineScene(packet, tokens.design, key, 0, 0, 'no scene author is configured for this render');
+    const drawn = engineScene(packet, tokens.design, key, 0, 0, 'no scene author is configured for this render', look);
     await options.store.put(key, drawn.html).catch(() => undefined);
     return drawn;
   }
 
   if (options.breaker?.reason) {
-    const drawn = engineScene(packet, tokens.design, key, 0, 0, options.breaker.reason);
+    const drawn = engineScene(packet, tokens.design, key, 0, 0, options.breaker.reason, look);
     options.log(`${packet.frameId}: drawn by the engine without asking the model (${options.breaker.reason})`);
     return drawn;
   }
@@ -187,11 +217,15 @@ export async function authorScene(
       lastProblem = options.breaker.reason;
       break;
     }
+    if (signature && !budgetAllows(signature.budget)) {
+      lastProblem = `the film's budget for written scenes is spent ($${signature.budget.spentUsd.toFixed(3)} of $${signature.budget.capUsd.toFixed(2)})`;
+      break;
+    }
     attempts = attempt;
     let html: string;
     try {
       const result = await llm.completeJson(
-        sceneMessages(packet, tokens.film, repair),
+        sceneMessages(packet, tokens.film, repair, stage?.prompt),
         {
           tier: options.tier,
           schema: SceneOutput,
@@ -204,6 +238,10 @@ export async function authorScene(
         { ...options.call, sceneId: packet.sceneId },
       );
       costUsd += result.usage.costUsd;
+      if (signature) {
+        signature.budget.spentUsd += result.usage.costUsd;
+        signature.budget.calls += 1;
+      }
       html = normalizeScene(result.value.html);
     } catch (error) {
       if (options.call.signal?.aborted) throw error;
@@ -218,22 +256,25 @@ export async function authorScene(
       continue;
     }
 
-    const findings = validateScene(html, context);
+    // A signature scene wears its act's colours; checked as it will be assembled.
+    const staged = stage ? withStageColours(html, stage.css) : html;
+    const findings = validateScene(staged, context);
     const errors = findings.filter((finding) => finding.severity === 'error');
     if (errors.length === 0) {
-      await options.store.put(key, html).catch((error: unknown) => {
+      await options.store.put(key, staged).catch((error: unknown) => {
         options.log(`${packet.frameId}: could not keep the scene (${(error as Error).message}); the master may rewrite it`);
       });
-      return { packet, key, html, report: report(packet, 'agent', attempt, costUsd, findings, null) };
+      return { packet, key, html: staged, report: report(packet, 'agent', attempt, costUsd, findings, null) };
     }
     lastProblem = errors.map((finding) => `[${finding.code}] ${finding.message}`).join(' ');
     options.log(`${packet.frameId}: attempt ${attempt} refused: ${lastProblem.slice(0, 400)}`);
     repair = { previous: html, findings: errors };
   }
 
-  const drawn = engineScene(packet, tokens.design, key, attempts, costUsd, lastProblem || 'no attempt succeeded');
+  const drawn = engineScene(packet, tokens.design, key, attempts, costUsd, lastProblem || 'no attempt succeeded', look);
   // A scene the model could not write is kept; one it was never able to try is not, so the master asks again.
-  if (!options.breaker?.reason) await options.store.put(key, drawn.html).catch(() => undefined);
+  // The launch look draws itself for nothing, every time: there is nothing worth keeping.
+  if (!options.breaker?.reason && look.name !== 'launch') await options.store.put(key, drawn.html).catch(() => undefined);
   options.log(`${packet.frameId}: fell back to the engine's own composition after ${attempts} attempt(s)`);
   return drawn;
 }
@@ -281,8 +322,23 @@ export function engineScene(
 }
 
 /** What a look adds to a scene's key: nothing for the classic port, the look and the beat's staging otherwise. */
-function lookVariant(look: EngineLook, packet: ScenePacket): unknown {
-  return look.name === 'launch' ? { look: 'launch', beat: look.plan.get(packet.frameId) ?? UNPLANNED_BEAT } : undefined;
+function lookVariant(look: EngineLook, packet: ScenePacket, signature = false): unknown {
+  if (look.name !== 'launch') return undefined;
+  const beat = look.plan.get(packet.frameId) ?? UNPLANNED_BEAT;
+  return signature ? { look: 'launch', beat, signature: true } : { look: 'launch', beat };
+}
+
+/** Where a signature scene is written: the act's field and accent for the model, the act's tokens for the scene. */
+function stageOf(design: DesignTokens, beat: LaunchBeat): { prompt: SceneStage; css: string } {
+  const field: SceneStage['field'] = beat.act === 'night' ? 'dark' : beat.act === 'day' ? 'light' : 'brand';
+  return { prompt: { field, accent: launchPalettes(design)[beat.act].accent }, css: actTokenCss(design, beat.act) };
+}
+
+/** A written scene with its act's colours set on its root, ahead of anything the model wrote. */
+export function withStageColours(html: string, css: string): string {
+  const opening = /^<template\b[^>]*>/i.exec(html);
+  if (!opening) return html;
+  return `${opening[0]}\n<style>\n${css}\n</style>${html.slice(opening[0].length)}`;
 }
 
 /** Whether a stored or assembled scene is the engine's own composition. */

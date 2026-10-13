@@ -5,7 +5,8 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { isolateLayers, UiRegion, UiSequence } from '@act-one/core';
 import { ProviderError, ScriptedLlmProvider, type LlmMessage } from '@act-one/providers';
-import { authorScene, authorScenes, isConstruction, isEngineScene, type SceneAuthorOptions } from '../author.ts';
+import { authorScene, authorScenes, budgetAllows, isConstruction, isEngineScene, type SceneAuthorOptions, type SceneBudget } from '../author.ts';
+import { planLaunch, signatureBeats } from '../launch.ts';
 import { SYSTEM_PROMPT, sceneMessages } from '../prompt.ts';
 import { MemorySceneStore, sceneKey } from '../scene-store.ts';
 import { image, packet, packetsFor, scene, sceneTokens, storyboard } from './helpers.ts';
@@ -283,5 +284,66 @@ describe('a scene whose capture is taken apart or hung in a volume', () => {
     const writes = new ScriptedLlmProvider([{ respond: { html: goodScene(plain.frameId, 'Every signal in one place.'), notes: '' } }]);
     await authorScene(plain, tokens, dir, options(writes));
     expect(writes.calls).toHaveLength(1);
+  });
+});
+
+describe('the launch look’s signature moments', () => {
+  const board = storyboard([
+    scene(0, { recipe: 'kinetic_headline', text: ['Forty unmatched rows.'] }),
+    scene(1, { recipe: 'product_zoom', text: ['Matched as they land.'], assets: ['ast_img'] }),
+    scene(2, { recipe: 'kinetic_headline', text: ['Every Monday.'] }),
+    scene(3, { recipe: 'kinetic_headline', text: ['Closed by Friday.'] }),
+    scene(4, { recipe: 'cta_end_card', text: [] }),
+  ]);
+  const packets = packetsFor(board, { staged: [image('ast_img')] });
+  const plan = planLaunch(packets);
+  const budget = (over: Partial<SceneBudget> = {}): SceneBudget => ({ capUsd: 0.3, spentUsd: 0, calls: 0, perCallUsd: 0.1, ...over });
+
+  it('are the opening line, then the chapters — never the product on its card or the brand’s mark', () => {
+    const chosen = signatureBeats(packets, plan, 3);
+    expect(chosen.has('scene-01')).toBe(true);
+    expect(chosen.has('scene-02')).toBe(false);
+    expect(chosen.has('scene-05')).toBe(false);
+    expect(chosen.size).toBeLessThanOrEqual(3);
+    expect(signatureBeats(packets, plan, 1)).toEqual(new Set(['scene-01']));
+    expect(signatureBeats(packets, plan, 0).size).toBe(0);
+  });
+
+  it('are written by the model over the film’s field, in the act’s colours, and paid out of the film’s budget', async () => {
+    const opener = packets[0]!;
+    const llm = new ScriptedLlmProvider([{ respond: { html: goodScene('scene-01', 'Forty unmatched rows.'), notes: '' } }]);
+    const shared = budget();
+    const written = await authorScene(opener, tokens, '/nowhere', options(llm, { look: { name: 'launch', plan }, signature: { frameIds: new Set(['scene-01']), budget: shared } }));
+    expect(written.report.source).toBe('agent');
+    expect(shared.calls).toBe(1);
+    // The night act's tokens, set on the scene's root ahead of what the model wrote.
+    expect(written.html).toMatch(/<template>\n<style>\n#root \{\n  --ao-canvas: #[0-9a-f]{6};\n  --ao-primary: #F4F6FB;/);
+    expect(lastUserMessage(llm.calls[0]!.messages)).toContain('signature moments');
+    expect(lastUserMessage(llm.calls[0]!.messages)).toContain('a deep, dark field');
+  });
+
+  it('are drawn by the engine, without a call, once the budget would not cover one more', async () => {
+    const opener = packets[0]!;
+    const llm = new ScriptedLlmProvider([]);
+    const written = await authorScene(opener, tokens, '/nowhere', options(llm, { look: { name: 'launch', plan }, signature: { frameIds: new Set(['scene-01']), budget: budget({ capUsd: 0.05 }) } }));
+    expect(llm.calls).toHaveLength(0);
+    expect(written.report.source).toBe('fallback');
+    expect(written.report.fallbackReason).toMatch(/budget for written scenes is spent/);
+    expect(written.html).toContain('scene-01');
+  });
+
+  it('leave every other beat to the engine, without a call', async () => {
+    const llm = new ScriptedLlmProvider([]);
+    const written = await authorScene(packets[2]!, tokens, '/nowhere', options(llm, { look: { name: 'launch', plan }, signature: { frameIds: new Set(['scene-01']), budget: budget() } }));
+    expect(llm.calls).toHaveLength(0);
+    expect(written.report.fallbackReason).toMatch(/launch look/);
+  });
+
+  it('judge a call by the estimate until one is paid for, then by what calls have cost', () => {
+    expect(budgetAllows(budget({ capUsd: 0.1, perCallUsd: 0.1 }))).toBe(true);
+    expect(budgetAllows(budget({ capUsd: 0.09, perCallUsd: 0.1 }))).toBe(false);
+    // Two calls at 0.1 each: the third is expected at 0.1, and 0.3 is over 0.25.
+    expect(budgetAllows(budget({ capUsd: 0.25, spentUsd: 0.2, calls: 2 }))).toBe(false);
+    expect(budgetAllows(budget({ capUsd: 0.3, spentUsd: 0.2, calls: 2 }))).toBe(true);
   });
 });

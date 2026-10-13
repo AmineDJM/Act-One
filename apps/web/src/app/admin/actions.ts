@@ -193,6 +193,8 @@ export async function saveRoutingAction(
       sceneAuthor: String(formData.get('render.sceneAuthor') ?? current.providers.render.sceneAuthor),
       sceneAuthorTier: String(formData.get('render.sceneAuthorTier') ?? current.providers.render.sceneAuthorTier),
       look: String(formData.get('render.look') ?? current.providers.render.look),
+      signatureScenes: Number(formData.get('render.signatureScenes') ?? current.providers.render.signatureScenes),
+      signatureBudgetUsd: Number(formData.get('render.signatureBudgetUsd') ?? current.providers.render.signatureBudgetUsd),
     },
     media: {
       ...current.providers.media,

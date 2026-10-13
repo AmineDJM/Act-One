@@ -23,7 +23,7 @@ import { authoringCanvas, outputPlan } from './canvas.ts';
 import { captionsComposition } from './captions.ts';
 import { blocking, CheckOutputError, parseCheckOutput, type CheckReport, type EngineFinding } from './checks.ts';
 import { bundleFonts } from './fonts.ts';
-import { launchBackdrop, launchSoundCues, planLaunch, type LaunchSoundCue } from './launch.ts';
+import { launchBackdrop, launchSoundCues, planLaunch, signatureBeats, type LaunchSoundCue } from './launch.ts';
 import { assumedColourMatrix, deliver, deliveryProblems, encodeFrames, MediaError, normaliseClip, probeMedia } from './media.ts';
 import { buildPackets, referencedAssetIds } from './packets.ts';
 import { MemorySceneStore } from './scene-store.ts';
@@ -91,6 +91,13 @@ export type HyperFramesRenderOptions = RenderFilmOptions & {
   author?: SceneAuthorConfig;
   /** The classic composition when absent. */
   look?: FilmLook;
+  /**
+   * In the launch look, the moments a model writes: the opening line, then
+   * the chapters, up to `scenes`, all within `budgetUsd` for the film.
+   * `perCallUsd` is what a call is expected to cost until one has been paid
+   * for. Absent, or with no scene author, the engine draws every beat.
+   */
+  signature?: { scenes: number; budgetUsd: number; perCallUsd?: number };
   /** Rewrites of scenes HyperFrames' own check refuses, before the engine draws them itself. */
   maxRepairPasses?: number;
   tools?: ToolOptions;
@@ -146,6 +153,8 @@ export class HyperFramesRenderError extends Error {
 const CHECK_TIMEOUT_MS = 10 * 60_000;
 const STILL_TIMEOUT_MS = 5 * 60_000;
 const LOGO_ID = 'brand-logo';
+/** What one written scene is expected to cost before any has been paid for: a deep-tier call with a scene's worth of output. */
+const DEFAULT_SIGNATURE_CALL_USD = 0.15;
 
 export async function renderFilmWithHyperFrames(options: HyperFramesRenderOptions): Promise<HyperFramesRenderResult> {
   const log = options.log ?? ((line: string) => console.log(`[hyperframes] ${line}`));
@@ -233,6 +242,14 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
     // 3. The scenes.
     const look: EngineLook = options.look === 'launch' ? { name: 'launch', plan: planLaunch(packets) } : CLASSIC_LOOK;
     const authorOptions = sceneAuthorOptions(options, log, look);
+    if (look.name === 'launch' && options.signature && authorOptions.llm && options.signature.scenes > 0 && options.signature.budgetUsd > 0) {
+      const frameIds = signatureBeats(packets, look.plan, Math.floor(options.signature.scenes));
+      authorOptions.signature = {
+        frameIds,
+        budget: { capUsd: options.signature.budgetUsd, spentUsd: 0, calls: 0, perCallUsd: options.signature.perCallUsd ?? DEFAULT_SIGNATURE_CALL_USD },
+      };
+      if (frameIds.size > 0) log(`signature scenes: ${[...frameIds].join(', ')} within $${options.signature.budgetUsd.toFixed(2)}`);
+    }
     const soundCues =
       look.name === 'launch'
         ? launchSoundCues(packets, look.plan, new Map(packets.map((packet) => [packet.frameId, windows.get(packet.frameId)!.fromSeconds + packet.timing.beatStart])))

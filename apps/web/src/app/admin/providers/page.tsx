@@ -136,6 +136,8 @@ export default async function ProvidersPage() {
               sceneAuthor: config.providers.render.sceneAuthor,
               sceneAuthorTier: config.providers.render.sceneAuthorTier,
               look: config.providers.render.look,
+              signatureScenes: config.providers.render.signatureScenes,
+              signatureBudgetUsd: config.providers.render.signatureBudgetUsd,
             },
             media: {
               enabled: config.providers.media.enabled,

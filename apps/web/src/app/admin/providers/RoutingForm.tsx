@@ -21,7 +21,7 @@ export function RoutingForm({
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
     speech: { primary: string; preview: string; recognizer: string };
-    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string; look: string };
+    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string; look: string; signatureScenes: number; signatureBudgetUsd: number };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -230,8 +230,21 @@ export function RoutingForm({
                 <option value="launch">Launch (backdrop in three acts, typed and resolving type, tilted cards, chapters)</option>
               </select>
               <span className="hint">
-                The same storyboard either way: its beats, words, pictures, framings and cuts. Every scene of a launch
-                film is drawn by the engine, for nothing; no model is asked.
+                The same storyboard either way: its beats, words, pictures, framings and cuts. A launch film&rsquo;s
+                beats are drawn by the engine, for nothing, except its signature moments below.
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-signature-scenes">Signature moments a model writes in a launch film</label>
+              <input id="render-signature-scenes" name="render.signatureScenes" type="number" min={0} max={4} step={1} className="input" defaultValue={routing.render.signatureScenes} />
+              <span className="hint">The opening line, then the chapters. Zero: the engine draws every beat.</span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-signature-budget">Most a film may spend on them (USD)</label>
+              <input id="render-signature-budget" name="render.signatureBudgetUsd" type="number" min={0} max={2} step={0.05} className="input" defaultValue={routing.render.signatureBudgetUsd} />
+              <span className="hint">
+                A call is made only when what it is expected to cost still fits; a moment the budget does not cover is
+                drawn by the engine. Never spent on an animatic.
               </span>
             </div>
             <div className="field">

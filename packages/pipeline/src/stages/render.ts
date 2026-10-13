@@ -1408,6 +1408,7 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
       maxAttempts: settings.maxSceneAttempts,
     },
     look: settings.look,
+    signature: { scenes: settings.signatureScenes, budgetUsd: settings.signatureBudgetUsd },
     ...(workers ? { concurrency: workers } : {}),
     log: (line) => console.log(`[render:hyperframes] ${render.id} ${line}`),
   });
@@ -1457,8 +1458,14 @@ export { filmEngine };
  * Only when the operator asked for it, and never for an animatic: a preview
  * the review may send back is the last place to spend a call per scene.
  */
-export function agentWritesScenes(settings: { sceneAuthor: 'engine' | 'agent' }, kind: Render['kind']): boolean {
-  return settings.sceneAuthor === 'agent' && kind !== 'animatic';
+export function agentWritesScenes(
+  settings: { sceneAuthor: 'engine' | 'agent'; look?: 'classic' | 'launch'; signatureScenes?: number; signatureBudgetUsd?: number },
+  kind: Render['kind'],
+): boolean {
+  if (kind === 'animatic') return false;
+  // The launch look asks a model only for its signature moments, within their budget.
+  const signatures = settings.look === 'launch' && (settings.signatureScenes ?? 0) > 0 && (settings.signatureBudgetUsd ?? 0) > 0;
+  return settings.sceneAuthor === 'agent' || signatures;
 }
 
 /** What a render drawn by the Remotion engine records about it. */

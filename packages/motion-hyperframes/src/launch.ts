@@ -169,6 +169,56 @@ export function launchPalettes(design: DesignTokens): Record<LaunchAct, Palette 
   };
 }
 
+/**
+ * The beats a model may write in the launch look: the line that opens the
+ * film, then its chapters, in order, at most `count`.
+ *
+ * Words, never a product beat: the capture on its card is the film's proof
+ * and is drawn as captured, by the engine. A signature moment is where type
+ * and motion carry the film — the first line, a turn — and where a written
+ * composition can do what a template cannot.
+ */
+export function signatureBeats(packets: readonly ScenePacket[], plan: ReadonlyMap<string, LaunchBeat>, count: number): Set<string> {
+  const chosen = new Set<string>();
+  if (count <= 0) return chosen;
+  const words = packets.filter((packet) => {
+    const beat = plan.get(packet.frameId);
+    return beat !== undefined && stagingOf(packet, beat) !== 'product' && stagingOf(packet, beat) !== 'mark';
+  });
+  const opener = words.find((packet) => plan.get(packet.frameId)?.opener);
+  if (opener) chosen.add(opener.frameId);
+  for (const packet of words) {
+    if (chosen.size >= count) break;
+    if (plan.get(packet.frameId)?.chapter) chosen.add(packet.frameId);
+  }
+  return chosen;
+}
+
+/**
+ * The act's colours as the scene tokens, set on a written scene's root.
+ *
+ * A model writes with var(--ao-primary) and its kin, which are the film's
+ * classic colours: light type on a dark canvas, say. Over the launch look's
+ * day those would vanish. Inside the scene they are the act's own, so what
+ * the model wrote in tokens reads on the field the backdrop paints under it.
+ */
+export function actTokenCss(design: DesignTokens, act: LaunchAct): string {
+  const palette = launchPalettes(design)[act];
+  return [
+    '#root {',
+    `  --ao-canvas: ${palette.base[1]};`,
+    `  --ao-primary: ${palette.ink};`,
+    `  --ao-secondary: ${palette.ink};`,
+    `  --ao-muted: ${palette.muted};`,
+    `  --ao-accent-text: ${palette.accent};`,
+    `  --ao-accent: ${palette.accent};`,
+    `  --ao-line: ${palette.line};`,
+    `  --ao-surface: ${palette.surface};`,
+    `  --ao-surface-raised: ${palette.surface};`,
+    '}',
+  ].join('\n');
+}
+
 /** How a beat is staged: what its words are, or what its picture is. */
 type Staging = 'headline' | 'chapter' | 'list' | 'metric' | 'quote' | 'product' | 'mark';
 
