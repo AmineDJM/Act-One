@@ -234,13 +234,13 @@ export const VARIANT_SPECS: Record<
   VariantPurpose,
   { aspect: AspectRatio; targetSeconds: number; label: string; captions: boolean }
 > = {
-  hero_60: { aspect: '16:9', targetSeconds: 60, label: 'Hero film', captions: false },
+  hero_60: { aspect: '16:9', targetSeconds: 60, label: 'Hero film', captions: true },
   vertical_30: { aspect: '9:16', targetSeconds: 30, label: 'Vertical 30', captions: true },
   ad_15_a: { aspect: '9:16', targetSeconds: 15, label: 'Ad A — problem led', captions: true },
   ad_15_b: { aspect: '9:16', targetSeconds: 15, label: 'Ad B — product led', captions: true },
   ad_15_c: { aspect: '1:1', targetSeconds: 15, label: 'Ad C — proof led', captions: true },
-  bumper_6: { aspect: '16:9', targetSeconds: 6, label: 'Bumper', captions: false },
-  homepage_loop: { aspect: '16:9', targetSeconds: 12, label: 'Homepage loop', captions: false },
+  bumper_6: { aspect: '16:9', targetSeconds: 6, label: 'Bumper', captions: true },
+  homepage_loop: { aspect: '16:9', targetSeconds: 12, label: 'Homepage loop', captions: true },
   product_hunt: { aspect: '16:9', targetSeconds: 45, label: 'Product Hunt', captions: true },
   linkedin_cut: { aspect: '1:1', targetSeconds: 30, label: 'LinkedIn', captions: true },
   reel: { aspect: '9:16', targetSeconds: 22, label: 'Reel', captions: true },

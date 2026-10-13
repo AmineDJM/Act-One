@@ -71,14 +71,14 @@ describe('planVariant', () => {
     }
   });
 
-  it('uses the channel’s own aspect ratio and caption policy', () => {
+  it('uses the channel’s own aspect ratio, and burns its captions in on every channel', () => {
     const vertical = planVariant(master(), 'vertical_30');
     expect(vertical.aspect).toBe('9:16');
     expect(vertical.captionsBurned).toBe(true);
 
     const loop = planVariant(master(), 'homepage_loop');
     expect(loop.aspect).toBe('16:9');
-    expect(loop.captionsBurned).toBe(false);
+    expect(loop.captionsBurned).toBe(true);
   });
 });
 

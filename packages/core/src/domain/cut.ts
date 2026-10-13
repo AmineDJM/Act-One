@@ -53,8 +53,10 @@ export type CutSpec = {
   /**
    * Whether the captions go into the picture.
    *
-   * In a feed, always: most playback is muted, so the captions are the words
-   * rather than an accessibility track, and they are composed with the frame.
+   * In a feed most playback is muted, so the captions are the words rather
+   * than an accessibility track. On every cut, by the house's decision: the
+   * voice is half the film's argument, and a viewer who meets it with the
+   * sound off, or in a second language, still gets all of it.
    */
   captionsBurned: boolean;
   /** Handed to every writing agent verbatim, so they all cut to the same film. */
@@ -71,7 +73,7 @@ export const FILM_CUTS: Record<FilmCut, CutSpec> = {
     defaultSeconds: 60,
     pace: 1,
     hookSeconds: 3,
-    captionsBurned: false,
+    captionsBurned: true,
     direction:
       'This film is watched by somebody who chose to watch it, in a landscape frame, with sound. ' +
       'It can open on an image and let it breathe, it can hold a shot, and it can build to ' +

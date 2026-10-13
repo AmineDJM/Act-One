@@ -62,7 +62,7 @@ describe('what a cut decides', () => {
 
   it('wears its captions in the picture where nobody hears it', () => {
     expect(FILM_CUTS.short.captionsBurned).toBe(true);
-    expect(FILM_CUTS.feature.captionsBurned).toBe(false);
+    expect(FILM_CUTS.feature.captionsBurned).toBe(true);
   });
 });
 

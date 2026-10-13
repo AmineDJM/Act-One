@@ -133,6 +133,7 @@ import { captionFilm, NO_CAPTIONS, type FilmCaptions } from './captions.ts';
 import type { LlmProvider } from '@act-one/providers';
 import { readInterfaces } from './interface-drawings.ts';
 import { scoreFilm } from './score.ts';
+import { cutToTheVoice, followTheCuts } from './voice-cut.ts';
 
 /**
  * The render stage.
@@ -415,6 +416,8 @@ export async function runRender(
         mode,
       });
       masterPath = rendered.path;
+      // What was drawn is what is judged: the beats as cut to the recorded voice.
+      current = rendered.storyboard;
       captions = rendered.captions;
       lastReadiness = rendered.readiness;
 
@@ -1580,6 +1583,10 @@ async function renderOnce(
   undecodable: string[];
   /** The manifest this pass was rendered from: what resolved, what did not. */
   readiness: MasterReadiness;
+  /** The storyboard as drawn: its narrated beats cut to the recorded voice. */
+  storyboard: Storyboard;
+  /** Where the music sits under that cut. */
+  musicPlacement: MusicPlacement | null;
 }> {
   const { brand, system } = params;
   /*
@@ -1602,7 +1609,28 @@ async function renderOnce(
   await context.progress(0.08, 'Reading the narration');
   await context.activity({ step: 'voice', kind: 'step', label: 'reading the narration', status: 'active' });
   const narration = await speakNarration(context, storyboard, params.workDir, params.quality, params.voice);
-  const voiceTracks = narration.tracks;
+  /*
+   * The picture, cut to the voice that was recorded rather than the one that
+   * was estimated — then onto the music's beat again, since the cuts moved —
+   * and each line placed where its beat now starts.
+   */
+  let musicPlacement = params.musicPlacement ?? null;
+  let voiceTracks = narration.tracks;
+  const voiceCut = cutToTheVoice(storyboard, voiceTracks);
+  if (voiceCut.recut.length > 0) {
+    const planned = storyboardDuration(storyboard);
+    const resynced = syncCutsToMusic(
+      { storyboard: voiceCut.storyboard, behaviour: system.sound, channel: soundChannel(params.aspect), hasVoiceOver: true },
+      DEFAULT_FPS,
+    );
+    storyboard = resynced.storyboard;
+    musicPlacement = resynced.placement;
+    voiceTracks = followTheCuts(voiceCut.tracks, voiceCut.storyboard, storyboard);
+    console.log(
+      `[render] cut to the voice: ${voiceCut.recut.length} narrated beat${voiceCut.recut.length === 1 ? '' : 's'} retimed, ` +
+        `${planned.toFixed(1)}s planned, ${storyboardDuration(storyboard).toFixed(1)}s spoken`,
+    );
+  }
   /*
    * Where the words actually are, as opposed to where the plan put them.
    *
@@ -2032,7 +2060,7 @@ async function renderOnce(
     behaviour: system.sound,
     channel: soundChannel(params.aspect),
     hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
-    ...(params.musicPlacement ? { placement: params.musicPlacement } : {}),
+    ...(musicPlacement ? { placement: musicPlacement } : {}),
     fps: DEFAULT_FPS,
   });
 
@@ -2207,7 +2235,7 @@ async function renderOnce(
   if (!mixed.ok) {
     // A broken filter graph must not cost the whole render; ship the picture.
     console.error('[render] mix failed, shipping silent film:', mixed.stderr.slice(-400));
-    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+    return { path: silentPath, missingAudio: stillMissing, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness, storyboard, musicPlacement };
   }
 
   await context.progress(0.72, 'Mixing');
@@ -2239,12 +2267,12 @@ async function renderOnce(
     await rm(audioPath, { force: true });
     const delivered = await mux(context, silentPath, premasterPath, params, stillMissing, drawn.durationSeconds);
     soundIssues.push(...deliveryIssues(delivered.measured, design.targetLufs));
-    return { path: delivered.path, missingAudio: delivered.missingAudio, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+    return { path: delivered.path, missingAudio: delivered.missingAudio, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness, storyboard, musicPlacement };
   }
 
   const delivered = await mux(context, silentPath, audioPath, params, stillMissing, drawn.durationSeconds);
   soundIssues.push(...deliveryIssues(delivered.measured, design.targetLufs));
-  return { path: delivered.path, missingAudio: delivered.missingAudio, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+  return { path: delivered.path, missingAudio: delivered.missingAudio, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness, storyboard, musicPlacement };
 }
 
 /**

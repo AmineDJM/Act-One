@@ -258,8 +258,7 @@ describe('which cuts wear their captions', () => {
     for (const purpose of ['vertical_30', 'tiktok', 'hero_60', 'bumper_6'] as const) {
       expect(planVariant(storyboard, purpose).captionsBurned).toBe(VARIANT_SPECS[purpose].captions);
     }
-    // The two that matter: a feed cut wears them, a hero film does not.
-    expect(VARIANT_SPECS.tiktok.captions).toBe(true);
-    expect(VARIANT_SPECS.hero_60.captions).toBe(false);
+    // Every channel wears them, the hero film included: the voice is half the argument.
+    expect(Object.values(VARIANT_SPECS).every((spec) => spec.captions)).toBe(true);
   });
 });
