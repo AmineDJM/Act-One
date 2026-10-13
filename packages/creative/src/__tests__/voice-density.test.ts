@@ -61,7 +61,7 @@ describe('where the voice is, and where it is missing', () => {
   });
 
   it('says a script is too long for its film, and by how much to cut it', () => {
-    const long = scenes(Array.from({ length: 12 }, () => ({ seconds: 4.5, line: LINE })).concat([{ seconds: 2.5, close: true }]));
+    const long = scenes([...Array.from({ length: 12 }, () => ({ seconds: 4.5, line: LINE })), { seconds: 2.5, close: true }]);
     expect(overlengthProblem(long, 45, 'continuous', 2.35)).toMatch(/runs 57s against a 45s target, because its narration is 120 words long .* about 80 words/);
     expect(overlengthProblem(long, 56, 'continuous', 2.35)).toBeNull();
   });
