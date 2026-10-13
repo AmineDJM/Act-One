@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -297,9 +298,23 @@ describe('Browserbase', () => {
   describe.skipIf(!executablePath)('a session on the vendor browser', () => {
     let chrome: { child: ChildProcess; wsUrl: string; profile: string } | null = null;
 
-    afterAll(() => {
-      chrome?.child.kill('SIGKILL');
-      if (chrome) rmSync(chrome.profile, { recursive: true, force: true });
+    /*
+     * Chrome writes into its profile until the moment it is gone: a profile
+     * removed straight after the kill signal raced it and, now and then,
+     * failed with ENOTEMPTY. The process is waited out first; the retries
+     * cover files the system is still closing.
+     */
+    const stopChrome = async (running: { child: ChildProcess; profile: string }) => {
+      if (running.child.exitCode === null && running.child.signalCode === null) {
+        const exited = once(running.child, 'exit');
+        running.child.kill('SIGKILL');
+        await exited;
+      }
+      rmSync(running.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    };
+
+    afterAll(async () => {
+      if (chrome) await stopChrome(chrome);
     });
 
     it('hands over the page itself, and closes it exactly once', async () => {
@@ -320,8 +335,7 @@ describe('Browserbase', () => {
       expect(fake.calls.filter((entry) => entry.path === `/v1/sessions/${handle.id}`)).toHaveLength(1);
       expect(sink.records).toHaveLength(1);
       // The vendor browser outlives our disconnect; only the release ends it.
-      chrome.child.kill('SIGKILL');
-      rmSync(chrome.profile, { recursive: true, force: true });
+      await stopChrome(chrome);
       chrome = null;
     }, 60_000);
 
