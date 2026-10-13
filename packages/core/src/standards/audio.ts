@@ -35,7 +35,8 @@ export const AUDIO_STANDARDS = {
     source: 'EBU R 128',
     clause: 'Maximum Permitted True Peak Level',
     authority: 'normative',
-    enforcement: 'designed_in',
+    // Measured on the delivered file, after its encode, and held under the ceiling there.
+    enforcement: 'checked',
     because:
       'Inter-sample peaks exceed sample peaks after encoding, so a mix that peaks at 0 dBFS ' +
       'distorts once it is an AAC file. The one decibel is the headroom that lossy encoding eats.',

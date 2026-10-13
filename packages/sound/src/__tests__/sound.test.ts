@@ -297,9 +297,9 @@ describe('how many times the audio is encoded', () => {
     expect(args).not.toContain('aac');
   });
 
-  it('encodes once, at the mux', () => {
+  it('encodes once, at the mux, keeping the band so the encode does not raise the peaks', () => {
     const args = muxArgs('/tmp/v.mp4', '/tmp/a.wav', '/tmp/out.mp4').join(' ');
-    expect(args).toContain('-c:a aac');
+    expect(args).toContain('-c:a aac -b:a 320k -cutoff 20000');
     // And never re-encodes the picture to attach it.
     expect(args).toContain('-c:v copy');
   });

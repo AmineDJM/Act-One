@@ -11,7 +11,7 @@ import {
 } from '@act-one/core';
 import { pauseAfter, segmentForSpeech, writeAudioEdition } from '@act-one/creative';
 import type { VoiceConsent } from '@act-one/providers';
-import { masterLoudness, runFfmpeg, stitchVoice } from '@act-one/sound';
+import { masterLoudness, measureLoudness, runFfmpeg, stitchVoice } from '@act-one/sound';
 import { storeAsset, type StageContext } from '../context.ts';
 import { planAllows, planFor } from '../entitlements.ts';
 import { narrate } from '../narration.ts';
@@ -182,6 +182,8 @@ export async function runAudioEdition(
       { ...(context.signal ? { signal: context.signal } : {}), timeoutMs: 10 * 60_000 },
     );
     if (!encode.ok) throw new AppError('internal', `Encoding the audio edition failed: ${encode.stderr.slice(-300)}`);
+    // What is recorded is what is shipped: the encoded file, measured, and the master's figures only if it cannot be.
+    const shipped = (await measureLoudness(encoded, context.signal ? { signal: context.signal } : {})) ?? measured;
 
     const durationSeconds = Math.round(segments.reduce((sum, s) => sum + s.durationSeconds - (s.trimHeadSeconds ?? 0) - (s.trimTailSeconds ?? 0) + s.gapAfterSeconds, 0.4 + 1.2) * 10) / 10;
     const stored = await storeAsset(context, {
@@ -200,8 +202,8 @@ export async function runAudioEdition(
         title: script.title,
         language,
         voiceId: result.tracks[0]?.assetId ? (chosen?.voiceId ?? null) : null,
-        integratedLufs: measured?.integratedLufs ?? null,
-        truePeakDb: measured?.truePeakDb ?? null,
+        integratedLufs: shipped?.integratedLufs ?? null,
+        truePeakDb: shipped?.truePeakDb ?? null,
         passages: result.tracks.length,
         scriptFallback: script.fallback,
       },
@@ -214,7 +216,7 @@ export async function runAudioEdition(
       brandVoiceId: chosen?.id ?? null,
       assetId: stored.asset.id,
       durationSeconds,
-      integratedLufs: measured?.integratedLufs ?? null,
+      integratedLufs: shipped?.integratedLufs ?? null,
       costUsd: result.usage.costUsd,
       findings: result.issues.map((issue) => ({ check: issue.check, severity: issue.severity, message: issue.message })),
       completedAt: new Date().toISOString(),

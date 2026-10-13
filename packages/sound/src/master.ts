@@ -46,11 +46,12 @@ export type LoudnessMeasurement = { integratedLufs: number; truePeakDb: number; 
  */
 export async function measureLoudness(
   source: string,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<LoudnessMeasurement | null> {
   const result = await runFfmpeg(
-    ['-i', source, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
-    { timeoutMs: options.timeoutMs ?? 5 * 60_000 },
+    // `-vn`: a delivered film is measured for its sound, without decoding its picture to nowhere.
+    ['-i', source, '-vn', '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
+    { timeoutMs: options.timeoutMs ?? 5 * 60_000, ...(options.signal ? { signal: options.signal } : {}) },
   );
   if (!result.ok) return null;
 

@@ -3,7 +3,7 @@ import { ProviderConfig, ProviderRegistry } from '@act-one/providers';
 import type { StageContext } from '../context.ts';
 import { RenderEngine, Scene, Storyboard } from '@act-one/core';
 import { SCENE_CONTRACT_VERSION, type HyperFramesRenderResult } from '@act-one/motion-hyperframes';
-import { agentWritesScenes, filmEngine, hyperframesEngineRecord, remotionEngineRecord, withMotionCues } from '../stages/render.ts';
+import { agentWritesScenes, deliveryIssues, filmEngine, hyperframesEngineRecord, remotionEngineRecord, withMotionCues } from '../stages/render.ts';
 import { captureWorkers } from '../stages/film-engine.ts';
 
 /**
@@ -140,5 +140,21 @@ describe('how many browsers capture a HyperFrames film', () => {
     for (const unreadable of [undefined, '', '0', '9', '1.5', '-2', 'two', '2; rm -rf /']) {
       expect(captureWorkers({ ACT_ONE_HYPERFRAMES_WORKERS: unreadable }), String(unreadable)).toBeUndefined();
     }
+  });
+});
+
+describe('what the delivered film measures', () => {
+  it('is a finding when the shipped file is over the true-peak ceiling or out of loudness tolerance', () => {
+    const issues = deliveryIssues({ integratedLufs: -14.2, truePeakDb: -0.3, lra: 4 }, -16);
+    expect(issues.map((issue) => [issue.check, issue.severity])).toEqual([['audio_clipping', 'soft_fail'], ['audio_loudness', 'soft_fail']]);
+    expect(issues[0]!.message).toContain('-0.3 dBTP');
+    expect(issues[1]!.message).toContain('-14.2 LUFS');
+  });
+
+  it('is nothing when it lands where it was mastered to, or when nothing could be measured', () => {
+    expect(deliveryIssues({ integratedLufs: -16.2, truePeakDb: -1.4, lra: 4 }, -16)).toEqual([]);
+    // Silence measures -70 and is the silent-master check's to judge, not this one's.
+    expect(deliveryIssues({ integratedLufs: -70, truePeakDb: Number.NEGATIVE_INFINITY, lra: 0 }, -16)).toEqual([]);
+    expect(deliveryIssues(null, -16)).toEqual([]);
   });
 });

@@ -10,6 +10,8 @@ import {
   FILM_CUTS,
   pitchDrift,
   AUDIO_STANDARDS,
+  LUFS_TOLERANCE,
+  TRUE_PEAK_CEILING,
   DEFAULT_FPS,
   DIALOGUE_LEAD_MIN,
   cite,
@@ -63,12 +65,13 @@ import {
   masterLoudness,
   measureDialogueLead,
   mixArgs,
-  muxArgs,
   posterArgs,
   extractFrame,
   runFfmpeg,
   buildSoundLibrary,
+  deliverWithinCeiling,
   DEFAULT_LIBRARY,
+  type LoudnessMeasurement,
 } from '@act-one/sound';
 import {
   abruptEndIssue,
@@ -2156,10 +2159,49 @@ async function renderOnce(
     // film than no sound at all.
     console.error('[render] mastering failed, shipping the premaster:', (error as Error).message);
     await rm(audioPath, { force: true });
-    return { ...(await mux(context, silentPath, premasterPath, params, stillMissing, drawn.durationSeconds)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+    const delivered = await mux(context, silentPath, premasterPath, params, stillMissing, drawn.durationSeconds);
+    soundIssues.push(...deliveryIssues(delivered.measured, design.targetLufs));
+    return { path: delivered.path, missingAudio: delivered.missingAudio, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
   }
 
-  return { ...(await mux(context, silentPath, audioPath, params, stillMissing, drawn.durationSeconds)), soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+  const delivered = await mux(context, silentPath, audioPath, params, stillMissing, drawn.durationSeconds);
+  soundIssues.push(...deliveryIssues(delivered.measured, design.targetLufs));
+  return { path: delivered.path, missingAudio: delivered.missingAudio, soundIssues, captions, spoken, hasSound, soundKeys, degradedIssues, undecodable, readiness };
+}
+
+/**
+ * What the delivered file measures against what it was mastered to.
+ *
+ * The figures are the shipped file's, after its one AAC encode: the master
+ * can be right as a WAV and wrong as the file anybody plays. A delivery that
+ * could not be brought under the true-peak ceiling, or that landed outside the
+ * loudness tolerance, is a finding rather than a quiet number in a log.
+ */
+export function deliveryIssues(measured: LoudnessMeasurement | null, targetLufs: number): QaFinding[] {
+  if (!measured) return [];
+  const issues: QaFinding[] = [];
+  const base = { sceneId: null, timecodeStart: null, detectedBy: 'deterministic' as const, evidenceAssetId: null, confidence: 1 };
+  if (Number.isFinite(measured.truePeakDb) && measured.truePeakDb > TRUE_PEAK_CEILING) {
+    issues.push({
+      ...base,
+      id: newId('evt'),
+      check: 'audio_clipping',
+      severity: 'soft_fail',
+      message: `The delivered film peaks at ${measured.truePeakDb.toFixed(1)} dBTP after its encode; ${TRUE_PEAK_CEILING} dBTP is the ceiling (${cite(AUDIO_STANDARDS.truePeak)}).`,
+      repair: 'remix_audio',
+    });
+  }
+  if (Number.isFinite(measured.integratedLufs) && measured.integratedLufs > -70 && Math.abs(measured.integratedLufs - targetLufs) > LUFS_TOLERANCE) {
+    issues.push({
+      ...base,
+      id: newId('evt'),
+      check: 'audio_loudness',
+      severity: 'soft_fail',
+      message: `The delivered film measures ${measured.integratedLufs.toFixed(1)} LUFS against a ${targetLufs} LUFS target; ±${LUFS_TOLERANCE} LU is the tolerance.`,
+      repair: 'remix_audio',
+    });
+  }
+  return issues;
 }
 
 /**
@@ -2273,7 +2315,11 @@ async function checkColourDistribution(
   return issues;
 }
 
-/** Puts the picture and the mix together, the picture's length kept, falling back to the silent cut. */
+/**
+ * Puts the picture and the mix together, the picture's length kept and the
+ * shipped file measured and held under the true-peak ceiling (see
+ * `deliverWithinCeiling`), falling back to the silent cut.
+ */
 async function mux(
   context: StageContext,
   silentPath: string,
@@ -2281,14 +2327,20 @@ async function mux(
   params: { workDir: string; attempt: number },
   missingAudio: string[],
   pictureSeconds: number,
-): Promise<{ path: string; missingAudio: string[] }> {
+): Promise<{ path: string; missingAudio: string[]; measured: LoudnessMeasurement | null }> {
   const masterPath = path.join(params.workDir, `master-${params.attempt}.mp4`);
-  const muxed = await runFfmpeg(muxArgs(silentPath, audioPath, masterPath, pictureSeconds), {
-    signal: context.signal,
+  const delivery = await deliverWithinCeiling({
+    video: silentPath,
+    master: audioPath,
+    output: masterPath,
+    pictureSeconds,
+    ...(context.signal ? { signal: context.signal } : {}),
     timeoutMs: 300_000,
   });
-
-  return { path: muxed.ok ? masterPath : silentPath, missingAudio };
+  if (delivery.ok && delivery.passes > 1) {
+    console.log(`[render] the encode raised the peaks; delivered at ${delivery.measured?.truePeakDb.toFixed(1)} dBTP after ${delivery.passes} passes`);
+  }
+  return { path: delivery.ok ? masterPath : silentPath, missingAudio, measured: delivery.ok ? delivery.measured : null };
 }
 
 /**

@@ -321,7 +321,16 @@ export function muxArgs(videoPath: string, audioPath: string, outputPath: string
      */
     '-bsf:v',
     'h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0',
-    '-c:a', 'aac', '-b:a', '256k',
+    /*
+     * The one lossy encode, set so it does not raise the peaks.
+     *
+     * At its defaults FFmpeg's AAC encoder band-limits well under the top of
+     * the audible range, and a lowpass rings on every transient: masters
+     * mastered to −2.0 dBTP came out at −0.3 and −0.6, over EBU R 128's −1.
+     * Measured on the same masters, 320 kb/s with the band kept to 20 kHz
+     * adds 0.05 dB at most — and costs a third of a megabyte a minute.
+     */
+    '-c:a', 'aac', '-b:a', '320k', '-cutoff', '20000',
     ...pad,
     '-shortest',
     '-movflags', '+faststart',

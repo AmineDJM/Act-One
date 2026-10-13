@@ -105,7 +105,7 @@ describe('the standards themselves', () => {
     for (const id of [
       'motion.red_flash', 'motion.thirty_degree', 'motion.axis_of_action',
       'color.distribution', 'color.broadcast_range',
-      'conversion.proof_placement', 'conversion.no_fake_urgency', 'audio.dialogue_lead',
+      'conversion.proof_placement', 'conversion.no_fake_urgency', 'audio.dialogue_lead', 'audio.true_peak',
     ]) {
       expect(all.find((s) => s.id === id)?.enforcement, id).toBe('checked');
     }

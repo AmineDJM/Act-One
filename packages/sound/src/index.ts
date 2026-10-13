@@ -2,6 +2,7 @@ export * from './library.ts';
 export * from './ending.ts';
 export * from './sound-director.ts';
 export * from './mix.ts';
+export * from './deliver.ts';
 export * from './master.ts';
 export * from './ffmpeg.ts';
 export * from './synthesis.ts';
