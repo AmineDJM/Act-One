@@ -70,6 +70,21 @@ describe('directSound', () => {
     expect(design.music!.enterAtSeconds).toBe(0);
   });
 
+  it('types for exactly as long as the field is typed into, and stays quiet when the system wants no interface sound', () => {
+    const typed = board([
+      scene({ id: 's1', duration: 4, visualType: 'product_ui', soundCues: [
+        { time: 1.2, type: 'typing', assetId: null, intensity: 0.45, durationSeconds: 0.4 },
+      ] }),
+    ]);
+    const cue = directSound({ storyboard: typed, behaviour: cinematic }).cues.find((c) => c.type === 'typing')!;
+    expect(cue.sfxKind).toBe('ui_typing');
+    expect(cue.atSeconds).toBe(1.2);
+    expect(cue.durationSeconds).toBe(0.4);
+    expect(findSfx(DEFAULT_LIBRARY, 'ui_typing')!.durationSeconds).toBeGreaterThanOrEqual(40 * 0.045);
+    const quiet = directSound({ storyboard: typed, behaviour: { ...cinematic, uiSoundDensity: 'none' as const } });
+    expect(quiet.cues.some((c) => c.type === 'typing' && c.storageKey)).toBe(false);
+  });
+
   it('starts impacts before the cut so the transient lands on it', () => {
     const design = directSound({ storyboard, behaviour: cinematic });
     const impact = design.cues.find((c) => c.type === 'impact')!;

@@ -1451,15 +1451,30 @@ export function soundChannel(aspect: AspectRatio): 'social' | 'web' {
   return aspect === '9:16' ? 'social' : 'web';
 }
 
+const MIX_DIRECTIONS: ReadonlySet<SoundCue['type']> = new Set(['music_in', 'music_out', 'music_duck', 'silence']);
+
 export function withMotionCues(storyboard: Storyboard, cues: readonly LaunchSoundCue[]): Storyboard {
   if (cues.length === 0) return storyboard;
   return {
     ...storyboard,
     scenes: storyboard.scenes.map((scene) => {
-      if (scene.soundCues.length > 0) return scene;
+      /*
+       * The storyboard's own sounds win where it asked for any; its directions
+       * to the mix — the music coming in, ducking under the voice, going out —
+       * are not sounds, and a narrated beat still clicks where its cursor does.
+       */
+      if (scene.soundCues.some((cue) => !MIX_DIRECTIONS.has(cue.type))) return scene;
       const offered = cues.filter((cue) => cue.sceneId === scene.id);
       if (offered.length === 0) return scene;
-      return { ...scene, soundCues: offered.map((cue) => SoundCue.parse({ time: cue.time, type: cue.type, intensity: cue.intensity })) };
+      return {
+        ...scene,
+        soundCues: [
+          ...scene.soundCues,
+          ...offered.map((cue) =>
+            SoundCue.parse({ time: cue.time, type: cue.type, intensity: cue.intensity, durationSeconds: cue.durationSeconds ?? null }),
+          ),
+        ],
+      };
     }),
   };
 }

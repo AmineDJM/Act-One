@@ -173,7 +173,7 @@ export async function scoreFilm(
  * sound synthesized from a score, not the brand's, and it is the last thing
  * a viewer hears. Music cues are the score's business.
  */
-const DESIGNABLE = new Set(['impact', 'riser', 'sub_drop', 'whoosh', 'texture', 'ui_click', 'logo_sting']);
+const DESIGNABLE = new Set(['impact', 'riser', 'sub_drop', 'whoosh', 'texture', 'ui_click', 'typing', 'logo_sting']);
 
 async function buildEffects(
   context: StageContext,
@@ -220,7 +220,11 @@ async function buildEffects(
 
   const paths: Record<string, string> = {};
   let unaffordable = 0;
-  for (const brief of briefs) {
+  const lasting = new Map(wanted.filter((cue) => cue.type === 'typing' && cue.durationSeconds).map((cue) => [cue.id, cue.durationSeconds!]));
+  for (const written of briefs) {
+    // Keystrokes run exactly as long as the typing they accompany, whatever length the brief proposed.
+    const lasts = lasting.get(written.cueId);
+    const brief = lasts ? { ...written, seconds: Math.min(22, Math.max(0.5, lasts)), loop: false } : written;
     if (!budget.allows(engine.effectPriceUsd(brief.seconds))) {
       unaffordable += 1;
       continue;

@@ -586,7 +586,7 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   const tilt = card.tilt ?? 1;
   const { picture } = card;
   // A capture production read into parts is drawn back up before it is shown, given the time to be.
-  const drawing = packet.drawing && picture.kind === 'image' && packet.timing.beatDuration >= DRAWING_MIN_SECONDS ? packet.drawing : null;
+  const drawing = drawsInterface(packet) && picture.kind === 'image' ? packet.drawing : null;
   const sequence = drawing ? undefined : card.sequence;
   const text = lineOf(packet);
   const items = listItems(text);
@@ -615,7 +615,7 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
     `#${id}-shine { position: absolute; top: -20%; bottom: -20%; left: 0; width: 38%; background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,0.32), rgba(255,255,255,0)); opacity: 0; }`,
   );
   const media = drawing
-    ? drawnInterface(packet, drawing, picture, { width: cardW, height: cardH }, design, palette, parts, start + 0.25, beatEnd)
+    ? drawnInterface(packet, drawing, picture, { width: cardW, height: cardH }, design, palette, parts, start + DRAWING_AFTER_ENTRANCE, beatEnd)
     : sequence
     ? framedPlate(packet, sequence, picture, { width: cardW, height: cardH }, parts)
     : picture.kind === 'video'
@@ -652,6 +652,53 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
 const DRAWING_MIN_SECONDS = 2.6;
 /** How long the real capture is held, fully up, before the beat leaves. */
 const DRAWING_REAL_HOLD = 0.7;
+/** The drawing starts once the card has begun to land. */
+const DRAWING_AFTER_ENTRANCE = 0.25;
+
+/**
+ * When the hand acts in a drawn interface, on the clock the interface is drawn on.
+ *
+ * One timeline, read by the drawing and by the sound: the parts arrive, the
+ * cursor clicks the control a person would use next, the words the field
+ * holds are typed after the click, and the real capture comes up. A sound is
+ * placed on what the hand does here and nowhere else — a keystroke is heard
+ * only while a glyph lands in a field.
+ */
+export type DrawingHand = {
+  /** When the last part starts arriving. */
+  built: number;
+  /** The click, or null when the drawing has no control to use or no time to use it. */
+  click: number | null;
+  /** The glyphs typed into the focused field after the click, when the hand types. */
+  typing: { start: number; perGlyph: number; glyphs: number } | null;
+  /** When the real capture starts coming up over the drawing. */
+  real: number;
+};
+
+export function drawingHand(drawing: UiDrawing, from: number, until: number): DrawingHand {
+  const leaves = until - EXIT_SECONDS;
+  const real = leaves - DRAWING_REAL_HOLD - 0.45;
+  const nodes = drawing.nodes;
+  const focusIndex = drawing.focus ? nodes.findIndex((node) => node.id === drawing.focus!.nodeId) : -1;
+  // The click lands 0.3 s after the last part starts, and the capture comes up 0.3 s after the click.
+  const buildRoom = Math.max(0, real - from - (focusIndex >= 0 ? 0.6 : 0.35));
+  const step = Math.min(0.035, buildRoom / Math.max(1, nodes.length));
+  const built = from + nodes.length * step;
+  if (focusIndex < 0 || real - built < 0.6 - 1e-6) return { built, click: null, typing: null, real };
+  const click = built + 0.3;
+  const focus = nodes[focusIndex]!;
+  const typed = drawing.focus!.action === 'type' && drawing.focus!.typed && !focus.text ? [...drawing.focus!.typed].slice(0, 40) : [];
+  const typing =
+    typed.length > 0
+      ? { start: click + 0.15, perGlyph: Math.min(0.045, Math.max(0.02, (real - click - 0.3) / typed.length)), glyphs: typed.length }
+      : null;
+  return { built, click, typing, real };
+}
+
+/** Whether a beat draws its capture back up: it was read into parts, and the beat has the time to build, use and show it. */
+function drawsInterface(packet: ScenePacket): boolean {
+  return packet.drawing !== null && packet.timing.beatDuration >= DRAWING_MIN_SECONDS;
+}
 
 /**
  * An interface drawn back up from its parts, used, and then shown as it is.
@@ -696,14 +743,11 @@ function drawnInterface(
   );
 
   // The capture comes up early enough to be seen: crossfaded in, then held before the beat leaves.
-  const leaves = until - EXIT_SECONDS;
-  const real = leaves - DRAWING_REAL_HOLD - 0.45;
-  const hasFocus = drawing.focus !== null && drawing.nodes.some((node) => node.id === drawing.focus!.nodeId);
+  const hand = drawingHand(drawing, from, until);
+  const { real } = hand;
   // Outermost first, as listed; a parent always arrives before what sits in it — in whatever time is left for it.
   const nodes = drawing.nodes;
-  // The click lands 0.3 s after the last part starts, and the capture comes up 0.3 s after the click.
-  const buildRoom = Math.max(0, real - from - (hasFocus ? 0.6 : 0.35));
-  const step = Math.min(0.035, buildRoom / Math.max(1, nodes.length));
+  const step = (hand.built - from) / Math.max(1, nodes.length);
   const markup = nodes.map((node, index) => {
     const left = node.rect.x * w;
     const top = node.rect.y * h;
@@ -744,18 +788,17 @@ function drawnInterface(
     parts.tweens.push(`tl.fromTo("#${id}-n${index + 1}", { opacity: 0, y: ${num(h * 0.008)} }, { opacity: 1, y: 0, duration: 0.35, ease: ActOne.ease("out_expo") }, ${num(at)});`);
     return `<div id="${id}-n${index + 1}" class="${id}-n">${content}</div>`;
   });
-  const built = from + nodes.length * step;
 
   // The hand: to the control, a click or the words the field holds, typed.
   const focusIndex = drawing.focus ? nodes.findIndex((node) => node.id === drawing.focus!.nodeId) : -1;
   const extras: string[] = [];
-  if (focusIndex >= 0 && real - built >= 0.6 - 1e-6) {
+  if (focusIndex >= 0 && hand.click !== null) {
     const focus = nodes[focusIndex]!;
     const cx = (focus.rect.x + focus.rect.w / 2) * w;
     const cy = (focus.rect.y + focus.rect.h / 2) * h;
     const size = Math.max(14, H * 0.028);
     // The cursor is already flying in while the last parts arrive.
-    const click = built + 0.3;
+    const click = hand.click;
     parts.styles.push(
       `#${id}-cursor { position: absolute; left: ${px(cx)}; top: ${px(cy)}; width: ${px(size)}; height: ${px(size * 1.4)}; opacity: 0; }`,
       `#${id}-ripple { position: absolute; left: ${px(cx - size)}; top: ${px(cy - size)}; width: ${px(size * 2)}; height: ${px(size * 2)}; border-radius: 50%; background: ${hexAlpha(palette.accent, 0.35)}; opacity: 0; }`,
@@ -768,11 +811,11 @@ function drawnInterface(
       `tl.fromTo("#${id}-ring", { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "none" }, ${num(click)});`,
     );
     extras.push(`<div id="${id}-ring"></div>`, `<div id="${id}-ripple"></div>`);
-    if (drawing.focus!.action === 'type' && drawing.focus!.typed && !focus.text) {
-      const typed = [...drawing.focus!.typed].slice(0, 40);
-      const per = Math.min(0.045, Math.max(0.02, (real - click - 0.3) / Math.max(1, typed.length)));
+    if (hand.typing) {
+      const { start: typingStart, perGlyph } = hand.typing;
+      const typed = [...drawing.focus!.typed!].slice(0, hand.typing.glyphs);
       const glyphs = typed.map((char, index) => {
-        parts.tweens.push(`tl.fromTo("#${id}-ty-g${index + 1}", { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, ${num(click + 0.15 + index * per)});`);
+        parts.tweens.push(`tl.fromTo("#${id}-ty-g${index + 1}", { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, ${num(typingStart + index * perGlyph)});`);
         return `<span id="${id}-ty-g${index + 1}" class="ao-g">${escapeHtml(char)}</span>`;
       });
       const size = Math.max(6, Math.min(focus.rect.h * h * 0.5, H * 0.03));
@@ -1162,8 +1205,10 @@ export type LaunchSoundCue = {
   sceneId: string;
   /** Seconds from the start of the film. */
   time: number;
-  type: 'whoosh' | 'impact' | 'ui_click' | 'logo_sting';
+  type: 'whoosh' | 'impact' | 'ui_click' | 'typing' | 'logo_sting';
   intensity: number;
+  /** How long the sound runs, for a sound that lasts as long as what it accompanies: the keystrokes of a typed field. */
+  durationSeconds?: number;
 };
 
 /**
@@ -1210,12 +1255,22 @@ export function launchSoundCues(
         cue(entrance + 0.12, 'impact', 0.35);
         break;
       case 'list':
-        items.forEach((_, index) => cue(entrance + index * 0.16, 'ui_click', 0.5));
+        // Chips landing are not a hand at work: one soft air for the column, never a click per chip.
+        if (items.length > 0) cue(entrance, 'whoosh', 0.25);
         break;
-      case 'product':
+      case 'product': {
         cue(entrance, 'whoosh', 0.3);
-        if (items.length >= 2 && packet.canvas.height <= packet.canvas.width) items.forEach((_, index) => cue(entrance + 0.12 + index * 0.14, 'ui_click', 0.45));
+        // A click where the cursor clicks, keystrokes while the field is typed into — and only there.
+        if (!drawsInterface(packet)) break;
+        const hand = drawingHand(packet.drawing!, entrance + DRAWING_AFTER_ENTRANCE, packet.timing.beatDuration);
+        if (hand.click !== null) cue(hand.click, 'ui_click', 0.5);
+        if (hand.typing) {
+          const seconds = hand.typing.glyphs * hand.typing.perGlyph;
+          const time = beatStart + hand.typing.start;
+          cues.push({ sceneId: packet.sceneId, time: Math.round(time * 1000) / 1000, type: 'typing', intensity: 0.45, durationSeconds: Math.round(seconds * 1000) / 1000 });
+        }
         break;
+      }
       case 'metric':
         cue(entrance, 'impact', 0.4);
         break;

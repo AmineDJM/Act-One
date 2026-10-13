@@ -377,6 +377,8 @@ export const SoundCueType = z.enum([
   'riser',
   'sub_drop',
   'ui_click',
+  /** Keystrokes, for as long as a field on screen is typed into; never under type that only animates. */
+  'typing',
   'whoosh',
   'texture',
   'silence',

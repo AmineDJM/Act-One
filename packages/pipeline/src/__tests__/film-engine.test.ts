@@ -141,6 +141,15 @@ describe('the sounds a film’s motion asks for', () => {
     expect(board.scenes[0]!.soundCues).toEqual([]);
     expect(withMotionCues(board, [])).toBe(board);
   });
+
+  it('still reach a narrated beat, whose only cue is the music ducking under its voice, and keep how long a sound lasts', () => {
+    const narrated = { ...board, scenes: [scene(0, [{ time: 0, type: 'music_duck', intensity: 0.4, durationSeconds: 2 }]), board.scenes[1]!] };
+    const sounded = withMotionCues(narrated, [{ sceneId: 'scn_0', time: 1.1, type: 'typing', intensity: 0.45, durationSeconds: 0.35 }]);
+    expect(sounded.scenes[0]!.soundCues.map((cue) => [cue.type, cue.durationSeconds])).toEqual([
+      ['music_duck', 2],
+      ['typing', 0.35],
+    ]);
+  });
 });
 
 describe('how many browsers capture a HyperFrames film', () => {

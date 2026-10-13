@@ -306,7 +306,8 @@ function placeCue(
     sfxKind: kind,
     storageKey: sample.storageKey,
     gainDb: gainFor(cue.type, cue.intensity),
-    durationSeconds: sample.durationSeconds,
+    // A sound that accompanies something for as long as it lasts stops when it does: keystrokes end with the typing.
+    durationSeconds: cue.durationSeconds ? Math.min(cue.durationSeconds, sample.durationSeconds) : sample.durationSeconds,
   };
 }
 
@@ -327,6 +328,8 @@ function sfxKindFor(
       return scene.duration > 2 ? 'whoosh_long' : 'whoosh_short';
     case 'ui_click':
       return behaviour.uiSoundDensity === 'none' ? null : 'ui_click';
+    case 'typing':
+      return behaviour.uiSoundDensity === 'none' ? null : 'ui_typing';
     case 'texture':
       return 'texture_air';
     case 'logo_sting':
@@ -346,6 +349,7 @@ function gainFor(type: SoundCueType, intensity: number): number {
     riser: [-22, -10],
     whoosh: [-26, -14],
     ui_click: [-30, -20],
+    typing: [-32, -22],
     texture: [-34, -24],
     logo_sting: [-14, -5],
   };

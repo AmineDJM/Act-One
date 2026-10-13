@@ -261,15 +261,12 @@ describe('the sound a launch film’s motion asks for', () => {
   const starts = new Map([['scene-01', 0], ['scene-02', 2], ['scene-03', 5], ['scene-04', 6.5]]);
   const cues = launchSoundCues(packets, plan, starts);
 
-  it('lands on the first light, the day opening, each chip, the chapter and the mark', () => {
+  it('lands on the first light, the day opening, the chapter and the mark — and never clicks for a chip nobody clicked', () => {
     expect(cues.map((cue) => `${cue.sceneId} ${cue.time} ${cue.type}`)).toEqual([
       'scn_0 0.06 whoosh',
       'scn_1 1.85 whoosh',
       'scn_1 2.3 impact',
       'scn_1 2.04 whoosh',
-      'scn_1 2.16 ui_click',
-      'scn_1 2.3 ui_click',
-      'scn_1 2.44 ui_click',
       'scn_2 5.16 impact',
       'scn_3 6.35 whoosh',
       'scn_3 6.55 logo_sting',
@@ -561,6 +558,36 @@ describe('a capture drawn back up in the launch look', () => {
     const html = launchScene(withPicture, design(), DAY);
     expect(html).toMatch(/#scene-01-n6 \{[^}]*background: url\(assets\/ast_img\.png\) -[\d.]+px -[\d.]+px \/ [\d.]+px [\d.]+px no-repeat/);
     expect(errorsOf(html, withPicture)).toEqual([]);
+  });
+
+  it('is heard where the hand acts: one click on the click, keystrokes exactly while the field is typed into', () => {
+    const target = drawn(3);
+    const html = launchScene(target, design(), DAY);
+    const filmStart = 10;
+    const cues = launchSoundCues([target], planLaunch([target]), new Map([[target.frameId, filmStart]]));
+    const toFilm = (composition: number) => Math.round((filmStart + composition - target.timing.beatStart) * 1000) / 1000;
+
+    const clickAt = Number(/tl\.fromTo\("#scene-01-ripple", [^)]*\}, ([\d.]+)\);/.exec(html)?.[1]);
+    const glyphAt = [...html.matchAll(/tl\.fromTo\("#scene-01-ty-g\d+", [^)]*\}, ([\d.]+)\);/g)].map((match) => Number(match[1]));
+    expect(glyphAt).toHaveLength('March'.length);
+    const clicks = cues.filter((cue) => cue.type === 'ui_click');
+    const typing = cues.filter((cue) => cue.type === 'typing');
+    expect(clicks.map((cue) => cue.time)).toEqual([toFilm(clickAt)]);
+    expect(typing).toHaveLength(1);
+    expect(typing[0]!.time).toBeCloseTo(toFilm(glyphAt[0]!), 3);
+    // The keystrokes stop with the last glyph: one glyph's time after it lands.
+    const perGlyph = glyphAt[1]! - glyphAt[0]!;
+    expect(typing[0]!.time + typing[0]!.durationSeconds!).toBeCloseTo(toFilm(glyphAt.at(-1)!) + perGlyph, 3);
+  });
+
+  it('is never heard typing when the hand only clicks, or when the beat is too short to draw the interface', () => {
+    const clicking = { ...drawn(3), drawing: { ...drawing, focus: { nodeId: 'search', action: 'click' as const, typed: null } } };
+    const clickCues = launchSoundCues([clicking], planLaunch([clicking]), new Map([[clicking.frameId, 0]]));
+    expect(clickCues.filter((cue) => cue.type === 'ui_click')).toHaveLength(1);
+    expect(clickCues.some((cue) => cue.type === 'typing')).toBe(false);
+    const short = drawn(2.4);
+    const shortCues = launchSoundCues([short], planLaunch([short]), new Map([[short.frameId, 0]]));
+    expect(shortCues.some((cue) => cue.type === 'typing' || cue.type === 'ui_click')).toBe(false);
   });
 
   it('is shown as captured when its beat is too short to draw it first', () => {

@@ -59,7 +59,7 @@ export type MusicTrack = z.infer<typeof MusicTrack>;
 
 export const SfxKind = z.enum([
   'impact_soft', 'impact_hard', 'sub_drop', 'riser_short', 'riser_long',
-  'whoosh_short', 'whoosh_long', 'ui_click', 'ui_confirm', 'texture_air',
+  'whoosh_short', 'whoosh_long', 'ui_click', 'ui_typing', 'ui_confirm', 'texture_air',
   'logo_sting_warm', 'logo_sting_clean',
 ]);
 export type SfxKind = z.infer<typeof SfxKind>;
@@ -150,6 +150,7 @@ export const DEFAULT_LIBRARY: SoundLibrary = {
     { id: 'sfx_whoosh_short', kind: 'whoosh_short', durationSeconds: 0.6, storageKey: 'library/sfx/whoosh-short.wav', lufs: -20, preRoll: 0.12 },
     { id: 'sfx_whoosh_long', kind: 'whoosh_long', durationSeconds: 1.4, storageKey: 'library/sfx/whoosh-long.wav', lufs: -20, preRoll: 0.2 },
     { id: 'sfx_ui_click', kind: 'ui_click', durationSeconds: 0.18, storageKey: 'library/sfx/ui-click.wav', lufs: -22, preRoll: 0 },
+    { id: 'sfx_ui_typing', kind: 'ui_typing', durationSeconds: 2, storageKey: 'library/sfx/ui-typing.wav', lufs: -24, preRoll: 0 },
     { id: 'sfx_ui_confirm', kind: 'ui_confirm', durationSeconds: 0.4, storageKey: 'library/sfx/ui-confirm.wav', lufs: -20, preRoll: 0 },
     { id: 'sfx_texture_air', kind: 'texture_air', durationSeconds: 4, storageKey: 'library/sfx/texture-air.wav', lufs: -24, preRoll: 0 },
     { id: 'sfx_logo_warm', kind: 'logo_sting_warm', durationSeconds: 2.2, storageKey: 'library/sfx/logo-warm.wav', lufs: -14, preRoll: 0.05 },

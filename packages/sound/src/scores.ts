@@ -540,6 +540,31 @@ const SFX_BUILDERS: Record<SfxKind, SfxBuilder> = {
     }
   },
 
+  ui_typing: (out, total, random) => {
+    // Light keystrokes on a laptop keyboard: a soft plastic tick and a little body under it, never a rhythm.
+    const tickL = stateVariable(2.2);
+    const tickR = stateVariable(2.2);
+    let onset = Math.round(0.01 * SAMPLE_RATE);
+    let next = onset;
+    let pitch = 2400;
+    let weight = 1;
+    for (let i = 0; i < total; i += 1) {
+      if (i === next) {
+        onset = i;
+        next = i + Math.round((0.07 + random() * 0.06) * SAMPLE_RATE);
+        pitch = 1900 + random() * 1300;
+        weight = 0.65 + random() * 0.35;
+      }
+      const t = (i - onset) / SAMPLE_RATE;
+      const tick = Math.exp(-t / 0.006) * weight;
+      const body = Math.exp(-t / 0.018) * weight;
+      const excitation = noise(random) * tick;
+      const thump = sine(t * 170) * body * 0.35;
+      out.left[i] = tickL.bp(excitation, pitch) * 0.9 + thump;
+      out.right[i] = tickR.bp(excitation, pitch * 1.03) * 0.9 + thump;
+    }
+  },
+
   ui_confirm: (out, total, _random, seconds) => {
     // Two notes a fifth apart, the second landing just after the first.
     const first = decay(seconds * 0.5);
