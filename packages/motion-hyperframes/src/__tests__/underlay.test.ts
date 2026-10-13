@@ -85,3 +85,33 @@ describe('the easing the plates change on', () => {
     expect(power2InOut(1.2)).toBe(1);
   });
 });
+
+describe('a frame of the iris', () => {
+  it('is, pixel for pixel, the incoming act inside a soft-edged circle over the outgoing one', async () => {
+    const { plateRuns, power2InOut } = await import('../media.ts');
+    const work = await mkdtemp(path.join(tmpdir(), 'act-one-iris-'));
+    const w = 64;
+    const h = 36;
+    const noise = (seed: number) => Buffer.from(Array.from({ length: w * h * 3 }, (_, i) => (i * 37 + seed * 101) % 251));
+    const a = noise(1);
+    const b = noise(2);
+    await sharp(a, { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(work, 'a.png'));
+    await sharp(b, { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(work, 'b.png'));
+    const runs = await plateRuns({ stills: [path.join(work, 'a.png'), path.join(work, 'b.png')], first: 0, changes: [{ to: 1, at: 0.1, seconds: 1, transition: 'iris' }] }, { width: w, height: h }, 10, 20, path.join(work, 'runs'));
+    expect(runs.map((run) => [run.kind, run.frames])).toEqual([['still', 2], ['sequence', 9], ['still', 9]]);
+    // Frame 6 is t = 0.6 s, half a second into the change.
+    const { data } = await sharp(path.join(work, 'runs', 'change-0-00006.png')).raw().toBuffer({ resolveWithObject: true });
+    const radius = power2InOut(0.5) * (0.75 * Math.hypot(w, h)) / Math.SQRT2;
+    let differ = 0;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const cover = Math.min(1, Math.max(0, (radius - Math.hypot(x + 0.5 - w / 2, y + 0.5 - h / 2)) / 1.5 + 0.5));
+        for (let c = 0; c < 3; c += 1) {
+          const at = (y * w + x) * 3 + c;
+          if (data[at] !== Math.round(a[at]! + (b[at]! - a[at]!) * cover)) differ += 1;
+        }
+      }
+    }
+    expect(differ).toBe(0);
+  });
+});

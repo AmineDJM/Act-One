@@ -267,12 +267,29 @@ export async function plateRuns(underlay: Underlay, size: { width: number; heigh
     if (state.transition === 'fade') {
       for (let i = 0; i < out.length; i += 1) out[i] = Math.round(a[i]! + (b[i]! - a[i]!) * eased);
     } else {
+      // Only the circle's soft edge is mixed; inside it is the incoming act, outside the outgoing, copied a row run at a time.
       const radius = eased * reference;
       for (let y = 0; y < H; y += 1) {
         const dy = y + 0.5 - H / 2;
-        for (let x = 0; x < W; x += 1) {
+        const row = y * W * 3;
+        const halfChord = (r: number) => (r > Math.abs(dy) ? Math.sqrt(r * r - dy * dy) : -1);
+        const outer = halfChord(radius + 0.75);
+        if (outer < 0) {
+          a.copy(out, row, row, row + W * 3);
+          continue;
+        }
+        const x0 = Math.max(0, Math.floor(W / 2 - outer - 1));
+        const x1 = Math.min(W, Math.ceil(W / 2 + outer + 1));
+        a.copy(out, row, row, row + x0 * 3);
+        a.copy(out, row + x1 * 3, row + x1 * 3, row + W * 3);
+        const inner = halfChord(radius - 0.75);
+        const i0 = inner < 0 ? x1 : Math.max(x0, Math.ceil(W / 2 - inner + 1));
+        const i1 = inner < 0 ? x1 : Math.min(x1, Math.floor(W / 2 + inner - 1));
+        if (i1 > i0) b.copy(out, row + i0 * 3, row + i0 * 3, row + i1 * 3);
+        for (let x = x0; x < x1; x += 1) {
+          if (x >= i0 && x < i1) continue;
           const cover = Math.min(1, Math.max(0, (radius - Math.hypot(x + 0.5 - W / 2, dy)) / 1.5 + 0.5));
-          const at = (y * W + x) * 3;
+          const at = row + x * 3;
           for (let c = 0; c < 3; c += 1) out[at + c] = Math.round(a[at + c]! + (b[at + c]! - a[at + c]!) * cover);
         }
       }
