@@ -6,7 +6,7 @@ import { ASPECT_DIMENSIONS, DEFAULT_FPS, sceneWindows, storyboardDuration, type 
 import { readMark, resolveTokens, showsAMark, watermark } from '@act-one/design';
 import type { RenderFilmOptions, RenderFilmResult } from '@act-one/motion';
 import type { CallContext, LlmProvider, LlmTier } from '@act-one/providers';
-import { writeProject } from './assemble.ts';
+import { writeBackdropOverlay, writePlatesProject, writeProject } from './assemble.ts';
 import { safeStem, stageAssets, type AssetFailure, type AssetLimits, type AssetRequest, type StagedAsset } from './assets.ts';
 import {
   authorScene,
@@ -23,8 +23,8 @@ import { authoringCanvas, outputPlan } from './canvas.ts';
 import { captionsComposition } from './captions.ts';
 import { blocking, CheckOutputError, parseCheckOutput, type CheckReport, type EngineFinding } from './checks.ts';
 import { bundleFonts } from './fonts.ts';
-import { launchBackdrop, launchSoundCues, planLaunch, signatureBeats, type LaunchSoundCue } from './launch.ts';
-import { assumedColourMatrix, deliver, deliveryProblems, encodeFrames, MediaError, normaliseClip, probeMedia } from './media.ts';
+import { launchBackdrop, launchSoundCues, planLaunch, signatureBeats, type Backdrop, type BackdropPlate, type LaunchSoundCue } from './launch.ts';
+import { assumedColourMatrix, deliver, deliveryProblems, encodeFrames, MediaError, normaliseClip, probeMedia, type Underlay } from './media.ts';
 import { buildPackets, referencedAssetIds } from './packets.ts';
 import { MemorySceneStore } from './scene-store.ts';
 import { studioCss } from './studio.ts';
@@ -266,8 +266,9 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
     const scenes = new Map(authored.map((scene) => [scene.packet.frameId, scene]));
 
     // 4. Assembled and checked by HyperFrames, scene rewrites until it passes.
+    let written: { backdrop: Backdrop | null; durationSeconds: number } = { backdrop: null, durationSeconds: 0 };
     const assemble = async () => {
-      await writeProject({
+      written = await writeProject({
         projectDir,
         canvas,
         fps,
@@ -330,7 +331,31 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
       return { ...common, outputPath: options.outputPath, durationSeconds: 0, width: plan.width, height: plan.height, undecodable: [] };
     }
 
-    // 5b. The film: every frame as a lossless PNG, then one encode (see encodeFrames).
+    /*
+     * 5b. The launch look's field, out of the frames.
+     *
+     * Every frame is captured as a lossless PNG, and the renderer's PNG
+     * encoder spends ten times as long on a screen of gradient as on a
+     * transparent one: with the field in them, a launch film's frames took
+     * twice a classic film's. So each act of the field is drawn once, as a
+     * still, by the same renderer; the frames are captured with only the line
+     * of light in the field's place; and the encode lays them over the stills,
+     * changing act as the page would have. A plate that cannot be drawn
+     * leaves the field in the frames: slower, the same film.
+     */
+    let underlay: Underlay | undefined;
+    if (look.name === 'launch' && written.backdrop) {
+      try {
+        underlay = await timed('plates', () => drawPlates(tools, workDir, written.backdrop!.plate, canvas, signal));
+        await writeBackdropOverlay(projectDir, written.backdrop, canvas, written.durationSeconds);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        underlay = undefined;
+        log(`the field stays in the frames: its plates could not be drawn (${(error as Error).message.slice(0, 200)})`);
+      }
+    }
+
+    // 5c. The film: every frame as a lossless PNG, then one encode (see encodeFrames).
     const framesDir = path.join(workDir, 'frames');
     const rawPath = path.join(workDir, 'render.mp4');
     const renderArgs = [
@@ -365,7 +390,7 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
 
     // The Remotion engine's rate factor: visually lossless for interface captures, which band long before photographs do.
     const encoded = await timed('encode', () =>
-      encodeFrames(framesDir, rawPath, { fps, frames: filmFrames, width: plan.width, height: plan.height, crf }, signal).catch((error: unknown) => {
+      encodeFrames(framesDir, rawPath, { fps, frames: filmFrames, width: plan.width, height: plan.height, crf, ...(underlay ? { underlay } : {}) }, signal).catch((error: unknown) => {
         if (error instanceof MediaError) throw new HyperFramesRenderError('render_failed', 'The rendered frames could not be encoded.', [error.message]);
         throw error;
       }),
@@ -736,6 +761,33 @@ function summarise(reports: readonly SceneReport[]): string {
  * rounded to a frame — and scaled only when the size asked for is not the
  * size the scenes were written at.
  */
+/** Each act of the field as a still, drawn by HyperFrames from a project of its own, in act order. */
+async function drawPlates(
+  tools: HyperFramesTools,
+  workDir: string,
+  plate: BackdropPlate,
+  canvas: { width: number; height: number },
+  signal: AbortSignal | undefined,
+): Promise<Underlay> {
+  const dir = path.join(workDir, 'plates');
+  const out = path.join(workDir, 'plate-stills');
+  const { times } = await writePlatesProject(dir, plate, canvas);
+  const run = await runCli(
+    tools,
+    ['snapshot', '--at', times.join(','), '--no-end', '--output', out, '--describe', 'false', '--no-browser-gpu', '--timeout', '20000', dir],
+    { cwd: dir, timeoutMs: STILL_TIMEOUT_MS, ...(signal ? { signal } : {}) },
+  );
+  const stills = (await readdir(out).catch(() => [] as string[]))
+    .map((name) => ({ name, index: /^frame-(\d+)-at-/.exec(name)?.[1] }))
+    .filter((entry): entry is { name: string; index: string } => entry.index !== undefined && entry.name.endsWith('.png'))
+    .sort((a, b) => Number(a.index) - Number(b.index))
+    .map((entry) => path.join(out, entry.name));
+  if (run.exitCode !== 0 || stills.length !== plate.acts.length) {
+    throw new Error(`hyperframes snapshot drew ${stills.length} of ${plate.acts.length} plates (exit ${run.exitCode ?? run.signal})`);
+  }
+  return { stills, first: plate.first, changes: plate.changes };
+}
+
 async function renderStill(
   tools: HyperFramesTools,
   projectDir: string,

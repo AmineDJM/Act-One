@@ -1221,7 +1221,30 @@ export function launchSoundCues(
  */
 
 /** The backdrop's styles, its layers, and the statements that move them on the film's clock. */
-export type Backdrop = { css: string; markup: string; statements: string[] };
+export type Backdrop = {
+  css: string;
+  markup: string;
+  statements: string[];
+  /**
+   * The same field as plates: each act a page of its own, drawn once as a
+   * still, and the changes between them. A film is encoded with the plates
+   * laid under its frames rather than with the field in every frame — the
+   * renderer compresses each frame losslessly, and a screen of gradient costs
+   * it ten times what a transparent one does. Only the line of light, which
+   * is small and moves, stays in the frames (`overlay`).
+   */
+  plate: BackdropPlate;
+  overlay: { css: string; markup: string; statements: string[] };
+};
+
+/** The acts of a film, in the order they appear: the act each segment shows, and how the next one arrives. */
+export type BackdropPlate = {
+  acts: { act: LaunchAct; css: string; markup: string }[];
+  /** Index into `acts` of the act the film opens on. */
+  first: number;
+  /** Film time, seconds. `seconds` is how long the change takes; `iris` opens from the centre, `fade` dissolves. */
+  changes: { to: number; at: number; seconds: number; transition: 'iris' | 'fade' }[];
+};
 
 /**
  * One field under the whole film, in its acts.
@@ -1271,6 +1294,8 @@ export function launchBackdrop(
   }
 
   const statements: string[] = [];
+  const lineStatements: string[] = [];
+  const plateChanges: BackdropPlate['changes'] = [];
   changes.slice(1).forEach((change, index) => {
     const previous = changes[index]!;
     const at = Math.max(0, change.at - 0.15);
@@ -1279,13 +1304,19 @@ export function launchBackdrop(
       // Above the one it replaces: it opens out over it.
       if (change.act === 'day' && previous.act === 'night') {
         const lineAt = Math.max(0, at - 0.35);
-        statements.push(
+        const line = [
           `tl.fromTo("#ao-bd-line", { opacity: 0, scaleX: 0 }, { opacity: 1, scaleX: 1, duration: 0.35, ease: ${EASE_OUT} }, ${num(lineAt)});`,
           `tl.fromTo("#ao-bd-line", { opacity: 1, scaleY: 1 }, { opacity: 0, scaleY: 6, duration: 0.45, ease: ActOne.ease("in_cubic"), immediateRender: false }, ${num(at + 0.1)});`,
+        ];
+        statements.push(
+          ...line,
           `tl.fromTo("${incoming}", { opacity: 1, clipPath: "circle(0% at 50% 50%)" }, { opacity: 1, clipPath: "circle(75% at 50% 50%)", duration: 0.75, ease: ${SWING}, immediateRender: false }, ${num(at)});`,
         );
+        lineStatements.push(...line);
+        plateChanges.push({ to: acts.indexOf(change.act), at, seconds: 0.75, transition: 'iris' });
       } else {
         statements.push(`tl.fromTo("${incoming}", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: ${SWING}, immediateRender: false }, ${num(at)});`);
+        plateChanges.push({ to: acts.indexOf(change.act), at, seconds: 0.6, transition: 'fade' });
       }
     } else {
       // Below it: the one on top clears to show it.
@@ -1293,6 +1324,8 @@ export function launchBackdrop(
         `tl.fromTo("${incoming}", { opacity: 0 }, { opacity: 1, duration: 0.001, ease: "none", immediateRender: false }, ${num(at)});`,
         `tl.fromTo("#ao-bd-${previous.act}", { opacity: 1 }, { opacity: 0, duration: 0.6, ease: ${SWING}, immediateRender: false }, ${num(at)});`,
       );
+      // The one on top clearing to show the one below is, seen from the front, the same dissolve.
+      plateChanges.push({ to: acts.indexOf(change.act), at, seconds: 0.6, transition: 'fade' });
     }
   });
   /*
@@ -1302,7 +1335,20 @@ export function launchBackdrop(
    * time. Still, each act is painted once and composited under the scenes.
    */
   const layers = acts.map((act) => `<div id="ao-bd-${act}" class="ao-bd"><div id="ao-bd-${act}-g1" class="ao-bd-glow"></div><div id="ao-bd-${act}-g2" class="ao-bd-glow"></div></div>`);
-  return { css: css.join('\n'), markup: `${layers.join('')}<div id="ao-bd-line"></div>`, statements };
+  const lineCss = css[3]!;
+  // Each act alone and fully shown: the same rules, the act's layer at full opacity.
+  const plateActs = acts.map((act, index) => ({
+    act,
+    css: [css[0]!, css[2]!, ...css.slice(4), `#ao-bd-${act} { opacity: 1; }`].join('\n'),
+    markup: layers[index]!,
+  }));
+  return {
+    css: css.join('\n'),
+    markup: `${layers.join('')}<div id="ao-bd-line"></div>`,
+    statements,
+    plate: { acts: plateActs, first: acts.indexOf(first), changes: plateChanges },
+    overlay: { css: lineCss, markup: '<div id="ao-bd-line"></div>', statements: lineStatements },
+  };
 }
 
 /*

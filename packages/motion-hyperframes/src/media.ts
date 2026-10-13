@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { copyFile, open, readdir, rename, rm } from 'node:fs/promises';
+import { copyFile, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 import { runFfmpeg } from '@act-one/sound';
 
 /**
@@ -185,20 +186,125 @@ export type FrameEncodeSpec = {
   height: number;
   /** x264 quality, the same the Remotion engine renders with. */
   crf: number;
+  /**
+   * Stills laid under every frame, changing at set times: the launch look's
+   * backdrop, when its frames were captured without it. The frames are then
+   * composited over it, alpha over the plate, before the one encode.
+   */
+  underlay?: Underlay;
 };
 
+export type Underlay = {
+  /** One still per act, drawn at the authoring canvas. */
+  stills: string[];
+  /** Index into `stills` of the one the film opens on. */
+  first: number;
+  /** Film time, seconds; each change eases in and out over `seconds`, as power2.inOut does. */
+  changes: { to: number; at: number; seconds: number; transition: 'iris' | 'fade' }[];
+};
+
+/** GSAP's power2.inOut — a cubic, GSAP counting its powers from linear — the easing the page's backdrop changes run on. */
+export function power2InOut(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return x < 0.5 ? 4 * x * x * x : 1 - (2 - 2 * x) ** 3 / 2;
+}
+
+/** A stretch of the backdrop: one still held for some frames, or frames of a change written out. */
+export type PlateRun = { kind: 'still'; file: string; frames: number } | { kind: 'sequence'; pattern: string; start: number; frames: number };
+
 /**
- * The film, encoded from its frames the way the Remotion engine encodes its own.
+ * The backdrop as runs of frames, at the frames' size.
  *
- * The renderer writes every frame as a lossless PNG, and this passes FFmpeg the
- * arguments the Remotion engine's renderer passes it: x264 at the same rate
- * factor, 4:2:0, and zscale turning the RGB into limited-range BT.709. The two
- * engines' pictures take one road from the browser to the file, and the colours
- * are the colours the file says they are. The CLI's own MP4 path pipes JPEG
- * frames, whose YCbCr is BT.601, changes only their range and labels them
- * BT.709, so every colour came out shifted: the brand green #39d98a as
- * (41, 194, 134).
+ * Frame n shows what the page would at n / fps: the act on screen, or a
+ * change part-way through — progress (t − at) / seconds, eased — drawn here
+ * from the two stills: a dissolve, or the incoming act inside a circle from
+ * the centre whose radius is that share of 75% of the CSS reference length
+ * (√(w² + h²) / √2), with a pixel and a half of soft edge. Only the frames
+ * of a change are written; a held act is one still the encoder repeats.
  */
+export async function plateRuns(underlay: Underlay, size: { width: number; height: number }, fps: number, frames: number, dir: string): Promise<PlateRun[]> {
+  await mkdir(dir, { recursive: true });
+  const { width: W, height: H } = size;
+  const stills = await Promise.all(
+    underlay.stills.map(async (file, index) => {
+      const sized = path.join(dir, `act-${index}.png`);
+      const { data } = await sharp(file).resize({ width: W, height: H, fit: 'fill', kernel: 'lanczos3' }).removeAlpha().toColourspace('srgb').raw().toBuffer({ resolveWithObject: true });
+      await sharp(data, { raw: { width: W, height: H, channels: 3 } }).png({ compressionLevel: 1 }).toFile(sized);
+      return { file: sized, pixels: data };
+    }),
+  );
+  const changes = [...underlay.changes].sort((a, b) => a.at - b.at);
+  type State = { act: number } | { from: number; to: number; progress: number; transition: Underlay['changes'][number]['transition']; change: number };
+  const stateAt = (t: number): State => {
+    let act = underlay.first;
+    for (const [index, change] of changes.entries()) {
+      if (t >= change.at + change.seconds) act = change.to;
+      else if (t > change.at) return { from: act, to: change.to, progress: (t - change.at) / change.seconds, transition: change.transition, change: index };
+      else break;
+    }
+    return { act };
+  };
+
+  const runs: PlateRun[] = [];
+  const reference = (0.75 * Math.hypot(W, H)) / Math.SQRT2;
+  for (let n = 0; n < frames; n += 1) {
+    const state = stateAt(n / fps);
+    if ('act' in state) {
+      const last = runs[runs.length - 1];
+      if (last?.kind === 'still' && last.file === stills[state.act]!.file) last.frames += 1;
+      else runs.push({ kind: 'still', file: stills[state.act]!.file, frames: 1 });
+      continue;
+    }
+    const pattern = path.join(dir, `change-${state.change}-%05d.png`);
+    const last = runs[runs.length - 1];
+    const run = last?.kind === 'sequence' && last.pattern === pattern ? last : { kind: 'sequence' as const, pattern, start: n, frames: 0 };
+    if (run !== last) runs.push(run);
+    run.frames += 1;
+    const a = stills[state.from]!.pixels;
+    const b = stills[state.to]!.pixels;
+    const eased = power2InOut(state.progress);
+    const out = Buffer.allocUnsafe(W * H * 3);
+    if (state.transition === 'fade') {
+      for (let i = 0; i < out.length; i += 1) out[i] = Math.round(a[i]! + (b[i]! - a[i]!) * eased);
+    } else {
+      const radius = eased * reference;
+      for (let y = 0; y < H; y += 1) {
+        const dy = y + 0.5 - H / 2;
+        for (let x = 0; x < W; x += 1) {
+          const cover = Math.min(1, Math.max(0, (radius - Math.hypot(x + 0.5 - W / 2, dy)) / 1.5 + 0.5));
+          const at = (y * W + x) * 3;
+          for (let c = 0; c < 3; c += 1) out[at + c] = Math.round(a[at + c]! + (b[at + c]! - a[at + c]!) * cover);
+        }
+      }
+    }
+    await sharp(out, { raw: { width: W, height: H, channels: 3 } }).png({ compressionLevel: 1 }).toFile(pattern.replace('%05d', String(n).padStart(5, '0')));
+  }
+  return runs;
+}
+
+/**
+ * The filter graph that lays the frames over the backdrop: each run an input —
+ * a still decoded once and repeated, or a change's frames — joined end to end,
+ * then the frames over it with their alpha, in planar RGB. Labelled [composited].
+ */
+export function underlayGraph(runs: readonly PlateRun[], fps: number, framesInput: number): { inputs: string[]; graph: string } {
+  const inputs: string[] = [];
+  const parts: string[] = [];
+  runs.forEach((run, index) => {
+    if (run.kind === 'still') {
+      inputs.push('-i', run.file);
+      parts.push(`[${index}:v]format=gbrp,loop=loop=${run.frames - 1}:size=1:start=0,setpts=N/(${fps}*TB)[r${index}]`);
+    } else {
+      inputs.push('-framerate', String(fps), '-start_number', String(run.start), '-i', run.pattern);
+      parts.push(`[${index}:v]format=gbrp,setpts=N/(${fps}*TB)[r${index}]`);
+    }
+  });
+  parts.push(`${runs.map((_, index) => `[r${index}]`).join('')}concat=n=${runs.length}:v=1:a=0,fps=${fps}[plate]`);
+  parts.push(`[${framesInput}:v]format=rgba[frames]`);
+  parts.push(`[plate][frames]overlay=format=rgb:shortest=1:eof_action=pass[composited]`);
+  return { inputs, graph: parts.join(';') };
+}
+
 export async function encodeFrames(framesDir: string, outputPath: string, spec: FrameEncodeSpec, signal?: AbortSignal): Promise<{ scaledFrom: { width: number; height: number } | null }> {
   const numbered = (await readdir(framesDir))
     .map((name) => ({ name, match: FRAME_FILE.exec(name) }))
@@ -220,19 +326,22 @@ export async function encodeFrames(framesDir: string, outputPath: string, spec: 
     ...(scaled ? [`scale=${spec.width}:${spec.height}:flags=lanczos`] : []),
     'zscale=matrix=709:matrixin=709:range=limited',
   ];
+  const framesInput = ['-framerate', String(spec.fps), '-start_number', String(first.index), '-i', path.join(framesDir, `frame_%0${first.digits}d.png`)];
+  const runs = spec.underlay ? await plateRuns(spec.underlay, drawn, spec.fps, spec.frames, path.join(path.dirname(framesDir), 'plate-runs')) : null;
+  const under = runs ? underlayGraph(runs, spec.fps, runs.length) : null;
+  const picture = under
+    ? [...under.inputs, ...framesInput, '-filter_complex', `${under.graph};[composited]${filters.join(',')}[out]`, '-map', '[out]']
+    : [...framesInput, '-vf', filters.join(',')];
   await ffmpegOrThrow(
     [
       '-y', '-v', 'error',
-      '-framerate', String(spec.fps),
-      '-start_number', String(first.index),
-      '-i', path.join(framesDir, `frame_%0${first.digits}d.png`),
+      ...picture,
       '-an',
       '-c:v', 'libx264',
       '-colorspace:v', 'bt709',
       '-color_primaries:v', 'bt709',
       '-color_trc:v', 'bt709',
       '-color_range', 'tv',
-      '-vf', filters.join(','),
       '-pix_fmt', 'yuv420p',
       '-video_track_timescale', '90000',
       '-crf', String(spec.crf),

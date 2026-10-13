@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { CAPTIONS_COMPOSITION_ID } from './captions.ts';
 import { joinStatements, type HostTiming } from './joins.ts';
-import type { Backdrop } from './launch.ts';
+import type { Backdrop, BackdropPlate } from './launch.ts';
 import { motionRuntimeSource } from './motion-runtime.ts';
 import type { ScenePacket } from './types.ts';
 
@@ -67,7 +67,7 @@ export type ProjectInput = {
 
 const require = createRequire(import.meta.url);
 
-export async function writeProject(input: ProjectInput): Promise<{ indexPath: string }> {
+export async function writeProject(input: ProjectInput): Promise<{ indexPath: string; backdrop: Backdrop | null; durationSeconds: number }> {
   const { projectDir } = input;
   await mkdir(path.join(projectDir, 'compositions'), { recursive: true });
   await mkdir(path.join(projectDir, 'vendor'), { recursive: true });
@@ -110,7 +110,67 @@ export async function writeProject(input: ProjectInput): Promise<{ indexPath: st
     JSON.stringify({ media: { autoProxy: false } }, null, 2),
     'utf8',
   );
-  return { indexPath };
+  return { indexPath, backdrop, durationSeconds: duration };
+}
+
+/**
+ * The film's backdrop composition with only what moves over the plates: the
+ * line of light. Written over the full one just before the film's frames are
+ * captured, once the checks and any still have seen the whole field.
+ */
+export async function writeBackdropOverlay(projectDir: string, backdrop: Backdrop, canvas: { width: number; height: number }, durationSeconds: number): Promise<void> {
+  await writeFile(
+    path.join(projectDir, 'compositions', `${BACKDROP_COMPOSITION_ID}.html`),
+    withPreamble(backdropComposition({ ...backdrop.overlay, plate: backdrop.plate, overlay: backdrop.overlay }, canvas, durationSeconds), ''),
+    'utf8',
+  );
+}
+
+/** The composition id of the plates project. */
+export const PLATES_COMPOSITION_ID = 'ao-plates';
+
+/**
+ * A project whose only content is the backdrop's acts, one per second, each
+ * whole: snapshotted at the middle of each second it gives one still per act,
+ * drawn by the same renderer as the film, so a plate is the field's own pixels.
+ */
+export async function writePlatesProject(dir: string, plate: BackdropPlate, canvas: { width: number; height: number }): Promise<{ times: number[] }> {
+  await mkdir(path.join(dir, 'vendor'), { recursive: true });
+  await copyFile(require.resolve('gsap/dist/gsap.min.js'), path.join(dir, 'vendor', 'gsap.min.js'));
+  const count = plate.acts.length;
+  const clips = plate.acts.map(
+    (act, index) =>
+      `<div id="ao-plate-${index}" class="clip ao-plate" data-start="${index}" data-duration="1" data-track-index="0">${act.markup}</div>`,
+  );
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
+<meta name="viewport" content="width=${canvas.width}, height=${canvas.height}">
+<script src="vendor/gsap.min.js"></script>
+<style>
+html, body { margin: 0; padding: 0; width: ${canvas.width}px; height: ${canvas.height}px; overflow: hidden; background: #000; }
+#root { position: relative; width: ${canvas.width}px; height: ${canvas.height}px; overflow: hidden; }
+.ao-plate { position: absolute; inset: 0; overflow: hidden; }
+${plate.acts.map((act) => act.css).join('\n')}
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="${PLATES_COMPOSITION_ID}" data-start="0" data-duration="${count}" data-width="${canvas.width}" data-height="${canvas.height}" data-fps="30">
+${clips.join('\n')}
+</div>
+<script>
+window.__timelines = window.__timelines || {};
+const tl = gsap.timeline({ paused: true });
+tl.set({}, {}, ${count});
+window.__timelines[${JSON.stringify(PLATES_COMPOSITION_ID)}] = tl;
+</script>
+</body>
+</html>
+`;
+  await writeFile(path.join(dir, 'index.html'), html, 'utf8');
+  return { times: plate.acts.map((_, index) => index + 0.5) };
 }
 
 /**
