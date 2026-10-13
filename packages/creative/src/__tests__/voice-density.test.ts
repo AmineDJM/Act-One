@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Scene } from '@act-one/core';
 import { ScriptedLlmProvider } from '@act-one/providers';
 import { StoryboardEngine } from '../index.ts';
-import { narrationWordsFor, voiceCoverage } from '../voice-density.ts';
+import { beatsForVoice, narrationWordsFor, overlengthProblem, voiceCoverage } from '../voice-density.ts';
 import { brandFixture, briefFixture, conceptFixture, treatmentFixture, understandingFixture } from './fixtures.ts';
 
 /**
@@ -54,6 +54,18 @@ describe('where the voice is, and where it is missing', () => {
     expect(voiceCoverage(thin, 'continuous').problem).toMatch(/heard in \d+% of the film/);
   });
 
+  it('plans a narrated film in beats that can each hold a line', () => {
+    // Forty-five seconds read throughout: about a dozen beats, not twenty-two two-second ones.
+    expect(beatsForVoice(45, 'continuous')).toBe(14);
+    expect(beatsForVoice(45, 'key_moments')).toBeGreaterThan(beatsForVoice(45, 'continuous'));
+  });
+
+  it('says a script is too long for its film, and by how much to cut it', () => {
+    const long = scenes(Array.from({ length: 12 }, () => ({ seconds: 4.5, line: LINE })).concat([{ seconds: 2.5, close: true }]));
+    expect(overlengthProblem(long, 45, 'continuous', 2.35)).toMatch(/runs 57s against a 45s target, because its narration is 120 words long .* about 80 words/);
+    expect(overlengthProblem(long, 56, 'continuous', 2.35)).toBeNull();
+  });
+
   it('asks for more words when the voice carries the whole film', () => {
     expect(narrationWordsFor(30, 'continuous', 2.35)).toBeGreaterThan(narrationWordsFor(30, 'key_moments', 2.35));
     expect(narrationWordsFor(30, 'continuous', 2.35)).toBe(56);
@@ -80,9 +92,9 @@ describe('a narrated storyboard', () => {
         treatment: treatmentFixture({ voiceStrategy: 'narrator', voiceDensity: 'continuous' }),
         understanding: understandingFixture({ productMoments: [] }),
         brand: brandFixture(),
-        brief: briefFixture({ durationSeconds: 30 }),
+        brief: briefFixture({ durationSeconds: 40 }),
         version: 1,
-        targetDurationSeconds: 30,
+        targetDurationSeconds: 40,
       },
       { organizationId: 'org_1', projectId: 'prj_1' },
     );

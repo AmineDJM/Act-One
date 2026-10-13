@@ -100,6 +100,40 @@ export function voiceCoverage(scenes: readonly Scene[], density: VoiceDensity): 
   };
 }
 
+/** How far past its target a narrated film may run before its script is too long for it. */
+export const OVERLENGTH_TOLERANCE = 1.15;
+
+/**
+ * About how many beats a narrated film of this length is planned in.
+ *
+ * A beat carries its own line and runs as long as the line does, so a film
+ * planned in two-second beats with a line on each is a film twice its length:
+ * no line worth hearing is said in two seconds. A continuous read wants beats
+ * of about three and a half seconds; a film on its key moments interleaves
+ * shorter silent beats with the narrated ones.
+ */
+export function beatsForVoice(targetSeconds: number, density: VoiceDensity): number {
+  const close = 2.5;
+  return Math.max(4, Math.round((targetSeconds - close) / (density === 'continuous' ? 3.4 : 2.8)) + 1);
+}
+
+/**
+ * A script too long for its film, said in the planner's words.
+ *
+ * Every narrated beat is at least as long as its line, so the film's length
+ * is the script's length: past the tolerance, the only fix is fewer words.
+ */
+export function overlengthProblem(scenes: readonly Scene[], targetSeconds: number, density: VoiceDensity, wordsPerSecond: number): string | null {
+  const runtime = scenes.reduce((total, scene) => total + scene.duration, 0);
+  if (runtime <= targetSeconds * OVERLENGTH_TOLERANCE + 1e-6) return null;
+  const words = scenes.reduce((total, scene) => total + scene.narration.trim().split(/\s+/).filter(Boolean).length, 0);
+  const wanted = narrationWordsFor(Math.max(4, targetSeconds - 2.5), density, wordsPerSecond);
+  return (
+    `The film runs ${runtime.toFixed(0)}s against a ${targetSeconds.toFixed(0)}s target, because its narration is ${words} words long ` +
+    `and every beat lasts as long as its line. Cut the narration to about ${wanted} words in all, in fewer, longer beats.`
+  );
+}
+
 /** How many words of narration a film of this length is written with, before its close. */
 export function narrationWordsFor(spokenSpanSeconds: number, density: VoiceDensity, wordsPerSecond: number): number {
   const share = density === 'continuous' ? 0.8 : 0.5;

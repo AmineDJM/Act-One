@@ -47,7 +47,7 @@ import {
 } from './systems/index.ts';
 import { routeShot, enforceBudget, checkBudget, type BudgetViolation } from './shot-routing.ts';
 import { copyFits, fitToDuration, narrationSeconds, readingSeconds, varyRhythm, type TimingConstraint } from './timing.ts';
-import { narrationWordsFor, voiceCoverage } from './voice-density.ts';
+import { beatsForVoice, narrationWordsFor, OVERLENGTH_TOLERANCE, overlengthProblem, voiceCoverage } from './voice-density.ts';
 import {
   canOpenAShort,
   needsAttention,
@@ -253,12 +253,17 @@ export class StoryboardEngine {
      * leaves less of the film unspoken.
      */
     if (input.treatment.voiceStrategy !== 'none') {
-      const heard = voiceCoverage(built.storyboard.scenes, input.treatment.voiceDensity);
-      if (heard.problem) {
-        const rewritten = await this.plan(input, system, archetypes, target, context, { fillVoice: heard.problem });
+      const density = input.treatment.voiceDensity;
+      const heard = voiceCoverage(built.storyboard.scenes, density);
+      // A script too long for the film is the same kind of problem: where the voice is, against what the film can hold.
+      const overlong = overlengthProblem(built.storyboard.scenes, target, density, NARRATION_WORDS_PER_SECOND);
+      const problem = [heard.problem, overlong].filter(Boolean).join(' ');
+      if (problem) {
+        const rewritten = await this.plan(input, system, archetypes, target, context, { fillVoice: problem });
         const second = this.materialise(rewritten, input, system, archetypes, target);
-        const secondHeard = voiceCoverage(second.storyboard.scenes, input.treatment.voiceDensity);
-        if (unspoken(secondHeard) < unspoken(heard) && (cut !== 'short' || opensOnAPatternInterrupt(second.storyboard.scenes))) built = second;
+        const worse = (scenes: readonly Scene[]) =>
+          unspoken(voiceCoverage(scenes, density)) + Math.max(0, storyboardDuration({ scenes } as Storyboard) - target * OVERLENGTH_TOLERANCE);
+        if (worse(second.storyboard.scenes) < worse(built.storyboard.scenes) && (cut !== 'short' || opensOnAPatternInterrupt(second.storyboard.scenes))) built = second;
       }
     }
 
@@ -385,10 +390,10 @@ export class StoryboardEngine {
     ];
     // The first sixteen: the ranking put approved and favourite pictures first.
     const library = (input.libraryAssets ?? []).slice(0, 16);
-    const approximateScenes = Math.max(
-      4,
-      Math.round(target / system.pacing.averageSceneSeconds),
-    );
+    const paced = Math.max(4, Math.round(target / system.pacing.averageSceneSeconds));
+    // A narrated film is planned in beats that can each hold a line.
+    const approximateScenes =
+      input.treatment.voiceStrategy === 'none' ? paced : Math.min(paced, beatsForVoice(target, input.treatment.voiceDensity));
 
     const { value } = await this.llm.completeJson(
       [
@@ -1368,10 +1373,11 @@ function voiceLines(treatment: CreativeTreatment, target: number): string[] {
   return treatment.voiceDensity === 'continuous'
     ? [
         'Voice: continuous. The narration carries the film from the first scene to the call to action, as a launch spot is read.',
-        `Give every scene a line except at most two you leave to the picture or the music alone, each under three seconds. Write about ${words} words of narration in all.`,
+        `Give every scene a line except at most two you leave to the picture or the music alone, each under three seconds. Write about ${words} words of narration in all — no more: every beat lasts as long as its line, so a longer script is a longer film.`,
+        'One short sentence per beat, about six to ten words.',
       ]
     : [
         'Voice: on the key moments. The narration takes the beats that matter; the music and the cut carry what is between them.',
-        `Never more than four seconds of film without a line. Write about ${words} words of narration in all.`,
+        `Never more than four seconds of film without a line. Write about ${words} words of narration in all — no more: every beat lasts as long as its line, so a longer script is a longer film.`,
       ];
 }
