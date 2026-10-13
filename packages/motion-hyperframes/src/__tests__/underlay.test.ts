@@ -115,3 +115,23 @@ describe('a frame of the iris', () => {
     expect(differ).toBe(0);
   });
 });
+
+describe('a film over plates whose changes fall between frames', () => {
+  it('keeps every one of its frames', async () => {
+    const work = await mkdtemp(path.join(tmpdir(), 'act-one-plate-count-'));
+    const frames = path.join(work, 'frames');
+    await mkdir(frames);
+    const clear = await sharp({ create: { width: 32, height: 18, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
+    for (let index = 0; index < 137; index += 1) await sharp(clear).toFile(path.join(frames, `frame_${String(index).padStart(4, '0')}.png`));
+    const stills = await Promise.all(['#c00000', '#00a040', '#2040c0'].map(async (colour, index) => {
+      const file = path.join(work, `p${index}.png`);
+      await sharp({ create: { width: 32, height: 18, channels: 3, background: colour } }).png().toFile(file);
+      return file;
+    }));
+    const out = path.join(work, 'film.mp4');
+    // At 30 fps, 1.37 s and 3.4167 s are not on the frame grid; a still's own time base is 1/25.
+    await encodeFrames(frames, out, { fps: 30, frames: 137, width: 32, height: 18, crf: 30, underlay: { stills, first: 0, changes: [{ to: 1, at: 1.37, seconds: 0.75, transition: 'iris' }, { to: 2, at: 3.4167, seconds: 0.6, transition: 'fade' }] } });
+    const counted = await runFfmpeg(['-v', 'error', '-i', out, '-map', '0:v', '-f', 'null', '-', '-stats']);
+    expect(counted.stderr.match(/frame=\s*(\d+)/g)?.pop()).toMatch(/frame=\s*137$/);
+  }, 120_000);
+});

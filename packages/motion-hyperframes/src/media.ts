@@ -310,12 +310,14 @@ export function underlayGraph(runs: readonly PlateRun[], fps: number, framesInpu
   runs.forEach((run, index) => {
     if (run.kind === 'still') {
       inputs.push('-i', run.file);
-      parts.push(`[${index}:v]format=gbrp,loop=loop=${run.frames - 1}:size=1:start=0,setpts=N/(${fps}*TB)[r${index}]`);
+      parts.push(`[${index}:v]format=gbrp,loop=loop=${run.frames - 1}:size=1:start=0,settb=1/${fps},setpts=N[r${index}]`);
     } else {
       inputs.push('-framerate', String(fps), '-start_number', String(run.start), '-i', run.pattern);
-      parts.push(`[${index}:v]format=gbrp,setpts=N/(${fps}*TB)[r${index}]`);
+      parts.push(`[${index}:v]format=gbrp,settb=1/${fps},setpts=N[r${index}]`);
     }
   });
+  // Every run counted in frames, one tick of 1/fps each: a still's own time base (1/25) rescaled lost frames to
+  // rounding. The closing fps then only states the rate — every frame is already on its tick — so nothing is dropped.
   parts.push(`${runs.map((_, index) => `[r${index}]`).join('')}concat=n=${runs.length}:v=1:a=0,fps=${fps}[plate]`);
   parts.push(`[${framesInput}:v]format=rgba[frames]`);
   parts.push(`[plate][frames]overlay=format=rgb:shortest=1:eof_action=pass[composited]`);
