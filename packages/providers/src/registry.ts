@@ -186,6 +186,14 @@ const RenderConfig = z.object({
    */
   interfaceDrawings: z.number().int().min(0).max(4).default(2),
   interfaceDrawingBudgetUsd: z.number().min(0).max(1).default(0.05),
+  /**
+   * The most a film's sound may spend: the narration, every take included,
+   * then a score composed for the picture, then sounds built for its cues.
+   * Each is priced before it is asked for; what the budget does not cover is
+   * played from the library. Three dollars covers a 45-second film in full
+   * (about $2.30 with the voice) and a 60-second one with its score.
+   */
+  soundBudgetUsd: z.number().min(0).max(10).default(3),
   /** The tier of model that writes HyperFrames scenes, when a model writes them. */
   sceneAuthorTier: z.enum(['fast', 'balanced', 'deep']).default('deep'),
   /** Model calls per scene before the engine draws it itself. */

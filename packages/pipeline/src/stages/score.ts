@@ -34,10 +34,45 @@ export type ScoredSound = {
   effectPaths: Record<string, string>;
   /** What was composed, for the console and the credit. */
   score: FilmScore | null;
+  /** What the score and the built sounds are expected to cost, in USD. */
+  costUsd: number;
   notes: string[];
 };
 
-export const NO_SCORE: ScoredSound = { musicPath: null, effectPaths: {}, score: null, notes: [] };
+export const NO_SCORE: ScoredSound = { musicPath: null, effectPaths: {}, score: null, costUsd: 0, notes: [] };
+
+/**
+ * What a film's sound may still spend, kept as it is spent.
+ *
+ * Priced before each call, never after: a sound that would take the film over
+ * its budget is not asked for, and the library plays in its place. The score
+ * is asked for first because it is under every frame; the built sounds share
+ * what it leaves.
+ */
+export class SoundBudget {
+  private spentUsd = 0;
+  private readonly limitUsd: number;
+
+  constructor(limitUsd: number) {
+    this.limitUsd = limitUsd;
+  }
+
+  get spent(): number {
+    return this.spentUsd;
+  }
+
+  get left(): number {
+    return Math.max(0, this.limitUsd - this.spentUsd);
+  }
+
+  allows(usd: number): boolean {
+    return Number.isFinite(usd) && usd >= 0 && this.spentUsd + usd <= this.limitUsd + 1e-9;
+  }
+
+  spend(usd: number): void {
+    this.spentUsd += Math.max(0, usd);
+  }
+}
 
 export async function scoreFilm(
   context: StageContext,
@@ -50,6 +85,8 @@ export async function scoreFilm(
     workDir: string;
     aspect: string;
     hasVoiceOver: boolean;
+    /** What the score and the built sounds may spend together, after the voice. */
+    budgetUsd: number;
   },
 ): Promise<ScoredSound> {
   const composer = context.registry.composerOrNull();
@@ -58,9 +95,16 @@ export async function scoreFilm(
   const notes: string[] = [];
   const call = { organizationId: context.organizationId, projectId: context.project.id, ...(context.signal ? { signal: context.signal } : {}) };
   const total = storyboardDuration(params.storyboard);
+  const budget = new SoundBudget(params.budgetUsd);
 
   let score: FilmScore | null = null;
   let musicPath: string | null = null;
+  // Priced against the picture before a model is paid to write a score nobody can afford to play.
+  if (!budget.allows(composer.musicPriceUsd(total))) {
+    notes.push(`A score for ${total.toFixed(1)}s would cost more than the $${budget.left.toFixed(2)} left for this film's sound, so the library was played.`);
+    const effectPaths = await buildEffects(context, params, notes, call, budget);
+    return { musicPath, effectPaths, score, costUsd: budget.spent, notes };
+  }
   try {
     await context.activity({ step: 'composition', kind: 'step', label: 'writing the score', status: 'active' });
     score = await writeScore(
@@ -75,6 +119,10 @@ export async function scoreFilm(
       },
       call,
     );
+    const price = composer.musicPriceUsd(scoreSeconds(score));
+    if (!budget.allows(price)) {
+      throw new Error(`the score as written ($${price.toFixed(2)}) is over the $${budget.left.toFixed(2)} left for this film's sound`);
+    }
 
     const composed = await composer.compose(
       {
@@ -91,6 +139,7 @@ export async function scoreFilm(
       call,
     );
 
+    budget.spend(composed.costUsd);
     musicPath = path.join(params.workDir, `score-${newId('ast').slice(-8)}.mp3`);
     await writeFile(musicPath, composed.audio);
     notes.push(
@@ -111,28 +160,40 @@ export async function scoreFilm(
     score = null;
   }
 
-  const effectPaths = await buildEffects(context, params, notes, call);
-  return { musicPath, effectPaths, score, notes };
+  const effectPaths = await buildEffects(context, params, notes, call, budget);
+  return { musicPath, effectPaths, score, costUsd: budget.spent, notes };
 }
 
 /**
  * One sound per cue, built from what the shot does.
  *
- * Bounded twice: only the cues the film actually placed, and only the kinds
- * where a built sound beats a library one. A logo sting is a brand asset, not
- * a generated noise, and music cues are the score's business.
+ * Bounded three times: only the cues the film actually placed, only the kinds
+ * where a built sound beats a library one, and only while the film's sound
+ * budget lasts. The closing sting is built too: the library's is a house
+ * sound synthesized from a score, not the brand's, and it is the last thing
+ * a viewer hears. Music cues are the score's business.
  */
-const DESIGNABLE = new Set(['impact', 'riser', 'sub_drop', 'whoosh', 'texture', 'ui_click']);
+const DESIGNABLE = new Set(['impact', 'riser', 'sub_drop', 'whoosh', 'texture', 'ui_click', 'logo_sting']);
 
 async function buildEffects(
   context: StageContext,
   params: { storyboard: Storyboard; design: SoundDesign; creativeSystem: CreativeSystemId; brand: BrandSystem | null; workDir: string },
   notes: string[],
   call: { organizationId: string; projectId: string | null; signal?: AbortSignal },
+  budget: SoundBudget,
 ): Promise<Record<string, string>> {
   const engine = context.registry.soundEffectsOrNull();
   if (!engine) return {};
-  const wanted = params.design.cues.filter((cue) => DESIGNABLE.has(cue.type)).slice(0, 12);
+  if (!budget.allows(engine.effectPriceUsd(0.5))) {
+    notes.push(`Nothing was left of this film's sound budget to build sounds with, so the library was played.`);
+    return {};
+  }
+  const designable = params.design.cues.filter((cue) => DESIGNABLE.has(cue.type));
+  // The closing sting first: when the budget or the cap runs out, it runs out on a whoosh, not on the last sound of the film.
+  const wanted = [
+    ...designable.filter((cue) => cue.type === 'logo_sting'),
+    ...designable.filter((cue) => cue.type !== 'logo_sting'),
+  ].slice(0, 12);
   if (wanted.length === 0) return {};
 
   let briefs;
@@ -158,12 +219,18 @@ async function buildEffects(
   }
 
   const paths: Record<string, string> = {};
+  let unaffordable = 0;
   for (const brief of briefs) {
+    if (!budget.allows(engine.effectPriceUsd(brief.seconds))) {
+      unaffordable += 1;
+      continue;
+    }
     try {
       const built = await engine.effect(
         { brief: brief.brief, seconds: brief.seconds, influence: brief.influence, loop: brief.loop },
         call,
       );
+      budget.spend(built.costUsd);
       const file = path.join(params.workDir, `sfx-${brief.cueId.slice(-8)}.mp3`);
       await writeFile(file, built.audio);
       paths[brief.cueId] = file;
@@ -173,6 +240,9 @@ async function buildEffects(
   }
   if (Object.keys(paths).length > 0) {
     notes.push(`${Object.keys(paths).length} sound${Object.keys(paths).length === 1 ? '' : 's'} built for this film.`);
+  }
+  if (unaffordable > 0) {
+    notes.push(`${unaffordable} sound${unaffordable === 1 ? ' was' : 's were'} left to the library: the film's sound budget was spent.`);
   }
   return paths;
 }

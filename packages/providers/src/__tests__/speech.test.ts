@@ -744,6 +744,16 @@ describe('scoring a film', () => {
     expect(body['loop']).toBeUndefined();
   });
 
+  it('prices a sound and a score before either is asked for, and charges what it priced', async () => {
+    // What a sound costs is priced on the length the engine will actually build.
+    expect(engine().effectPriceUsd(40)).toBeCloseTo(engine().effectPriceUsd(22), 9);
+    expect(engine().effectPriceUsd(0.1)).toBeCloseTo(engine().effectPriceUsd(0.5), 9);
+    expect(engine().effectPriceUsd(null)).toBeCloseTo(engine().effectPriceUsd(4), 9);
+    expect(engine().musicPriceUsd(60)).toBeCloseTo(2 * engine().musicPriceUsd(30), 9);
+    const built = await engine().effect({ brief: 'A short dry wooden knock, close-miked, almost no tail.', seconds: 40, influence: 0.8, loop: false }, call);
+    expect(built.costUsd).toBeCloseTo(engine().effectPriceUsd(40), 9);
+  });
+
   it('says where each word fell, and drops what is not a word', async () => {
     const alignment = await engine().align(new Uint8Array([1, 2, 3]), 'A week later.', call);
     expect(alignment.words.map((word) => word.word)).toEqual(['A', 'week', 'later.']);

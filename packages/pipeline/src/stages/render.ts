@@ -2065,7 +2065,10 @@ async function renderOnce(
     workDir: params.workDir,
     aspect: params.aspect,
     hasVoiceOver: storyboard.scenes.some((scene) => scene.voiceOver),
+    // One budget for everything the film's sound costs: what the voice spent is not there for the score.
+    budgetUsd: Math.max(0, context.registry.config.render.soundBudgetUsd - narration.costUsd),
   });
+  if (scored.notes.length > 0) console.log(`[render] sound: ${scored.notes.join(' ')} ($${(narration.costUsd + scored.costUsd).toFixed(3)} with the voice)`);
   if (scored.musicPath && design.music) {
     const key = `composed:${params.attempt}`;
     resolvedPaths[key] = scored.musicPath;
@@ -2769,11 +2772,13 @@ async function speakNarration(
     text: string;
   }[];
   issues: QaFinding[];
+  /** What reading the narration cost, every take included, in USD. */
+  costUsd: number;
 }> {
   const spoken = storyboard.scenes.filter(
     (scene) => scene.voiceOver && scene.narration.trim().length > 0,
   );
-  if (storyboard.voiceStrategy === 'none' || spoken.length === 0) return { tracks: [], issues: [] };
+  if (storyboard.voiceStrategy === 'none' || spoken.length === 0) return { tracks: [], issues: [], costUsd: 0 };
 
   // A preview is for timing; the studio voice is for the film, on plans that carry it.
   const tier: SpeechQuality = quality === 'preview' || !voice.premium ? 'preview' : 'final';
@@ -2832,10 +2837,11 @@ async function speakNarration(
         text: track.text,
       })),
       issues: result.issues,
+      costUsd: result.usage.costUsd,
     };
   } catch (error) {
     console.error('[render] narration failed:', (error as Error).message.slice(0, 200));
-    return { tracks: [], issues: [] };
+    return { tracks: [], issues: [], costUsd: 0 };
   }
 }
 

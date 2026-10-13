@@ -138,6 +138,7 @@ export default async function ProvidersPage() {
               look: config.providers.render.look,
               signatureScenes: config.providers.render.signatureScenes,
               signatureBudgetUsd: config.providers.render.signatureBudgetUsd,
+              soundBudgetUsd: config.providers.render.soundBudgetUsd,
             },
             media: {
               enabled: config.providers.media.enabled,

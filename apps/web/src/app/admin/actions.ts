@@ -195,6 +195,7 @@ export async function saveRoutingAction(
       look: String(formData.get('render.look') ?? current.providers.render.look),
       signatureScenes: Number(formData.get('render.signatureScenes') ?? current.providers.render.signatureScenes),
       signatureBudgetUsd: Number(formData.get('render.signatureBudgetUsd') ?? current.providers.render.signatureBudgetUsd),
+      soundBudgetUsd: Number(formData.get('render.soundBudgetUsd') ?? current.providers.render.soundBudgetUsd),
     },
     media: {
       ...current.providers.media,

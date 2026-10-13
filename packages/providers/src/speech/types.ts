@@ -328,6 +328,8 @@ export type ComposedMusic = {
 export interface MusicComposer extends Provider {
   readonly kind: 'speech';
   compose(plan: MusicPlan, context: CallContext): Promise<ComposedMusic>;
+  /** What composing this many seconds of score is expected to cost, in USD, before anything is asked for. */
+  musicPriceUsd(seconds: number): number;
 }
 
 /**
@@ -351,6 +353,8 @@ export type GeneratedEffect = { audio: Uint8Array; contentType: string; seconds:
 export interface SoundEffectEngine extends Provider {
   readonly kind: 'speech';
   effect(request: EffectRequest, context: CallContext): Promise<GeneratedEffect>;
+  /** What building one sound of this length is expected to cost, in USD; null is the engine's own choice of length. */
+  effectPriceUsd(seconds: number | null): number;
 }
 
 /**

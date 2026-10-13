@@ -21,7 +21,7 @@ export function RoutingForm({
     llm: { fast: string; balanced: string; deep: string };
     browser: { primary: string; fallback: string };
     speech: { primary: string; preview: string; recognizer: string };
-    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string; look: string; signatureScenes: number; signatureBudgetUsd: number };
+    render: { engine: string; sceneAuthor: string; sceneAuthorTier: string; look: string; signatureScenes: number; signatureBudgetUsd: number; soundBudgetUsd: number };
     media: { enabled: boolean; maxCostPerRequestUsd: number; maxCostPerSecondUsd: number; maxRetries: number };
   };
   budget: {
@@ -245,6 +245,14 @@ export function RoutingForm({
               <span className="hint">
                 A call is made only when what it is expected to cost still fits; a moment the budget does not cover is
                 drawn by the engine. Never spent on an animatic.
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="render-sound-budget">Most a film&rsquo;s sound may spend (USD)</label>
+              <input id="render-sound-budget" name="render.soundBudgetUsd" type="number" min={0} max={10} step={0.25} className="input" defaultValue={routing.render.soundBudgetUsd} />
+              <span className="hint">
+                The narration, then a score composed for the picture, then sounds built for its cues, each priced before
+                it is asked for. What the budget does not cover plays from the library.
               </span>
             </div>
             <div className="field">

@@ -241,6 +241,10 @@ const COST_PER_TRANSCRIBED_MINUTE = 0.4 / 60;
  */
 const COST_PER_COMPOSED_MINUTE = 2.5;
 const COST_PER_EFFECT_SECOND = 0.02;
+/** A sound left to the engine's own length is billed as one of four seconds; any other is held to what the engine builds. */
+function billedEffectSeconds(seconds: number | null): number {
+  return seconds === null ? 4 : Math.min(22, Math.max(0.5, seconds));
+}
 
 /** The engines. Music takes a plan; sound takes a sentence. */
 const MUSIC_MODEL = 'music_v2_5';
@@ -759,7 +763,7 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
     }
 
     const seconds = movements.reduce((total, movement) => total + movement.durationMs, 0) / 1000;
-    const costUsd = (seconds / 60) * COST_PER_COMPOSED_MINUTE;
+    const costUsd = this.musicPriceUsd(seconds);
     await this.costSink?.record({
       provider: this.name,
       model,
@@ -772,6 +776,10 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
     });
 
     return { audio, contentType: 'audio/mpeg', durationSeconds: seconds, model, costUsd };
+  }
+
+  musicPriceUsd(seconds: number): number {
+    return (Math.max(0, seconds) / 60) * COST_PER_COMPOSED_MINUTE;
   }
 
   /**
@@ -811,8 +819,8 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
       throw this.describe(error);
     }
 
-    const billed = seconds ?? 4;
-    const costUsd = billed * COST_PER_EFFECT_SECOND;
+    const billed = billedEffectSeconds(seconds);
+    const costUsd = this.effectPriceUsd(billed);
     await this.costSink?.record({
       provider: this.name,
       model: EFFECT_MODEL,
@@ -825,6 +833,10 @@ export class ElevenLabsProvider implements SpeechProvider, SpeechRecognizer, Voi
     });
 
     return { audio, contentType: 'audio/mpeg', seconds: billed, costUsd, model: EFFECT_MODEL };
+  }
+
+  effectPriceUsd(seconds: number | null): number {
+    return billedEffectSeconds(seconds) * COST_PER_EFFECT_SECOND;
   }
 
   /**
