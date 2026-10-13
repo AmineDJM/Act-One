@@ -1,4 +1,4 @@
-import { emphasisIn } from '@act-one/core';
+import { emphasisIn, type UiDrawing, type UiDrawingNode } from '@act-one/core';
 import { contrastRatio, ensureContrast, fitToLines, hexToRgb, measureText, mix, rgbToHex, type DesignTokens } from '@act-one/design';
 import type { StagedAsset } from './assets.ts';
 import { escapeHtml } from './captions.ts';
@@ -584,7 +584,10 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   const { width: W, height: H } = design.frame;
   const portrait = H > W;
   const tilt = card.tilt ?? 1;
-  const { picture, sequence } = card;
+  const { picture } = card;
+  // A capture production read into parts is drawn back up before it is shown, given the time to be.
+  const drawing = packet.drawing && picture.kind === 'image' && packet.timing.beatDuration >= DRAWING_MIN_SECONDS ? packet.drawing : null;
+  const sequence = drawing ? undefined : card.sequence;
   const text = lineOf(packet);
   const items = listItems(text);
   const start = packet.timing.beatStart + entranceOf(packet, 'product');
@@ -611,12 +614,14 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
     `#${id}-card { position: absolute; inset: 0; border-radius: ${px(radius)}; overflow: hidden; background: ${palette.surface}; border: 1px solid ${palette.line}; box-shadow: 0 ${px(H * 0.035)} ${px(H * 0.09)} rgba(8,12,24,0.28), 0 ${px(H * 0.006)} ${px(H * 0.016)} rgba(8,12,24,0.12); transform-origin: 50% 50%; opacity: 0; }`,
     `#${id}-shine { position: absolute; top: -20%; bottom: -20%; left: 0; width: 38%; background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,0.32), rgba(255,255,255,0)); opacity: 0; }`,
   );
-  const media = sequence
+  const media = drawing
+    ? drawnInterface(packet, drawing, picture, { width: cardW, height: cardH }, design, palette, parts, start + 0.25, beatEnd)
+    : sequence
     ? framedPlate(packet, sequence, picture, { width: cardW, height: cardH }, parts)
     : picture.kind === 'video'
       ? `<video id="${id}-media" class="clip" src="${picture.path}" muted playsinline data-start="0" data-duration="${num(packet.timing.mountedSeconds)}" data-track-index="1"></video>`
       : `<img id="${id}-media" src="${picture.path}" alt="">`;
-  if (!sequence) parts.styles.push(`#${id}-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }`);
+  if (!sequence && !drawing) parts.styles.push(`#${id}-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }`);
   parts.markup.push(`<div id="${id}-glow"></div>`, `<div id="${id}-space"><div id="${id}-card">${media}<div id="${id}-shine"></div></div></div>`);
 
   const settle = Math.max(0.8, Math.min(1.1, packet.timing.beatDuration * 0.45));
@@ -641,6 +646,131 @@ function productScene(packet: ScenePacket, design: DesignTokens, palette: Palett
   );
   const rule = accentRule(`${id}-rule`, palette, parts, start + 0.1, H, portrait ? 'center' : 'left');
   parts.markup.push(`<div id="${id}-words">${rule}<h1 id="${id}-title">${risingTitle(`${id}-title`, set, palette, parts, start + 0.15)}</h1></div>`);
+}
+
+/** A beat shorter than this shows its capture as it is: drawing it up first would leave no time to see it. */
+const DRAWING_MIN_SECONDS = 2.2;
+
+/**
+ * An interface drawn back up from its parts, used, and then shown as it is.
+ *
+ * Inside the card, the capture's parts arrive outermost first — the window,
+ * the panels, the rows — in the capture's own colours and places, each word
+ * one the capture shows (an unread word is a neutral line). A cursor comes to
+ * the control a person would use next and clicks it, or types what the field
+ * already holds. Then the real capture comes up over the drawing, so the beat
+ * ends on the product's own pixels.
+ */
+function drawnInterface(
+  packet: ScenePacket,
+  drawing: UiDrawing,
+  picture: StagedAsset,
+  card: { width: number; height: number },
+  design: DesignTokens,
+  palette: Palette,
+  parts: Parts,
+  from: number,
+  until: number,
+): string {
+  const id = packet.frameId;
+  const H = design.frame.height;
+  // Placed as the capture is placed on the card: covering it, from the top.
+  const sourceW = picture.width ?? card.width;
+  const sourceH = picture.height ?? card.height;
+  const scale = Math.max(card.width / sourceW, card.height / sourceH);
+  const w = sourceW * scale;
+  const h = sourceH * scale;
+  const ink = drawing.theme === 'dark' ? '#E8EAED' : '#1B1F24';
+  const radii: Record<UiDrawingNode['radius'], number> = { none: 0, sm: w * 0.004, md: w * 0.008, lg: w * 0.014, pill: 999 };
+  const contained = new Set(['window', 'sidebar', 'toolbar', 'panel', 'card', 'list']);
+  const worded = new Set(['row', 'button', 'input', 'text']);
+
+  parts.styles.push(
+    `#${id}-ui { position: absolute; left: ${px((card.width - w) / 2)}; top: 0; width: ${px(w)}; height: ${px(h)}; background: ${drawing.background}; overflow: hidden; }`,
+    `.${id}-n { position: absolute; display: flex; align-items: center; overflow: hidden; opacity: 0; }`,
+    `.${id}-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--ao-body-family); line-height: 1.2; }`,
+    `.${id}-sk { height: 30%; border-radius: 999px; opacity: 0.16; flex: none; }`,
+    `#${id}-real { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; opacity: 0; }`,
+  );
+
+  // Outermost first, as listed; a parent always arrives before what sits in it.
+  const nodes = drawing.nodes;
+  const step = Math.min(0.035, 0.9 / Math.max(1, nodes.length));
+  const markup = nodes.map((node, index) => {
+    const left = node.rect.x * w;
+    const top = node.rect.y * h;
+    const nodeW = node.rect.w * w;
+    const nodeH = node.rect.h * h;
+    const textInk = node.ink ?? ink;
+    const rules = [
+      `left: ${px(left)}`,
+      `top: ${px(top)}`,
+      `width: ${px(nodeW)}`,
+      `height: ${px(nodeH)}`,
+      `border-radius: ${px(node.kind === 'avatar' ? 999 : radii[node.radius])}`,
+      `padding: 0 ${px(Math.min(nodeH * 0.35, w * 0.008))}`,
+      node.kind === 'button' || node.kind === 'avatar' || node.kind === 'icon' ? 'justify-content: center' : '',
+      node.fill ? `background: ${node.fill}` : node.kind === 'icon' || node.kind === 'avatar' ? `background: ${hexAlpha(textInk, 0.22)}` : '',
+      !node.fill && contained.has(node.kind) ? `box-shadow: inset 0 0 0 1px ${hexAlpha(textInk, 0.1)}` : '',
+      node.kind === 'input' ? `box-shadow: inset 0 0 0 1px ${hexAlpha(textInk, 0.22)}` : '',
+    ].filter(Boolean);
+    parts.styles.push(`#${id}-n${index + 1} { ${rules.join('; ')}; }`);
+    let content = '';
+    if (node.text) {
+      const size = Math.max(6, Math.min(nodeH * (node.kind === 'text' ? 0.72 : 0.5), H * 0.03));
+      parts.styles.push(`#${id}-n${index + 1} .${id}-t { font-size: ${px(size)}; font-weight: ${node.strong ? 600 : 400}; color: ${textInk}; }`);
+      content = `<span class="${id}-t">${escapeHtml(node.text)}</span>`;
+    } else if (worded.has(node.kind)) {
+      // An unread word is drawn as a wireframe draws one: a neutral line.
+      parts.styles.push(`#${id}-n${index + 1} .${id}-sk { width: ${30 + ((index * 17) % 40)}%; background: ${textInk}; }`);
+      content = `<span class="${id}-sk"></span>`;
+    }
+    const at = from + index * step;
+    parts.tweens.push(`tl.fromTo("#${id}-n${index + 1}", { opacity: 0, y: ${num(h * 0.008)} }, { opacity: 1, y: 0, duration: 0.35, ease: ActOne.ease("out_expo") }, ${num(at)});`);
+    return `<div id="${id}-n${index + 1}" class="${id}-n">${content}</div>`;
+  });
+  const built = from + nodes.length * step + 0.3;
+
+  // The hand: to the control, a click or the words the field holds, typed.
+  const focusIndex = drawing.focus ? nodes.findIndex((node) => node.id === drawing.focus!.nodeId) : -1;
+  const real = Math.min(until - 0.35, Math.max(built + (focusIndex >= 0 ? 0.9 : 0.25), until - 0.8));
+  const extras: string[] = [];
+  if (focusIndex >= 0 && real - built > 0.5) {
+    const focus = nodes[focusIndex]!;
+    const cx = (focus.rect.x + focus.rect.w / 2) * w;
+    const cy = (focus.rect.y + focus.rect.h / 2) * h;
+    const size = Math.max(14, H * 0.028);
+    const click = built + 0.35;
+    parts.styles.push(
+      `#${id}-cursor { position: absolute; left: ${px(cx)}; top: ${px(cy)}; width: ${px(size)}; height: ${px(size * 1.4)}; opacity: 0; }`,
+      `#${id}-ripple { position: absolute; left: ${px(cx - size)}; top: ${px(cy - size)}; width: ${px(size * 2)}; height: ${px(size * 2)}; border-radius: 50%; background: ${hexAlpha(palette.accent, 0.35)}; opacity: 0; }`,
+      `#${id}-ring { position: absolute; left: ${px(focus.rect.x * w - 2)}; top: ${px(focus.rect.y * h - 2)}; width: ${px(focus.rect.w * w + 4)}; height: ${px(focus.rect.h * h + 4)}; border-radius: ${px(radii[focus.radius] + 2)}; box-shadow: 0 0 0 2px ${palette.accent}; opacity: 0; }`,
+    );
+    parts.tweens.push(
+      `tl.fromTo("#${id}-cursor", { x: ${num(w * 0.28)}, y: ${num(h * 0.3)}, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: 0.5, ease: ${SWING} }, ${num(click - 0.5)});`,
+      `tl.fromTo("#${id}-cursor", { scale: 1 }, { scale: 0.86, duration: 0.08, ease: "power1.out", transformOrigin: "0% 0%", immediateRender: false }, ${num(click)});`,
+      `tl.fromTo("#${id}-ripple", { scale: 0.2, opacity: 0.8 }, { scale: 1.6, opacity: 0, duration: 0.5, ease: ${EASE_OUT} }, ${num(click)});`,
+      `tl.fromTo("#${id}-ring", { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "none" }, ${num(click)});`,
+    );
+    extras.push(`<div id="${id}-ring"></div>`, `<div id="${id}-ripple"></div>`);
+    if (drawing.focus!.action === 'type' && drawing.focus!.typed && !focus.text) {
+      const typed = [...drawing.focus!.typed].slice(0, 40);
+      const per = Math.min(0.045, Math.max(0.02, (real - click - 0.3) / Math.max(1, typed.length)));
+      const glyphs = typed.map((char, index) => {
+        parts.tweens.push(`tl.fromTo("#${id}-ty-g${index + 1}", { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, ${num(click + 0.15 + index * per)});`);
+        return `<span id="${id}-ty-g${index + 1}" class="ao-g">${escapeHtml(char)}</span>`;
+      });
+      const size = Math.max(6, Math.min(focus.rect.h * h * 0.5, H * 0.03));
+      parts.styles.push(`#${id}-ty { position: absolute; left: ${px(focus.rect.x * w + Math.min(focus.rect.h * h * 0.35, w * 0.008))}; top: ${px(focus.rect.y * h)}; height: ${px(focus.rect.h * h)}; display: flex; align-items: center; font-family: var(--ao-body-family); font-size: ${px(size)}; color: ${focus.ink ?? ink}; white-space: nowrap; }`, `#${id}-ty .ao-g { opacity: 0; }`);
+      extras.push(`<div id="${id}-ty">${glyphs.join('')}</div>`);
+    }
+    // An arrow pointer, drawn here: white, with a dark edge, so it reads on either theme.
+    extras.push(
+      `<svg id="${id}-cursor" viewBox="0 0 20 28"><path d="M1 1 L1 22 L6.5 16.5 L10.5 26 L14 24.5 L10 15.5 L18 15.5 Z" fill="#FFFFFF" stroke="#0D1117" stroke-width="1.6" stroke-linejoin="round"/></svg>`,
+    );
+  }
+  parts.tweens.push(`tl.fromTo("#${id}-real", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: ${SWING} }, ${num(real)});`);
+  return `<div id="${id}-ui">${markup.join('')}${extras.join('')}</div><img id="${id}-real" src="${picture.path}" alt="">`;
 }
 
 /**

@@ -158,6 +158,14 @@ const RenderConfig = z.object({
    */
   signatureScenes: z.number().int().min(0).max(4).default(2),
   signatureBudgetUsd: z.number().min(0).max(2).default(0.25),
+  /**
+   * In the launch look, how many captures are read into parts and drawn back
+   * up before they are shown, and the most a film may spend reading them (one
+   * fast-tier call with one image each, checked against an OCR model, kept by
+   * the capture's hash so a picture is read once).
+   */
+  interfaceDrawings: z.number().int().min(0).max(4).default(2),
+  interfaceDrawingBudgetUsd: z.number().min(0).max(1).default(0.05),
   /** The tier of model that writes HyperFrames scenes, when a model writes them. */
   sceneAuthorTier: z.enum(['fast', 'balanced', 'deep']).default('deep'),
   /** Model calls per scene before the engine draws it itself. */

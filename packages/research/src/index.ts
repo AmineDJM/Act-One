@@ -12,3 +12,4 @@ export { readUiStructure, findControls, type UiRegion, type UiStructure } from '
 export { normalizeUrl, registrableDomainOf, pathOf, absolutize } from './url.ts';
 export { siteName } from './site-name.ts';
 export { keepDrawnLogos, dataUrlDrawsAMark } from './logo-ink.ts';
+export { readInterfaceDrawing, coherent as coherentDrawing, INTERFACE_DRAWING_VERSION, type InterfaceReading } from './interface-drawing.ts';

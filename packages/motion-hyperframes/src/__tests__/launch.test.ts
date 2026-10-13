@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
-import { sceneWindows, UiSequence, type CaptionCue, type MotionRecipeName } from '@act-one/core';
+import { sceneWindows, UiDrawing, UiSequence, type CaptionCue, type MotionRecipeName } from '@act-one/core';
 import { contrastRatio, resolveTokens } from '@act-one/design';
 import type { LlmProvider } from '@act-one/providers';
 import { writeProject } from '../assemble.ts';
@@ -515,5 +515,45 @@ describe('an upright frame’s words', () => {
     const html = launchScene(target, upright, { act: 'brand', opener: false, chapter: false, chapterIndex: -1 });
     const top = pxOf(html, new RegExp(`#${target.frameId}-words \\{[^}]*top: ([\\d.]+)px`));
     expect(top).toBeLessThanOrEqual(H * 0.53);
+  });
+});
+
+describe('a capture drawn back up in the launch look', () => {
+  const drawing = UiDrawing.parse({
+    background: '#ffffff',
+    theme: 'light',
+    nodes: [
+      { id: 'win', parent: null, kind: 'window', rect: { x: 0, y: 0, w: 1, h: 1 }, fill: '#ffffff', radius: 'md', text: null, ink: null, strong: false },
+      { id: 'side', parent: 'win', kind: 'sidebar', rect: { x: 0, y: 0, w: 0.2, h: 1 }, fill: '#f2f3f5', radius: 'none', text: null, ink: null, strong: false },
+      { id: 'r1', parent: 'side', kind: 'row', rect: { x: 0.01, y: 0.1, w: 0.18, h: 0.05 }, fill: null, radius: 'sm', text: 'Inbox', ink: '#1b1f24', strong: true },
+      { id: 'r2', parent: 'side', kind: 'row', rect: { x: 0.01, y: 0.16, w: 0.18, h: 0.05 }, fill: null, radius: 'sm', text: null, ink: null, strong: false },
+      { id: 'search', parent: 'win', kind: 'input', rect: { x: 0.3, y: 0.02, w: 0.4, h: 0.06 }, fill: '#f6f7f9', radius: 'pill', text: null, ink: '#5c6473', strong: false },
+    ],
+    focus: { nodeId: 'search', action: 'type', typed: 'March' },
+  });
+  const drawn = (duration: number): ScenePacket => ({
+    ...packet({ recipe: 'product_zoom', text: ['Matched as they land.'], assets: ['ast_img'], duration }, { staged: [image('ast_img')] }),
+    drawing,
+  });
+
+  it('builds the parts, uses the control, and ends on the capture itself — passing the engine’s own checks', () => {
+    const target = drawn(3);
+    const html = launchScene(target, design(), DAY);
+    expect(errorsOf(html, target)).toEqual([]);
+    expect(html).toContain('<span class="scene-01-t">Inbox</span>');
+    // The row the capture's words were not found in is a neutral line, not a word.
+    expect(html).toContain('<div id="scene-01-n4" class="scene-01-n"><span class="scene-01-sk"></span></div>');
+    expect(html).toContain('id="scene-01-cursor"');
+    expect(html).toContain('id="scene-01-ty-g1" class="ao-g">M</span>');
+    expect(html).toContain('<img id="scene-01-real" src="assets/ast_img.png" alt="">');
+    const realAt = Number(/tl\.fromTo\("#scene-01-real", \{ opacity: 0 \}, \{ opacity: 1, duration: 0\.45, ease: "power2\.inOut" \}, ([\d.]+)\);/.exec(html)?.[1]);
+    expect(realAt).toBeLessThanOrEqual(target.timing.beatStart + 3 - 0.35);
+    expect(realAt).toBeGreaterThan(target.timing.beatStart + 1);
+  });
+
+  it('is shown as captured when its beat is too short to draw it first', () => {
+    const html = launchScene(drawn(1.8), design(), DAY);
+    expect(html).not.toContain('scene-01-ui');
+    expect(html).toContain('id="scene-01-media"');
   });
 });

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { ASPECT_DIMENSIONS, DEFAULT_FPS, sceneWindows, storyboardDuration } from '@act-one/core';
+import { ASPECT_DIMENSIONS, DEFAULT_FPS, sceneWindows, storyboardDuration, type UiDrawing } from '@act-one/core';
 import { readMark, resolveTokens, showsAMark, watermark } from '@act-one/design';
 import type { RenderFilmOptions, RenderFilmResult } from '@act-one/motion';
 import type { CallContext, LlmProvider, LlmTier } from '@act-one/providers';
@@ -98,6 +98,12 @@ export type HyperFramesRenderOptions = RenderFilmOptions & {
    * for. Absent, or with no scene author, the engine draws every beat.
    */
   signature?: { scenes: number; budgetUsd: number; perCallUsd?: number };
+  /**
+   * Captures read into parts, by asset id (see `UiDrawing`). In the launch
+   * look a product beat whose first picture is one draws the interface back
+   * up before showing the capture; the classic look shows captures as they are.
+   */
+  drawings?: Readonly<Record<string, UiDrawing>>;
   /** Rewrites of scenes HyperFrames' own check refuses, before the engine draws them itself. */
   maxRepairPasses?: number;
   tools?: ToolOptions;
@@ -233,6 +239,7 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
       cta: props.cta ?? '',
       tagline: props.tagline ?? '',
       design,
+      ...(options.look === 'launch' && options.drawings ? { drawings: new Map(Object.entries(options.drawings)) } : {}),
     });
     const frameIds = new Set(packets.map((packet) => packet.frameId));
     const windows = new Map(

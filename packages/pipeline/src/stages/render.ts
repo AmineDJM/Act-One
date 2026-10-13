@@ -129,6 +129,8 @@ import {
 import { masterTermsFor, planAllows, planFor } from '../entitlements.ts';
 import { narrate } from '../narration.ts';
 import { captionFilm, NO_CAPTIONS, type FilmCaptions } from './captions.ts';
+import type { LlmProvider } from '@act-one/providers';
+import { readInterfaces } from './interface-drawings.ts';
 import { scoreFilm } from './score.ts';
 
 /**
@@ -1393,6 +1395,17 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
     }
   }
   const workers = captureWorkers();
+  // The launch look draws the product's interface back up before showing it: the captures it would, read.
+  const read =
+    settings.look === 'launch' && render.kind !== 'animatic'
+      ? await readInterfaces(context, options.props.storyboard, {
+          scenes: settings.interfaceDrawings,
+          budgetUsd: settings.interfaceDrawingBudgetUsd,
+          llm: readerFor(context),
+          workDir: path.dirname(options.outputPath),
+        })
+      : null;
+  for (const note of read?.notes ?? []) console.log(`[render:hyperframes] ${render.id} interface: ${note}`);
   const result = await renderFilmWithHyperFrames({
     ...options,
     author: {
@@ -1409,6 +1422,7 @@ async function drawFilm(context: StageContext, render: Render, options: RenderFi
     },
     look: settings.look,
     signature: { scenes: settings.signatureScenes, budgetUsd: settings.signatureBudgetUsd },
+    ...(read && read.drawings.size > 0 ? { drawings: Object.fromEntries(read.drawings) } : {}),
     ...(workers ? { concurrency: workers } : {}),
     log: (line) => console.log(`[render:hyperframes] ${render.id} ${line}`),
   });
@@ -1458,6 +1472,15 @@ export { filmEngine };
  * Only when the operator asked for it, and never for an animatic: a preview
  * the review may send back is the last place to spend a call per scene.
  */
+/** The model that reads captures, when one is configured; without one, captures are shown as captured. */
+function readerFor(context: StageContext): LlmProvider | null {
+  try {
+    return context.registry.llm();
+  } catch {
+    return null;
+  }
+}
+
 export function agentWritesScenes(
   settings: { sceneAuthor: 'engine' | 'agent'; look?: 'classic' | 'launch'; signatureScenes?: number; signatureBudgetUsd?: number },
   kind: Render['kind'],

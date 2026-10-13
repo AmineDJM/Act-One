@@ -353,7 +353,9 @@ export function validationContextFor(packet: ScenePacket): ValidationContext {
   for (const source of layerSources(packet.uiSequence)) allowedPaths.add(source);
 
   const endCard = packet.recipe.name === 'cta_end_card' || packet.recipe.name === 'logo_reveal' || packet.isFinalScene;
-  const texts = [...packet.onScreenText, packet.brand.name, packet.brand.cta, ...(endCard ? [packet.brand.tagline] : [])];
+  // A redrawn interface shows the capture's own words, each one found there by OCR.
+  const drawn = [...(packet.drawing?.nodes ?? []).flatMap((node) => (node.text ? [node.text] : [])), ...(packet.drawing?.focus?.typed ? [packet.drawing.focus.typed] : [])];
+  const texts = [...packet.onScreenText, packet.brand.name, packet.brand.cta, ...(endCard ? [packet.brand.tagline] : []), ...drawn];
   return {
     frameId: packet.frameId,
     mountedSeconds: packet.timing.mountedSeconds,

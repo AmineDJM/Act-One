@@ -24,3 +24,4 @@ export * from './gemini/run.ts';
 export * from './gemini/merge.ts';
 export * from './analyze.ts';
 export * from './library.ts';
+export * from './forensics/read-text.ts';

@@ -1,4 +1,4 @@
-import { sceneWindows, type Scene, type Storyboard, type UiSequence } from '@act-one/core';
+import { sceneWindows, type Scene, type Storyboard, type UiDrawing, type UiSequence } from '@act-one/core';
 import type { DesignTokens } from '@act-one/design';
 import type { StagedAsset } from './assets.ts';
 import type { Canvas } from './canvas.ts';
@@ -17,6 +17,8 @@ export type PacketInput = {
   tagline: string;
   /** The tokens the type is set with: the authoring canvas's, the same the Remotion engine lays out with at HD. */
   design: DesignTokens;
+  /** Captures read into parts, by asset id: a scene whose first picture is one draws it back up (launch look). */
+  drawings?: ReadonlyMap<string, UiDrawing>;
 };
 
 /** The composition id of the scene at `index`: stable, sortable, safe as a file name. */
@@ -86,6 +88,7 @@ export function buildPackets(input: PacketInput): ScenePacket[] {
         FILMED_RECIPES.has(scene.motionRecipe.name) && assets[0]?.kind === 'image' && filmedSequence(scene.uiSequence ?? null) !== null
           ? inFrameWords(scene.onScreenText, input.design)
           : null,
+      drawing: assets[0]?.kind === 'image' ? (input.drawings?.get(assets[0].id) ?? null) : null,
       brand: { name: input.brandName, logo: input.logo, cta: input.cta, tagline: input.tagline },
       isFinalScene: position === scenes.length - 1,
     } satisfies ScenePacket;

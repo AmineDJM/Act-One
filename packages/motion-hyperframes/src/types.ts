@@ -1,4 +1,4 @@
-import type { AspectRatio, CameraRecipe, EasingName, Handover, MotionRecipeName, VisualType } from '@act-one/core';
+import type { AspectRatio, CameraRecipe, EasingName, Handover, MotionRecipeName, UiDrawing, VisualType } from '@act-one/core';
 import type { StagedAsset } from './assets.ts';
 import type { ProductWindowBox } from './studio.ts';
 import type { InFrameWords, Typeset } from './typeset.ts';
@@ -55,6 +55,12 @@ export type ScenePacket = {
   productWindow: ProductWindowBox | null;
   /** The scene's words when the capture is filmed as its framings (see uiSequence); null otherwise. */
   inFrameWords: InFrameWords | null;
+  /**
+   * The scene's first picture read into parts, when production read it: the
+   * launch look draws the interface back up from these before the capture
+   * itself. Its words are the ones an OCR model found in the capture.
+   */
+  drawing: UiDrawing | null;
   brand: {
     name: string;
     logo: StagedAsset | null;

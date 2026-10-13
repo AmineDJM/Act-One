@@ -63,3 +63,4 @@ export * from './domain/editorial.ts';
 export * from './domain/speech-usage.ts';
 export * from './domain/collaboration.ts';
 export * from './domain/credentials.ts';
+export * from './domain/ui-drawing.ts';
