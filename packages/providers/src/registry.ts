@@ -101,7 +101,14 @@ const CuratedProfiles = z.object({
  * never grades itself.
  */
 const SpeechConfig = z.object({
-  primary: SpeechEngine.default('openai-speech'),
+  /**
+   * ElevenLabs by default: a narrated film is heard before it is watched, and
+   * its voice (eleven_v3) is what a viewer judges the film by. Without a key
+   * the film is still voiced, by OpenAI (see buildSpeech). With one, the same
+   * key also composes the film's music and builds its effects (scoreFilm):
+   * about $2.30 a 45-second film at the vendor's studio rates.
+   */
+  primary: SpeechEngine.default('elevenlabs'),
   preview: z.enum(['same', 'openai-speech', 'elevenlabs']).default('same'),
   recognizer: SpeechEngine.default('openai-speech'),
   enabled: z.boolean().default(true),
