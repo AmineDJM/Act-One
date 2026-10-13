@@ -153,7 +153,8 @@ async function launchCdpChromium(): Promise<{
       `--host-resolver-rules=MAP ${HOST} 127.0.0.1`,
       'about:blank',
     ],
-    { stdio: ['ignore', 'ignore', 'pipe'] },
+    // A group of its own, so the renderer and GPU helpers go down with it (see stopChrome).
+    { stdio: ['ignore', 'ignore', 'pipe'], detached: true },
   );
   const wsUrl = await new Promise<string>((resolve, reject) => {
     let log = '';
@@ -299,18 +300,22 @@ describe('Browserbase', () => {
     let chrome: { child: ChildProcess; wsUrl: string; profile: string } | null = null;
 
     /*
-     * Chrome writes into its profile until the moment it is gone: a profile
-     * removed straight after the kill signal raced it and, now and then,
-     * failed with ENOTEMPTY. The process is waited out first; the retries
-     * cover files the system is still closing.
+     * Chrome writes into its profile until the moment it is gone — and it is
+     * not one process: its renderer and GPU helpers outlive a kill of the
+     * main one and keep writing, so removing the profile raced them and,
+     * now and then, failed with ENOTEMPTY. The whole process group is killed
+     * and the main process waited out; the retries cover files the system is
+     * still closing.
      */
     const stopChrome = async (running: { child: ChildProcess; profile: string }) => {
-      if (running.child.exitCode === null && running.child.signalCode === null) {
-        const exited = once(running.child, 'exit');
+      const exited = running.child.exitCode === null && running.child.signalCode === null ? once(running.child, 'exit') : null;
+      try {
+        if (running.child.pid) process.kill(-running.child.pid, 'SIGKILL');
+      } catch {
         running.child.kill('SIGKILL');
-        await exited;
       }
-      rmSync(running.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      await exited;
+      rmSync(running.profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     };
 
     afterAll(async () => {
