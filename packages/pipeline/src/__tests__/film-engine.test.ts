@@ -23,9 +23,9 @@ afterEach(() => {
 });
 
 describe('the film engine', () => {
-  it('is Remotion unless the operator chose otherwise', () => {
-    expect(filmEngine(contextWith())).toBe('remotion');
-    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'remotion', sceneAuthor: 'engine', look: 'classic', signatureScenes: 0, signatureBudgetUsd: 0.25, interfaceDrawings: 2, interfaceDrawingBudgetUsd: 0.05, sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
+  it('is HyperFrames in the launch look unless the operator chose otherwise', () => {
+    expect(filmEngine(contextWith())).toBe('hyperframes');
+    expect(ProviderConfig.parse({}).render).toEqual({ engine: 'hyperframes', sceneAuthor: 'engine', look: 'launch', signatureScenes: 0, signatureBudgetUsd: 0.25, interfaceDrawings: 2, interfaceDrawingBudgetUsd: 0.05, sceneAuthorTier: 'deep', maxSceneAttempts: 3 });
     expect(ProviderConfig.parse({ render: { look: 'launch' } }).render.look).toBe('launch');
     expect(ProviderConfig.safeParse({ render: { look: 'loud' } }).success).toBe(false);
     expect(filmEngine(contextWith('hyperframes'))).toBe('hyperframes');

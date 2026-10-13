@@ -126,7 +126,14 @@ export type SpeechConfig = z.infer<typeof SpeechConfig>;
 /**
  * Which engine draws the film.
  *
- * Remotion is the reference: every scene is one of Act One's own components.
+ * HyperFrames in the launch look, by default: the platform's film. Measured
+ * before it became the default — upright, square and wide films of the same
+ * storyboard passing HyperFrames' own checks without a warning, and costing
+ * 1.3 times a classic film's render, no longer twice (see launchBackdrop's
+ * plates). Remotion remains the reference the classic look was ported from,
+ * one setting away, and a worker can pin either (ACT_ONE_FILM_ENGINE).
+ *
+ * Remotion: every scene is one of Act One's own components.
  * HyperFrames draws the same scenes with its port of those components and
  * renders them with the pinned HyperFrames CLI; the hero shortlist is drawn by
  * the same engine as the film. It can instead have a model write each scene
@@ -134,7 +141,7 @@ export type SpeechConfig = z.infer<typeof SpeechConfig>;
  * Remotion render, comes out no closer to it than the port does.
  */
 const RenderConfig = z.object({
-  engine: z.enum(['remotion', 'hyperframes']).default('remotion'),
+  engine: z.enum(['remotion', 'hyperframes']).default('hyperframes'),
   /**
    * Who writes a HyperFrames scene: the engine's port of the Remotion
    * component, for nothing, or a model, paid per scene. An animatic is drawn
@@ -149,7 +156,7 @@ const RenderConfig = z.object({
    * on tilted cards, chapters, chips, a closing mark in orbit. Drawn by the
    * engine either way, for nothing.
    */
-  look: z.enum(['classic', 'launch']).default('classic'),
+  look: z.enum(['classic', 'launch']).default('launch'),
   /**
    * In the launch look, how many of a film's moments a model writes — the
    * opening line, then the chapters — and the most a film may spend on them.
