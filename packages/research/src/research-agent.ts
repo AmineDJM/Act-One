@@ -18,6 +18,8 @@ import { PolicyViolation, policyForPublicResearch, withFallback } from '@act-one
 import { expandPlan, initialPlan, type PageIntent, type PlannedPage } from './crawl-plan.ts';
 import { dedupeEvidence, extractEvidence, extractMeta } from './evidence.ts';
 import { extractBrandSystem } from './brand-extractor.ts';
+import { keepDrawnLogos } from './logo-ink.ts';
+import { siteName } from './site-name.ts';
 import { extractCommunication } from './brand-communication.ts';
 import { synthesiseUnderstanding, understandingConfidence } from './understanding.ts';
 import { assessCapture, cropToFold, previewForModel } from './capture-quality.ts';
@@ -210,12 +212,14 @@ export class ProductResearchAgent {
     progress({ fraction: 0.62, message: 'Reading the brand' });
 
     const homepage = captures[0]!;
-    const brand = extractBrandSystem({
-      organizationId: input.organizationId,
-      name: input.brandName ?? hostLabel(root),
-      captures,
-      themeColor: extractMeta(homepage.html).themeColor,
-    });
+    const brand = await keepDrawnLogos(
+      extractBrandSystem({
+        organizationId: input.organizationId,
+        name: input.brandName ?? siteName(homepage.html, root),
+        captures,
+        themeColor: extractMeta(homepage.html).themeColor,
+      }),
+    );
 
     progress({ fraction: 0.7, message: 'Gathering evidence' });
 
@@ -609,14 +613,4 @@ function productImageLabel(capture: PageCapture, alt: string, shows: string): st
   const where = pageLabel(capture.url, '').replace(/ \(.*\)$/, '');
   const detail = shows || alt;
   return detail ? `product image on ${where} — ${detail.slice(0, 160)}` : `product image on ${where}`;
-}
-
-function hostLabel(url: string): string {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, '');
-    const name = host.split('.')[0] ?? host;
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  } catch {
-    return 'Product';
-  }
 }

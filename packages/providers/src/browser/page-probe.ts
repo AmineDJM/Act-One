@@ -22,7 +22,8 @@ export function probeDocument(): {
     spacingScale: number[];
     hasGradients: boolean;
     hasGlow: boolean;
-    logoCandidates: { src: string; alt: string; width: number; height: number }[];
+    /** Best first, by the evidence that each is the brand's mark; only those with more for than against. */
+    logoCandidates: { src: string; alt: string; width: number; height: number; score: number }[];
     maxHeadingSizePx: number;
     bodySizePx: number;
     /** Small inline SVGs by how they are drawn: stroked outlines, or filled shapes. */
@@ -36,10 +37,54 @@ export function probeDocument(): {
   // serialises this single function and evaluates it in the page, where module
   // scope does not exist. A helper declared outside is silently undefined at
   // runtime, which takes down the whole capture.
-  const inlineSvgMarkup = (svg: SVGElement): string => {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const XLINK_NS = 'http://www.w3.org/1999/xlink';
+  const DRAWN = 'path, rect, circle, ellipse, polygon, polyline, line, text, image';
+
+  // The <svg> as a file of its own, or null when the copy would draw nothing.
+  // A sprite icon is a <use> pointing at a <symbol> elsewhere in the page, and
+  // a gradient fill names a <linearGradient> the same way: copied alone, the
+  // <svg> loses them and renders empty. The elements it refers to travel with
+  // it in a <defs>; a reference that cannot (another file, or an id the page
+  // does not have) means the copy is not the mark the page shows.
+  const inlineSvgMarkup = (svg: SVGElement): string | null => {
     const clone = svg.cloneNode(true) as SVGElement;
     if (!clone.getAttribute('xmlns')) {
-      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('xmlns', SVG_NS);
+    }
+    const carried = new Set<string>();
+    let defs: Element | null = null;
+    const pending: Element[] = [clone, ...Array.from(clone.querySelectorAll('*'))];
+    while (pending.length > 0) {
+      const element = pending.shift()!;
+      const references: string[] = [];
+      if (element.tagName.toLowerCase() === 'use') {
+        const href = element.getAttribute('href') ?? element.getAttributeNS(XLINK_NS, 'href') ?? '';
+        if (!href.startsWith('#')) return null;
+        references.push(href.slice(1));
+      }
+      for (const name of ['fill', 'stroke', 'clip-path', 'mask', 'filter', 'style']) {
+        for (const match of (element.getAttribute(name) ?? '').matchAll(/url\(\s*['"]?#([^'")\s]+)['"]?\s*\)/g)) {
+          references.push(match[1]!);
+        }
+      }
+      for (const id of references) {
+        if (carried.has(id) || Array.from(clone.querySelectorAll('[id]')).some((node) => node.id === id)) continue;
+        const target = document.getElementById(id);
+        if (!target || target.namespaceURI !== SVG_NS || carried.size >= 32) return null;
+        carried.add(id);
+        if (!defs) {
+          defs = document.createElementNS(SVG_NS, 'defs');
+          clone.insertBefore(defs, clone.firstChild);
+        }
+        const copy = target.cloneNode(true) as Element;
+        defs.appendChild(copy);
+        pending.push(copy, ...Array.from(copy.querySelectorAll('*')));
+      }
+    }
+    if (!clone.querySelector(DRAWN)) return null;
+    if (clone.querySelector('[*|href]') && !clone.getAttribute('xmlns:xlink')) {
+      clone.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xlink', XLINK_NS);
     }
     // A logo that inherits currentColor renders black-on-black once it leaves
     // the page, so resolve it to what the browser actually painted.
@@ -189,45 +234,149 @@ export function probeDocument(): {
         : ('body' as const),
   }));
 
-  const logoCandidates = Array.from(document.querySelectorAll<Element>('img, svg'))
-    .filter((node) => {
-      const rect = node.getBoundingClientRect();
-      if (rect.top > 400 || rect.width < 16 || rect.width > 520) return false;
-      const haystack = [
-        node.getAttribute('alt') ?? '',
-        node.getAttribute('class') ?? '',
-        node.getAttribute('id') ?? '',
-        node.getAttribute('src') ?? '',
-        node.getAttribute('aria-label') ?? '',
-        node.closest('a')?.getAttribute('href') ?? '',
-      ]
-        .join(' ')
-        .toLowerCase();
-      return /logo|brand|wordmark/.test(haystack) || node.closest('header') !== null;
-    })
-    .slice(0, 8)
-    .map((node) => {
-      const rect = node.getBoundingClientRect();
+  // The logo, by the evidence for it rather than by where it sits. A header
+  // holds the mark and also the search glass, the menu toggle, the language
+  // picker and the theme switch; taking whatever <svg> comes first put a
+  // magnifying glass — or nothing at all — where a brand's mark belongs. Each
+  // candidate is scored on what a logo is: the link home, the name "logo" or
+  // "brand", the site's own name; and against what an icon is. Only the ones
+  // with more for than against are kept, best first.
+  const siteHost = location.hostname.replace(/^www\./, '').toLowerCase();
+  const siteWord = (() => {
+    const labels = siteHost.split('.');
+    if (labels.length < 2) return labels[0] ?? '';
+    const second = labels[labels.length - 2]!;
+    return labels.length >= 3 && /^(co|com|net|org|gov|ac|edu)$/.test(second) ? labels[labels.length - 3]! : second;
+  })();
+  const LOGO_WORDS = /logo|brand|wordmark/;
+  const ICON_WORDS =
+    /(^|[^a-z])(search|menu|hamburger|burger|close|toggle|toggler|theme|cart|basket|user|account|avatar|profile|login|signin|chevron|arrow|caret|bell|notifications?|globe|languages?|lang|flag|twitter|facebook|github|linkedin|youtube|instagram|mastodon|discord|rss|share|play|external|download|spinner|loader)([^a-z]|$)/;
+  const ICON_CLASSES = /(^|\s)(icon|bi|fa[srlbd]?|material-icons|material-symbols|lucide|feather|octicon|svg-inline--fa|glyphicon)([-_\s]|$)/;
+  const linksHome = (node: Element): boolean => {
+    const anchor = node.closest('a[href]') as HTMLAnchorElement | null;
+    if (!anchor) return false;
+    try {
+      const target = new URL(anchor.href, location.href);
+      return (
+        target.hostname.replace(/^www\./, '').toLowerCase() === siteHost &&
+        /^\/(?:[a-z]{2}(?:[-_][a-z]{2})?\/?)?(?:index\.[a-z]+)?$/i.test(target.pathname)
+      );
+    } catch {
+      return false;
+    }
+  };
+  type LogoCandidate = { src: string; alt: string; width: number; height: number; score: number; left: number; top: number };
+  const scoreLogo = (node: Element, rect: DOMRect, words: string, classes: string): number => {
+    const hasLogoWord = LOGO_WORDS.test(words);
+    const hasSiteWord = siteWord.length >= 2 && words.includes(siteWord);
+    let score = 0;
+    if (linksHome(node)) score += 3;
+    if (hasLogoWord) score += 3;
+    if (hasSiteWord) score += 2;
+    if (node.closest('header, [role="banner"], nav')) score += 1;
+    if (rect.left < window.innerWidth / 3) score += 1;
+    if (!hasSiteWord && (ICON_WORDS.test(words) || ICON_CLASSES.test(classes))) score -= 6;
+    if (node.closest('button')) score -= 3;
+    if (!hasLogoWord && !hasSiteWord && rect.width <= 32 && rect.height <= 32 && Math.abs(rect.width - rect.height) <= 4) score -= 3;
+    return score;
+  };
+  const describe = (node: Element): { words: string; classes: string } => {
+    const anchor = node.closest('a');
+    const parent = node.parentElement;
+    const classes = [node.getAttribute('class') ?? '', parent?.getAttribute('class') ?? ''].join(' ').toLowerCase();
+    const words = [
+      node.getAttribute('alt') ?? '',
+      node.getAttribute('id') ?? '',
+      node.getAttribute('src') ?? '',
+      node.getAttribute('aria-label') ?? '',
+      node.getAttribute('title') ?? '',
+      node.querySelector('title')?.textContent ?? '',
+      ...Array.from(node.querySelectorAll('use')).map((use) => use.getAttribute('href') ?? use.getAttributeNS(XLINK_NS, 'href') ?? ''),
+      anchor?.getAttribute('class') ?? '',
+      anchor?.getAttribute('id') ?? '',
+      anchor?.getAttribute('aria-label') ?? '',
+      classes,
+    ]
+      .join(' ')
+      .toLowerCase();
+    return { words, classes };
+  };
+  const inView = (node: Element, rect: DOMRect): boolean => {
+    if (rect.top > 400 || rect.width < 16 || rect.width > 520 || rect.height < 8) return false;
+    const style = getComputedStyle(node);
+    return style.visibility !== 'hidden' && parseFloat(style.opacity || '1') > 0.05;
+  };
+  const drawnCandidates: LogoCandidate[] = [];
+  for (const node of Array.from(document.querySelectorAll<Element>('img, svg'))) {
+    const rect = node.getBoundingClientRect();
+    if (!inView(node, rect) || node.closest('footer')) continue;
+    const isSvg = node.tagName.toLowerCase() === 'svg';
+    if (isSvg && node.parentElement?.closest('svg')) continue;
+    let src = '';
+    if (isSvg) {
+      // Laid out and still nothing inside it: a <use> whose symbol is missing.
+      try {
+        const box = (node as SVGGraphicsElement).getBBox();
+        if (box.width * box.height <= 0) continue;
+      } catch {
+        continue;
+      }
+      const markup = inlineSvgMarkup(node as SVGElement);
+      if (!markup) continue;
       // Inline <svg> is how most well-built sites ship their logo, and it has
       // no src at all. Serialising it to a data URL is the only way to get the
       // real mark rather than falling back to a screenshot crop — and it is
       // vector, which is what a 4K logo reveal needs.
       // percent-encoded rather than base64: btoa throws on any non-Latin-1
       // character, and logos carry ™, © and accented wordmarks routinely.
-      const src =
-        node.tagName.toLowerCase() === 'svg'
-          ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-              inlineSvgMarkup(node as SVGElement),
-            )}`
-          : node.getAttribute('src') ?? node.getAttribute('data-src') ?? '';
-      return {
-        src,
-        alt: node.getAttribute('alt') ?? node.getAttribute('aria-label') ?? '',
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-      };
-    })
-    .filter((candidate) => candidate.src.length > 0 && candidate.src.length < 200_000);
+      src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+    } else {
+      const image = node as HTMLImageElement;
+      // Loaded and nothing decoded: a broken picture is not a logo.
+      if (image.complete && image.naturalWidth === 0 && (image.currentSrc || image.src)) continue;
+      src = image.currentSrc || node.getAttribute('src') || node.getAttribute('data-src') || '';
+    }
+    const { words, classes } = describe(node);
+    drawnCandidates.push({
+      src,
+      alt: node.getAttribute('alt') ?? node.getAttribute('aria-label') ?? node.querySelector('title')?.textContent?.trim() ?? '',
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      score: scoreLogo(node, rect, words, classes),
+      left: rect.left,
+      top: rect.top,
+    });
+  }
+  // A mark painted as a CSS background on the link home — kde.org ships its
+  // logo this way, with no <img> or <svg> anywhere near it. Only an element
+  // that says it is the logo, or links home, is read: backgrounds are
+  // everywhere else too.
+  for (const node of Array.from(document.querySelectorAll<HTMLElement>('header a, header div, header span, nav a, [role="banner"] a, a[class*="logo"], a[class*="brand"], div[class*="logo"], span[class*="logo"]')).slice(0, 400)) {
+    const rect = node.getBoundingClientRect();
+    if (!inView(node, rect) || node.closest('footer')) continue;
+    const background = getComputedStyle(node).backgroundImage;
+    const url = /url\(\s*['"]?([^'")]+)['"]?\s*\)/.exec(background ?? '')?.[1];
+    if (!url) continue;
+    const { words, classes } = describe(node);
+    const evidence = LOGO_WORDS.test(words) || linksHome(node);
+    if (!evidence) continue;
+    drawnCandidates.push({
+      src: url,
+      alt: node.getAttribute('aria-label') ?? node.getAttribute('title') ?? '',
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      score: scoreLogo(node, rect, `${words} ${url.toLowerCase()}`, classes),
+      left: rect.left,
+      top: rect.top,
+    });
+  }
+  const seenLogos = new Set<string>();
+  const logoCandidates = drawnCandidates
+    .filter((candidate) => candidate.score > 0 && candidate.src.length > 0 && candidate.src.length < 200_000)
+    .sort((a, b) => b.score - a.score || a.top - b.top || a.left - b.left)
+    .filter((candidate) => !seenLogos.has(candidate.src) && Boolean(seenLogos.add(candidate.src)))
+    .slice(0, 8)
+    .map(({ src, alt, width, height, score }) => ({ src, alt, width, height, score }));
 
   const bodySizePx =
     Array.from(bodySizes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 16;

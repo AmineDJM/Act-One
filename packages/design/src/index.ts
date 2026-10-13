@@ -5,3 +5,4 @@ export * from './layout.ts';
 export * from './tokens.ts';
 export * from './svg.ts';
 export * from './plot.ts';
+export * from './mark.ts';

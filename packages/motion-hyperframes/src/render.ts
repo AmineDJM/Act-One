@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { ASPECT_DIMENSIONS, DEFAULT_FPS, sceneWindows, storyboardDuration } from '@act-one/core';
-import { resolveTokens, watermark } from '@act-one/design';
+import { readMark, resolveTokens, showsAMark, watermark } from '@act-one/design';
 import type { RenderFilmOptions, RenderFilmResult } from '@act-one/motion';
 import type { CallContext, LlmProvider, LlmTier } from '@act-one/providers';
 import { writeProject } from './assemble.ts';
@@ -208,7 +208,7 @@ export async function renderFilmWithHyperFrames(options: HyperFramesRenderOption
     for (const id of footageHint) {
       if (staged.get(id)?.kind === 'image') notes.push(`${id} was listed as footage but is a still picture; it is placed as one.`);
     }
-    const logo = logoOf(options, staged, failed, notes);
+    const logo = await logoOf(options, staged, failed, notes, projectDir);
     const referenced = new Set(referencedAssetIds(storyboard));
     const undecodable = failed.filter((failure) => referenced.has(failure.id)).map((failure) => `${failure.id} (${failure.url}): ${failure.reason}`);
     for (const line of undecodable) log(`asset refused: ${line}`);
@@ -418,16 +418,43 @@ function assetRequests(options: HyperFramesRenderOptions): AssetRequest[] {
   return requests;
 }
 
-function logoOf(options: HyperFramesRenderOptions, staged: ReadonlyMap<string, StagedAsset>, failed: readonly AssetFailure[], notes: string[]): StagedAsset | null {
+async function logoOf(
+  options: HyperFramesRenderOptions,
+  staged: ReadonlyMap<string, StagedAsset>,
+  failed: readonly AssetFailure[],
+  notes: string[],
+  projectDir: string,
+): Promise<StagedAsset | null> {
   const logo = options.props.brand.logo;
   if (!logo) return null;
   const id = logo.assetId && options.props.assetUrls[logo.assetId] ? logo.assetId : logo.url ? LOGO_ID : null;
   if (!id) return null;
   const asset = staged.get(id);
-  if (asset?.kind === 'image') return asset;
+  if (asset?.kind === 'image') {
+    // A picture that decodes is not yet a mark: a sprite icon copied without
+    // its symbol is a valid, empty SVG, and it put a blank disc on an end card.
+    if (await drawsAMark(path.join(projectDir, asset.path))) return asset;
+    notes.push('The logo draws nothing (an empty or flat picture); the brand name is set in its place.');
+    return null;
+  }
   const failure = failed.find((candidate) => candidate.id === id);
   notes.push(`The logo could not be placed (${failure?.reason ?? 'not a picture'}); the brand name is set in its place.`);
   return null;
+}
+
+/** Whether the picture at `file` shows a mark, read at 256 px from its own pixels. */
+export async function drawsAMark(file: string): Promise<boolean> {
+  try {
+    const { data, info } = await sharp(file, { limitInputPixels: 20_000 * 20_000, density: 96 })
+      .resize(256, 256, { fit: 'inside', withoutEnlargement: false })
+      .toColourspace('srgb')
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return info.channels === 4 && showsAMark(readMark(data, info.width, info.height));
+  } catch {
+    return false;
+  }
 }
 
 /**

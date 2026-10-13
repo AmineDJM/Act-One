@@ -71,7 +71,8 @@ export type StyleProfile = {
   spacingScale: number[];
   hasGradients: boolean;
   hasGlow: boolean;
-  logoCandidates: { src: string; alt: string; width: number; height: number }[];
+  /** Best first. `score` is the evidence each is the brand's mark; absent from captures made before it was measured. */
+  logoCandidates: { src: string; alt: string; width: number; height: number; score?: number }[];
   maxHeadingSizePx: number;
   bodySizePx: number;
   /** Small inline SVGs by how they are drawn. Absent from captures made before it was measured. */

@@ -349,7 +349,7 @@ function pickLogo(captures: PageCapture[]): BrandLogo | null {
 }
 
 function allLogos(captures: PageCapture[]): BrandLogo[] {
-  const logos: BrandLogo[] = [];
+  const logos: { logo: BrandLogo; score: number }[] = [];
   for (const capture of captures) {
     for (const candidate of capture.styleProfile?.logoCandidates ?? []) {
       const url = absolutize(capture.url, candidate.src);
@@ -364,17 +364,63 @@ function allLogos(captures: PageCapture[]): BrandLogo[] {
           : /^data:image\/jpe?g/i.test(url) || /\.jpe?g(\?|$)/i.test(url)
             ? 'jpg'
             : 'unknown';
+      if (/^data:image\/svg\+xml/i.test(url) && !inlineSvgDraws(url)) continue;
       logos.push({
-        assetId: null,
-        url,
-        background: 'any',
-        format,
-        aspectRatio: candidate.height > 0 ? candidate.width / candidate.height : 1,
+        logo: {
+          assetId: null,
+          url,
+          background: 'any',
+          format,
+          aspectRatio: candidate.height > 0 ? candidate.width / candidate.height : 1,
+        },
+        score: candidate.score ?? 0,
       });
     }
   }
-  // SVG first: it is the only format that survives a 4K logo reveal.
-  return dedupeLogos(logos).sort((a, b) => (a.format === 'svg' ? -1 : 0) - (b.format === 'svg' ? -1 : 0));
+  // The likeliest mark first, by the evidence the page gave for it; between
+  // equals, SVG, the only format that survives a 4K logo reveal.
+  return dedupeLogos(
+    logos
+      .map((entry, order) => ({ ...entry, order }))
+      .sort((a, b) => b.score - a.score || svgFirst(a.logo) - svgFirst(b.logo) || a.order - b.order)
+      .map((entry) => entry.logo),
+  );
+}
+
+function svgFirst(logo: BrandLogo): number {
+  return logo.format === 'svg' ? 0 : 1;
+}
+
+const DRAWN_ELEMENT = /<(path|rect|circle|ellipse|polygon|polyline|line|text|image)\b/i;
+
+/**
+ * Whether an inline SVG mark draws anything once it is a file of its own.
+ *
+ * A sprite icon copied out of a page is an <svg> holding a <use> that points
+ * at a symbol the page kept elsewhere: as a file it is empty. Captures made
+ * before the probe carried those symbols across still hold such copies, and
+ * one of them — a search glass that drew nothing — was a film's logo. A mark
+ * with no shape in it, or a reference to an element it does not contain, or
+ * to another file, is not a mark.
+ */
+export function inlineSvgDraws(dataUrl: string): boolean {
+  const comma = dataUrl.indexOf(',');
+  if (comma < 0) return false;
+  let markup: string;
+  try {
+    markup = /;base64$/i.test(dataUrl.slice(0, comma))
+      ? Buffer.from(dataUrl.slice(comma + 1), 'base64').toString('utf8')
+      : decodeURIComponent(dataUrl.slice(comma + 1));
+  } catch {
+    return false;
+  }
+  if (!DRAWN_ELEMENT.test(markup)) return false;
+  const ids = new Set([...markup.matchAll(/\sid\s*=\s*["']([^"']+)["']/gi)].map((match) => match[1]!));
+  for (const match of markup.matchAll(/<use\b[^>]*?\s(?:xlink:)?href\s*=\s*["']([^"']*)["']/gi)) {
+    const href = match[1]!;
+    if (!href.startsWith('#') || !ids.has(href.slice(1))) return false;
+  }
+  return true;
 }
 
 function dedupeLogos(logos: BrandLogo[]): BrandLogo[] {

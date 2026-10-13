@@ -10,3 +10,5 @@ export * from './public-captures.ts';
 export { assessCapture, fitForRender, type CaptureAssessment } from './capture-quality.ts';
 export { readUiStructure, findControls, type UiRegion, type UiStructure } from './ui-structure.ts';
 export { normalizeUrl, registrableDomainOf, pathOf, absolutize } from './url.ts';
+export { siteName } from './site-name.ts';
+export { keepDrawnLogos, dataUrlDrawsAMark } from './logo-ink.ts';
