@@ -339,6 +339,7 @@ export async function encodeFrames(framesDir: string, outputPath: string, spec: 
     throw new MediaError(`the frames are not one numbered sequence (${first.name} to ${last.name} for ${spec.frames} frames)`);
   }
 
+  await uniformFrames(numbered.map((entry) => path.join(framesDir, entry.name)));
   const drawn = await pngSize(path.join(framesDir, first.name));
   const scaled = drawn.width !== spec.width || drawn.height !== spec.height;
   const filters = [
@@ -377,18 +378,49 @@ const FRAME_FILE = /^frame_(\d+)\.png$/;
 
 /** A PNG's size, from its header: the width and height of the IHDR chunk. */
 export async function pngSize(file: string): Promise<{ width: number; height: number }> {
+  const { width, height } = await pngHeader(file);
+  return { width, height };
+}
+
+/** PNG colour type 6: every pixel carries its own alpha. */
+const PNG_RGBA = 6;
+
+/** A PNG's IHDR: its size, and how its pixels are stored (colour type 2 is RGB, 6 is RGBA). */
+export async function pngHeader(file: string): Promise<{ width: number; height: number; colourType: number }> {
   const handle = await open(file, 'r');
   try {
-    const header = Buffer.alloc(24);
-    const { bytesRead } = await handle.read(header, 0, 24, 0);
+    const header = Buffer.alloc(26);
+    const { bytesRead } = await handle.read(header, 0, 26, 0);
     const signature = header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-    if (bytesRead < 24 || !signature || header.toString('ascii', 12, 16) !== 'IHDR') {
+    if (bytesRead < 26 || !signature || header.toString('ascii', 12, 16) !== 'IHDR') {
       throw new MediaError(`${path.basename(file)} is not a PNG frame`);
     }
-    return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) };
+    return { width: header.readUInt32BE(16), height: header.readUInt32BE(20), colourType: header[25]! };
   } finally {
     await handle.close();
   }
+}
+
+/**
+ * Every frame of a sequence stored the same way: RGBA.
+ *
+ * The renderer writes a frame with nothing transparent in it as plain RGB —
+ * which a frame becomes when the camera fills the picture with a screen. A
+ * decoder that meets that change mid-sequence rebuilds the encode's filter
+ * graph, and the plates under the frames start over and run out: a 67-second
+ * film came out 10 seconds long. The few frames stored otherwise are given an
+ * opaque alpha in place; the header alone says which.
+ */
+export async function uniformFrames(files: readonly string[]): Promise<number> {
+  let rewritten = 0;
+  for (const file of files) {
+    if ((await pngHeader(file)).colourType === PNG_RGBA) continue;
+    const temporary = `${file}.rgba.png`;
+    await sharp(file).ensureAlpha(1).png({ compressionLevel: 1 }).toFile(temporary);
+    await rename(temporary, file);
+    rewritten += 1;
+  }
+  return rewritten;
 }
 
 export type DeliveryTarget = {

@@ -4,7 +4,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { runFfmpeg } from '@act-one/sound';
-import { encodeFrames } from '../media.ts';
+import { encodeFrames, pngHeader } from '../media.ts';
 
 /**
  * The launch look's backdrop laid under frames captured without it.
@@ -133,5 +133,28 @@ describe('a film over plates whose changes fall between frames', () => {
     await encodeFrames(frames, out, { fps: 30, frames: 137, width: 32, height: 18, crf: 30, underlay: { stills, first: 0, changes: [{ to: 1, at: 1.37, seconds: 0.75, transition: 'iris' }, { to: 2, at: 3.4167, seconds: 0.6, transition: 'fade' }] } });
     const counted = await runFfmpeg(['-v', 'error', '-i', out, '-map', '0:v', '-f', 'null', '-', '-stats']);
     expect(counted.stderr.match(/frame=\s*(\d+)/g)?.pop()).toMatch(/frame=\s*137$/);
+  }, 120_000);
+  it('keeps every frame when the camera fills some of them with a screen, and the renderer stores those without alpha', async () => {
+    const work = await mkdtemp(path.join(tmpdir(), 'act-one-plate-opaque-'));
+    const frames = path.join(work, 'frames');
+    await mkdir(frames);
+    const clear = await sharp({ create: { width: 32, height: 18, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
+    // The middle of the film is a screen filling the frame: written as plain RGB, as the renderer writes it.
+    const opaque = await sharp({ create: { width: 32, height: 18, channels: 3, background: '#f4f4f4' } }).png().toBuffer();
+    for (let index = 0; index < 120; index += 1) {
+      await sharp(index >= 40 && index < 70 ? opaque : clear).toFile(path.join(frames, `frame_${String(index).padStart(4, '0')}.png`));
+    }
+    expect((await pngHeader(path.join(frames, 'frame_0050.png'))).colourType).toBe(2);
+    const stills = await Promise.all(['#c00000', '#00a040'].map(async (colour, index) => {
+      const file = path.join(work, `p${index}.png`);
+      await sharp({ create: { width: 32, height: 18, channels: 3, background: colour } }).png().toFile(file);
+      return file;
+    }));
+    const out = path.join(work, 'film.mp4');
+    await encodeFrames(frames, out, { fps: 30, frames: 120, width: 32, height: 18, crf: 30, underlay: { stills, first: 0, changes: [{ to: 1, at: 2.5, seconds: 0.5, transition: 'fade' }] } });
+    const counted = await runFfmpeg(['-v', 'error', '-i', out, '-map', '0:v', '-f', 'null', '-', '-stats']);
+    expect(counted.stderr.match(/frame=\s*(\d+)/g)?.pop()).toMatch(/frame=\s*120$/);
+    // The opaque frames were given an alpha, so the sequence is one kind of picture throughout.
+    expect((await pngHeader(path.join(frames, 'frame_0050.png'))).colourType).toBe(6);
   }, 120_000);
 });
